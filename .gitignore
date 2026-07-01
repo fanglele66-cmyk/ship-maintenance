@@ -4,5 +4,8 @@ dist/
 *.log
 .DS_Store
 船舶设备检修助手.html
-public/ship-bg*.jpg
-public/ship-bg*.png
+ship-dashboard-full-src.tar.gz
+*.zip
+public/ship-bg-t.png
+public/ship-bg-transparent.png
+public/ship-bg.jpg
