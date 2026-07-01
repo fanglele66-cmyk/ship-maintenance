@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.workbuddy/
+*.log
+.DS_Store
+船舶设备检修助手.html
+public/ship-bg*.jpg
+public/ship-bg*.png

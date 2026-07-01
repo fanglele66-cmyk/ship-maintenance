@@ -1,0 +1,2832 @@
+<template>
+  <div class="repair-page">
+    <!-- ====== 顶部栏 ====== -->
+    <div class="top-bar">
+      <div class="tb-left">
+        <span class="page-title">检修中心</span>
+        <el-input v-model="keyword" placeholder="搜索事件标题、设备、描述..." clearable size="default" class="search-input">
+          <template #prefix><Icon icon="mdi:magnify" /></template>
+        </el-input>
+      </div>
+    </div>
+
+    <!-- ====== 主体 ====== -->
+    <div class="main-body" :class="{ 'mode-full': detailMode === 'fullscreen' }">
+      <!-- ====== 左侧栏 ====== -->
+      <aside class="sidebar" :class="{ 'collapsed': detailMode === 'fullscreen' }">
+        <div class="filter-area">
+          <div class="f-row">
+            <span class="f-label">设备系统</span>
+            <div class="chips">
+              <button class="chip" :class="{ active: !filters.device }" @click="filters.device = null">全部</button>
+              <button v-for="d in deviceOptions.slice(1)" :key="d.id" class="chip" :class="{ active: filters.device === d.id }" @click="filters.device = d.id">{{ d.name }}</button>
+            </div>
+          </div>
+          <div class="f-row">
+            <span class="f-label">紧急程度</span>
+            <div class="chips">
+              <button class="chip" :class="{ active: !filters.priority }" @click="filters.priority = null">全部</button>
+              <button class="chip pri high" :class="{ active: filters.priority === 'high' }" @click="filters.priority = 'high'"><i></i>高</button>
+              <button class="chip pri medium" :class="{ active: filters.priority === 'medium' }" @click="filters.priority = 'medium'"><i></i>中</button>
+              <button class="chip pri low" :class="{ active: filters.priority === 'low' }" @click="filters.priority = 'low'"><i></i>低</button>
+            </div>
+          </div>
+          <div class="f-row">
+            <span class="f-label">状态</span>
+            <div class="chips">
+              <button class="chip" :class="{ active: !filters.status }" @click="filters.status = null">全部</button>
+              <button v-for="s in statusOptions" :key="s.value" class="chip" :class="{ active: filters.status === s.value }" @click="filters.status = s.value">{{ s.label }}</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-list" ref="listRef">
+          <div
+            v-for="e in filtered"
+            :key="e.id"
+            class="evt-card"
+            :class="[`pri-${e.priority}`, { selected: selectedId === e.id }]"
+            @click="selectEvent(e)"
+          >
+            <span class="ec-bar"></span>
+            <div class="ec-body">
+              <div class="ec-title-row">
+                <span class="ec-title">{{ e.title }}</span>
+                <StatusBadge type="event" :value="e.status" size="small" />
+              </div>
+              <div class="ec-sub-row">
+                <span class="ec-device"><Icon icon="mdi:cube-outline" /> {{ e.deviceName || '--' }}</span>
+                <StatusBadge type="priority" :value="e.priority" />
+              </div>
+              <div class="ec-meta">
+                <span class="ec-source">{{ sourceLabel(e.source) }}</span>
+                <span class="ec-time font-mono-num">{{ e.createdAt }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="!filtered.length" class="empty-list">
+            <Icon icon="mdi:clipboard-text-off-outline" />
+            <span>无匹配事件</span>
+          </div>
+        </div>
+
+        <div class="list-footer">
+          共 <b class="font-mono-num">{{ filtered.length }}</b> 条事件
+          <span v-if="keyword || filters.device || filters.priority || filters.status" class="clear-filter" @click="clearFilters">清除筛选</span>
+        </div>
+      </aside>
+
+      <!-- ====== 右侧区 ====== -->
+      <main class="right-panel">
+        <!-- 未选中：空态占位 -->
+        <div v-if="!selectedEvent" class="empty-detail">
+          <div class="ed-icon-wrap">
+            <Icon icon="mdi:cursor-default-click-outline" />
+          </div>
+          <p class="ed-title">点击左侧事件查看详情</p>
+          <p class="ed-sub">选择一个检修事件以查看完整信息、AI分析和处理进度</p>
+        </div>
+
+        <!-- 已选中：事件详情页（key 强制重建防止状态残留） -->
+        <template v-else>
+          <div :key="'ev-' + selectedEvent.id + '-' + (selectedEvent.status || '')" class="detail-wrapper">
+          <!-- ====== 2.4.2.1 基础信息区（固定顶部）====== -->
+          <section class="detail-header-fixed">
+            <div class="dhf-left">
+              <button v-if="detailMode === 'fullscreen'" class="back-btn" @click="goBackList" title="返回列表">
+                <Icon icon="mdi:arrow-left" />
+              </button>
+              <div class="dhf-info">
+                <div class="dhf-title-row">
+                  <h2 class="dhf-title">{{ selectedEvent.title }}</h2>
+                  <StatusBadge type="priority" :value="selectedEvent.priority" />
+                  <StatusBadge type="event" :value="selectedEvent.status" />
+                </div>
+                <div class="dhf-meta">
+                  <span class="dhfm-item"><Icon icon="mdi:identifier" /> {{ selectedEvent.id }}</span>
+                  <span class="dhfm-item"><Icon icon="mdi:cube-outline" /> {{ selectedEvent.deviceName }}</span>
+                  <span class="dhfm-item"><Icon icon="mdi:clock-outline" /> 更新于 {{ selectedEvent.updatedAt }}</span>
+                </div>
+                <p class="dhf-desc">{{ selectedEvent.description }}</p>
+              </div>
+            </div>
+            <!-- 快速反馈按钮（右上角） -->
+            <button class="dhf-quick-fb" @click="showQuickFeedback = true">
+              <Icon icon="mdi:pencil-outline" /> 快速反馈
+            </button>
+          </section>
+
+          <!-- 进度条（动态流转路径） -->
+          <section class="progress-bar-section">
+            <div class="progress-steps">
+              <template v-for="(node, i) in eventStageNodes" :key="i">
+                <div class="ps-node" :class="{ done: i < selectedEvent.stageIndex, active: i === selectedEvent.stageIndex }">
+                  <span class="ps-dot"></span>
+                  <span class="ps-lbl">{{ node }}</span>
+                </div>
+                <span v-if="i < eventStageNodes.length - 1" class="ps-line" :class="{ done: i < selectedEvent.stageIndex }"></span>
+              </template>
+            </div>
+            <div class="ps-summary">{{ selectedEvent.progressSummary }}</div>
+          </section>
+
+          <!-- ====== Tab 导航 ====== -->
+          <nav class="tab-nav">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              class="tab-btn"
+              :class="{ active: activeTabKey === tab.key }"
+              @click="activeTabKey = tab.key"
+            >
+              <Icon :icon="tab.icon" />
+              <span>{{ tab.label }}</span>
+              <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
+            </button>
+          </nav>
+
+          <!-- ====== Tab 内容区（滚动）====== -->
+          <div class="tab-content-scroll">
+            <!-- ====== AI分析 Tab（一比一还原 ship-maintenance 原型）v2 ====== -->
+            <section v-show="activeTabKey === 'ai'" class="tab-pane ai-tab">
+              <!-- (1) 结论与建议 -->
+              <div class="ai-section">
+                <div class="ai-section-title"><span class="st-icon">🧠</span> 结论与建议</div>
+                <div class="conclusion-box" :class="selectedEvent.aiAnalysis?.verdict || 'suspected'">
+                  <div class="cb-label">判定结论：{{ selectedEvent.aiAnalysis?.verdict || 'suspected' }}（{{ verdictLabel(selectedEvent.aiAnalysis?.verdict) }}，置信度 {{ selectedEvent.aiAnalysis?.confidence || 60 }}%）</div>
+                  <div class="cb-text" v-html="renderMd(selectedEvent.aiAnalysis?.conclusionDetail) || selectedEvent.aiAnalysis?.conclusion || '分析中…'"></div>
+                </div>
+                <div class="suggest-hd">建议措施</div>
+                <ul class="suggest-list">
+                  <li v-for="(s, si) in (selectedEvent.aiAnalysis?.suggestionsList || selectedEvent.aiAnalysis?.suggestions || [])" :key="si">
+                    <span class="sn">{{ si + 1 }}.</span><span v-if="typeof s === 'string'">{{ s }}</span><template v-else>{{ s.symptom || s.action }}</template>
+                  </li>
+                </ul>
+              </div>
+
+              <!-- (2) 可能的原因与后果 -->
+              <div class="ai-section">
+                <div class="ai-section-title"><span class="st-icon">📋</span> 可能的原因与后果</div>
+                <table class="fault-table">
+                  <thead><tr><th>候选故障</th><th>可能原因</th><th>直接后果</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(c, ci) in (selectedEvent.aiAnalysis?.faultTable || selectedEvent.aiAnalysis?.causes || [])" :key="ci">
+                      <td>{{ c.candidate || c.cause }}</td>
+                      <td>{{ c.reason }}</td>
+                      <td>{{ c.consequence }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- (3) 数据分析 -->
+              <div class="ai-section">
+                <div class="ai-section-title"><span class="st-icon">📊</span> 数据分析</div>
+                <div class="ds-grid">
+                  <template v-for="(d, di) in (selectedEvent.aiAnalysis?.dataCards || selectedEvent.aiAnalysis?.snapshot || [])" :key="di">
+                    <div class="ds-card ds-clickable"
+                      :class="['ds-' + (d.verdictType || d.status || 'normal'), { 'ds-active': selectedDSIdx === di }]"
+                      @click="selectDSCard(di)">
+                      <div class="ds-card-head">
+                        <div class="ds-name">{{ d.name }}</div>
+                        <span class="ds-active-dot" v-if="selectedDSIdx === di"></span>
+                      </div>
+                      <div class="ds-meta">{{ d.meta }}</div>
+                      <div class="ds-value" v-html="formatDsValue(d)"></div>
+                      <div class="ds-verdict" :class="d.verdictType || d.status">{{ d.verdict || snapStatusLabel(d.status) }}</div>
+                    </div>
+                  </template>
+                </div>
+                <!-- 趋势图 — 跟随选中卡片联动 -->
+                <div class="chart-wrap">
+                  <div class="chart-title-row">
+                    <span class="chart-title-text">
+                      <Icon icon="mdi:chart-line" /> {{ currentDSCardName }}
+                    </span>
+                    <span class="chart-hint">点击上方卡片切换趋势图</span>
+                  </div>
+                  <v-chart :option="trendChartOption" autoresize class="trend-chart-ai" />
+                </div>
+              </div>
+
+              <!-- (4) 工程机理分析 -->
+              <div v-if="selectedEvent.aiAnalysis?.engineering" class="ai-section">
+                <div class="ai-section-title"><span class="st-icon">⚙️</span> 工程机理分析</div>
+                <div class="eng-text" v-html="selectedEvent.aiAnalysis.engineering.intro"></div>
+                <table class="fault-table eng-table">
+                  <thead><tr><th>候选故障</th><th>匹配度</th><th>分析理由</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(m, mi) in selectedEvent.aiAnalysis.engineering.matches" :key="mi">
+                      <td>{{ m.fault }}</td>
+                      <td><span class="match-tag" :class="m.cls">{{ m.match }}</span></td>
+                      <td>{{ m.reason }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- ====== 待办事项 Tab（状态流转：排查→异常反馈→维修→登记→完成）====== -->
+            <section v-show="activeTabKey === 'todo'" class="tab-pane">
+              <div v-for="(scheme, si) in todoSchemes" :key="si" class="todo-scheme" :class="{ 'scheme-maintenance': scheme.phase === 'maintenance' }">
+                <div class="scheme-header" @click="toggleScheme(scheme)">
+                  <div class="scheme-left">
+                    <!-- 维修阶段标题加蓝色左边线 -->
+                    <span v-if="scheme.phase === 'maintenance'" class="title-bar-indicator"></span>
+                    <span class="scheme-title">{{ scheme.phase === 'maintenance' ? scheme.title.replace('排查方案', '维修方案') : scheme.title }}</span>
+                  </div>
+                  <div class="scheme-right">
+                    <!-- 已完成/已标正常/未解决 等最终标签状态 -->
+                    <span v-if="scheme.tag && scheme.phase !== 'maintenance'" class="scheme-tag" :class="scheme.tagClass">{{ scheme.tag }}</span>
+                        <!-- 维修阶段：登记按钮 -->
+                    <button v-else-if="scheme.phase === 'maintenance' && !scheme.tag" class="btn-register" @click.stop="openMaintFeedback(scheme)">登记</button>
+                    <!-- 排查阶段：正常/异常 按钮 -->
+                    <template v-else-if="!scheme.tag">
+                      <button class="btn-normal" @click.stop="markScheme(scheme, 'normal')">正常</button>
+                      <button class="btn-abnormal" @click.stop="markScheme(scheme, 'abnormal')">异常</button>
+                    </template>
+                    <span class="scheme-expand" :class="{ open: scheme.open }">▼</span>
+                  </div>
+                </div>
+
+                <div class="scheme-body" v-if="scheme.open">
+                  <!-- ═══ 维修方案内容（phase=maintenance）═══ -->
+                  <template v-if="scheme.phase === 'maintenance'">
+                    <!-- 前情提要（排查结论摘要，放在最顶部、安全警告之上） -->
+                    <div v-if="scheme.inspectSummary" class="inspect-summary" :class="{ 'is-collapsed': !scheme.summaryOpen }" @click="scheme.summaryOpen = !scheme.summaryOpen">
+                      <div class="is-head">
+                        <span class="is-icon">📋</span>
+                        <span class="is-title">前情提要</span>
+                        <span class="is-tag">{{ scheme.inspectResult?.label || '已记录' }}</span>
+                        <span class="is-arrow" :class="{ open: scheme.summaryOpen }">∨</span>
+                      </div>
+                      <div v-if="scheme.summaryOpen" class="is-body" v-html="scheme.inspectSummary"></div>
+                    </div>
+
+                    <!-- 重要安全警告 -->
+                    <div v-if="scheme.safety?.length" class="safety-box">
+                      <div class="safety-title">⚠️ 重要安全警告</div>
+                      <div class="safety-subtitle">多源产管执行前需以下强制安全措施：</div>
+                      <div v-for="(s, si2) in scheme.safety" :key="si2" class="safety-item" v-html="s"></div>
+                    </div>
+                    <!-- 标准处理流程 -->
+                    <div class="maint-flow-hd">标准处理流程</div>
+                    <div class="maint-steps">
+                      <div v-for="(ms, mi) in scheme.maintSteps" :key="mi" class="maint-step" @click="ms.open = !ms.open">
+                        <div class="ms-head">
+                          <span class="ms-num-circle">{{ mi + 1 }}</span>
+                          <span class="ms-title">{{ ms.title }}</span>
+                          <span class="ms-time">预计 {{ ms.time }}</span>
+                          <span class="ms-arrow" :class="{ open: ms.open }">∨</span>
+                        </div>
+                        <!-- 展开详情 -->
+                        <template v-if="ms.open">
+                          <div v-if="ms.detail" class="ms-detail" v-html="ms.detail"></div>
+                          <div v-if="ms.criteria?.length" class="ms-criteria">
+                            <div class="mc-label">监测：</div>
+                            <div v-for="(c, ci) in ms.criteria" :key="ci" class="mc-item">• {{ c }}</div>
+                          </div>
+                          <!-- 图片占位 -->
+                          <div v-if="ms.hasImages" class="ms-images">
+                            <div class="ms-img-placeholder"><Icon icon="mdi:image-outline" /></div>
+                            <div class="ms-img-placeholder"><Icon icon="mdi:image-outline" /></div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- ═══ 排查方案内容（phase=inspection）═══ -->
+                  <template v-else>
+                    <!-- 注意事项（橙色区域，数组渲染） -->
+                    <div v-if="scheme.warning?.length" class="warn-box-rich">
+                      <div class="warn-hd">注意事项</div>
+                      <ul class="warn-list">
+                        <li v-for="(w, wi) in scheme.warning" :key="wi">{{ w }}</li>
+                      </ul>
+                    </div>
+                    <!-- 排查步骤列表 -->
+                    <div class="step-list">
+                      <div v-for="(step, sti) in scheme.steps" :key="sti" class="step-item" @click="step.open = !step.open">
+                        <div class="step-head">
+                          <span><span class="step-num">{{ sti + 1 }}</span><span class="step-title">{{ step.title }}</span></span>
+                          <span v-if="step.time" class="step-time">{{ step.time }}</span>
+                        </div>
+                        <div v-if="step.open && step.detail?.length" class="step-detail">
+                          <div v-for="(d, di) in step.detail" :key="di" class="sd-item">{{ d }}</div>
+                        </div>
+                        <!-- 图片占位 -->
+                        <div v-if="step.open && step.hasImages" class="step-images">
+                          <div class="step-img-placeholder"><Icon icon="mdi:image-outline" /></div>
+                          <div class="step-img-placeholder"><Icon icon="mdi:image-outline" /></div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </section>
+
+            <!-- ====== 事件日志 Tab ====== -->
+            <section v-show="activeTabKey === 'log'" class="tab-pane">
+              <div class="log-toolbar">
+                <button class="report-pdf-btn" @click="generateReport">
+                  <Icon icon="mdi:download" /> 下载为PDF
+                </button>
+              </div>
+              <div class="timeline">
+                <div v-for="(log, li) in eventLogsDisplay" :key="li" class="tl-node">
+                  <div :class="['tl-dot', log.dotType]"></div>
+                  <div class="tl-card">
+                    <div class="tl-title">{{ log.title }}</div>
+                    <div class="tl-time font-mono-num">{{ log.time }}</div>
+                    <div class="tl-desc">{{ log.desc }}</div>
+                    <div v-if="log.tags?.length" class="tl-tags">
+                      <span v-for="(tag, ti) in log.tags" :key="ti" class="tl-tag" :class="tag.cls">{{ tag.text }}</span>
+                    </div>
+                    <div v-if="log.actions?.length" class="tl-action">
+                      <button v-for="(a, ai) in log.actions" :key="ai" :class="{ 'btn-primary': a.primary }" @click="logAction(a, log)">{{ a.icon }} {{ a.text }}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- ====== 事件内智能助手入口（悬浮）====== -->
+          <button class="assistant-fab" @click="openAssistant">
+            <Icon icon="mdi:robot" />
+          </button>
+        </div><!-- /detail-wrapper -->
+        </template>
+      </main>
+    </div>
+
+    <!-- ====== 弹窗 ====== -->
+    <teleport to="body">
+      <!-- 排查反馈弹窗 —— 动态问答式 -->
+      <div v-if="showFeedback" class="modal-overlay" @click.self="showFeedback = false">
+        <div class="modal-box fb-modal fb-modal-lg" style="display:flex;flex-direction:column;">
+          <div class="modal-header">
+            <h4>排查反馈</h4>
+            <button class="modal-close" @click="showFeedback = false"><Icon icon="mdi:close" /></button>
+          </div>
+          <div class="modal-body fb-scrollable" style="flex:1;overflow-y:auto;">
+            <div class="form-row"><label>排查项</label><input class="form-input-readonly" :value="feedbackTarget" readonly /></div>
+
+            <!-- AI动态生成的问题列表（来自排查步骤子项） -->
+            <div class="fb-ai-hint"><Icon icon="mdi:robot" /> 已根据排查方案自动生成 <b>{{ feedbackQuestions.length }}</b> 项检查问题</div>
+            <div v-for="(q, qi) in feedbackQuestions" :key="qi" class="fb-question" :data-idx="qi + 1">
+              <div class="fb-q-step" v-if="q.stepTitle">{{ q.stepTitle }}</div>
+              <div class="fb-q-title">{{ q.text }}</div>
+              <div class="fb-q-options">
+                <button v-for="opt in q.options" :key="opt.value"
+                  class="fb-q-opt"
+                  :class="{ active: q.answer === opt.value, 'custom-btn': opt.value.startsWith('_custom') }"
+                  :data-negative="isNegativeOpt(opt.value) ? 'true' : undefined"
+                  @click="setFeedbackAnswer(qi, opt.value)">
+                  <template v-if="opt.value.startsWith('_custom')"><Icon icon="mdi:pencil-outline" /> </template>{{ opt.label }}
+                </button>
+              </div>
+              <!-- 负面/自定义选项时需要填写详情或数值 -->
+              <div v-if="isNegativeOpt(q.answer)" class="fb-q-detail-wrap" :class="{ 'fb-num-input': q.inputType === 'number' }">
+                <!-- 数字输入模式（比较类/数值类） -->
+                <template v-if="q.inputType === 'number'">
+                  <div class="fb-num-hint">
+                    <Icon icon="mdi:counter" /> 请填写具体数值
+                  </div>
+                  <div class="fb-num-row">
+                    <input v-model="q.detail"
+                      class="fb-q-input fb-num-field"
+                      :placeholder="q.detailPlaceholder"
+                      type="text"
+                      inputmode="decimal" />
+                    <span class="fb-num-unit">{{ q.answer === 'mismatch' ? '偏差值' : '实测值' }}</span>
+                  </div>
+                </template>
+                <!-- 文本输入模式（其他） -->
+                <input v-else v-model="q.detail" class="fb-q-input" :placeholder="q.detailPlaceholder" />
+              </div>
+            </div>
+
+            <!-- 补充说明 -->
+            <div class="form-row"><label>补充说明</label>
+              <textarea v-model="feedbackDesc" rows="2" placeholder="其他发现或备注..."></textarea>
+            </div>
+            <!-- 图片 -->
+            <div class="form-row"><label>图片</label><div class="img-upload"><div class="img-btn">+<br/>添加</div></div></div>
+          </div>
+          <div class="modal-footer" style="flex-shrink:0;"><button class="btn-submit-red" @click="submitFeedback">提交</button></div>
+        </div>
+      </div>
+
+      <!-- 维修反馈弹窗 —— 截图4 -->
+      <div v-if="showMaintFeedback" class="modal-overlay" @click.self="showMaintFeedback = false">
+        <div class="modal-box fb-modal">
+          <div class="modal-header">
+            <h4>维修反馈</h4>
+            <button class="modal-close" @click="showMaintFeedback = false"><Icon icon="mdi:close" /></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row"><label>维修项</label><input class="form-input-readonly" :value="maintTarget" readonly /></div>
+            <div class="form-row"><label>维修类型</label>
+              <select v-model="maintType" class="form-select-el">
+                <option value="">请选择</option>
+                <option value="solved">已解决</option>
+                <option value="temp">临时处理</option>
+                <option value="unsolved">未解决</option>
+              </select>
+              <div class="form-hint">【已解决】的速度取空"已完成"状态；【临时处理】的在进度中新增"临时处理"状态节点；【未解决】的保留在"处理中"状态</div>
+            </div>
+            <div class="form-row"><label>处理反馈</label><textarea v-model="maintDesc" rows="3" placeholder="请描述维修处理情况..."></textarea><div class="form-hint"><Icon icon="mdi:microphone" /> 支持语音输入</div></div>
+            <div class="form-row"><label>图片</label><div class="img-upload"><div class="img-btn">+<br/>添加</div></div></div>
+          </div>
+          <div class="modal-footer"><button class="btn-submit-red" @click="submitMaintFeedback">提交</button></div>
+        </div>
+      </div>
+
+      <!-- 快速反馈 -->
+      <div v-if="showQuickFeedback" class="modal-overlay" @click.self="showQuickFeedback = false">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h4>快速反馈</h4>
+            <button class="modal-close" @click="showQuickFeedback = false"><Icon icon="mdi:close" /></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row"><label>判断结论</label>
+              <select v-model="quickFeedbackForm.conclusion" class="form-select-el">
+                <option value="">请选择</option>
+                <option value="false">正常（误报）</option>
+                <option value="done">已处理</option>
+              </select>
+            </div>
+            <div class="form-row"><label>备注</label><textarea v-model="quickFeedbackForm.note" rows="3" placeholder="补充说明..."></textarea><div class="form-hint"><Icon icon="mdi:microphone" /> 支持语音输入</div></div>
+            <div class="form-row"><label>图片</label><div class="img-upload"><div class="img-btn">+<br/>添加</div></div></div>
+          </div>
+          <div class="modal-footer"><button class="btn-submit-red" @click="submitQuickFeedback">提交</button></div>
+        </div>
+      </div>
+
+      <!-- 补充说明弹窗（针对日志卡片） -->
+      <div v-if="showSupplementModal" class="modal-overlay" @click.self="showSupplementModal = false">
+        <div class="modal-box" style="display:flex;flex-direction:column;max-width:520px">
+          <div class="modal-header">
+            <h4>补充说明</h4>
+            <button class="modal-close" @click="showSupplementModal = false"><Icon icon="mdi:close" /></button>
+          </div>
+          <div class="modal-body" style="flex:1;overflow-y:auto">
+            <!-- 当前日志卡片信息呈现 -->
+            <div v-if="supplementTarget" class="supp-orig-card">
+              <div class="supp-orig-header">
+                <span class="supp-orig-stage" :class="supplementTarget.tags?.[0]?.cls">{{ supplementTarget.tags?.[0]?.text || '日志' }}</span>
+                <span class="supp-orig-time font-mono-num">{{ supplementTarget.time }}</span>
+              </div>
+              <div class="supp-orig-title">{{ supplementTarget.title }}</div>
+              <div class="supp-orig-desc">{{ supplementTarget.desc }}</div>
+              <div v-if="supplementTarget.tags?.length > 1" class="supp-orig-tags">
+                <span v-for="(tag, ti) in supplementTarget.tags.slice(1)" :key="ti" class="tl-tag" :class="tag.cls">{{ tag.text }}</span>
+              </div>
+              <div class="supp-orig-operator"><Icon icon="mdi:account-outline" /> {{ supplementTarget.operator }}</div>
+            </div>
+
+            <!-- 补充说明输入区 -->
+            <div class="form-row supp-input-row">
+              <label>补充说明</label>
+              <textarea v-model="supplementNote" rows="4" placeholder="请输入补充说明内容，如后续观察结果、补充检查数据、现场情况描述等..."></textarea>
+              <div class="form-hint"><Icon icon="mdi:information-outline" /> 补充说明将作为新的日志记录追加到事件日志</div>
+            </div>
+
+            <!-- 图片上传区 -->
+            <div class="form-row supp-img-row">
+              <label>补充图片</label>
+              <div class="supp-img-upload">
+                <div v-for="(img, ii) in supplementImages" :key="img.id" class="supp-img-item">
+                  <Icon icon="mdi:image" />
+                  <span class="supp-img-name">{{ img.name }}</span>
+                  <button class="supp-img-del" @click="removeSupplementImage(ii)"><Icon icon="mdi:close-circle" /></button>
+                </div>
+                <button class="supp-img-add" @click="addSupplementImage">
+                  <Icon icon="mdi:camera-plus-outline" />
+                  <span>添加图片</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer supp-footer" style="flex-shrink:0">
+            <button class="supp-btn-cancel" @click="showSupplementModal = false">
+              <Icon icon="mdi:close" /> 取消
+            </button>
+            <button class="btn-submit-red supp-btn-submit" @click="submitSupplement">
+              <Icon icon="mdi:check" /> 提交补充
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- Toast -->
+    <teleport to="body">
+      <div class="toast-container">
+        <div v-for="t in toasts" :key="t.id" class="toast" :class="{ leaving: t.leaving }">
+          <span class="toast-icon">✓</span>
+          <span>{{ t.text }}</span>
+          <button class="toast-close" @click="dismissToast(t.id)">✕</button>
+        </div>
+      </div>
+    </teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { Icon } from '@iconify/vue'
+import VChart from 'vue-echarts'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { LineChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { useRepairStore } from '@/stores/repairStore'
+import { useDeviceStore } from '@/stores/deviceStore'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { getEventStageNodes } from '@/mock'
+
+use([CanvasRenderer, LineChart, GridComponent, TooltipComponent])
+
+const router = useRouter()
+const route = useRoute()
+const repairStore = useRepairStore()
+const deviceStore = useDeviceStore()
+
+const emit = defineEmits(['report', 'assistant'])
+
+// 事件内助手：携带当前事件ID
+function openAssistant() {
+  emit('assistant', selectedEvent.value?.id || null)
+}
+
+// ---- UI 状态 ----
+const keyword = ref('')
+const selectedId = ref(null)
+const detailMode = ref('split')
+const filters = reactive({ device: null, priority: null, status: null })
+
+// Tab 状态（自动定位）
+const activeTabKey = ref('ai')
+const tabs = computed(() => [
+  { key: 'ai', label: 'AI分析', icon: 'mdi:robot' },
+  { key: 'todo', label: '待办事项', icon: 'mdi:clipboard-check' },
+  { key: 'log', label: '事件日志', icon: 'mdi:timeline-clock' },
+])
+
+// 弹窗状态
+const showRepairModal = ref(false)
+const showQuickFeedback = ref(false)
+const showSupplementModal = ref(false)
+const currentRepairItem = ref(null)
+const repairForm = reactive({ result: 'resolved', measure: '', operator: '', photos: [] })
+const quickType = ref('')
+const quickNote = ref('')
+const quickCondition = ref('')
+
+// 补充说明弹窗数据
+const supplementTarget = ref(null)    // 当前操作的日志卡片完整数据
+const supplementNote = ref('')         // 补充说明文本
+const supplementImages = ref([])       // 补充图片列表（模拟）
+
+// 反馈表单池
+const feedbackForms = reactive({})
+
+const deviceOptions = computed(() => [{ id: '', name: '全部' }, ...deviceStore.devices])
+const statusOptions = [
+  { value: 'pending', label: '待确认' },
+  { value: 'processing', label: '处理中' },
+  { value: 'temp_handled', label: '临时处理' },
+  { value: 'resolved', label: '已解决' },
+  { value: 'false_alarm', label: '误报' },
+]
+
+// ---- 过滤排序 ----
+const filtered = computed(() => {
+  let list = [...repairStore.sortedEvents]
+  const kw = keyword.value.trim().toLowerCase()
+  if (kw) {
+    list = list.filter(e =>
+      e.title.toLowerCase().includes(kw) ||
+      (e.deviceName||'').toLowerCase().includes(kw) ||
+      (e.systemPart||'').toLowerCase().includes(kw) ||
+      (e.description||'').toLowerCase().includes(kw)
+    )
+  }
+  if (filters.device) list = list.filter(e => e.deviceId === filters.device)
+  if (filters.priority) list = list.filter(e => e.priority === filters.priority)
+  if (filters.status) list = list.filter(e => e.status === filters.status)
+  return list
+})
+
+const selectedEvent = computed(() =>
+  repairStore.sortedEvents.find(e => e.id === selectedId.value) || null
+)
+
+// ---- 动态进度阶段（根据事件状态选择流转路径） ----
+const eventStageNodes = computed(() => {
+  if (!selectedEvent.value) return getEventStageNodes('pending')
+  return getEventStageNodes(selectedEvent.value.status)
+})
+
+// ---- AI建议 ----
+const aiSuggestions = computed(() => selectedEvent.value?.aiAnalysis?.suggestionsList || [
+  '持续监控燃油进机压力（0413）和燃油共轨压力的趋势变化，特别是在主机负荷稳定后的稳态值',
+  '检查供油单元出口压力是否正常，确认压力保持阀工作状态',
+  '对燃油共轨压力传感器进行交叉比对，排除传感器信号漂移的可能',
+  '确认当前使用燃油类型（HFO/MDO），判断燃油温度的合理性'
+])
+
+// ---- 待办方案（从事件数据动态生成，支持完整状态流转）----
+const todoSchemes = ref([])
+// 当前正在反馈的维修方案引用
+const currentFeedbackScheme = ref(null)
+
+watch(selectedEvent, (ev) => {
+  if (!ev?.todos) { todoSchemes.value = []; return }
+  const inspectSchemes = (ev.todos.inspections || []).map((item, idx) => {
+    // 优先使用 item.steps（新格式：含多步骤+子项），否则从 detail 兼容生成
+    const hasRichSteps = Array.isArray(item.steps) && item.steps.length > 0
+    const steps = hasRichSteps ? item.steps.map((s, si) => ({
+      title: s.title || item.title,
+      open: idx === 0 && si === 0,
+      detail: s.items || [s.detail || '待执行'],
+      time: s.time || '',
+      hasImages: !!s.hasImages
+    })) : (item.detail ? [item.detail] : ['执行此项排查任务']).map((d, di) => ({
+      title: typeof d === 'string' ? item.title : (d.title || item.title),
+      open: idx === 0 && di === 0,
+      detail: typeof d === 'string' ? [d] : (d.items || [d.text || '待执行']),
+      time: '',
+      hasImages: false
+    }))
+    return {
+      title: item.title + '排查方案',
+      open: idx === 0,          // 第一个默认展开（当前待排查项）
+      phase: 'inspection',      // inspection | maintenance | done
+      tag: null,
+      tagClass: null,
+      _rawItem: item,
+      warning: getInspectionWarnings(ev),
+      steps,
+      safety: null,
+      maintSteps: null
+    }
+  })
+  todoSchemes.value = inspectSchemes
+}, { immediate: true })
+
+// ---- 排查注意事项（截图1：橙色区域，数组形式）----
+function getInspectionWarnings(ev) {
+  const dev = ev.deviceName || ''
+  if (dev.includes('供油') || dev.includes('燃油') || dev.includes('主机')) {
+    return [
+      `${dev}系统存在600~800 bar高压燃油，维修前务必泄压`,
+      '执行看卡时的应先摇摇：可屏低燃油压力控制阀的开启压力至500~700 bar',
+      '参考wiki："燃油原有电子执行器故障，各室工作的执行器要依做做执行器的节"'
+    ]
+  }
+  if (dev.includes('液压')) {
+    return [
+      `${dev}工作压力较高，检漏时需佩戴护目镜和耐油手套`,
+      '发现高压喷射点立即远距离关闭隔离阀',
+      '操作前确认液压蓄能器已完全卸压'
+    ]
+  }
+  return [
+    '执行排查时注意个人安全防护，必要时申请配合人员',
+    '操作前确认设备隔离状态和能量锁定'
+  ]
+}
+
+// ---- 维修安全警告（截图3：橙色详细警告）----
+function getMaintSafety(ev) {
+  const dev = ev.deviceName || ''
+  if (dev.includes('供油') || dev.includes('燃油')) {
+    return [
+      '<strong>挂牌上锁（LOTO）：</strong>拆开1#、2#主油泵电源（解锁码：LOCK-01）、关闭启动空气主阀（解锁码：LOCK-02），并经压力表归零+万用表验电双重验证；',
+      '<strong>泄压与隔离：</strong>确认液压管/进回管各压力均为0 bar，清除残余完全隔离；',
+      '<strong>高温防护：</strong>质气处理熔视表面温度>80℃，作业前须覆盖耐高温隔热服（型号：HT-Blankot-200℃）'
+    ]
+  }
+  return [
+    '<strong>安全准备：</strong>确认设备已停机/隔离，挂牌上锁（LOTO），释放残余压力',
+    '<strong>防护措施：</strong>根据作业内容佩戴相应PPE（护目镜/手套/耳塞等）',
+    '<strong>完工验证：</strong>维修后必须进行功能测试并记录结果'
+  ]
+}
+
+/**
+ * 根据排查反馈中的异常项，动态生成维修步骤
+ * 每个异常发现 → 对应一个维修步骤 + 验收标准
+ * 最后统一加一个"功能测试与验收"步骤
+ */
+function getMaintStepsFromFeedback(abnormalQuestions, ev) {
+  const steps = []
+
+  abnormalQuestions.forEach((q, idx) => {
+    const opt = q.options.find(o => o.value === q.answer)
+    const optLabel = opt ? opt.label : q.answer
+    const findingText = q.detail ? `${optLabel}（${q.detail}）` : optLabel
+
+    // 根据问题文本内容推断维修动作
+    const text = q.text
+    const stepTitle = inferRepairTitle(text, optLabel)
+    const detail = inferRepairDetail(text, findingText, ev)
+    const criteria = inferRepairCriteria(text, ev)
+
+    steps.push({
+      title: stepTitle,
+      time: '1~2h',
+      open: idx === 0,
+      detail,
+      criteria,
+      hasImages: false
+    })
+  })
+
+  // 最后统一加验收测试步骤
+  steps.push({
+    title: '功能测试与验收',
+    time: '30min',
+    open: false,
+    detail: inferAcceptanceDetail(ev),
+    criteria: inferAcceptanceCriteria(ev),
+    hasImages: false
+  })
+
+  return steps
+}
+
+/** 根据排查项文本推断维修步骤标题 */
+function inferRepairTitle(checkText, resultLabel) {
+  // 密封类
+  if (/密封|密封圈|O型|垫片/.test(checkText)) return '更换受损密封件'
+  // 泄漏类
+  if (/泄漏|渗漏|渗油|漏油|荧光/.test(checkText)) return '修复泄漏部位'
+  // 滤器/堵塞类
+  if (/滤|堵塞|脏堵|阻塞|压差/.test(checkText)) return '清洗或更换滤芯'
+  // 压力/参数类
+  if (/压力|压差|参数|PID|增益|频率/.test(checkText)) return '调整系统参数至正常范围'
+  // 轴承/润滑类
+  if (/轴承|润滑|油脂|润滑脂/.test(checkText)) return '更换润滑脂/检修轴承'
+  // 阀门类
+  if (/阀门|阀芯|阀座/.test(checkText)) return '研磨/更换阀门密封面'
+  // 电气/传感器类
+  if (/传感器|信号|接线|电压|电流/.test(checkText)) return '校验/更换传感器元件'
+  // 管路类
+  if (/管路|管接头|软管|焊缝/.test(checkText)) return '修复管路缺陷'
+  // 螺栓/紧固类
+  if (/螺栓|紧固|松动|力矩/.test(checkText)) return '按规定力矩重新紧固'
+  // 默认
+  return `针对"${checkText.slice(0, 12)}..."执行维修处置`
+}
+
+/** 推断维修步骤详情 */
+function inferRepairDetail(checkText, finding, ev) {
+  const dev = ev?.deviceName || '设备'
+  if (/密封|密封圈|O型|垫片/.test(checkText)) {
+    return `<div style="color:#8BAAC0;line-height:1.7">
+      <div style="color:#FAAD14;margin-bottom:4px">▸ 异常发现：${finding}</div>
+      <div>● 拆卸${dev}相关部位，取出受损密封件</div>
+      <div>● 清洁密封槽，检查密封面有无损伤</div>
+      <div>● 选用同规格新密封件，表面涂润滑脂后装入</div>
+      <div>● 按规定力矩对角均匀拧紧</div>
+    </div>`
+  }
+  if (/滤|堵塞|脏堵|阻塞|压差/.test(checkText)) {
+    return `<div style="color:#8BAAC0;line-height:1.7">
+      <div style="color:#FAAD14;margin-bottom:4px">▸ 异常发现：${finding}</div>
+      <div>● 隔离滤器进出口阀门</div>
+      <div>● 取出脏堵滤芯，清洗或更换新滤芯</div>
+      <div>● 清除滤器壳体内部沉积物</div>
+      <div>● 复装后恢复投运，确认压差降至正常值</div>
+    </div>`
+  }
+  if (/泄漏|渗漏|渗油|漏油|荧光/.test(checkText)) {
+    return `<div style="color:#8BAAC0;line-height:1.7">
+      <div style="color:#FAAD14;margin-bottom:4px">▸ 异常发现：${finding}</div>
+      <div>● 根据排查标记定位泄漏点</div>
+      <div>● 隔离并泄压相关管段</div>
+      <div>● 更换密封件或补焊修复</div>
+      <div>● 复装后保压30min验证无渗漏</div>
+    </div>`
+  }
+  if (/压力|压差|参数|PID|增益|频率/.test(checkText)) {
+    return `<div style="color:#8BAAC0;line-height:1.7">
+      <div style="color:#FAAD14;margin-bottom:4px">▸ 异常发现：${finding}</div>
+      <div>● 备份当前参数</div>
+      <div>● 按推荐值范围逐步调整参数</div>
+      <div>● 在不同工况下验证调整效果</div>
+    </div>`
+  }
+  if (/轴承|润滑|油脂|润滑脂/.test(checkText)) {
+    return `<div style="color:#8BAAC0;line-height:1.7">
+      <div style="color:#FAAD14;margin-bottom:4px">▸ 异常发现：${finding}</div>
+      <div>● 清除旧润滑脂，清洗轴承内部</div>
+      <div>● 填入新润滑脂至轴承腔容积的1/2~2/3</div>
+      <div>● 检查轴承游隙和转动灵活性</div>
+    </div>`
+  }
+  return `<div style="color:#8BAAC0;line-height:1.7">
+    <div style="color:#FAAD14;margin-bottom:4px">▸ 异常发现：${finding}</div>
+    <div>● 按${ev?.deviceName || '设备'}标准作业程序执行维修</div>
+    <div>● 维修后清理现场、复装部件</div>
+  </div>`
+}
+
+/** 推断维修验收标准 */
+function inferRepairCriteria(checkText, ev) {
+  if (/密封|泄漏|渗漏|漏油/.test(checkText)) return ['保压30min无压降', '目视检查无渗漏痕迹']
+  if (/滤|堵塞|压差/.test(checkText)) return ['滤器压差 < 0.05bar', '系统流量恢复正常']
+  if (/压力|PID|频率/.test(checkText)) return ['参数在推荐范围内', '运行工况稳定无波动']
+  if (/轴承|润滑/.test(checkText)) return ['轴承温度 < 65℃', '振动值在ISO 10816合格区']
+  return ['功能测试通过', '运行参数恢复正常范围']
+}
+
+/** 验收步骤详情 */
+function inferAcceptanceDetail(ev) {
+  const dev = ev?.deviceName || '设备'
+  return `<div style="color:#8BAAC0;line-height:1.7">
+    <div>● ${dev}维修后空载试运行30min，确认无异响/异振/异温</div>
+    <div>● 带载运行验证，各项参数达标</div>
+    <div>● 记录最终数据并归档</div>
+  </div>`
+}
+
+/** 验收标准 */
+function inferAcceptanceCriteria(ev) {
+  const dev = ev?.deviceName || ''
+  if (dev.includes('液压') || dev.includes('锚机')) return ['系统压力稳定在额定值±5%', '管路无渗漏', '油位恢复正常（≥60%）']
+  if (dev.includes('发电') || dev.includes('电机')) return ['频率 60±0.2Hz', '电压 440±10V', '负荷分配偏差 <5%']
+  if (dev.includes('泵')) return ['流量达到额定值', '振动 ≤2.8mm/s', '密封泄漏 <2滴/min']
+  if (dev.includes('阀')) return ['阀门动作灵活到位', '密封面泄漏率 <0.02%']
+  return ['运行参数恢复正常', '无异常告警']
+}
+
+// 保留旧函数兼容（不再使用但防止外部引用报错）
+function getMaintSteps(ev) {
+  return getMaintStepsFromFeedback([], ev)
+}
+
+// ---- 待办操作 ----
+function toggleScheme(scheme) { scheme.open = !scheme.open }
+
+/**
+ * 根据排查/维修卡片的操作状态，重新计算事件状态和进度
+ *
+ * 状态流转规则（基于待办事项操作驱动）：
+ *   所有排查卡片未操作 → pending（待确认）
+ *   任一排查卡片有反馈但未维修登记 → processing（处理中）
+ *   维修登记为"临时处理" → temp_handled（临时处理）
+ *   维修登记为"未解决" → processing（处理中）
+ *   维修登记为"已解决" → resolved（已解决）
+ *
+ * @param {Object} ev - 事件对象
+ */
+function recalcEventStatus(ev) {
+  if (!ev) return
+  const inspections = ev.todos?.inspections || []
+  const repairs = ev.todos?.repairs || []
+
+  // 检查排查卡片：是否有任何一张已标记（phase !== undefined 或有 result）
+  const anyInsDone = inspections.some(t => t.phase === 'done' || t.phase === 'maintenance' || t.result)
+  // 检查维修卡片：取最新维修反馈结果
+  const anyRepairResult = repairs.map(r => {
+    // 也检查翻转后的 inspection 卡片里 phase=done/maintenance 的
+    return r.phase === 'done' ? r.tagClass : null
+  })
+
+  // 遍历所有方案（排查翻转后变维修的也在 inspections 里）
+  // 收集所有维修反馈类型
+  let hasResolved = false
+  let hasTempHandled = false
+  const allSchemes = [...inspections, ...repairs]
+  allSchemes.forEach(s => {
+    if (s.phase === 'done') {
+      if (s.tagClass === 'resolved') hasResolved = true
+      else if (s.tag === '已完成' || s.tagClass === 'resolved') hasResolved = true
+    }
+    // 临时处理：phase 回到 maintenance 且之前提交过 temp
+    if (s.maintTempHandled) hasTempHandled = true
+  })
+
+  // 优先级：已解决 > 临时处理 > 处理中 > 待确认
+  // stageIndex 对应4节点路径：0=待确认 / 1=处理中 / 2=临时处理 / 3=已解决
+  const oldStatus = ev.status
+  let newStatus = 'pending'
+  let newStageIndex = 0
+
+  if (hasResolved) {
+    newStatus = 'resolved'
+    newStageIndex = 3
+  } else if (hasTempHandled) {
+    newStatus = 'temp_handled'
+    newStageIndex = 2
+  } else if (anyInsDone) {
+    newStatus = 'processing'
+    newStageIndex = 1
+  }
+
+  if (newStatus !== oldStatus) {
+    ev.status = newStatus
+    ev.stageIndex = newStageIndex
+    ev.updatedAt = repairStore.formatNow()
+    // 同步更新进度摘要
+    const summaryMap = {
+      pending: '待确认：AI检测触发，待人工确认',
+      processing: '处理中：排查进行中，待完成处置',
+      temp_handled: '临时处理：已采取临时措施，待最终解决',
+      resolved: '已解决：事件已关闭归档'
+    }
+    ev.progressSummary = summaryMap[newStatus] || ev.progressSummary
+  }
+}
+
+function markScheme(scheme, type) {
+  const ev = selectedEvent.value
+
+  if (type === 'normal') {
+    scheme.phase = 'done'
+    scheme.tag = '已标正常'
+    scheme.tagClass = 'normal'
+    scheme.open = false
+    // 写入事件日志
+    if (ev) {
+      ev.logs.unshift({
+        time: repairStore.formatNow(),
+        stage: '排查',
+        title: `排查项判定正常：${scheme.title}`,
+        content: `经检查判定该项正常，无需进一步处置。`,
+        operator: '当前用户'
+      })
+      ev.updatedAt = repairStore.formatNow()
+    }
+    showToast(`已标记「${scheme.title}」为正常`)
+  } else if (type === 'abnormal') {
+    openFeedback(scheme)
+  }
+
+  // ★ 状态联动：只要操作过任一排查卡片（正常或异常），事件进入处理中
+  //    但尚未到维修阶段（temp_handled/resolved）时才前进，不回退
+  if (ev) {
+    const insDone = (ev.todos?.inspections || []).some(t =>
+      t.phase === 'done' || t.phase === 'maintenance' || t.result
+    )
+    if (insDone && ev.stageIndex < 1) {
+      ev.status = 'processing'
+      ev.stageIndex = 1
+      ev.progressSummary = '处理中：排查进行中，待完成处置'
+      ev.updatedAt = repairStore.formatNow()
+    }
+  }
+}
+
+// ---- 排查反馈（动态问答式） ----
+const showFeedback = ref(false)
+const feedbackTarget = ref('')
+const feedbackDesc = ref('')
+const feedbackQuestions = ref([])
+
+/**
+ * 从文本中提取具体的检查项列表
+ * 支持格式：
+ *   "有无X/Y/Z" / "有无X、Y、Z" / "有无X，Y，Z"  → 提取 [X, Y, Z]
+ *   "有无XXX" 单项  → 提取 [XXX]
+ *   "是否一致/对比/比对"  → 返回 null（走比较模式）
+ */
+function extractCheckItems(text) {
+  // 比较类问题，不走提取
+  if (/是否|一致$|对比|比对/.test(text) && !text.includes('有无')) return null
+
+  // 匹配 "有无..." 模式，提取后面的具体项目
+  const youwuMatch = text.match(/有无[：:?\s]*(.+?)(?:[，,。]|$)/)
+  if (youwuMatch) {
+    const raw = youwuMatch[1].trim()
+    // 用 / 、, 分割成多个选项
+    const items = raw.split(/[\/\、,，]/).map(s => s.trim()).filter(Boolean)
+    if (items.length > 0) return items
+  }
+
+  // 匹配 "检查XX有无XX" 或 "目视检查XX有无XX" 的变体
+  const inspectYouwu = text.match(/(?:检查|目视|确认|检测)[^有无]{0,20}有无[：:?\s]*(.+?)(?:[，,。]|$)/)
+  if (inspectYouwu) {
+    const raw = inspectYouwu[1].trim()
+    const items = raw.split(/[\/\、,，]/).map(s => s.trim()).filter(Boolean)
+    if (items.length > 0) return items
+  }
+
+  return null // 无法提取具体项
+}
+
+/**
+ * 根据排查步骤子项文本，AI智能生成问答选项
+ *
+ * 核心逻辑：从子项（items）文本中提取具体的检查对象，生成精确选项
+ * ⚠️ 步骤标题（step.title）仅作为分组标签展示，不参与问题生成
+ *   - 能提取到具体项目时：每个项目变成独立选项 + 兜底"其他"
+ *   - 比较类问题（一致/不一致）：选"不一致"必须填写偏差数字
+ *   - 数值类问题（读数/压力等）：正常范围/偏高/偏低
+ *
+ * ⚠️ 操作步骤类（准备/清洁/加油/拆卸/复装等纯动作指令）会被过滤掉，
+ *    只保留判断类（检查/测量/对比/有无/是否/读数等需给出结论的项）
+ */
+// 操作类关键词：纯动作指令，不需要反馈判定结果
+const OPERATION_KEYWORDS = [
+  '准备', '清洁', '擦拭', '加油', '加注', '注入', '排放', '排气', '泄压',
+  '拆卸', '拆除', '拆开', '取出', '复装', '安装', '装入', '紧固', '拧紧',
+  '更换', '换新', '送实验室', '采集', '采集.*取样瓶', '送检',
+  '拍照记录', '拍照', '标记', '整理.*清单', '记录.*坐标',
+  '关闭.*阀', '打开.*阀', '隔离', '启动', '停机', '启泵', '关机',
+  '按对角顺序', '使用力矩扳手', '涂抹', '点动', '缓慢注入',
+  '按规定比例加入', '系统循环运行'
+]
+
+function isOperationStep(text) {
+  // 判断是否为操作类步骤（纯动作指令，无判定结论）
+  // 规则：以操作关键词开头 或 整句是操作指令（不含检查/测量/对比/有无等判断词）
+  const hasJudgmentWord = /检查|测量|目视|对比|比对|是否|有无|读数|听诊|观察|确认|校验|化验|评估|判定/.test(text)
+  if (hasJudgmentWord) return false  // 含判断词，保留
+
+  // 不含判断词，检查是否以操作动词开头
+  const opRegex = new RegExp('^(' + OPERATION_KEYWORDS.join('|') + ')')
+  if (opRegex.test(text)) return true
+
+  // 补充：以动词开头且整句是祈使操作句（"用XX做YY" "通过XX做YY" 等）
+  if (/^(用|通过|按照|按|从|将|对|在)/.test(text) && !hasJudgmentWord) return true
+
+  return false
+}
+function generateFeedbackQuestions(steps) {
+  const questions = []
+  steps.forEach((step, si) => {
+    // ★ 只从子项（items/detail）生成问题，步骤标题不参与
+    const items = step.detail || step.items || []
+    if (!Array.isArray(items)) return
+
+    items.forEach((item, ii) => {
+      const text = typeof item === 'string' ? item.trim() : (item.text || String(item)).trim()
+      if (!text) return // 跳过空字符串
+      if (isOperationStep(text)) return // ★ 跳过操作步骤类，只保留判断类
+
+      let options = []
+      let detailPlaceholder = ''
+      let inputType = 'text' // 默认文本输入
+
+      // ====== 1. 比较类：是否一致/对比/比对 → 选"不一致"必须填数字 ======
+      if ((text.includes('是否') || text.includes('一致') || text.includes('对比') || text.includes('比对')) && !text.includes('有无')) {
+        options = [
+          { value: 'match', label: '一致' },
+          { value: 'mismatch', label: '不一致' },
+        ]
+        detailPlaceholder = '请输入偏差值（如：实测 45%，偏差 -5%）...'
+        inputType = 'number' // 数字输入
+      }
+      // ====== 2. 可提取具体项目的"有无"类问题 ======
+      else {
+        const checkItems = extractCheckItems(text)
+        if (checkItems && checkItems.length > 0) {
+          // 第一项：全部正常
+          const normalLabel = `无${checkItems.join('、')}`
+          options.push({ value: '_all_normal', label: normalLabel })
+
+          // 每个项目单独作为选项
+          checkItems.forEach(ci => {
+            options.push({ value: `_found_${ci}`, label: `发现${ci}` })
+          })
+
+          // 兜底：其他情况（人工介入）
+          options.push({ value: '_custom', label: '其他情况（自定义）' })
+          detailPlaceholder = '请详细描述发现的问题...'
+        }
+        // ====== 3. 数值/仪表类 ======
+        else if (text.includes('读数') || text.includes('压力') || text.includes('温度') || text.includes('液位') || text.includes('数值')) {
+          options = [
+            { value: 'normal_range', label: '正常范围内' },
+            { value: 'high', label: '偏高' },
+            { value: 'low', label: '偏低' },
+            { value: '_custom_num', label: '其他（自定义）' },
+          ]
+          detailPlaceholder = '请输入实测数值（如：12.5）...'
+          inputType = 'number'
+        }
+        // ====== 4. 荧光/UV检漏类 ======
+        else if (text.includes('荧光') || text.includes('UV') || text.includes('紫外')) {
+          options = [
+            { value: 'no_trace', label: '未发现荧光痕迹' },
+            { value: 'trace_found', label: '发现荧光痕迹' },
+            { value: '_custom_fluor', label: '其他发现（自定义）' },
+          ]
+          detailPlaceholder = '请描述荧光痕迹位置、形状及强度...'
+        }
+        // ====== 5. 化验/实验室检测类 ======
+        else if (text.includes('化验') || text.includes('取样') || text.includes('含水量') || text.includes('颗粒度') || text.includes('粘度')) {
+          options = [
+            { value: 'qualified', label: '各项指标合格' },
+            { value: 'unqualified', label: '存在指标超标' },
+            { value: '_custom_lab', label: '其他情况（自定义）' },
+          ]
+          detailPlaceholder = '请填写具体检测值及超标项目名称...'
+        }
+        // ====== 6. 通用检查/确认类（兜底） ======
+        else {
+          options = [
+            { value: 'ok', label: '正常/通过' },
+            { value: 'abnormal', label: '发现异常' },
+            { value: '_custom_other', label: '其他情况（自定义）' },
+          ]
+          detailPlaceholder = '请描述具体情况及发现...'
+        }
+      }
+
+      questions.push({
+        text, options,
+        answer: '',
+        detail: '',
+        detailPlaceholder,
+        inputType,
+        stepTitle: step.title,
+        stepIndex: si + 1,
+        itemIndex: ii + 1,
+        qId: `Q${questions.length + 1}`
+      })
+    })
+  })
+  return questions
+}
+
+function openFeedback(scheme) {
+  feedbackTarget.value = scheme.title.replace('排查方案', '')
+  feedbackDesc.value = ''
+  // 从当前方案的步骤中动态生成问题
+  feedbackQuestions.value = generateFeedbackQuestions(scheme.steps || [])
+  currentFeedbackScheme.value = scheme
+  showFeedback.value = true
+}
+
+function setFeedbackAnswer(qIndex, value) {
+  const q = feedbackQuestions.value[qIndex]
+  if (!q) return
+  // 用新对象替换确保 Vue 响应式追踪
+  feedbackQuestions.value[qIndex] = {
+    ...q,
+    answer: value,
+    detail: isNegativeOpt(value) ? q.detail : ''
+  }
+}
+
+// 所有需要填写详情的"负面/自定义"选项
+const NEGATIVE_OPTS = new Set([
+  'mismatch', 'abnormal', 'found', 'blocked', 'worn', 'fail',
+  'high', 'low',
+  // 新增：从文本提取的具体项目选项（_found_xxx）
+  // 新增：自定义类选项（_custom_xxx）——也需要填详情
+])
+function isNegativeOpt(v) {
+  if (NEGATIVE_OPTS.has(v)) return true
+  // _found_ 开头 = 发现了某个具体问题 → 需填详情
+  if (v && v.startsWith('_found_')) return true
+  // _custom_ 开头 = 自定义情况 → 需填详情
+  if (v && v.startsWith('_custom')) return true
+  return false
+}
+
+function submitFeedback() {
+  try {
+    // 校验：每道题都必须选一个答案
+    const unanswered = feedbackQuestions.value.findIndex(q => !q.answer)
+    if (unanswered >= 0) {
+      const q = feedbackQuestions.value[unanswered]
+      showToast(`请完成第 ${unanswered + 1} 题的判定：${q.text.slice(0, 15)}...`)
+      return
+    }
+
+    const s = currentFeedbackScheme.value
+    if (!s) {
+      showToast('提交失败：未找到排查方案数据')
+      return
+    }
+
+    const ev = selectedEvent.value
+    if (!ev) {
+      showToast('提交失败：未找到事件数据')
+      return
+    }
+
+    // 汇总结果：统计有多少异常项
+    const abnormalCount = feedbackQuestions.value.filter(q => isNegativeOpt(q.answer)).length
+    const allNormal = abnormalCount === 0
+    const total = feedbackQuestions.value.length
+    const resultLabel = allNormal ? '全部正常'
+      : (total === abnormalCount ? '全部异常' : `部分异常(${abnormalCount}/${total})`)
+
+    // 构建详细结论文本
+    const detailLines = feedbackQuestions.value.map(q => {
+      const opt = q.options.find(o => o.value === q.answer)
+      const optLabel = opt ? opt.label : q.answer
+      let line = `• ${q.text} → ${optLabel}`
+      if (q.detail) line += `（${q.detail}）`
+      return line
+    })
+
+    // ★ 只提取异常项（排除正常反馈）
+    const abnormalQuestions = feedbackQuestions.value.filter(q => isNegativeOpt(q.answer))
+    const abnormalLines = abnormalQuestions.map(q => {
+      const opt = q.options.find(o => o.value === q.answer)
+      const optLabel = opt ? opt.label : q.answer
+      let line = `• ${q.text} → <span style="color:#FF7875">${optLabel}</span>`
+      if (q.detail) line += `（${q.detail}）`
+      return line
+    })
+
+    // 关闭弹窗
+    showFeedback.value = false
+
+    // ★ 核心翻转：原地变为维修方案卡片
+    s.phase = 'maintenance'
+    s.isMaintenance = true
+    s.safety = getMaintSafety(ev)
+    s.inspectResult = {
+      type: allNormal ? 'normal' : 'partial_abnormal',
+      label: resultLabel,
+      desc: detailLines.join('\n'),
+      answers: feedbackQuestions.value.map(q => ({
+        question: q.text,
+        answer: q.options.find(o => o.value === q.answer)?.label,
+        detail: q.detail
+      }))
+    }
+
+    // ★ 前情提要：只总结异常项，正常项不显示
+    if (allNormal) {
+      // 全部正常 → 无异常，无需维修
+      s.inspectSummary = `<div style="color:#E8F0FF;line-height:1.7;font-size:12px">
+        <div style="margin-bottom:6px"><b style="color:#52C41A">判定结果：全部正常</b></div>
+        <div style="color:#8BAAC0">所有检查项均正常，无需进一步维修处置。</div>
+        <div style="margin-top:6px"><b>操作人：</b>当前用户 &nbsp; <b>时间：</b>${repairStore.formatNow()}</div>
+      </div>`
+    } else {
+      s.inspectSummary = `<div style="color:#E8F0FF;line-height:1.7;font-size:12px">
+        <div style="margin-bottom:6px"><b style="color:#FF7875">判定结果：${resultLabel}（共 ${abnormalCount} 项异常）</b></div>
+        <div style="margin-bottom:4px;color:#8BAAC0">异常发现汇总：</div>
+        <div style="max-height:140px;overflow-y:auto">${abnormalLines.map(l => `<div style="padding:3px 0;border-bottom:1px solid rgba(255,120,117,0.1)">${l}</div>`).join('')}</div>
+        <div style="margin-top:6px"><b>操作人：</b>当前用户 &nbsp; <b>时间：</b>${repairStore.formatNow()}</div>
+      </div>`
+    }
+
+    s.summaryOpen = true
+    // ★ 维修步骤：根据异常反馈动态生成
+    s.maintSteps = getMaintStepsFromFeedback(abnormalQuestions, ev)
+    s.open = true   // 翻转后自动展开
+    s.tag = null
+    s.tagClass = null
+
+    // ★ 写入事件日志：排查反馈提交
+    ev.logs.unshift({
+      time: repairStore.formatNow(),
+      stage: '排查',
+      title: `排查反馈提交：${s.title}`,
+      content: `判定结果：${resultLabel}。共 ${total} 项检查，其中 ${abnormalCount} 项异常。\n${detailLines.slice(0, 3).join('\n')}${detailLines.length > 3 ? '\n...' : ''}`,
+      operator: '当前用户'
+    })
+    ev.updatedAt = repairStore.formatNow()
+
+    showToast(`排查反馈已提交：${resultLabel}`)
+
+    // ★ 状态联动：有排查卡片操作 → processing
+    recalcEventStatus(ev)
+
+    currentFeedbackScheme.value = null
+    feedbackDesc.value = ''
+    feedbackQuestions.value = []
+  } catch (err) {
+    console.error('[submitFeedback] 提交异常:', err)
+    showToast('提交失败：' + (err && err.message ? err.message : '未知错误'))
+  }
+}
+
+// ---- 维修反馈（截图4） ----
+const showMaintFeedback = ref(false)
+const maintTarget = ref('')
+const maintType = ref('')
+const maintDesc = ref('')
+function openMaintFeedback(scheme) {
+  maintTarget.value = scheme.title.replace('维修方案', '').replace('排查方案', '')
+  maintType.value = ''
+  maintDesc.value = ''
+  currentFeedbackScheme.value = scheme
+  showMaintFeedback.value = true
+}
+function submitMaintFeedback() {
+  const s = currentFeedbackScheme.value
+  if (!s) return
+  const mt = maintType.value
+  if (!mt) {
+    showToast('请选择维修类型')
+    return
+  }
+
+  s.phase = 'done'
+
+  if (mt === 'solved') {
+    // 已解决 → "已完成"标签，收起
+    s.tag = '已完成'
+    s.tagClass = 'resolved'
+    s.maintTempHandled = false
+  } else if (mt === 'temp') {
+    // 临时处理 → 保持登记按钮可见（phase 回到 maintenance）
+    s.phase = 'maintenance'
+    s.tag = null
+    s.maintTempHandled = true   // 标记：曾临时处理过
+    showToast('临时处理已登记，可继续登记最终结果')
+  } else if (mt === 'unsolved') {
+    // 未解决 → 保持处理中状态，登记按钮保留
+    s.phase = 'maintenance'
+    s.tag = '未解决'
+    s.tagClass = 'unsolved'
+    s.maintTempHandled = false
+    showToast('已登记未解决，可继续处理')
+  }
+
+  s.open = (mt !== 'solved')  // 非已解决的都保持展开以便继续操作
+
+  // ★ 写入事件日志：维修反馈提交
+  const ev = selectedEvent.value
+  if (ev) {
+    const now = repairStore.formatNow()
+    const typeLabel = mt === 'solved' ? '已解决' : (mt === 'temp' ? '临时处理' : '未解决')
+    ev.logs.unshift({
+      time: now,
+      stage: '维修',
+      title: `维修反馈提交：${s.title}`,
+      content: `处理结果：${typeLabel}${maintDesc.value ? '。' + maintDesc.value : ''}`,
+      operator: '当前用户'
+    })
+    ev.updatedAt = now
+    // ★ 状态联动：维修反馈驱动事件状态流转
+    recalcEventStatus(ev)
+  }
+
+  showMaintFeedback.value = false
+  maintType.value = ''
+  maintDesc.value = ''
+  currentFeedbackScheme.value = null
+}
+
+// ---- 事件日志 ----
+const eventLogsDisplay = computed(() => {
+  if (!selectedEvent.value?.logs) return []
+  return selectedEvent.value.logs.map((l, i) => {
+    const hasAbnormal = l.content.includes('异常') || l.content.includes('未解决') || l.content.includes('临时处理')
+    const hasNormal = l.title.includes('正常') || (l.content.includes('正常') && !hasAbnormal)
+    const hasResolved = l.title.includes('已解决') || l.title.includes('已完成') || l.stage === '归档'
+
+    // 根据 stage 和内容判断 dotType
+    let dotType = 'info'
+    if (l.stage === '确认') {
+      dotType = i === 0 ? 'urgent' : (l.content.includes('AI') || l.content.includes('检测') ? 'auto' : 'info')
+    } else if (l.stage === '排查') {
+      dotType = hasAbnormal ? 'warn' : (hasNormal ? 'done' : 'info')
+    } else if (l.stage === '维修') {
+      dotType = hasResolved ? 'done' : (hasAbnormal ? 'warn' : 'info')
+    } else if (l.stage === '归档') {
+      dotType = 'done'
+    }
+
+    const tagMap = {
+      '确认': { text: '确认', cls: 'auto' },
+      '排查': { text: '排查', cls: hasAbnormal ? 'abnormal' : (hasNormal ? 'normal' : 'system') },
+      '维修': { text: '维修', cls: hasResolved ? 'normal' : 'abnormal' },
+      '归档': { text: '归档', cls: 'normal' },
+    }
+    const baseTags = [tagMap[l.stage] || { text: l.stage, cls: 'system' }]
+
+    // AI 相关加自动触发标签
+    if (l.operator === 'AI检测引擎') baseTags.push({ text: 'AI自动', cls: 'ai-auto' })
+    // 异常标记
+    if (hasAbnormal) baseTags.push({ text: '异常', cls: 'abnormal' })
+
+    return {
+      title: l.title,
+      time: l.time,
+      desc: l.content,
+      operator: l.operator,
+      dotType,
+      tags: baseTags,
+      actions: !(l.time || '').startsWith('待') && l.stage !== '归档'
+        ? [{ text: '补充说明', icon: '✏️', primary: false }]
+        : null
+    }
+  })
+})
+
+// ---- 数据分析卡片联动趋势图 ----
+const selectedDSIdx = ref(0)
+
+const currentDSCards = computed(() => {
+  return selectedEvent.value?.aiAnalysis?.dataCards || selectedEvent.value?.aiAnalysis?.snapshot || []
+})
+
+const currentDSCardName = computed(() => {
+  const card = currentDSCards.value[selectedDSIdx.value]
+  return card ? card.name : '趋势图'
+})
+
+function selectDSCard(idx) {
+  selectedDSIdx.value = idx
+}
+
+// 为每张卡片生成虚拟趋势数据（基于卡片信息推断参数）
+function genCardTrendData(card, idx) {
+  const baseTrend = selectedEvent.value?.aiAnalysis?.trendData
+  // 如果是核心监控卡片（idx=0）且有原始 trendData，直接用
+  if (idx === 0 && baseTrend) {
+    return baseTrend
+  }
+  const name = card?.name || ''
+  const verdictType = card?.verdictType || card?.status || 'normal'
+  const meta = card?.meta || ''
+  const valueStr = card?.value || ''
+
+  // ---- 提取单位 ----
+  let yUnit = ''
+  const unitMatch = (meta + ' ' + valueStr).match(/(MPa|Hz|℃|mm\/s|m³\/h|kW|kV|bar|rpm|r\/min|ppm|%|dB|Ω|MΩ|A|V)/i)
+  if (unitMatch) yUnit = unitMatch[1]
+
+  // ---- 提取数值范围（优先级：范围>单值>从value推断） ----
+  let yMin = 0, yMax = 100
+
+  // 1) 范围格式 "30~100" / "16~21" / "-10~120"
+  //    排除时间格式 "15:10~16:10"：要求 ~ 前后不能紧跟冒号或数字以时间形式出现
+  const rangeMatch = meta.match(/(-?\d+\.?\d*)\s*[~～]\s*(\d+\.?\d*)\s*(MPa|Hz|%|℃|mm\/s|m³\/h|kW|kV|bar|rpm|r\/min|ppm|dB|Ω|MΩ|A|V)?/)
+  if (rangeMatch) {
+    const lo = parseFloat(rangeMatch[1])
+    const hi = parseFloat(rangeMatch[2])
+    // 合法性校验：范围必须 lo < hi 且差值 > 0.5（排除 "15:10~16:10" 误匹配）
+    if (lo < hi && (hi - lo) > 0.5) {
+      yMin = lo
+      yMax = hi
+      if (rangeMatch[3]) yUnit = rangeMatch[3]
+    }
+  }
+
+  // 2) 如果范围没匹配到，尝试单值格式
+  if (yMin === 0 && yMax === 100) {
+    const singleMatch = meta.match(/(?:额定|容量|阈值|上限|≤|约)\s*(\d+\.?\d*)/)
+    if (singleMatch) {
+      const val = parseFloat(singleMatch[1])
+      yMin = 0
+      yMax = val * 1.3
+    } else {
+      // 3) 从 value 里的 <strong>XXX</strong> 取第一个纯数字值
+      const valMatch = valueStr.match(/<strong>(\d+\.?\d*)/)
+      if (valMatch) {
+        const val = parseFloat(valMatch[1])
+        yMin = val > 0 ? val * 0.6 : 0
+        yMax = val * 1.3
+      }
+    }
+  }
+
+  // ---- 提取基准值 ----
+  const valMatch = valueStr.match(/<strong>(\d+\.?\d*)/)
+  let baseVal = valMatch ? parseFloat(valMatch[1]) : (yMin + yMax) / 2
+  // 确保 baseVal 在 yMin~yMax 范围内（防止线被画到可视区外）
+  if (baseVal < yMin) baseVal = (yMin + yMax) / 2
+  if (baseVal > yMax) baseVal = yMax * 0.85
+
+  // ---- 生成时间轴 ----
+  const numPoints = baseTrend?.times?.length || 6
+  const times = baseTrend?.times?.slice() || []
+  while (times.length < numPoints) {
+    times.unshift(`T-${(numPoints - times.length)}h`)
+  }
+
+  // ---- 生成数值 ----
+  let values = []
+  const range = (yMax - yMin) || 10
+  for (let i = 0; i < numPoints; i++) {
+    const progress = i / (numPoints - 1)
+    if (verdictType === 'danger') {
+      // danger：从基值向 yMax 方向急剧上升
+      values.push(+(baseVal + (yMax * 0.9 - baseVal) * progress * 0.8).toFixed(2))
+    } else if (verdictType === 'warning') {
+      // warning：缓慢漂移 + 小噪声
+      const drift = range * 0.12 * progress
+      const noise = (Math.random() - 0.5) * range * 0.04
+      values.push(+(baseVal + drift + noise).toFixed(2))
+    } else {
+      // normal：在基值附近小幅波动
+      const noise = (Math.random() - 0.5) * range * 0.03
+      values.push(+(baseVal + noise).toFixed(2))
+    }
+  }
+
+  return {
+    seriesName: name.split('-').pop()?.trim() || name.slice(0, 12),
+    yUnit, yMin: yMin * 0.9, yMax: yMax * 1.1,
+    times, values
+  }
+}
+
+// 预警级别配色
+const LEVEL_COLORS = {
+  danger:  { line: '#FF4D4F', area: 'rgba(255,77,79,0.2)',  areaEnd: 'rgba(255,77,79,0.01)',  symbol: '#FF4D4F' },
+  warning: { line: '#FAAD14', area: 'rgba(250,173,20,0.2)', areaEnd: 'rgba(250,173,20,0.01)', symbol: '#FAAD14' },
+  normal:  { line: '#52C41A', area: 'rgba(82,196,26,0.15)', areaEnd: 'rgba(82,196,26,0.01)', symbol: '#52C41A' },
+  safe:    { line: '#00BCD4', area: 'rgba(0,188,212,0.2)',  areaEnd: 'rgba(0,188,212,0.01)',  symbol: '#00BCD4' }
+}
+
+const trendChartOption = computed(() => {
+  const cards = currentDSCards.value
+  if (cards.length === 0) {
+    const td = selectedEvent.value?.aiAnalysis?.trendData
+    if (!td) return {}
+    return buildChartOption(td, 'normal')
+  }
+  const idx = Math.min(selectedDSIdx.value, cards.length - 1)
+  const card = cards[idx]
+  const level = card?.verdictType || card?.status || 'normal'
+  const td = genCardTrendData(card, idx)
+  if (!td || !td.values || td.values.length === 0) return {}
+  return buildChartOption(td, level)
+})
+
+function buildChartOption(td, level) {
+  if (!td) return {}
+  const colors = LEVEL_COLORS[level] || LEVEL_COLORS.normal
+  return {
+    grid: { top: 30, right: 15, bottom: 35, left: 45 },
+    tooltip: { trigger: 'axis', backgroundColor: '#1a2332', borderColor: 'rgba(255,255,255,.1)', textStyle: { color: '#f1f5f9', fontSize: 11 } },
+    xAxis: {
+      type: 'category', data: td.times || [],
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,.06)' } },
+      axisLabel: { color: '#64748b', fontSize: 9, maxTicksLimit: 8 },
+    },
+    yAxis: {
+      type: 'value', name: td.yUnit || '',
+      min: td.yMin, max: td.yMax,
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,.06)' } },
+      axisLabel: { color: '#64748b', fontSize: 9 },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,.04)' } },
+      nameTextStyle: { color: '#64748b', fontSize: 10 }
+    },
+    series: [{
+      type: 'line', data: td.values || [], name: td.seriesName || '',
+      smooth: true, symbol: 'circle', symbolSize: 3,
+      lineStyle: { color: colors.line, width: 2 },
+      itemStyle: { color: colors.symbol },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: colors.area }, { offset: 1, color: colors.areaEnd }] } }
+    }]
+  }
+}
+
+watch(selectedEvent, () => {
+  selectedDSIdx.value = 0
+})
+
+// ---- 待办操作（已上移至 todoSchemes watch 附近，含完整状态流转逻辑）----
+
+// 快速反馈（showQuickFeedback 已在上方声明）
+const quickFeedbackForm = reactive({ conclusion: '', note: '' })
+function submitQuickFeedback() {
+  const conclusion = quickFeedbackForm.conclusion
+  if (!conclusion) {
+    showToast('请选择判断结论')
+    return
+  }
+  const ev = selectedEvent.value
+  if (!ev) return
+  const note = quickFeedbackForm.note
+
+  try {
+    if (conclusion === 'false') {
+      // 正常（误报）→ 事件状态流转至误报，设备恢复正常，写入日志
+      repairStore.advanceEvent(ev.id, 'false_alarm', { note })
+      showToast('已标记为误报，事件关闭')
+    } else if (conclusion === 'done') {
+      // 已处理 → 事件流转至已解决，写入日志
+      repairStore.advanceEvent(ev.id, 'resolve', { note })
+      showToast('已标记为已解决，事件归档')
+    } else if (conclusion === 'more') {
+      // 需进一步排查 → 如果还在待确认则推进到处理中，写入日志
+      if (ev.status === 'pending') {
+        repairStore.advanceEvent(ev.id, 'confirm', { note })
+        showToast('事件已确认，进入排查阶段')
+      } else {
+        const now = repairStore.formatNow ? repairStore.formatNow() : new Date().toISOString().slice(0,16).replace('T',' ')
+        ev.logs.unshift({ time: now, stage: '排查', title: '快速反馈：需进一步排查', content: note || '判定需要进一步排查', operator: '当前用户' })
+        ev.updatedAt = now
+        showToast('已记录，需进一步排查')
+      }
+    } else if (conclusion === 'shore') {
+      // 转岸基支持 → 写入日志，状态不变
+      const now = repairStore.formatNow ? repairStore.formatNow() : new Date().toISOString().slice(0,16).replace('T',' ')
+      ev.logs.unshift({ time: now, stage: '维修', title: '快速反馈：转岸基支持', content: note || '已申请岸基技术支持，等待回复', operator: '当前用户' })
+      ev.updatedAt = now
+      showToast('已申请岸基支持')
+    }
+  } catch (e) {
+    console.error('submitQuickFeedback error:', e)
+    showToast('操作失败，请重试')
+    return
+  }
+
+  // 提交后关闭弹窗、清空表单、回到分屏模式（确保右侧面板始终可见）
+  showQuickFeedback.value = false
+  quickFeedbackForm.conclusion = ''
+  quickFeedbackForm.note = ''
+  detailMode.value = 'split'
+}
+
+function exportReport() { showToast('报告已生成，开始下载') }
+function generateReport() { showToast('已生成阶段性小结报告') }
+function logAction(a, logEntry) {
+  if (a.text === '补充说明') {
+    supplementTarget.value = logEntry
+    supplementNote.value = ''
+    supplementImages.value = []
+    showSupplementModal.value = true
+  }
+}
+
+function submitSupplement() {
+  const target = supplementTarget.value
+  if (!target) return
+
+  const ev = selectedEvent.value
+  if (ev) {
+    const now = repairStore.formatNow()
+    const imgNote = supplementImages.value.length ? `（附图${supplementImages.value.length}张）` : ''
+    ev.logs.unshift({
+      time: now,
+      stage: target.stage || '排查',
+      title: `补充说明：${target.title || '日志记录'}`,
+      content: `对「${target.title}」补充说明：${supplementNote.value || '（无文字描述）'}${imgNote}`,
+      operator: '当前用户'
+    })
+    ev.updatedAt = now
+  }
+
+  showToast('补充说明已提交')
+  showSupplementModal.value = false
+  supplementTarget.value = null
+  supplementNote.value = ''
+  supplementImages.value = []
+}
+
+function addSupplementImage() {
+  // 模拟添加图片
+  supplementImages.value.push({ id: Date.now() + Math.random(), name: 'IMG_' + (supplementImages.value.length + 1) + '.jpg' })
+}
+
+function removeSupplementImage(idx) {
+  supplementImages.value.splice(idx, 1)
+}
+
+// ---- Toast ----
+const toasts = ref([])
+let toastId = 0
+function showToast(text) {
+  const id = ++toastId
+  toasts.value.push({ id, text, leaving: false })
+  setTimeout(() => dismissToast(id), 5000)
+}
+function dismissToast(id) {
+  const t = toasts.value.find(x => x.id === id)
+  if (t) {
+    t.leaving = true
+    setTimeout(() => { toasts.value = toasts.value.filter(x => x.id !== id) }, 300)
+  }
+}
+
+// ---- 方法 ----
+/**
+ * 选中事件
+ * @param {Object} e - 事件对象
+ * @param {boolean} [goFull=true] - 是否进入全屏模式。默认 true（用户点击卡片时），
+ *   设为 false 时仅选中不切换模式（onMounted/路由跳转等场景）
+ */
+function selectEvent(e, goFull = true) {
+  selectedId.value = e.id
+  repairStore.selectEvent(e.id)
+  if (goFull) detailMode.value = 'fullscreen'
+}
+
+function autoLocateTab(ev) {
+  if (ev.status === 'pending') activeTabKey.value = 'ai'
+  else if (ev.status === 'processing') activeTabKey.value = ev.stageIndex >= 2 ? 'todo' : 'todo'
+  else if (ev.status === 'temp_handled') activeTabKey.value = 'log'
+  else activeTabKey.value = 'log'
+}
+
+function initFeedbackForms(ev) {
+  feedbackForms.value = {}
+  ev.todos?.inspections?.forEach(t => {
+    if (!t.result) {
+      feedbackForms.value[t.id] = { result: null, detail: '' }
+    }
+  })
+}
+
+function goBackList() { detailMode.value = 'split' }
+
+// ---- 路由参数：从首页跳转时自动选中事件 / 筛选状态 ----
+onMounted(() => {
+  const eid = route.query.eventId
+  const sf = route.query.statusFilter
+  if (sf) {
+    filters.status = sf
+  }
+  if (eid) {
+    nextTick(() => {
+      const target = repairStore.sortedEvents.find(e => e.id === eid)
+      if (target) selectEvent(target, false)
+    })
+  } else {
+    // 无路由参数时，默认选中第一条（紧急程度最高的）事件
+    nextTick(() => {
+      const first = repairStore.sortedEvents[0]
+      if (first) selectEvent(first, false)
+    })
+  }
+})
+
+// 监听路由变化（首页多次点击不同卡片/统计卡片时）
+watch(() => [route.query.eventId, route.query.statusFilter], ([newId, newSf]) => {
+  if (newSf) { filters.status = newSf }
+  if (newId) {
+    nextTick(() => {
+      const target = repairStore.sortedEvents.find(e => e.id === newId)
+      if (target) selectEvent(target, false)
+    })
+  }
+})
+
+function clearFilters() {
+  filters.device = null; filters.priority = null; filters.status = null
+  keyword.value = ''
+}
+
+function toggleFold(item) { item.folded = !item.folded }
+
+function setFeedback(itemId, field, val) {
+  if (!feedbackForms.value[itemId]) feedbackForms.value[itemId] = { result: null, detail: '' }
+  feedbackForms.value[itemId][field] = val
+}
+
+function submitInspectionFeedback(item) {
+  const form = feedbackForms.value[item.id]
+  if (!form?.result) return
+  repairStore.submitInspection(selectedEvent.value.id, item.id, form.result, form.detail)
+}
+
+function openRepairModal(item) {
+  currentRepairItem.value = item
+  repairForm.result = 'resolved'
+  repairForm.measure = ''
+  repairForm.operator = ''
+  showRepairModal.value = true
+}
+
+function submitRepairFeedback() {
+  if (!currentRepairItem.value) return
+  repairStore.submitRepair(selectedEvent.value.id, currentRepairItem.value.id, repairForm.result, repairForm.measure, repairForm.operator)
+  showRepairModal.value = false
+}
+
+function exportReportOld() {
+  alert(`事件报告「${selectedEvent.value.title}」正在生成PDF...\n（原型演示）`)
+}
+
+function quickAction(type) {
+  quickType.value = type
+  quickNote.value = ''
+  quickCondition.value = ''
+}
+
+function submitQuick() {
+  if (quickType.value === 'false_alarm') {
+    repairStore.advanceEvent(selectedEvent.value.id, 'false_alarm', { note: quickNote.value })
+  } else {
+    const ev = selectedEvent.value
+    const now = new Date()
+    const pad = n => String(n).padStart(2, '0')
+    ev.logs.unshift({
+      time: `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      stage: '维修', title: '快速登记处理方案', content: quickNote.value, operator: '当前用户'
+    })
+  }
+  showQuickFeedback.value = false
+}
+
+// ---- 辅助 ----
+function priorityLabel(p) { return ({ high: '高', medium: '中', low: '低' })[p] || '-' }
+function statusLabel(s) { return repairStore.STATUS_LABELS[s] || s }
+function sourceLabel(s) { return ({ ai_detection: 'AI检测', inspection: '巡检发现', crew_report: '船员上报', ai: 'AI检测', crew: '船员上报' })[s] || s }
+function snapStatusLabel(st) { return ({ normal: '正常', warning: '警告', danger: '异常' })[st] || st }
+function repairResultLabel(r) { return ({ resolved: '已解决', partial: '部分完成', temp: '临时处理' })[r] || r }
+
+// ---- AI 分析辅助函数 ----
+function verdictLabel(v) {
+  return ({ normal: '正常', suspected: '疑似故障', confirmed: '确认故障', resolved: '已解决' })[v] || v
+}
+/** 简单 Markdown → HTML（仅处理 **bold** 和换行） */
+function renderMd(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+}
+/** 修复数据卡片 value：mock 中 value 是数字，需转为带单位的展示字符串 */
+function formatDsValue(d) {
+  // 优先用预格式化的字符串
+  if (d.value && typeof d.value === 'string') return d.value
+  // 数字型：显示 "实测 XX unit"
+  if (typeof d.value === 'number') return `实测 <strong>${d.value}</strong>${d.unit || ''}`
+  // 有 value_num 字段时
+  if (d.value_num != null) return `实测 <strong>${d.value_num}</strong>${d.unit || ''}`
+  return d.value || '—'
+}
+</script>
+
+<style scoped>
+.repair-page {
+  display: flex; flex-direction: column;
+  height: 100%; overflow: hidden;
+  background: #060d17;
+}
+
+/* ========== 顶部栏 ========== */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; flex-shrink: 0;
+  background: #0A1628; border-bottom: 1px solid #162940;
+}
+.tb-left { display: flex; align-items: center; gap: 14px; }
+.page-title { font-size: 16px; font-weight: 800; color: #E0ECF8; letter-spacing: 0.5px; white-space: nowrap; }
+.search-input { width: 340px; }
+.btn-report {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 20px; border-radius: 6px;
+  background: #E74C3C; color: #fff;
+  font-size: 13px; font-weight: 700; border: none; cursor: pointer;
+}
+.btn-report:hover { opacity: 0.9; }
+
+/* ========== 主体 ========== */
+.main-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+
+/* ---- 左侧栏 ---- */
+.sidebar {
+  width: 380px; flex-shrink: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid #162940; background: #080e1a;
+  transition: width 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+}
+.sidebar.collapsed { width: 0; opacity: 0; pointer-events: none; overflow: hidden; border: none; }
+
+.filter-area { padding: 10px 12px; flex-shrink: 0; border-bottom: 1px solid #111e34; }
+.f-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; }
+.f-label { font-size: 11px; color: #4A6A8A; width: 52px; flex-shrink: 0; font-weight: 600; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.chip {
+  padding: 3px 11px; border-radius: 12px; font-size: 11px; cursor: pointer;
+  background: #0c1420; border: 1px solid #1E3A5F; color: #8BAAC0; transition: all 0.12s; white-space: nowrap;
+}
+.chip:hover { border-color: #243B58; color: #B0C4D8; }
+.chip.active { background: #1890FF; color: #fff; border-color: #1890FF; }
+.chip.pri { padding-left: 7px; display: inline-flex; align-items: center; gap: 4px; }
+.chip.pri i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.chip.pri.high i { background: #FF4D4F; }
+.chip.pri.medium i { background: #FAAD14; }
+.chip.pri.low i { background: #1890FF; }
+.chip.pri.high.active { background: #FF4D4F; border-color: #FF4D4F; }
+.chip.pri.medium.active { background: #FAAD14; border-color: #FAAD14; }
+.chip.pri.low.active { background: #1890FF; border-color: #1890FF; }
+
+.card-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.card-list::-webkit-scrollbar { width: 5px; }
+.card-list::-webkit-scrollbar-thumb { background: #243B58; border-radius: 4px; }
+
+.evt-card {
+  display: flex; overflow: hidden; background: #0a1020; border-radius: 8px; cursor: pointer;
+  transition: all 0.15s; border: 1px solid transparent;
+  flex-shrink: 0;
+}
+.ec-bar { width: 4px; flex-shrink: 0; border-radius: 0 4px 4px 0; }
+.evt-card.pri-high .ec-bar { background: #FF4D4F; }
+.evt-card.pri-medium .ec-bar { background: #FAAD14; }
+.evt-card.pri-low .ec-bar { background: #1890FF; }
+.evt-card.selected { border-color: rgba(24,144,255,0.45); background: rgba(24,144,255,0.06); box-shadow: 0 0 14px rgba(24,144,255,0.08); }
+.ec-body { flex: 1; min-width: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+.ec-title-row { display: flex; align-items: center; gap: 8px; }
+.ec-title { font-size: 13px; font-weight: 700; color: #E0ECF8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ec-sub-row { display: flex; align-items: center; gap: 8px; }
+.ec-device { font-size: 11px; color: #5A7A92; display: flex; align-items: center; gap: 3px; }
+.ec-meta { display: flex; align-items: center; justify-content: space-between; }
+.ec-source { font-size: 10px; color: #3A5A7A; }
+.ec-time { font-size: 10px; color: #3A5A7A; }
+.empty-list { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; color: #3A5A7A; font-size: 13px; }
+.list-footer { padding: 8px 14px; border-top: 1px solid #111e34; font-size: 11px; color: #4A6A8A; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.list-footer b { color: #1890FF; }
+.clear-filter { margin-left: auto; color: #1890FF; cursor: pointer; text-decoration: underline; }
+
+/* ---- 右侧面板 ---- */
+.right-panel { flex: 1; min-width: 0; overflow: hidden; background: #060d17; display: flex; flex-direction: column; position: relative; }
+.detail-wrapper { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.empty-detail { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.ed-icon-wrap { width: 72px; height: 72px; border-radius: 50%; background: rgba(24,144,255,0.06); border: 2px dashed #1E3A5F; display: flex; align-items: center; justify-content: center; }
+.ed-icon-wrap > span { font-size: 32px; color: #2A4566; }
+.ed-title { font-size: 15px; font-weight: 600; color: #4A6A8A; margin: 0; }
+.ed-sub { font-size: 12px; color: #2A4566; margin: 0; }
+
+/* ---- 2.4.2.1 基础信息区（固定顶部）---- */
+.detail-header-fixed {
+  flex-shrink: 0; padding: 14px 24px;
+  background: linear-gradient(135deg, #0d1e38 0%, #0a1628 100%);
+  border-bottom: 1px solid #1a3050;
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+/* 快速反馈按钮（标题右上角） */
+.dhf-quick-fb {
+  flex-shrink: 0; margin-left: 16px;
+  background: rgba(255,77,79,0.12); border: 1px solid rgba(255,77,79,0.3);
+  color: #FF7875; border-radius: 6px;
+  padding: 7px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+  transition: all 0.15s;
+}
+.dhf-quick-fb:hover { background: rgba(255,77,79,0.2); color: #FF4D4F; }
+.dhf-quick-fb svg { font-size: 14px; }
+.dhf-left { display: flex; gap: 14px; align-items: flex-start; }
+.back-btn {
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 8px; border: 1px solid #1E3A5F; background: #0a1020;
+  color: #8BAAC0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; transition: all 0.15s;
+}
+.back-btn:hover { border-color: #1890FF; color: #1890FF; }
+.dhf-info { flex: 1; min-width: 0; }
+.dhf-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dhf-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+.dhf-meta { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+.dhfm-item { font-size: 11px; color: #5A7A92; display: flex; align-items: center; gap: 4px; }
+.dhf-desc { font-size: 12px; color: #6888A8; margin: 6px 0 0; line-height: 1.5; }
+
+/* 进度条 */
+.progress-bar-section {
+  flex-shrink: 0; padding: 12px 24px; background: #0A1628; border-bottom: 1px solid #162940;
+}
+.progress-steps { display: flex; align-items: center; justify-content: center; }
+.ps-node { display: flex; flex-direction: column; align-items: center; z-index: 1; }
+.ps-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #162940; border: 2.5px solid #2A4566; transition: all 0.25s;
+}
+.ps-node.done .ps-dot { background: #52C41A; border-color: #52C41A; }
+.ps-node.done .ps-dot::after { content:'✓'; color:#fff; font-size:9px; font-weight:900; position:relative;top:-6.5px;left:-3px;}
+.ps-node.active .ps-dot { background: #1890FF; border-color: #1890FF; animation: psPulse 1.6s infinite; }
+@keyframes psPulse { 0%,100%{box-shadow:0 0 0 0 rgba(24,144,255,0.6);} 50%{box-shadow:0 0 0 6px rgba(24,144,255,0);} }
+.ps-lbl { font-size: 11px; color: #4A6A8A; margin-top: 5px; font-weight: 600; }
+.ps-node.done .ps-lbl { color: #52C41A; }
+.ps-node.active .ps-lbl { color: #1890FF; }
+.ps-line { width: 48px; height: 2px; background: #162940; margin: 0 -4px; margin-bottom: 24px; }
+.ps-line.done { background: #52C41A; }
+.ps-summary { margin-top: 8px; text-align: center; font-size: 11px; color: #8BAAC0; }
+
+/* ---- Tab 导航 ---- */
+.tab-nav {
+  flex-shrink: 0; display: flex; gap: 0; padding: 0 24px;
+  background: #080e1a; border-bottom: 1px solid #162940;
+}
+.tab-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 18px; background: none; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: #5A7A92;
+  border-bottom: 2px solid transparent; transition: all 0.15s; position: relative;
+}
+.tab-btn svg { font-size: 16px; }
+.tab-btn:hover { color: #8BAAC0; }
+.tab-btn.active { color: #1890FF; border-bottom-color: #1890FF; }
+.tab-badge {
+  font-size: 10px; background: #FF4D4F; color: #fff;
+  border-radius: 8px; padding: 0 5px; min-width: 16px; height: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ---- Tab 内容滚动 ---- */
+.tab-content-scroll { flex: 1; overflow-y: auto; }
+.tab-content-scroll::-webkit-scrollbar { width: 5px; }
+.tab-content-scroll::-webkit-scrollbar-thumb { background: #243B58; border-radius: 4px; }
+.tab-pane { padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ====== AI 分析 Tab（一比一还原 ship-maintenance 原型）====== */
+.ai-tab { display: flex; flex-direction: column; gap: 12px; }
+
+/* 每个区块卡片 */
+.ai-section {
+  background: #0D1B2E; border: 1px solid #162940;
+  border-radius: 12px; padding: 16px; margin-bottom: 12px;
+}
+
+/* 区块标题 */
+.ai-section-title {
+  font-size: 14px; font-weight: 700; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px; color: #E8F0FF;
+}
+.st-icon { font-size: 16px; line-height: 1; }
+
+/* 结论框 */
+.conclusion-box {
+  padding: 12px; border-radius: 6px; margin-bottom: 12px;
+}
+.conclusion-box.suspected {
+  background: rgba(250,173,20,0.06);
+  border-left: 3px solid #FAAD14;
+}
+.conclusion-box.normal {
+  background: rgba(82,196,26,0.06);
+  border-left: 3px solid #52C41A;
+}
+.conclusion-box.confirmed {
+  background: rgba(255,77,79,0.06);
+  border-left: 3px solid #FF4D4F;
+}
+.cb-label {
+  font-size: 11px; font-weight: 700; color: #FAAD14; margin-bottom: 4px;
+}
+.conclusion-box.normal .cb-label { color: #52C41A; }
+.conclusion-box.confirmed .cb-label { color: #FF4D4F; }
+.cb-text {
+  font-size: 12px; color: #94A3B8; line-height: 1.7;
+}
+
+/* 建议措施 */
+.suggest-hd {
+  font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #E8F0FF;
+}
+.suggest-list { list-style: none; }
+.suggest-list li {
+  font-size: 12px; color: #94A3B8;
+  padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.03);
+  display: flex; gap: 8px; line-height: 1.6;
+}
+.suggest-list li:last-child { border-bottom: none; }
+.suggest-list .sn { color: #1890FF; font-weight: 700; flex-shrink: 0; }
+
+/* 故障原因表格（与原型一致：3列，无概率列） */
+.fault-table {
+  width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;
+}
+.fault-table th {
+  text-align: left; padding: 7px 10px;
+  color: #5A7A92; font-weight: 600;
+  border-bottom: 1px solid #1E3A5F; font-size: 11px;
+}
+.fault-table td {
+  padding: 7px 10px; color: #94A3B8;
+  border-bottom: 1px solid rgba(255,255,255,.03); vertical-align: top;
+}
+.fault-table tbody tr:last-child td { border-bottom: none; }
+
+/* 数据分析卡片网格 —— 原型 minmax(280px) 单列宽卡片 */
+.ds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px; margin-top: 10px;
+}
+.ds-card {
+  background: #080f1a; border: 1px solid #1E3A5F;
+  border-radius: 6px; padding: 11px 13px;
+  transition: all 0.2s;
+}
+.ds-card.ds-clickable {
+  cursor: pointer; position: relative;
+}
+.ds-card.ds-clickable:hover {
+  border-color: #2A5580; background: #0c1626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.ds-card.ds-active {
+  border-color: #1890FF; background: rgba(24,144,255,0.05);
+  box-shadow: 0 0 0 1px #1890FF, 0 4px 16px rgba(24,144,255,0.1);
+}
+.ds-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.ds-active-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #1890FF; flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(24,144,255,0.5);
+  animation: dsDotPulse 1.5s ease infinite;
+}
+@keyframes dsDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.ds-name {
+  font-size: 12px; font-weight: 600; color: #E8F0FF; margin-bottom: 4px;
+  line-height: 1.35;
+}
+.ds-meta {
+  font-size: 11px; color: #5A7A92; margin-bottom: 4px;
+}
+.ds-value {
+  font-size: 11.5px; color: #94A3B8; line-height: 1.65;
+}
+.ds-value strong { color: #1890FF; font-weight: 600; }
+.ds-card.ds-danger .ds-value strong { color: #FF4D4F; }
+.ds-card.ds-warning .ds-value strong { color: #FAAD14; }
+.ds-verdict {
+  font-size: 11px; margin-top: 4px; line-height: 1.5;
+}
+.ds-verdict.normal,
+.ds-verdict.safe { color: #52C41A; }
+.ds-verdict.warning,
+.ds-verdict.warn { color: #FAAD14; }
+.ds-verdict.danger,
+.ds-verdict.abnormal { color: #FF4D4F; }
+
+/* 趋势图容器 */
+.chart-wrap { margin-top: 12px; background: #080f1a; border: 1px solid #1E3A5F; border-radius: 8px; padding: 12px; }
+.chart-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(30,58,95,0.5);
+}
+.chart-title-text {
+  font-size: 13px; font-weight: 600; color: #1890FF;
+  display: flex; align-items: center; gap: 6px;
+}
+.chart-title-text svg { font-size: 16px; }
+.chart-hint {
+  font-size: 11px; color: #5A7A92;
+}
+.trend-chart-ai { width: 100%; height: 220px; }
+
+/* 工程机理文本 */
+.eng-text {
+  font-size: 12px; color: #94A3B8; line-height: 1.85; margin-bottom: 10px;
+}
+.eng-text p { margin-bottom: 8px; }
+.eng-text :last-child { margin-bottom: 0; }
+.eng-text strong { color: #E8F0FF; }
+
+/* 匹配度标签 */
+.match-tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 700;
+}
+.match-tag.high,
+.match-tag.partial { background: rgba(250,173,20,0.12); color: #FAAD14; }
+.match-tag.medium { background: rgba(250,173,20,0.08); color: #D4920A; }
+.match-tag.low { background: rgba(24,144,255,0.1); color: #1890FF; }
+.match-tag.pending { background: rgba(90,122,146,0.15); color: #5A7A92; }
+
+/* ---- 待办事项 Tab ---- */
+.todo-section { display: flex; flex-direction: column; gap: 10px; }
+.todo-section-hd { display: flex; align-items: center; justify-content: space-between; }
+.todo-section-hd h4 { font-size: 14px; font-weight: 700; color: #E0ECF8; margin: 0; display: flex; align-items: center; gap: 6px; }
+.todo-section-hd h4 svg { color: #1890FF; }
+.todo-progress { font-size: 11px; color: #5A7A92; }
+
+/* ---- 待办方案卡片 (todo-scheme) ---- */
+.todo-scheme {
+  background: #0D1B2E; border: 1px solid #162940; border-radius: 12px;
+  overflow: hidden; margin-bottom: 10px;
+}
+/* 维修阶段卡片：蓝色左边框 */
+.todo-scheme.scheme-maintenance { border-left: 3px solid #1890FF; }
+
+/* 方案头部 —— 对齐 ship-maintenance 截图 */
+.scheme-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; cursor: pointer; user-select: none;
+  transition: background 0.2s;
+}
+.scheme-header:hover { background: rgba(255,255,255,.02); }
+.scheme-left { display: flex; align-items: center; gap: 8px; }
+/* 维修阶段标题蓝色竖线 */
+.title-bar-indicator {
+  width: 3px; height: 14px; background: #1890FF; border-radius: 2px; flex-shrink: 0;
+}
+.scheme-title { font-size: 13px; font-weight: 600; color: #E0ECF8; }
+.scheme-right { display: flex; align-items: center; gap: 8px; }
+.scheme-tag { font-size: 10px; padding: 2px 10px; border-radius: 8px; font-weight: 700; flex-shrink: 0; }
+.scheme-tag.normal { color: #52C41A; background: rgba(82,196,26,0.12); }
+.scheme-tag.abnormal { color: #FF4D4F; background: rgba(255,77,79,0.12); }
+.scheme-tag.maintenance { color: #FAAD14; background: rgba(250,173,20,0.12); }
+.scheme-tag.resolved { color: #52C41A; background: rgba(82,196,26,0.12); }
+.scheme-tag.unsolved { color: #FF4D4F; background: rgba(255,77,79,0.12); }
+
+.btn-normal, .btn-abnormal {
+  padding: 4px 14px; border-radius: 5px; font-size: 11px; font-weight: 600; border: 1px solid currentColor; cursor: pointer;
+  background: transparent;
+}
+.btn-normal { color: #52C41A; border-color: #52C41A; }
+.btn-normal:hover { background: rgba(82,196,26,0.12); }
+.btn-abnormal { color: #FF4D4F; border-color: #FF4D4F; }
+.btn-abnormal:hover { background: rgba(255,77,79,0.12); }
+
+/* 登记按钮 —— 截图3右上角 */
+.btn-register {
+  padding: 4px 16px; border-radius: 5px; font-size: 11px; font-weight: 600;
+  border: 1px solid #1890FF; color: #1890FF; background: transparent; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-register:hover { background: rgba(24,144,255,0.1); }
+
+.scheme-expand { color: #5A7A92; font-size: 12px; transition: transform 0.2s; }
+.scheme-expand.open { transform: rotate(180deg); }
+
+/* 方案展开体 */
+.scheme-body { padding: 0 16px 14px; }
+
+/* 安全警告框（维修方案）—— 对齐截图3 */
+.safety-box {
+  margin-top: 12px;
+  background: rgba(250,173,20,0.08);
+  border: 1px solid rgba(250,173,20,0.35);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.safety-title {
+  font-size: 13px; font-weight: 700; color: #FAAD14; margin-bottom: 6px;
+}
+.safety-subtitle {
+  font-size: 11px; color: #D48806; font-weight: 600; margin-bottom: 8px;
+}
+.safety-item {
+  font-size: 11px; color: #94A3B8; line-height: 1.75;
+  padding: 2px 0 2px 14px; position: relative;
+}
+.safety-item::before {
+  content: '•'; position: absolute; left: 0; top: 2px;
+  color: #FAAD14; font-size: 14px;
+}
+
+/* 前情提要（排查结论摘要卡片） */
+.inspect-summary {
+  background: linear-gradient(135deg, rgba(250,173,20,0.07) 0%, rgba(24,144,255,0.04) 100%);
+  border: 1px solid rgba(250,173,20,0.28); border-radius: 8px;
+  cursor: pointer; transition: all 0.2s; overflow: hidden;
+}
+.inspect-summary:hover { border-color: rgba(250,173,20,0.5); }
+.is-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; user-select: none;
+}
+.is-icon { font-size: 16px; }
+.is-title { font-size: 13px; font-weight: 700; color: #FAAD14; }
+.is-tag {
+  margin-left: auto; padding: 2px 10px; border-radius: 10px;
+  font-size: 11px; background: rgba(250,173,20,0.15); color: #FAAD14;
+}
+.is-arrow { color: #5A7A92; font-size: 11px; transition: transform 0.2s; }
+.is-arrow.open { transform: rotate(180deg); }
+.is-body { padding: 0 14px 12px 14px; border-top: 1px solid rgba(250,173,20,0.12); }
+
+/* 标准处理流程标题 */
+.maint-flow-hd {
+  font-size: 13px; font-weight: 700; color: #E8F0FF;
+  background: #0a1628;
+  padding: 10px 14px; margin-top: 16px; border-radius: 6px;
+}
+
+/* 维修步骤 —— 截图3样式 */
+.maint-steps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.maint-step {
+  background: #0c1628; border: 1px solid #1E3A5F; border-radius: 6px; padding: 10px 14px;
+  cursor: pointer; transition: border-color 0.15s;
+}
+.maint-step:hover { border-color: #2A4566; }
+.ms-head { display: flex; align-items: center; gap: 8px; }
+.ms-num-circle {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #1890FF; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.ms-title { font-size: 13px; font-weight: 600; color: #E0ECF8; flex: 1; }
+.ms-time { font-size: 11px; color: #5A7A92; font-family: Consolas, monospace; flex-shrink: 0; }
+.ms-arrow { color: #5A7A92; font-size: 12px; transition: transform 0.2s; }
+.ms-arrow.open { transform: rotate(180deg); }
+
+.ms-detail { font-size: 11.5px; color: #94A3B8; line-height: 1.7; margin-top: 10px; padding-left: 4px; }
+.ms-detail ul { list-style: none; padding: 0; margin: 0; }
+
+.ms-criteria {
+  margin-top: 10px; padding: 8px 12px;
+  background: rgba(24,144,255,0.05); border-radius: 5px;
+  border-left: 3px solid #1890FF;
+}
+.mc-label { font-size: 11px; color: #1890FF; font-weight: 600; margin-bottom: 4px; }
+.mc-item { font-size: 11.5px; color: #8BAAC0; padding: 2px 0; line-height: 1.6; }
+
+/* 图片占位区域 */
+.ms-images, .step-images {
+  display: flex; gap: 10px; margin-top: 10px;
+}
+.ms-img-placeholder, .step-img-placeholder {
+  width: 140px; height: 90px;
+  background: #0a1220; border: 1px dashed #2A4566; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: #3A5A7A; font-size: 24px;
+}
+
+/* 排查注意事项（截图1：橙色区域，数组渲染） */
+.warn-box-rich {
+  margin-top: 12px;
+  background: rgba(250,173,20,0.08);
+  border: 1px solid rgba(250,173,20,0.35);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.warn-hd {
+  font-size: 12px; font-weight: 700; color: #FAAD14; margin-bottom: 8px;
+}
+.warn-list { margin: 0; padding-left: 18px; }
+.warn-list li {
+  font-size: 11.5px; color: #D4A855; line-height: 1.75;
+  margin-bottom: 3px;
+}
+
+/* 步骤列表（排查方案） —— 截图1样式 */
+.step-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.step-item {
+  background: #080f1a; border: 1px solid #162940; border-radius: 6px;
+  cursor: pointer; transition: border-color 0.15s; overflow: hidden;
+}
+.step-item:hover { border-color: #2A4566; }
+.step-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+}
+.step-num { font-size: 13px; font-weight: 700; color: #E0ECF8; margin-right: 6px; }
+.step-title { font-size: 12px; color: #B0C4D8; }
+.step-time { font-size: 10px; color: #5A7A92; font-family: Consolas, monospace; }
+.step-detail {
+  padding: 0 14px 12px 32px; display: flex; flex-direction: column; gap: 4px;
+}
+.sd-item {
+  font-size: 11.5px; color: #8BAAC0; line-height: 1.6;
+  padding-left: 12px; position: relative;
+}
+.sd-item::before { content: '–'; position: absolute; left: 0; color: #3A5A7A; }
+
+/* 展开动画（保留） */
+.expand-enter-active, .expand-leave-active { transition: all 0.25s ease; overflow: hidden; }
+.expand-enter-from, .expand-leave-to { opacity: 0; max-height: 0; margin-top: 0; padding-top: 0; padding-bottom: 0; }
+
+.todo-cards { display: flex; flex-direction: column; gap: 8px; }
+.todo-card {
+  background: #0D1B2E; border: 1px solid #162940; border-radius: 8px; overflow: hidden;
+  transition: all 0.2s;
+}
+.todo-card.is-normal { border-color: rgba(82,196,26,0.35); }
+.todo-card.is-abnormal { border-color: rgba(255,77,79,0.35); background: rgba(255,77,79,0.03); }
+.todo-card.repair.is-done { border-color: rgba(82,196,26,0.35); }
+.todo-card.is-dimmed { opacity: 0.45; }
+.tc-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer; user-select: none;
+}
+.tc-status-icon svg { font-size: 20px; }
+.tc-status-icon .ok { color: #52C41A; }
+.tc-status-icon .warn { color: #FAAD14; }
+.tc-status-icon .pending { color: #3A5A7A; }
+.tc-title { flex: 1; font-size: 13px; font-weight: 600; color: #E0ECF8; }
+.tc-result-tag { font-size: 10px; padding: 1px 8px; border-radius: 3px; font-weight: 700; }
+.tc-result-tag.normal { color: #52C41A; background: rgba(82,196,26,0.12); }
+.tc-result-tag.abnormal { color: #FF4D4F; background: rgba(255,77,79,0.12); }
+.tc-arrow { color: #5A7A92; font-size: 18px; }
+
+.tc-body { padding: 0 16px 14px; }
+.feedback-detail p { font-size: 12px; color: #8BAAC0; line-height: 1.6; margin: 0 0 8px; }
+.feedback-detail .fd-tag { font-size: 10px; padding: 1px 8px; border-radius: 3px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
+.feedback-detail .fd-tag.resolved { color: #52C41A; background: rgba(82,196,26,0.12); }
+.feedback-detail .fd-tag.partial { color: #FAAD14; background: rgba(250,173,20,0.12); }
+.feedback-detail .fd-tag.temp { color: #1890FF; background: rgba(24,144,255,0.12); }
+.fd-meta { display: flex; gap: 16px; font-size: 11px; color: #4A6A8A; }
+
+.feedback-form { display: flex; flex-direction: column; gap: 10px; }
+.ff-judge { display: flex; gap: 8px; }
+.judge-btn {
+  flex: 1; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  border: 1px solid #1E3A5F; background: #080f1a; color: #8BAAC0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s;
+}
+.judge-btn.normal.active { border-color: #52C41A; background: rgba(82,196,26,0.1); color: #52C41A; }
+.judge-btn.abnormal.active { border-color: #FF4D4F; background: rgba(255,77,79,0.1); color: #FF4D4F; }
+.ff-textarea {
+  width: 100%; background: #080f1a; border: 1px solid #1E3A5F; border-radius: 6px;
+  color: #E0ECF8; padding: 8px 12px; font-size: 12px; resize: vertical; outline: none;
+}
+.ff-textarea:focus { border-color: #1890FF; }
+.ff-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ff-upload, .ff-voice {
+  padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  border: 1px solid #1E3A5F; background: #080f1a; color: #5A7A92; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+}
+.ff-upload:hover, .ff-voice:hover { color: #1890FF; border-color: #1890FF; }
+.ff-submit {
+  margin-left: auto; padding: 6px 18px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  background: #1890FF; color: #fff; border: none; cursor: pointer;
+}
+.ff-submit:hover { background: #1677cc; }
+
+.repair-handle-btn {
+  width: 100%; padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+  background: rgba(24,144,255,0.1); color: #1890FF; border: 1px dashed #1890FF; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.repair-handle-btn:hover { background: rgba(24,144,255,0.2); }
+
+.slide-down-enter-active, .slide-down-leave-active { transition: all 0.25s ease; max-height: 300px; }
+.slide-down-enter-from, .slide-down-leave-to { opacity: 0; max-height: 0; }
+
+/* ---- 事件日志 Tab ---- */
+.log-actions { display: flex; gap: 10px; margin-bottom: 14px; }
+.log-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  border: none; cursor: pointer; transition: opacity 0.12s;
+}
+.log-btn.export { background: #1890FF; color: #fff; }
+.log-btn.export:hover { background: #1677cc; }
+.log-btn.quick { background: #0D1B2E; color: #FAAD14; border: 1px solid #FAAD14; }
+.log-btn.quick:hover { background: rgba(250,173,20,0.1); }
+
+/* ---- 事件日志 Tab ---- */
+.log-toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+.timeline { position: relative; padding-left: 24px; }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #162940; }
+.tl-node { position: relative; margin-bottom: 16px; }
+.tl-dot { position: absolute; left: -20px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid; flex-shrink: 0; }
+.tl-dot.urgent { border-color: #FF4D4F; background: rgba(255,77,79,0.2); }
+.tl-dot.warn { border-color: #FAAD14; background: rgba(250,173,20,0.2); }
+.tl-dot.info { border-color: #5A7A92; background: rgba(90,122,146,0.15); }
+.tl-dot.auto { border-color: #1890FF; background: rgba(24,144,255,0.15); }
+.tl-dot.done { border-color: #52C41A; background: rgba(82,196,26,0.15); }
+.tl-card { background: #0D1B2E; border: 1px solid #162940; border-radius: 8px; padding: 12px 14px; }
+.tl-title { font-size: 13px; font-weight: 600; color: #E0ECF8; margin-bottom: 2px; }
+.tl-time { font-size: 10px; color: #5A7A92; margin-bottom: 6px; font-family: Consolas, monospace; }
+.tl-desc { font-size: 12px; color: #8BAAC0; line-height: 1.6; margin-bottom: 6px; }
+.tl-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+.tl-tag { font-size: 10px; padding: 1px 7px; border-radius: 8px; font-weight: 600; }
+.tl-tag.urgent { background: rgba(255,77,79,0.12); color: #FF4D4F; }
+.tl-tag.abnormal { background: rgba(250,173,20,0.12); color: #FAAD14; }
+.tl-tag.auto, .tl-tag.ai-auto { background: rgba(24,144,255,0.12); color: #1890FF; }
+.tl-tag.normal { background: rgba(82,196,26,0.12); color: #52C41A; }
+.tl-tag.system { background: rgba(255,255,255,0.05); color: #5A7A92; }
+.tl-action { display: flex; gap: 6px; margin-top: 6px; }
+.tl-action button {
+  font-size: 11px; padding: 3px 10px; border-radius: 4px;
+  border: 1px solid #1E3A5F; background: transparent; color: #8BAAC0; cursor: pointer; transition: all 0.12s;
+}
+.tl-action button:hover { border-color: #1890FF; color: #1890FF; }
+.tl-action button.btn-primary { background: rgba(24,144,255,0.1); color: #1890FF; border-color: transparent; }
+
+/* ---- 补充说明弹窗 ---- */
+.supp-orig-card {
+  background: #0A1628; border: 1px solid #1E3A5F; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;
+}
+.supp-orig-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.supp-orig-stage {
+  font-size: 10px; padding: 1px 8px; border-radius: 8px; font-weight: 600;
+}
+.supp-orig-stage.auto { background: rgba(24,144,255,0.12); color: #1890FF; }
+.supp-orig-stage.system { background: rgba(255,255,255,0.05); color: #5A7A92; }
+.supp-orig-stage.normal { background: rgba(82,196,26,0.12); color: #52C41A; }
+.supp-orig-stage.abnormal { background: rgba(250,173,20,0.12); color: #FAAD14; }
+.supp-orig-stage.urgent { background: rgba(255,77,79,0.12); color: #FF4D4F; }
+.supp-orig-time { font-size: 10px; color: #5A7A92; }
+.supp-orig-title { font-size: 13px; font-weight: 600; color: #E0ECF8; margin-bottom: 4px; }
+.supp-orig-desc { font-size: 12px; color: #8BAAC0; line-height: 1.6; margin-bottom: 6px; }
+.supp-orig-tags { display: flex; gap: 4px; margin-bottom: 6px; }
+.supp-orig-operator { font-size: 11px; color: #5A7A92; display: flex; align-items: center; gap: 4px; }
+.supp-input-row textarea {
+  width: 100%; background: #0A1628; border: 1px solid #1E3A5F; border-radius: 6px;
+  padding: 8px 10px; color: #E8F0FF; font-size: 12px; line-height: 1.6; resize: vertical;
+  font-family: inherit; outline: none;
+}
+.supp-input-row textarea:focus { border-color: #1890FF; }
+.supp-img-row label { margin-bottom: 6px; }
+.supp-img-upload { display: flex; flex-wrap: wrap; gap: 8px; }
+.supp-img-item {
+  display: flex; align-items: center; gap: 4px;
+  background: #0A1628; border: 1px solid #1E3A5F; border-radius: 6px;
+  padding: 6px 8px; font-size: 11px; color: #8BAAC0;
+}
+.supp-img-item svg { font-size: 16px; color: #1890FF; }
+.supp-img-name { white-space: nowrap; }
+.supp-img-del { background: none; border: none; cursor: pointer; color: #FF4D4F; font-size: 14px; display: flex; }
+.supp-img-add {
+  display: flex; flex-direction: row; align-items: center; gap: 6px;
+  padding: 8px 16px; border: 1px dashed #2A4566; border-radius: 6px;
+  background: transparent; color: #5A7A92; font-size: 12px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.supp-img-add:hover { border-color: #1890FF; color: #1890FF; }
+.supp-img-add svg { font-size: 18px; }
+.supp-footer { display: flex !important; gap: 12px; }
+.supp-btn-cancel {
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 22px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  border: 1px solid #2A4566; background: transparent; color: #8BAAC0;
+  transition: all 0.15s; flex: 1; justify-content: center;
+}
+.supp-btn-cancel:hover { color: #E8F0FF; border-color: #3A5A7A; background: rgba(255,255,255,0.02); }
+.supp-btn-cancel svg { font-size: 16px; }
+.supp-btn-submit {
+  display: flex; align-items: center; gap: 4px; justify-content: center; flex: 1;
+}
+.supp-btn-submit svg { font-size: 16px; }
+
+/* 日志底部按钮 —— 对齐 ship-maintenance */
+.log-btn-ghost {
+  padding: 6px 16px; font-size: 12px;
+  background: transparent; border: 1px solid rgba(255,255,255,.1);
+  color: #94A3B8; border-radius: 5px; cursor: pointer;
+}
+.log-btn-ghost:hover { border-color: #1890FF; color: #1890FF; }
+.log-btn-blue {
+  padding: 6px 16px; font-size: 12px;
+  background: rgba(24,144,255,0.12); border: none;
+  color: #1890FF; border-radius: 5px; cursor: pointer;
+}
+/* 下载PDF按钮（与巡检报告页统一） */
+.report-pdf-btn {
+  background: #1890FF; border: none; border-radius: 6px;
+  color: #fff; padding: 7px 18px; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: background 0.15s;
+}
+.report-pdf-btn:hover { background: #40A9FF; }
+.report-pdf-btn svg { font-size: 16px; }
+
+/* ---- 智能助手悬浮（截图2 对齐） ---- */
+.assistant-fab {
+  position: absolute; right: 24px; bottom: 24px; z-index: 50;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, #1890FF, #096DD9); color: #fff;
+  border: none; cursor: pointer; font-size: 22px;
+  box-shadow: 0 4px 20px rgba(24,144,255,0.4);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.2s;
+}
+.assistant-fab:hover { transform: scale(1.1); }
+/* ---- 弹窗 ---- */
+.modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+.modal-box { background: #0D1B2E; border: 1px solid #243B58; border-radius: 12px; width: 420px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-box.fb-modal { width: 440px; }
+.modal-box.fb-modal-lg { width: 540px; max-height: 82vh; }
+.fb-scrollable { overflow-y: auto; max-height: calc(82vh - 110px); padding-right: 6px; }
+.fb-scrollable::-webkit-scrollbar { width: 4px; }
+.fb-scrollable::-webkit-scrollbar-thumb { background: #2A4566; border-radius: 2px; }
+/* 动态问题卡片 */
+.fb-ai-hint {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #5A7A92; padding: 8px 12px; margin-bottom: 12px;
+  background: rgba(24,144,255,0.05); border-radius: 6px; border: 1px dashed #1E3A5F;
+}
+.fb-ai-hint b { color: #1890FF; }
+.fb-question {
+  background: #0a1020; border: 1px solid #1E3A5F; border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 12px; position: relative;
+}
+.fb-question:last-of-type { margin-bottom: 0; }
+/* 问题序号角标 */
+.fb-question::before {
+  content: attr(data-idx); position: absolute; top: -8px; left: 12px;
+  background: #1890FF; color: #fff; font-size: 10px; font-weight: 700;
+  width: 18px; height: 18px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; line-height: 1;
+}
+/* 所属步骤标题 */
+.fb-q-step {
+  font-size: 11px; color: #FAAD14; font-weight: 600; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 4px;
+}
+.fb-q-step::before { content: ''; width: 6px; height: 6px; border-radius: 2px; background: #FAAD14; }
+.fb-q-title {
+  font-size: 13px; color: #E0ECF8; font-weight: 600;
+  margin-bottom: 8px; line-height: 1.5;
+  padding-left: 10px;
+  border-left: 3px solid #1890FF;
+}
+.fb-q-options {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.fb-q-opt {
+  padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  background: #0c1420; border: 1px solid #243B58; color: #8BAAC0;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.fb-q-opt:hover { border-color: #3A6090; color: #B0C4D8; }
+.fb-q-opt.active {
+  background: rgba(24,144,255,0.12); border-color: #1890FF; color: #1890FF;
+  box-shadow: 0 0 8px rgba(24,144,255,0.15);
+}
+/* 负面选项选中时的特殊高亮 */
+.fb-q-opt.active[data-negative="true"] {
+  background: rgba(255,77,79,0.08); border-color: #FF4D4F; color: #FF4D4F;
+  box-shadow: 0 0 8px rgba(255,77,79,0.12);
+}
+/* "其他（自定义）"按钮特殊样式 - 虚线边框+橙色 */
+.fb-q-opt.custom-btn {
+  border-style: dashed; color: #FAAD14 !important;
+  border-color: rgba(250,173,20,0.3) !important;
+}
+.fb-q-opt.custom-btn:hover {
+  border-color: #FAAD14 !important; background: rgba(250,173,20,0.06) !important;
+}
+.fb-q-opt.custom-btn.active {
+  background: rgba(250,173,20,0.1) !important; border-color: #FAAD14 !important;
+  box-shadow: 0 0 8px rgba(250,173,20,0.15);
+}
+.fb-q-input {
+  width: 100%; margin-top: 8px;
+  background: #080f1a; border: 1px solid #243B58; border-radius: 6px;
+  color: #E0ECF8; padding: 7px 12px; font-size: 12px; outline: none;
+}
+.fb-q-input:focus { border-color: #1890FF; }
+.fb-input::placeholder { color: #3A5A78; }
+/* 负面选项详情输入区域 */
+.fb-q-detail-wrap {
+  margin-top: 10px; padding: 10px 12px;
+  background: rgba(255,77,79,0.03); border-radius: 6px;
+  border: 1px solid rgba(255,77,79,0.15);
+}
+.fb-q-detail-wrap .fb-q-input {
+  background: #080f1a; border-color: rgba(255,77,79,0.2); font-size: 12px;
+}
+.fb-q-detail-wrap .fb-q-input:focus { border-color: #FF4D4F; }
+
+/* 数字输入模式（比较类/数值类 — 选"不一致/偏高/偏低"时） */
+.fb-q-detail-wrap.fb-num-input {
+  background: rgba(250,173,20,0.03);
+  border-color: rgba(250,173,20,0.2);
+}
+.fb-num-hint {
+  font-size: 11px; color: #FAAD14; font-weight: 600;
+  display: flex; align-items: center; gap: 4px; margin-bottom: 6px;
+}
+.fb-num-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.fb-num-field {
+  flex: 1 !important;
+  background: #080f1a !important;
+  border-color: rgba(250,173,20,0.25) !important;
+  font-family: Consolas, 'Courier New', monospace !important;
+  font-size: 13px !important;
+  letter-spacing: 0.5px;
+}
+.fb-num-field:focus { border-color: #FAAD14 !important; }
+.fb-num-unit {
+  font-size: 11px; color: #5A7A92; white-space: nowrap;
+  padding: 6px 8px; background: rgba(250,173,20,0.06);
+  border-radius: 4px; border: 1px solid rgba(250,173,20,0.15);
+}
+.modal-box.modal-lg { width: 520px; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #1E3A5F; }
+.modal-header h4 { font-size: 14px; font-weight: 700; color: #E0ECF8; margin: 0; display: flex; align-items: center; gap: 6px; }
+.modal-header h4 svg { color: #1890FF; }
+.modal-close { background: none; border: none; color: #5A7A92; font-size: 18px; cursor: pointer; }
+.modal-body { padding: 16px 20px; }
+.modal-body label { display: block; font-size: 12px; color: #5A7A92; font-weight: 600; margin-bottom: 6px; }
+.modal-body input, .modal-body textarea {
+  width: 100%; background: #080f1a; border: 1px solid #1E3A5F; border-radius: 6px;
+  color: #E0ECF8; padding: 8px 12px; font-size: 12px; outline: none;
+}
+.modal-body textarea { resize: vertical; }
+.modal-body input:focus, .modal-body textarea:focus { border-color: #1890FF; }
+.form-row { margin-bottom: 14px; }
+.form-row label { display: block; font-size: 12px; color: #5A7A92; font-weight: 600; margin-bottom: 6px; }
+/* 只读输入框 —— 截图2/4：排查项/维修项 */
+.form-input-readonly {
+  width: 100%; background: #0a1220; border: 1px solid #243B58; border-radius: 6px;
+  color: #E0ECF8; padding: 9px 12px; font-size: 13px; font-weight: 600;
+  text-align: center; outline: none;
+}
+/* 下拉选择框 */
+.form-select-el {
+  width: 100%; background: #080f1a; border: 1px solid #1E3A5F; border-radius: 6px;
+  color: #E0ECF8; padding: 9px 12px; font-size: 12px; outline: none; cursor: pointer;
+}
+.form-select-el option { background: #0D1B2E; color: #E0ECF8; }
+/* 提示文字 */
+.form-hint {
+  margin-top: 4px; font-size: 11px; color: #5A7A92;
+  display: flex; align-items: center; gap: 4px;
+}
+/* 判定结果选择框 */
+.result-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.result-chip {
+  padding: 7px 14px; border-radius: 6px; font-size: 12px;
+  background: #0c1420; border: 1px solid #1E3A5F; color: #8BAAC0;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.result-chip:hover { border-color: #2A5580; color: #B0C4D8; }
+.result-chip.active {
+  background: rgba(24,144,255,0.12); border-color: #1890FF; color: #1890FF;
+}
+.result-chip.active.custom-active {
+  background: rgba(250,173,20,0.1); border-color: #FAAD14; color: #FAAD14;
+}
+/* 图片上传区 */
+.img-upload { display: flex; gap: 10px; }
+.img-btn {
+  width: 72px; height: 64px; border: 1px dashed #2A4566; border-radius: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; font-size: 11px; color: #5A7A92; cursor: pointer;
+  transition: border-color 0.15s; background: transparent;
+}
+.img-btn:hover { border-color: #1890FF; color: #1890FF; }
+.img-btn svg { font-size: 20px; }
+
+/* 红色提交按钮 */
+.btn-submit-red {
+  width: 100%; padding: 10px; border: none; border-radius: 6px;
+  background: #FF4D4F; color: #fff; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: filter 0.15s;
+}
+.btn-submit-red:hover { filter: brightness(1.1); }
+.radio-group { display: flex; gap: 8px; }
+.radio-group button {
+  flex: 1; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  border: 1px solid #1E3A5F; background: #080f1a; color: #8BAAC0; cursor: pointer;
+}
+.radio-group button.active { border-color: #1890FF; background: rgba(24,144,255,0.1); color: #1890FF; }
+.upload-area {
+  width: 100%; padding: 20px; border: 2px dashed #1E3A5F; border-radius: 8px;
+  text-align: center; color: #5A7A92; font-size: 12px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.upload-area svg { font-size: 28px; }
+.upload-area:hover { border-color: #1890FF; color: #1890FF; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid #1E3A5F; }
+.btn-modal-cancel { padding: 8px 20px; border-radius: 6px; background: transparent; border: 1px solid #2A4566; color: #8BAAC0; font-size: 12px; cursor: pointer; }
+.btn-modal-cancel:hover { color: #B0C4D8; }
+.btn-modal-ok { padding: 8px 24px; border-radius: 6px; font-size: 12px; font-weight: 700; border: none; color: #fff; cursor: pointer; }
+.btn-modal-ok.primary { background: #1890FF; }
+
+.quick-options { display: flex; gap: 12px; }
+.qo-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 20px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid #1E3A5F; background: #080f1a; color: #8BAAC0; font-size: 13px; font-weight: 600;
+}
+.qo-btn svg { font-size: 28px; color: #1890FF; }
+.qo-btn.danger svg { color: #FF4D4F; }
+.qo-btn:hover { border-color: #1890FF; }
+.qo-btn.danger:hover { border-color: #FF4D4F; }
+
+/* ============ Toast 提示 ============ */
+.toast-container {
+  position: fixed; top: 20px; right: 20px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: 8px;
+  background: #0D1B2E; border: 1px solid #1890FF; border-left: 4px solid #1890FF;
+  border-radius: 6px; padding: 10px 16px;
+  color: #E8F0FF; font-size: 13px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  pointer-events: auto;
+  animation: toastSlide 0.3s ease;
+  max-width: 360px;
+}
+.toast.leaving { animation: toastOut 0.3s ease forwards; }
+.toast-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #1890FF; color: #fff; font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+.toast-close {
+  background: none; border: none; color: #5A7A92;
+  font-size: 14px; cursor: pointer; padding: 0 0 0 4px;
+  flex-shrink: 0;
+}
+.toast-close:hover { color: #FF4D4F; }
+@keyframes toastSlide {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translateX(40px); }
+}
+</style>
