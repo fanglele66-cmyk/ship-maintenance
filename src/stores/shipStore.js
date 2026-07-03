@@ -11,7 +11,11 @@ import { shipInfo, notifications } from '@/mock'
  */
 export const useShipStore = defineStore('ship', () => {
   // ============ State ============
-  const info = ref({ ...shipInfo })
+  const info = ref({
+    ...shipInfo,
+    shipName: '远洋6号',
+    healthScore: 82
+  })
   // 网络状态：online / offline
   const networkStatus = ref('online')
   // 上次同步时间
