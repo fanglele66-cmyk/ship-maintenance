@@ -16,12 +16,38 @@
       >
         <span class="nav-icon">{{ item.icon }}</span>
         <span class="nav-label">{{ item.label }}</span>
+        <span
+          v-if="item.path === '/event' && totalUnread > 0"
+          class="nav-badge"
+          :class="{ 'nav-badge-pulse': recentlyBumpedTotal }"
+          :title="`${totalUnread} 条未读`"
+        >
+          {{ totalUnread > 99 ? '99+' : totalUnread }}
+        </span>
       </router-link>
     </div>
   </nav>
 </template>
 
 <script setup>
+import { inject, ref, watch, onUnmounted } from 'vue'
+
+const totalUnread = inject('totalUnread', ref(0))
+
+// 触发一次红圈缩放动画
+const recentlyBumpedTotal = ref(false)
+let bumpTimer = null
+let lastTotal = 0
+watch(totalUnread, (v) => {
+  if (v > lastTotal) {
+    recentlyBumpedTotal.value = true
+    if (bumpTimer) clearTimeout(bumpTimer)
+    bumpTimer = setTimeout(() => { recentlyBumpedTotal.value = false }, 1200)
+  }
+  lastTotal = v
+})
+onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
+
 const navItems = [
   { path: '/event', icon: '📌', label: '事件' },
   { path: '/situation', icon: '📡', label: '态势' },
@@ -67,6 +93,7 @@ const navItems = [
 }
 
 .nav-item {
+  position: relative;
   width: 48px;
   height: 48px;
   display: flex;
@@ -109,5 +136,33 @@ const navItems = [
   color: #5A7A92;
   line-height: 1;
   transition: color 0.2s;
+}
+
+/* Unread total badge — floating top-right corner of the nav item */
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 0 0 1.5px #0C1A2E;
+}
+.nav-badge-pulse {
+  animation: nav-badge-pulse 1.2s ease-out;
+}
+@keyframes nav-badge-pulse {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,77,79,0.6); }
+  40%  { transform: scale(1.35); box-shadow: 0 0 0 6px rgba(255,77,79,0); }
+  100% { transform: scale(1); }
 }
 </style>

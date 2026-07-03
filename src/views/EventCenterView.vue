@@ -19,11 +19,16 @@
     </transition>
 
     <!-- Right: AI Assistant (always visible) -->
-    <AssistantPanel
-      :mode="assistantMode"
-      :event-context="eventStore.selectedEvent"
-      @chip-click="handleChipAction"
-    />
+    <div
+      class="assistant-wrapper"
+      :class="{ compact: eventStore.isDrawerOpen && eventStore.selectedEvent }"
+    >
+      <AssistantPanel
+        :mode="assistantMode"
+        :event-context="eventStore.selectedEvent"
+        @chip-click="handleChipAction"
+      />
+    </div>
   </div>
 </template>
 
@@ -135,6 +140,34 @@ function handleChipAction(action) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+/* Right column: AI Assistant wrapper
+   - General mode (A): flex:1 (fills the right side, "WeChat style")
+   - Event mode  (B): fixed compact width, drawer takes the rest */
+.assistant-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  transition: flex-basis 0.3s ease, flex-grow 0.3s ease;
+  display: flex;
+}
+
+.assistant-wrapper.compact {
+  flex: 0 0 360px;
+}
+
+/* In A mode (general), AssistantPanel is a fixed-width widget internally.
+   Force it to stretch to the wrapper so it fills the right column. */
+.assistant-wrapper :deep(.assistant-panel) {
+  width: 100%;
+  min-width: 0;
+}
+
+/* In B mode, restore the panel's own width variable. */
+.assistant-wrapper.compact :deep(.assistant-panel) {
+  width: var(--assistant-width);
+  min-width: var(--assistant-width);
 }
 
 /* Drawer slide transition */
