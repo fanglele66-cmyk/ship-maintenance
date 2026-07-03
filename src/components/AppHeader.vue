@@ -1,110 +1,116 @@
 <template>
   <header class="app-header">
-    <!-- 左侧：船名 + 航行状态 -->
     <div class="header-left">
-      <div class="ship-brand">
-        <Icon icon="mdi:ferry" class="brand-icon" />
-        <span class="ship-name">{{ shipStore.shipDisplayName }}</span>
-        <span class="ship-status">{{ shipStore.navStatusLabel }}</span>
-      </div>
+      <span class="ship-name">远洋6号</span>
+      <span class="status-tag" :style="{ background: statusBg, color: statusColor }">
+        {{ statusLabel }}
+      </span>
     </div>
 
-    <!-- 中间：时钟 -->
-    <div class="header-center">
-      <div class="clock font-mono-num">{{ timeStr }}</div>
-      <div class="date">{{ dateStr }}</div>
-    </div>
-
-    <!-- 右侧：网络指示 -->
     <div class="header-right">
-      <NetworkIndicator />
+      <span class="network-indicator">
+        <span class="net-dot"></span>
+        在线
+      </span>
+      <span class="header-time">{{ currentTime }}</span>
     </div>
   </header>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { Icon } from '@iconify/vue'
-import { useShipStore } from '@/stores/shipStore'
-import NetworkIndicator from './NetworkIndicator.vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { shipInfo, statusLabels, statusColors } from '@/mock/devices'
 
-const shipStore = useShipStore()
+const currentTime = ref('')
 
-const timeStr = computed(() => {
-  const d = shipStore.systemTime
-  const p = n => String(n).padStart(2, '0')
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+const statusLabel = computed(() => statusLabels[shipInfo.status] || '未知')
+const statusColor = computed(() => statusColors[shipInfo.status] || '#5A7A92')
+const statusBg = computed(() => statusColors[shipInfo.status] + '20' || '#5A7A9220')
+
+let timer = null
+
+function updateTime() {
+  const now = new Date()
+  currentTime.value = now.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+}
+
+onMounted(() => {
+  updateTime()
+  timer = setInterval(updateTime, 1000)
 })
 
-const dateStr = computed(() => {
-  const d = shipStore.systemTime
-  const p = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
 })
 </script>
 
 <style scoped>
 .app-header {
-  height: 44px;
-  flex-shrink: 0;
+  height: var(--header-height);
+  background: #0F1F38;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  background: linear-gradient(180deg, #0F2238 0%, #0A1828 100%);
-  border-bottom: 1px solid var(--border-color);
+  padding: 0 16px;
+  flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-}
-
-.ship-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.brand-icon {
-  font-size: 22px;
-  color: var(--accent-primary);
+  gap: 10px;
 }
 
 .ship-name {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
-.ship-status {
-  font-size: 11px;
-  color: var(--text-muted);
-  padding: 2px 8px;
-  background: rgba(24, 144, 255, 0.1);
-  border-radius: 10px;
-  border: 1px solid rgba(24, 144, 255, 0.2);
-}
-
-.header-center {
-  text-align: center;
-}
-
-.clock {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent-primary);
-  letter-spacing: 1px;
-}
-
-.date {
+.status-tag {
   font-size: 10px;
-  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 500;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+}
+
+.network-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--success);
+}
+
+.net-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.header-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 </style>

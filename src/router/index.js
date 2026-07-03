@@ -1,39 +1,30 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
-// V2.0 路由 - 事件驱动架构
-// 导航栏：事件中心 | 态势感知 | 知识库
 const routes = [
-  {
-    path: '/',
-    redirect: '/event'
-  },
+  { path: '/', redirect: '/event' },
   {
     path: '/event',
-    name: 'event',
+    name: 'EventCenter',
     component: () => import('@/views/EventCenterView.vue'),
-    meta: { title: '事件中心', icon: 'mdi:bell-ring' }
+    meta: { title: '事件中心', icon: '📌' }
   },
   {
     path: '/situation',
-    name: 'situation',
+    name: 'Situation',
     component: () => import('@/views/SituationView.vue'),
-    meta: { title: '态势感知', icon: 'mdi:radar' }
+    meta: { title: '态势感知', icon: '📡' }
   },
   {
     path: '/knowledge',
-    name: 'knowledge',
+    name: 'Knowledge',
     component: () => import('@/views/KnowledgeView.vue'),
-    meta: { title: '知识库', icon: 'mdi:bookshelf' }
+    meta: { title: '知识库', icon: '📖' }
   }
 ]
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes
-})
-
-router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} · 船舶设备检修助手` : '船舶设备检修助手'
 })
 
 export default router
