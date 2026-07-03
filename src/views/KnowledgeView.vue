@@ -689,4 +689,18 @@ const renderContent = computed(() => {
   border-top: 1px solid #162940;
   margin: 16px 0;
 }
+
+/* 文档元信息头 */
+.doc-content-body :deep(.doc-meta-header) {
+  display: flex;
+  gap: 20px;
+  padding: 8px 14px;
+  background: #0a1020;
+  border: 1px solid #162940;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #4a6a8a;
+  font-family: Consolas, monospace;
+  margin-bottom: 20px;
+}
 </style>

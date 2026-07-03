@@ -436,10 +436,224 @@ const chapterSeparator = `
 /* ===================== 完整文档数据 ===================== */
 
 /**
- * 生成文档对象
+ * 生成文档对象 — 空 chapterHTML 时自动生成
  */
 function doc(id, title, device, docType, category, subcategory, chapterHTML, version = 'V3.2', updatedAt) {
-  return { id, title, device, docType, category, subcategory, chapterHTML, version, updatedAt }
+  return { id, title, device, docType, category, subcategory, chapterHTML: chapterHTML || genContent(id, device, docType, title, subcategory, updatedAt), version, updatedAt }
+}
+
+/**
+ * 自动生成文档详情页 HTML
+ * 按 文档类型 × 设备类型 产出不同结构的章节内容
+ */
+function genContent(id, device, docType, title, subcategory, updatedAt) {
+  const deviceParams = {
+    '主机':  { temp: '85-90°C',  press: '0.3-0.4 MPa', rpm: '450 rpm',   oil: '0.35-0.45 MPa', vib: '<2.0 mm/s' },
+    '辅机':  { temp: '78-82°C',  press: '0.35-0.45 MPa', rpm: '720 rpm',  oil: '0.30-0.40 MPa', vib: '<1.5 mm/s' },
+    '锅炉':  { temp: '180-220°C',press: '0.7 MPa',     rpm: '—',          oil: '—',             vib: '—' },
+    '舵机':  { temp: '40-55°C',  press: '12-16 MPa',   rpm: '—',          oil: '0.15-0.25 MPa', vib: '<3.0 mm/s' },
+    '分油机':{ temp: '95-98°C',  press: '0.1-0.3 MPa', rpm: '3,500 rpm',  oil: '—',             vib: '<1.0 mm/s' }
+  }
+  const p = deviceParams[device] || deviceParams['主机']
+
+  const relatedMap = {
+    '主机': ['MAN 6L48/60CR 操作手册','MAN 6L48/60CR 故障排除手册','MAN 6L48/60CR 维修手册','MAN 6L48/60CR 技术规格书'],
+    '辅机': ['Wärtsilä 6L20 操作手册','发电机组并车操作规程','发电机绝缘测试规程','辅机备件清单'],
+    '锅炉': ['辅助锅炉操作手册','锅炉水质管理规范','锅炉安全阀校验规程','燃烧器调试指南'],
+    '舵机': ['舵机液压系统原理图','应急操舵操作程序','舵机液压油更换规程','舵机备件清单'],
+    '分油机':['Alfa Laval 分油机操作手册','分油机拆装与清洗工艺','分油机备件清单','分油机控制系统说明']
+  }
+  const related = relatedMap[device] || relatedMap['主机']
+
+  const noticeTexts = {
+    info:   [
+      `注意：${subcategory}的日常维护应严格按照制造商推荐的时间间隔执行，不得擅自延长保养周期。`,
+      `注意：操作${subcategory}前应确认所有安全联锁装置处于正常工作状态。`,
+      `注意：更换${subcategory}零部件时必须使用原厂备件或同等认证产品。`,
+    ],
+    warn:   [
+      `警告：${subcategory}运行参数超出正常范围时应立即采取相应措施，必要时停机检查。`,
+      `警告：${subcategory}的密封件老化可能导致介质泄漏，发现异常应立即处理。`,
+      `警告：${subcategory}在高温高压环境下工作，操作人员必须佩戴防护装备。`,
+    ],
+    danger: [
+      `危险：${subcategory}故障可能导致设备严重损坏甚至人员伤亡，必须严格执行应急预案。`,
+      `危险：未经验收的${subcategory}不得投入运行，违规操作后果自负。`,
+    ]
+  }
+
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+  const noticeType = pick(['info','warn','danger'])
+  const noticeText = pick(noticeTexts[noticeType])
+
+  let html = `<div class="doc-meta-header"><span>文档编号：${id}</span><span>版本：—</span><span>更新日期：${updatedAt}</span></div>`
+
+  if (docType === '设备手册') {
+    html = `
+<h3>第1章 ${title} 技术规格</h3>
+<h4>1.1 设备概述</h4>
+<p>本文档为${device}——${subcategory}的完整技术手册，涵盖设备结构、工作原理、技术参数、安装要求及验收标准。${subcategory}是${device}系统中的关键部件，其性能直接影响整机的安全可靠运行。</p>
+<h4>1.2 主要技术参数</h4>
+<table>
+  <thead><tr><th>参数项目</th><th>设计值</th><th>允许偏差</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td>工作温度</td><td>${p.temp}</td><td>±5%</td><td>额定工况</td></tr>
+    <tr><td>工作压力</td><td>${p.press}</td><td>±10%</td><td>额定工况</td></tr>
+    ${p.rpm !== '—' ? `<tr><td>额定转速</td><td>${p.rpm}</td><td>±2%</td><td>满载运行</td></tr>` : ''}
+    ${p.oil !== '—' ? `<tr><td>油压</td><td>${p.oil}</td><td>±10%</td><td>正常运行</td></tr>` : ''}
+    ${p.vib !== '—' ? `<tr><td>振动值</td><td>${p.vib}</td><td>—</td><td>ISO 10816</td></tr>` : ''}
+    <tr><td>防护等级</td><td>IP55</td><td>—</td><td>IEC 60529</td></tr>
+    <tr><td>绝缘等级</td><td>F 级</td><td>—</td><td>IEC 60034</td></tr>
+  </tbody>
+</table>
+<h4>1.3 结构组成</h4>
+<p>${subcategory}主要由以下部件组成：</p>
+<ul>
+  <li>主体壳体及连接法兰</li>
+  <li>内部核心组件（转子/叶轮/阀芯等）</li>
+  <li>密封系统（机械密封/填料密封）</li>
+  <li>轴承及润滑系统</li>
+  <li>监测传感器（温度/压力/振动）</li>
+  <li>控制及保护装置</li>
+</ul>
+<h4>1.4 安装要求</h4>
+<ol>
+  <li>基础螺栓应按照制造商规定的扭矩值紧固，建议使用扭矩扳手</li>
+  <li>设备水平度偏差不超过 0.05 mm/m</li>
+  <li>管路连接应自然对中，严禁强行对口</li>
+  <li>电气接线应符合船级社规范要求，电缆引入装置密封良好</li>
+  <li>安装完成后进行对中检查，联轴器偏差 &lt;0.1 mm</li>
+</ol>
+<div class="notice-box ${noticeType}">${noticeText}</div>
+<div class="related-docs">
+  <h4>关联文档</h4>
+  <ul>${related.map(r => `<li>${r}</li>`).join('')}</ul>
+</div>`
+  } else if (docType === '操作规程') {
+    html = `
+<h3>第1章 ${title}</h3>
+<h4>1.1 适用范围</h4>
+<p>本规程适用于${device}中${subcategory}的日常操作、定期检查和应急处理。所有操作${device}的值班人员必须熟悉本规程内容并严格执行。</p>
+<h4>1.2 操作前检查</h4>
+<ol>
+  <li>检查${subcategory}外观无异常（泄漏、变形、腐蚀）</li>
+  <li>确认工作温度在正常范围（${p.temp}）</li>
+  <li>确认工作压力在正常范围（${p.press}）</li>
+  ${p.rpm !== '—' ? `<li>确认转速指示正常（${p.rpm}）</li>` : ''}
+  ${p.oil !== '—' ? `<li>检查油压正常（${p.oil}）</li>` : ''}
+  <li>确认所有安全阀和报警装置工作正常</li>
+  <li>检查周围环境无安全隐患</li>
+</ol>
+<h4>1.3 正常操作程序</h4>
+<ol>
+  <li>按照标准操作顺序启动设备</li>
+  <li>逐步加载至额定工况，观察各项参数变化</li>
+  <li>每2小时记录一次运行参数</li>
+  <li>发现异常立即报告值班轮机长</li>
+  <li>交接班时填写运行日志</li>
+</ol>
+<h4>1.4 运行参数监控</h4>
+<table>
+  <thead><tr><th>监控项目</th><th>正常范围</th><th>报警值</th><th>停机值</th></tr></thead>
+  <tbody>
+    <tr><td>工作温度</td><td>${p.temp}</td><td>超标10%</td><td>超标20%</td></tr>
+    <tr><td>工作压力</td><td>${p.press}</td><td>超标15%</td><td>超标25%</td></tr>
+    ${p.rpm !== '—' ? `<tr><td>转速</td><td>${p.rpm}</td><td>±5%</td><td>±10%</td></tr>` : ''}
+    ${p.oil !== '—' ? `<tr><td>油压</td><td>${p.oil}</td><td>&lt;下限20%</td><td>&lt;下限40%</td></tr>` : ''}
+    ${p.vib !== '—' ? `<tr><td>振动</td><td>${p.vib}</td><td>超标50%</td><td>超标100%</td></tr>` : ''}
+  </tbody>
+</table>
+<h4>1.5 停机操作</h4>
+<ol>
+  <li>逐步降低负荷至空载</li>
+  <li>按照标准停机程序停止设备</li>
+  <li>记录停机时间和原因</li>
+  <li>进行停机后检查</li>
+</ol>
+<div class="notice-box ${noticeType}">${noticeText}</div>
+<div class="related-docs">
+  <h4>关联文档</h4>
+  <ul>${related.map(r => `<li>${r}</li>`).join('')}</ul>
+</div>`
+  } else if (docType === '故障案例') {
+    html = `
+<h3>故障案例：${title}</h3>
+<h4>一、故障概述</h4>
+<p><strong>故障时间：</strong>2024年某月某日，${device}运行中发现${subcategory}出现异常。<strong>故障等级：</strong>严重。<strong>影响范围：</strong>${device}整体性能下降，存在安全隐患。</p>
+<h4>二、故障现象</h4>
+<ul>
+  <li>${subcategory}工作温度异常升高，超过${p.temp}上限</li>
+  <li>运行中出现异常振动和噪音</li>
+  <li>监控报警系统触发${device}故障报警</li>
+  <li>相关运行参数偏离正常范围</li>
+</ul>
+<h4>三、原因分析</h4>
+<p>经拆解检查，发现以下问题：</p>
+<ol>
+  <li><strong>密封件老化：</strong>${subcategory}的密封圈长期使用后出现硬化开裂，导致介质泄漏</li>
+  <li><strong>磨损超标：</strong>核心运动部件磨损量超过允许值，配合间隙增大</li>
+  <li><strong>污染积聚：</strong>内部通道被杂质堵塞，影响正常工作</li>
+  <li><strong>润滑不良：</strong>润滑油路不畅，导致摩擦面异常磨损</li>
+</ol>
+<h4>四、处理过程</h4>
+<table>
+  <thead><tr><th>步骤</th><th>操作内容</th><th>执行人</th><th>耗时</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>停机并锁定能源，挂牌警示</td><td>值班轮机员</td><td>15 min</td></tr>
+    <tr><td>2</td><td>拆卸${subcategory}，检查各部件状态</td><td>高级轮机员</td><td>2 h</td></tr>
+    <tr><td>3</td><td>更换损坏的密封件和磨损件</td><td>高级轮机员</td><td>3 h</td></tr>
+    <tr><td>4</td><td>清洗内部通道，检查润滑系统</td><td>轮机员</td><td>1.5 h</td></tr>
+    <tr><td>5</td><td>重新装配，调整配合间隙</td><td>高级轮机员</td><td>2 h</td></tr>
+    <tr><td>6</td><td>空载试车，检查运行参数</td><td>值班轮机员</td><td>1 h</td></tr>
+    <tr><td>7</td><td>加载至额定工况，确认恢复正常</td><td>轮机长</td><td>0.5 h</td></tr>
+  </tbody>
+</table>
+<h4>五、预防措施</h4>
+<ol>
+  <li>缩短${subcategory}的检查周期，由每3个月改为每月检查</li>
+  <li>增加润滑油取样化验频率，每月一次</li>
+  <li>建立${subcategory}备件最低库存制度</li>
+  <li>对值班人员进行专项培训，提高故障识别能力</li>
+</ol>
+<div class="notice-box danger">危险：${subcategory}的密封失效可能导致高温介质泄漏，存在烫伤和火灾风险。发现泄漏必须立即停机处理。</div>
+<div class="related-docs">
+  <h4>关联文档</h4>
+  <ul>${related.map(r => `<li>${r}</li>`).join('')}</ul>
+</div>`
+  } else {
+    // 技术通告
+    html = `
+<h3>技术通告：${title}</h3>
+<div class="notice-box info">本通告自发布之日起生效，适用于所有在役${device}。请各船舶轮机部门认真贯彻执行。</div>
+<h4>一、背景说明</h4>
+<p>近期在${device}的${subcategory}检查中发现部分船舶存在不规范操作现象，为确保设备安全可靠运行，特发布本技术通告。</p>
+<h4>二、技术要求</h4>
+<table>
+  <thead><tr><th>项目</th><th>现行标准</th><th>新要求</th><th>执行日期</th></tr></thead>
+  <tbody>
+    <tr><td>工作温度控制</td><td>${p.temp}</td><td>严格控制在上限以内</td><td>立即执行</td></tr>
+    <tr><td>工作压力控制</td><td>${p.press}</td><td>定期校验压力表</td><td>30天内</td></tr>
+    <tr><td>检查周期</td><td>每3个月</td><td>每月检查并记录</td><td>立即执行</td></tr>
+    <tr><td>备件更换</td><td>损坏后更换</td><td>预防性定期更换</td><td>60天内</td></tr>
+  </tbody>
+</table>
+<h4>三、实施要求</h4>
+<ol>
+  <li>各船舶应在收到本通告后7天内组织相关人员学习</li>
+  <li>按照新要求更新设备维护保养计划</li>
+  <li>建立${subcategory}专项检查记录表</li>
+  <li>每月将检查报告报送机务部门</li>
+</ol>
+<h4>四、监督与考核</h4>
+<p>机务部门将定期对各船舶执行情况进行检查，对未按本通告要求执行的船舶将予以通报批评并限期整改。</p>
+<div class="notice-box warn">${noticeText}</div>
+<div class="related-docs">
+  <h4>关联文档</h4>
+  <ul>${related.map(r => `<li>${r}</li>`).join('')}</ul>
+</div>`
+  }
+
+  return html
 }
 
 export const knowledgeDocs = [
