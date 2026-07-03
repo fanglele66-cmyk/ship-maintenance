@@ -15,6 +15,12 @@ const routes = [
     meta: { title: '态势感知', icon: '📡' }
   },
   {
+    path: '/inspection',
+    name: 'Inspection',
+    component: () => import('@/views/InspectionReportView.vue'),
+    meta: { title: '巡检报告', icon: '' }
+  },
+  {
     path: '/knowledge',
     name: 'Knowledge',
     component: () => import('@/views/KnowledgeView.vue'),

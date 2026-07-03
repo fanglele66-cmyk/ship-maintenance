@@ -25,6 +25,7 @@
 const navItems = [
   { path: '/event', icon: '📌', label: '事件' },
   { path: '/situation', icon: '📡', label: '态势' },
+  { path: '/inspection', icon: '📋', label: '巡检' },
   { path: '/knowledge', icon: '📖', label: '知识' }
 ]
 </script>
