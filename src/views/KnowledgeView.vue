@@ -1,49 +1,57 @@
 <template>
   <div class="knowledge-view">
-    <!-- Search bar -->
-    <div class="kv-search">
-      <input
-        v-model="searchQuery"
-        type="text"
-        class="search-input"
-        placeholder="搜索知识条目..."
-      />
+    <!-- Header: 标题 + 搜索框（V1.0 布局） -->
+    <div class="kv-header">
+      <h2 class="kv-title">知识库</h2>
+      <div class="kv-search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="搜索知识库..."
+        />
+      </div>
     </div>
 
-    <!-- Category tabs -->
+    <!-- 分类标签（V1.0 圆角药丸形） -->
     <div class="kv-categories">
       <button
         v-for="cat in categories"
         :key="cat"
-        class="cat-tag"
+        class="cat-tab"
         :class="{ active: currentCategory === cat }"
         @click="currentCategory = cat"
-      >
-        {{ cat }}
-      </button>
+      >{{ cat }}</button>
     </div>
 
-    <!-- Knowledge list -->
+    <!-- 知识列表 -->
     <div class="kv-list">
       <div
         v-for="item in filteredKnowledge"
         :key="item.id"
         class="knowledge-card"
+        :class="{ expanded: selectedItem?.id === item.id }"
         @click="selectedItem = selectedItem?.id === item.id ? null : item"
       >
-        <div class="kc-icon">📄</div>
-        <div class="kc-body">
-          <div class="kc-title">{{ item.title }}</div>
-          <div class="kc-meta">
-            <span class="kc-category">{{ item.category }}</span>
-            <span class="kc-date">{{ item.updatedAt }}</span>
+        <!-- 主体行（V1.0 布局） -->
+        <div class="kc-main">
+          <div class="kc-body">
+            <h3 class="kc-title">{{ item.title }}</h3>
+            <div class="kc-meta">
+              <span class="kc-time">{{ item.updatedAt }}</span>
+              <span v-if="item.extra" class="kc-extra">{{ item.extra }}</span>
+            </div>
           </div>
-          <div class="kc-tags">
-            <span v-for="tag in item.tags" :key="tag" class="kc-tag">{{ tag }}</span>
-          </div>
+          <span
+            class="kc-category"
+            :style="getCategoryStyle(item.category)"
+          >{{ item.category }}</span>
         </div>
 
-        <!-- Expanded content -->
+        <!-- 展开详情（V2.0 功能保留） -->
         <transition name="expand">
           <div v-if="selectedItem?.id === item.id" class="kc-detail">
             <div class="kc-summary">{{ item.summary }}</div>
@@ -61,7 +69,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { mockKnowledge, categories } from '@/mock/knowledge'
+import { mockKnowledge, categories, categoryColors } from '@/mock/knowledge'
 
 const searchQuery = ref('')
 const currentCategory = ref('全部')
@@ -77,11 +85,17 @@ const filteredKnowledge = computed(() => {
     list = list.filter(k =>
       k.title.toLowerCase().includes(q) ||
       k.category.includes(q) ||
-      k.tags.some(t => t.toLowerCase().includes(q))
+      (k.tags && k.tags.some(t => t.toLowerCase().includes(q)))
     )
   }
   return list
 })
+
+function getCategoryStyle(cat) {
+  const c = categoryColors[cat]
+  if (c) return { color: c.color, background: c.bg }
+  return {}
+}
 </script>
 
 <style scoped>
@@ -91,94 +105,120 @@ const filteredKnowledge = computed(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 20px;
+}
+
+/* Header（V1.0 风格） */
+.kv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.kv-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .kv-search {
-  padding: 14px 18px 8px;
-  flex-shrink: 0;
-}
-
-.search-input {
-  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 8px 14px;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.search-input::placeholder {
-  color: var(--text-muted);
-}
-.search-input:focus {
-  border-color: var(--accent);
+  padding: 8px 12px;
+  width: 240px;
 }
 
+.search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.kv-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.kv-search input::placeholder {
+  color: var(--text-muted);
+}
+
+/* 分类标签（V1.0 药丸风格） */
 .kv-categories {
   display: flex;
   gap: 6px;
-  padding: 6px 18px;
-  flex-shrink: 0;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.cat-tag {
-  font-size: 12px;
-  padding: 4px 14px;
-  border-radius: 4px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-.cat-tag:hover {
-  color: var(--text-secondary);
-  background: rgba(24,144,255,0.05);
-}
-.cat-tag.active {
-  background: var(--accent);
-  color: white;
-}
-
-.kv-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.knowledge-card {
-  display: flex;
+  margin-bottom: 16px;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
+  flex-shrink: 0;
 }
-.knowledge-card:hover {
+
+.cat-tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.cat-tab:hover {
+  color: var(--text-secondary);
+  border-color: #2A4566;
+}
+
+.cat-tab.active {
+  color: #fff;
+  background: var(--accent);
   border-color: var(--accent);
 }
 
-.kc-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+/* 知识列表 */
+.kv-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 卡片（V1.0 布局 + V2.0 展开功能） */
+.knowledge-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.knowledge-card:hover {
+  border-color: var(--accent);
+  background: rgba(24,144,255,0.05);
+}
+
+.knowledge-card.expanded {
+  border-color: var(--accent);
+}
+
+/* 主体行（V1.0 风格） */
+.kc-main {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .kc-body {
@@ -188,49 +228,42 @@ const filteredKnowledge = computed(() => {
 
 .kc-title {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
+  margin: 0 0 8px 0;
   line-height: 1.4;
 }
 
 .kc-meta {
   display: flex;
-  gap: 10px;
-  margin-top: 3px;
+  gap: 12px;
 }
 
-.kc-category {
-  font-size: 10px;
-  color: var(--accent);
-  background: rgba(24,144,255,0.1);
-  padding: 1px 6px;
-  border-radius: 3px;
-}
-
-.kc-date {
+.kc-time,
+.kc-extra {
   font-size: 10px;
   color: var(--text-muted);
 }
 
-.kc-tags {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
+.kc-extra {
+  padding-left: 12px;
+  border-left: 1px solid var(--border-color);
 }
 
-.kc-tag {
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(90,122,146,0.15);
-  color: var(--offline);
+/* 分类色块（V1.0 风格，每种分类不同颜色） */
+.kc-category {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
 }
 
-/* Expanded detail */
+/* 展开详情（V2.0 功能） */
 .kc-detail {
-  width: 100%;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-color);
 }
 
@@ -238,9 +271,9 @@ const filteredKnowledge = computed(() => {
   font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.6;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   padding: 8px 10px;
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   border-radius: 6px;
 }
 
@@ -251,7 +284,7 @@ const filteredKnowledge = computed(() => {
   white-space: pre-wrap;
 }
 
-/* Expand transition */
+/* 展开动画 */
 .expand-enter-active,
 .expand-leave-active {
   transition: all 0.25s ease;
