@@ -1,6 +1,6 @@
 /**
- * 事件 Mock 数据
- * 每条事件携带快照数据、AI 诊断、关联案例、处理时间线
+ * 事件 Mock 数据 — 增强版
+ * 每条事件携带完整流转数据 + 结构化分析字段
  */
 export const mockEvents = [
   {
@@ -9,7 +9,7 @@ export const mockEvents = [
     system: '主机系统',
     priority: 'critical',
     status: 'pending',
-    createdAt: '2026-07-02T14:05:00',
+    createdAt: '2026-07-03T14:05:00',
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
@@ -24,7 +24,7 @@ export const mockEvents = [
         time: `${String(i).padStart(2, '0')}:00`,
         value: 72 + Math.sin(i / 3) * 5 + (i >= 20 ? (i - 20) * 2 : 0)
       })),
-      snapshotTime: '2026-07-02T14:05:00'
+      snapshotTime: '2026-07-03T14:05:00'
     },
     aiAnalysis: {
       summary: '冷却水温差异常偏大（43.7°C），高度怀疑冷却系统存在堵塞或热交换器效率下降。',
@@ -33,15 +33,15 @@ export const mockEvents = [
         { name: '淡水冷却侧水垢', probability: 'medium', detail: '温差大但进口温度正常，可能是换热面结垢' },
         { name: '温控阀故障', probability: 'low', detail: '温控阀卡滞在开度较小位置，需检查执行机构' }
       ],
-      suggestions: '建议优先检查：① 海水冷却管路 ② 淡水冷却侧水垢 ③ 温控阀工作状态'
+      suggestions: '优先排查海水冷却管路滤器脏污程度，其次检查淡水侧换热面结垢情况。'
     },
     relatedCases: [
       { title: '2026-05 主机冷却水系统堵塞案例', id: 'case-001' }
     ],
     timeline: [
-      { time: '2026-07-02T14:05:00', action: '事件创建（系统自动）' },
-      { time: '2026-07-02T14:05:10', action: '快照数据冻结完成' },
-      { time: '2026-07-02T14:05:15', action: 'AI 诊断完成' }
+      { time: '2026-07-03T14:05:00', action: '事件创建（传感器告警触发）' },
+      { time: '2026-07-03T14:05:08', action: '快照数据冻结完成' },
+      { time: '2026-07-03T14:05:12', action: 'AI 初步诊断完成' }
     ]
   },
   {
@@ -50,7 +50,7 @@ export const mockEvents = [
     system: '辅机系统',
     priority: 'normal',
     status: 'pending',
-    createdAt: '2026-07-02T11:30:00',
+    createdAt: '2026-07-03T11:30:00',
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
@@ -65,7 +65,7 @@ export const mockEvents = [
         time: `${String(i).padStart(2, '0')}:00`,
         value: 0.28 + Math.sin(i / 4) * 0.03 - (i >= 16 ? (i - 16) * 0.01 : 0)
       })),
-      snapshotTime: '2026-07-02T11:30:00'
+      snapshotTime: '2026-07-03T11:30:00'
     },
     aiAnalysis: {
       summary: '机油压力偏低（0.18MPa）且滤器压差偏高，可能为滤器堵塞导致供油不畅。',
@@ -74,12 +74,12 @@ export const mockEvents = [
         { name: '机油泵磨损', probability: 'medium', detail: '泵出口压力正常但系统压力低，可能内部泄漏' },
         { name: '机油管路渗漏', probability: 'low', detail: '检查管路接头和密封件' }
       ],
-      suggestions: '建议优先检查机油滤器压差，如确认堵塞需清洗滤器并检查机油品质。'
+      suggestions: '优先检查机油滤器压差，如确认堵塞需清洗滤器并检查机油品质。'
     },
     relatedCases: [],
     timeline: [
-      { time: '2026-07-02T11:30:00', action: '事件创建（系统自动）' },
-      { time: '2026-07-02T11:30:05', action: '快照数据冻结完成' }
+      { time: '2026-07-03T11:30:00', action: '事件创建（传感器告警触发）' },
+      { time: '2026-07-03T11:30:05', action: '快照数据冻结完成' }
     ]
   },
   {
@@ -88,7 +88,7 @@ export const mockEvents = [
     system: '甲板机械',
     priority: 'critical',
     status: 'pending',
-    createdAt: '2026-07-02T09:15:00',
+    createdAt: '2026-07-03T09:15:00',
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
@@ -103,7 +103,7 @@ export const mockEvents = [
         time: `${String(i).padStart(2, '0')}:00`,
         value: 55 + Math.sin(i / 2) * 5 + (i >= 8 ? (i - 8) * 1.5 : 0)
       })),
-      snapshotTime: '2026-07-02T09:15:00'
+      snapshotTime: '2026-07-03T09:15:00'
     },
     aiAnalysis: {
       summary: '舵机液压油温度78°C，超65°C阈值。持续高温会加速油液老化，影响密封件寿命。',
@@ -112,14 +112,14 @@ export const mockEvents = [
         { name: '液压系统过载', probability: 'medium', detail: '检查舵机负荷是否异常增大' },
         { name: '油液变质或不足', probability: 'low', detail: '检查油液颜色、气味和粘度' }
       ],
-      suggestions: '建议优先检查液压油冷却器工作状态，清洗冷却器并检查油液品质。'
+      suggestions: '优先检查液压油冷却器工作状态，清洗冷却器并检查油液品质。'
     },
     relatedCases: [
       { title: '舵机液压油温度过高处理流程', id: 'case-004' }
     ],
     timeline: [
-      { time: '2026-07-02T09:15:00', action: '事件创建（系统自动）' },
-      { time: '2026-07-02T09:15:05', action: '快照数据冻结完成' }
+      { time: '2026-07-03T09:15:00', action: '事件创建（传感器告警触发）' },
+      { time: '2026-07-03T09:15:05', action: '快照数据冻结完成' }
     ]
   },
   {
@@ -128,30 +128,27 @@ export const mockEvents = [
     system: '泵系统',
     priority: 'normal',
     status: 'pending',
-    createdAt: '2026-07-02T08:00:00',
+    createdAt: '2026-07-03T08:00:00',
     source: 'maintenance_schedule',
     snapshot: {
       sensors: [
         { name: '累计运行时间', value: 505, unit: 'h', threshold: 500, status: 'over' },
         { name: '振动值', value: 3.2, unit: 'mm/s', threshold: 7.1, status: 'normal' },
         { name: '轴承温度', value: 42.5, unit: '°C', threshold: 65, status: 'normal' },
-        { name: '机械密封状态', value: '正常', unit: '', status: 'normal' },
-        { name: '电机电流', value: 22.5, unit: 'A', threshold: 30, status: 'normal' },
-        { name: '出口压力', value: 0.35, unit: 'MPa', range: '0.25-0.45', status: 'normal' }
+        { name: '出口压力', value: 0.35, unit: 'MPa', range: '0.25-0.45', status: 'normal' },
+        { name: '电机电流', value: 22.5, unit: 'A', threshold: 30, status: 'normal' }
       ],
       trendData: [],
-      snapshotTime: '2026-07-02T08:00:00'
+      snapshotTime: '2026-07-03T08:00:00'
     },
     aiAnalysis: {
       summary: '3号冷却泵累计运行505小时，超过500小时维保周期，需安排定期保养。',
       faultTable: [],
-      suggestions: '建议安排：① 更换机油和滤芯 ② 检查机械密封 ③ 测量绝缘电阻 ④ 填写维保记录'
+      suggestions: '建议安排更换机油和滤芯、检查机械密封、测量绝缘电阻，填写维保记录。'
     },
-    relatedCases: [
-      { title: '冷却水泵定期保养操作指南', id: 'case-007' }
-    ],
+    relatedCases: [],
     timeline: [
-      { time: '2026-07-02T08:00:00', action: '维保提醒（系统定时触发）' }
+      { time: '2026-07-03T08:00:00', action: '维保提醒（系统定时触发）' }
     ]
   },
   {
@@ -160,7 +157,7 @@ export const mockEvents = [
     system: '辅机系统',
     priority: 'important',
     status: 'processing',
-    createdAt: '2026-07-01T22:40:00',
+    createdAt: '2026-07-02T22:40:00',
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
@@ -175,7 +172,7 @@ export const mockEvents = [
         time: `${String(i).padStart(2, '0')}:00`,
         value: 0.78 + Math.sin(i / 2) * 0.04
       })),
-      snapshotTime: '2026-07-01T22:40:00'
+      snapshotTime: '2026-07-02T22:40:00'
     },
     aiAnalysis: {
       summary: '排气压力在0.78-0.85MPa之间波动，可能存在进气阀或排气阀工作不稳定。',
@@ -184,15 +181,15 @@ export const mockEvents = [
         { name: '排气阀弹簧疲劳', probability: 'medium', detail: '弹簧刚度下降，阀门动作异常' },
         { name: '安全阀微漏', probability: 'low', detail: '安全阀设定压力偏低或密封面损伤' }
       ],
-      suggestions: '建议检查进气阀和排气阀的工作状态，清洗阀片积碳，检查弹簧弹性。'
+      suggestions: '检查进气阀和排气阀的工作状态，清洗阀片积碳，检查弹簧弹性。'
     },
     relatedCases: [
       { title: '空压机排气压力波动分析', id: 'case-005' }
     ],
     timeline: [
-      { time: '2026-07-01T22:40:00', action: '事件创建（系统自动）' },
-      { time: '2026-07-01T22:40:10', action: '快照数据冻结完成' },
-      { time: '2026-07-02T08:30:00', action: '用户开始处理' }
+      { time: '2026-07-02T22:40:00', action: '事件创建（传感器告警触发）' },
+      { time: '2026-07-02T22:40:10', action: '快照数据冻结完成' },
+      { time: '2026-07-03T08:30:00', action: '开始排查' }
     ]
   },
   {
@@ -201,31 +198,27 @@ export const mockEvents = [
     system: '辅机系统',
     priority: 'normal',
     status: 'resolved',
-    createdAt: '2026-07-01T16:00:00',
+    createdAt: '2026-07-02T16:00:00',
     source: 'maintenance_schedule',
     snapshot: {
       sensors: [
         { name: '水位', value: 72.0, unit: '%', range: '40-85', status: 'normal' },
         { name: '蒸汽压力', value: 0.7, unit: 'MPa', range: '0.5-0.8', status: 'normal' },
         { name: '给水温度', value: 85.0, unit: '°C', threshold: 90, status: 'normal' },
-        { name: '炉膛温度', value: 680, unit: '°C', threshold: 750, status: 'normal' },
-        { name: '排烟温度', value: 185, unit: '°C', threshold: 200, status: 'normal' },
-        { name: '燃料流量', value: 125, unit: 'kg/h', range: '100-160', status: 'normal' }
+        { name: '炉膛温度', value: 680, unit: '°C', threshold: 750, status: 'normal' }
       ],
       trendData: [],
-      snapshotTime: '2026-07-01T16:00:00'
+      snapshotTime: '2026-07-02T16:00:00'
     },
     aiAnalysis: {
       summary: '季度水位传感器校准提醒，当前水位读数正常但已到校准周期。',
       faultTable: [],
-      suggestions: '建议执行锅炉水位传感器季度校准流程，记录校准前后偏差值。'
+      suggestions: '执行锅炉水位传感器季度校准流程，记录校准前后偏差值。'
     },
-    relatedCases: [
-      { title: '锅炉水位传感器校准规程', id: 'case-008' }
-    ],
+    relatedCases: [],
     timeline: [
-      { time: '2026-07-01T16:00:00', action: '校准提醒（系统定时触发）' },
-      { time: '2026-07-02T10:00:00', action: '用户标记已处理，校准完成' }
+      { time: '2026-07-02T16:00:00', action: '校准提醒（系统定时触发）' },
+      { time: '2026-07-03T10:00:00', action: '校准完成，事件关闭' }
     ]
   }
 ]

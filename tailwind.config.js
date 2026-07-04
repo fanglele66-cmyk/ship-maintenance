@@ -7,19 +7,26 @@ export default {
   theme: {
     extend: {
       colors: {
-        'bg-primary': '#0A1628',
-        'bg-secondary': '#0F1F38',
-        'bg-card': '#0B1A2E',
-        'bg-chat': '#0B1422',
-        'border-color': '#1E3A5F',
-        'accent': '#1890FF',
-        'success': '#52C41A',
-        'warning': '#FAAD14',
-        'danger': '#FF4D4F',
-        'offline': '#5A7A92',
-        'text-primary': '#E8F0FF',
-        'text-secondary': '#8BAAC0',
-        'text-muted': '#5A7A92'
+        'bg-app': '#F0F2F5',
+        'bg-panel': '#F7F8FA',
+        'bg-surface': '#FFFFFF',
+        'bg-hover': '#F5F7FA',
+        'bg-selected': '#E8F3FF',
+        'bg-chat': '#F7F8FA',
+        'bg-primary': '#F0F2F5',
+        'bg-secondary': '#F7F8FA',
+        'bg-card': '#FFFFFF',
+        'border-primary': '#E5E6EB',
+        'border-secondary': '#F2F3F5',
+        'border-color': '#E5E6EB',
+        'accent': '#1677FF',
+        'success': '#00B42A',
+        'warning': '#FF7D00',
+        'danger': '#F53F3F',
+        'offline': '#86909C',
+        'text-primary': '#1D2129',
+        'text-secondary': '#646A73',
+        'text-muted': '#8B919A'
       },
       fontFamily: {
         'mono-num': ['Consolas', 'monospace']

@@ -51,7 +51,7 @@
           <div class="top-bar-right">
             <span class="device-badge">
               <span class="device-badge-dot"></span>
-              {{ selectedDevice }} · {{ filteredDocs.length }} 篇文档
+              {{ selectedDevice }} . {{ filteredDocs.length }} 篇文档
             </span>
           </div>
         </div>
@@ -188,15 +188,15 @@ const renderContent = computed(() => {
   height: 100%;
   display: flex;
   overflow: hidden;
-  background: #070c14;
+  background: var(--bg-surface);
 }
 
 /* ============ 左侧 Sidebar ============ */
 .sidebar {
   width: 220px;
   min-width: 220px;
-  background: #0a101d;
-  border-right: 1px solid #162940;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -210,7 +210,7 @@ const renderContent = computed(() => {
 .sb-section-title {
   font-size: 11px;
   font-weight: 600;
-  color: #4a6a8a;
+  color: var(--text-muted);
   padding: 8px 16px 6px;
   letter-spacing: 0.5px;
 }
@@ -222,7 +222,7 @@ const renderContent = computed(() => {
   justify-content: space-between;
   padding: 8px 16px;
   font-size: 12px;
-  color: #8baac0;
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -232,30 +232,30 @@ const renderContent = computed(() => {
 }
 
 .sb-item:hover {
-  color: #ffffff;
-  background: #16294055;
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .sb-item.active {
-  color: #1890ff;
-  background: rgba(24,144,255,0.08);
+  color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .sb-item-label { flex: 1; }
 
 .sb-item-count {
   font-size: 10px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   padding: 1px 7px;
   border-radius: 8px;
-  background: #0d192d;
+  background: var(--bg-surface);
   min-width: 22px;
   text-align: center;
 }
 
 .sb-item-count.active {
-  color: #1890ff;
-  background: rgba(24,144,255,0.15);
+  color: var(--accent);
+  background: var(--accent-bg);
 }
 
 /* ============ 主内容区 ============ */
@@ -273,7 +273,7 @@ const renderContent = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid #162940;
+  border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
 }
 
@@ -287,7 +287,7 @@ const renderContent = computed(() => {
 .page-title {
   font-size: 15px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   margin: 0;
   display: flex;
   align-items: center;
@@ -305,8 +305,8 @@ const renderContent = computed(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #0a1020;
-  border: 1px solid #162940;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 8px 14px;
   width: 280px;
@@ -315,7 +315,7 @@ const renderContent = computed(() => {
 .search-icon {
   width: 15px;
   height: 15px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -324,13 +324,13 @@ const renderContent = computed(() => {
   background: transparent;
   border: none;
   outline: none;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 12px;
   font-family: inherit;
 }
 
 .search-input::placeholder {
-  color: #4a6a8a;
+  color: var(--text-muted);
 }
 
 .top-bar-right {
@@ -344,11 +344,11 @@ const renderContent = computed(() => {
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #52c41a;
+  color: var(--success);
   padding: 5px 14px;
   border-radius: 14px;
-  background: #52c41a1f;
-  border: 1px solid #52c41a33;
+  background: var(--success-bg);
+  border: 1px solid var(--success-bg);
   white-space: nowrap;
 }
 
@@ -356,8 +356,8 @@ const renderContent = computed(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #52c41a;
-  box-shadow: 0 0 6px rgba(82,196,26,0.6);
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(0, 180, 42, 0.6);
 }
 
 /* ============ 文档卡片网格 ============ */
@@ -372,8 +372,8 @@ const renderContent = computed(() => {
 }
 
 .doc-card {
-  background: #0d192d;
-  border: 1px solid #162940;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 14px 16px;
   cursor: pointer;
@@ -381,13 +381,14 @@ const renderContent = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: var(--shadow-sm);
 }
 
 .doc-card:hover {
-  border-color: #1890ff;
-  background: #111e34;
+  border-color: var(--accent);
+  background: var(--bg-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .doc-card-top {
@@ -407,7 +408,7 @@ const renderContent = computed(() => {
 .doc-card-title {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -424,12 +425,12 @@ const renderContent = computed(() => {
 
 .doc-card-date {
   font-size: 10px;
-  color: #4a6a8a;
+  color: var(--text-muted);
 }
 
 .doc-card-id {
   font-size: 10px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   font-family: Consolas, monospace;
 }
 
@@ -437,7 +438,7 @@ const renderContent = computed(() => {
   grid-column: 1 / -1;
   text-align: center;
   padding: 60px 20px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -453,8 +454,8 @@ const renderContent = computed(() => {
   display: flex;
   align-items: center;
   padding: 10px 20px;
-  border-bottom: 1px solid #162940;
-  background: #0a1020;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-panel);
   gap: 16px;
   flex-shrink: 0;
 }
@@ -464,7 +465,7 @@ const renderContent = computed(() => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -474,14 +475,14 @@ const renderContent = computed(() => {
   font-family: inherit;
 }
 .back-btn:hover {
-  color: #ffffff;
-  background: #162940;
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .detail-title {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -490,7 +491,7 @@ const renderContent = computed(() => {
 
 .detail-meta {
   font-size: 11px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -500,9 +501,9 @@ const renderContent = computed(() => {
   gap: 4px;
   padding: 5px 12px;
   font-size: 11px;
-  color: #1890ff;
+  color: var(--accent);
   background: transparent;
-  border: 1px solid #1890ff;
+  border: 1px solid var(--accent);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
@@ -510,7 +511,7 @@ const renderContent = computed(() => {
   white-space: nowrap;
 }
 .download-btn:hover {
-  background: #1890ff1f;
+  background: var(--accent-bg);
 }
 
 /* 文档内容 */
@@ -523,47 +524,48 @@ const renderContent = computed(() => {
 }
 
 .doc-content-card {
-  background: #0d192d;
-  border: 1px solid #162940;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 28px 36px;
   max-width: 720px;
   width: 100%;
+  box-shadow: var(--shadow-sm);
 }
 
 /* ===== 文档内容 HTML 样式 ===== */
 .doc-content-body :deep(h3) {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   margin: 0 0 16px 0;
   padding-bottom: 10px;
-  border-bottom: 1px solid #162940;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .doc-content-body :deep(h4) {
   font-size: 14px;
   font-weight: 700;
-  color: #1890ff;
+  color: var(--accent);
   margin: 20px 0 8px 0;
 }
 
 .doc-content-body :deep(h5) {
   font-size: 13px;
   font-weight: 600;
-  color: #1890ff;
+  color: var(--accent);
   margin: 16px 0 6px 0;
 }
 
 .doc-content-body :deep(p) {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--text-secondary);
   line-height: 1.8;
   margin: 6px 0;
 }
 
 .doc-content-body :deep(strong) {
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .doc-content-body :deep(ul),
@@ -574,7 +576,7 @@ const renderContent = computed(() => {
 
 .doc-content-body :deep(li) {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--text-secondary);
   line-height: 1.8;
   margin: 2px 0;
 }
@@ -587,23 +589,23 @@ const renderContent = computed(() => {
 }
 
 .doc-content-body :deep(thead th) {
-  background: #0a1020;
-  color: #4a6a8a;
+  background: var(--bg-panel);
+  color: var(--text-muted);
   font-weight: 600;
   text-align: left;
   padding: 8px 12px;
-  border-bottom: 1px solid #162940;
+  border-bottom: 1px solid var(--border-primary);
   font-size: 11px;
 }
 
 .doc-content-body :deep(tbody td) {
   padding: 8px 12px;
-  color: #a0aec0;
-  border-bottom: 1px solid #0c1320;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .doc-content-body :deep(tbody tr:hover) {
-  background: #16294033;
+  background: var(--bg-hover);
 }
 
 /* 通知框 */
@@ -624,37 +626,37 @@ const renderContent = computed(() => {
 }
 
 .doc-content-body :deep(.notice-box.info) {
-  background: #1890ff0f;
-  border: 1px solid #1890ff33;
-  color: #8baac0;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-bg);
+  color: var(--text-secondary);
 }
 .doc-content-body :deep(.notice-box.info::before) {
-  content: 'ℹ️';
+  content: '';
 }
 
 .doc-content-body :deep(.notice-box.warn) {
-  background: #faad140f;
-  border: 1px solid #faad1433;
-  color: #faad14;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-bg);
+  color: var(--warning);
 }
 .doc-content-body :deep(.notice-box.warn::before) {
-  content: '️';
+  content: '';
 }
 
 .doc-content-body :deep(.notice-box.danger) {
-  background: #ff4d4f0f;
-  border: 1px solid #ff4d4f33;
-  color: #ff4d4f;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-bg);
+  color: var(--danger);
 }
 .doc-content-body :deep(.notice-box.danger::before) {
-  content: '🔴';
+  content: '';
 }
 
 /* 关联文档 */
 .doc-content-body :deep(.related-docs) {
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #162940;
+  border-top: 1px solid var(--border-primary);
 }
 
 .doc-content-body :deep(.related-docs h4) {
@@ -676,7 +678,7 @@ const renderContent = computed(() => {
 
 .doc-content-body :deep(.related-docs li) {
   padding: 4px 0;
-  color: #1890ff;
+  color: var(--accent);
   cursor: pointer;
   font-size: 12px;
 }
@@ -686,7 +688,7 @@ const renderContent = computed(() => {
 
 .doc-content-body :deep(hr) {
   border: none;
-  border-top: 1px solid #162940;
+  border-top: 1px solid var(--border-primary);
   margin: 16px 0;
 }
 
@@ -695,11 +697,11 @@ const renderContent = computed(() => {
   display: flex;
   gap: 20px;
   padding: 8px 14px;
-  background: #0a1020;
-  border: 1px solid #162940;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   font-size: 11px;
-  color: #4a6a8a;
+  color: var(--text-muted);
   font-family: Consolas, monospace;
   margin-bottom: 20px;
 }

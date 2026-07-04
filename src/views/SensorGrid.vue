@@ -262,9 +262,9 @@ const filteredSensors = computed(() => {
   font-weight: 500;
   white-space: nowrap;
 }
-.sc-badge.over { background: rgba(255,77,79,0.15); color: var(--danger); }
-.sc-badge.warning { background: rgba(250,173,20,0.15); color: var(--warning); }
-.sc-badge.normal { background: rgba(82,196,26,0.15); color: var(--success); }
+.sc-badge.over { background: var(--danger-bg); color: var(--danger); }
+.sc-badge.warning { background: var(--warning-bg); color: var(--warning); }
+.sc-badge.normal { background: var(--success-bg); color: var(--success); }
 
 .empty-state {
   grid-column: 1 / -1;

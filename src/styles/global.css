@@ -4,24 +4,74 @@
 
 /* ===== CSS Variables ===== */
 :root {
-  --bg-primary: #0A1628;
-  --bg-secondary: #0F1F38;
-  --bg-card: #0B1A2E;
-  --bg-chat: #0B1422;
-  --border-color: #1E3A5F;
-  --accent: #1890FF;
-  --accent-hover: #40A9FF;
-  --success: #52C41A;
-  --warning: #FAAD14;
-  --danger: #FF4D4F;
-  --offline: #5A7A92;
-  --text-primary: #E8F0FF;
-  --text-secondary: #8BAAC0;
-  --text-muted: #5A7A92;
-  --nav-width: 56px;
-  --header-height: 44px;
+  /* ---- Backgrounds (light tiered system) ---- */
+  --bg-app: #F0F2F5;
+  --bg-panel: #F7F8FA;
+  --bg-surface: #FFFFFF;
+  --bg-hover: #F5F7FA;
+  --bg-selected: #E8F3FF;
+  --bg-chat: #F7F8FA;
+
+  /* Deprecated aliases (for backward compat in templates still referencing old names) */
+  --bg-primary: var(--bg-app);
+  --bg-secondary: var(--bg-panel);
+  --bg-card: var(--bg-surface);
+
+  /* ---- Borders ---- */
+  --border-primary: #E5E6EB;
+  --border-secondary: #F2F3F5;
+  --border-focus: #1677FF;
+
+  /* Deprecated alias */
+  --border-color: var(--border-primary);
+
+  /* ---- Accent ---- */
+  --accent: #1677FF;
+  --accent-hover: #4096FF;
+  --accent-bg: #E8F3FF;
+
+  /* ---- Status ---- */
+  --success: #00B42A;
+  --success-bg: #E8FFEA;
+  --warning: #FF7D00;
+  --warning-bg: #FFF7E8;
+  --danger: #F53F3F;
+  --danger-bg: #FFECE8;
+  --offline: #86909C;
+  --offline-bg: #F2F3F5;
+
+  /* ---- Text ---- */
+  --text-primary: #1D2129;
+  --text-secondary: #646A73;
+  --text-muted: #8B919A;
+  --text-inverse: #FFFFFF;
+
+  /* ---- Shadow / Elevation ---- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* ---- Radius ---- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ---- Layout (PAD-optimised) ---- */
+  --nav-width: 64px;
+  --header-height: 48px;
   --assistant-width: 300px;
   --event-list-width: 280px;
+
+  /* ---- Typography ---- */
+  --font-xs: 10px;
+  --font-sm: 12px;
+  --font-base: 13px;
+  --font-md: 14px;
+  --font-lg: 16px;
+  --font-xl: 18px;
+  --font-2xl: 22px;
 }
 
 /* ===== Global ===== */
@@ -35,26 +85,27 @@ html, body, #app {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--bg-app);
   color: var(--text-primary);
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: var(--font-base);
   -webkit-font-smoothing: antialiased;
 }
 
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 2px;
+  background: #D0D3D8;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #A8ADB4;
 }
 
 /* ===== Monospace Numbers ===== */
@@ -85,17 +136,17 @@ html, body, #app {
 
 /* ===== Tags ===== */
 .tag {
-  font-size: 10px;
+  font-size: var(--font-xs);
   padding: 1px 7px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
   white-space: nowrap;
 }
-.tag.critical { background: rgba(255,77,79,0.15); color: var(--danger); }
-.tag.important { background: rgba(250,173,20,0.15); color: var(--warning); }
-.tag.normal { background: rgba(24,144,255,0.15); color: var(--accent); }
-.tag.resolved { background: rgba(82,196,26,0.15); color: var(--success); }
-.tag.offline { background: rgba(90,122,146,0.15); color: var(--offline); }
+.tag.critical { background: var(--danger-bg); color: var(--danger); }
+.tag.important { background: var(--warning-bg); color: var(--warning); }
+.tag.normal { background: var(--accent-bg); color: var(--accent); }
+.tag.resolved { background: var(--success-bg); color: var(--success); }
+.tag.offline { background: var(--offline-bg); color: var(--offline); }
 
 /* ===== Transitions ===== */
 .fade-slide-enter-active,
@@ -117,6 +168,6 @@ html, body, #app {
   100% { transform: translateY(100%); }
 }
 @keyframes scan-glow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.4; }
 }

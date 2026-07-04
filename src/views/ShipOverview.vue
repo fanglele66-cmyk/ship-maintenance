@@ -151,7 +151,7 @@ const healthOffset = computed(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #0A1628;
+  background: #F0F2F5;
   overflow: hidden;
 }
 
@@ -159,9 +159,12 @@ const healthOffset = computed(() => {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 14px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  z-index: 5;
 }
 
 .health-score {
@@ -173,8 +176,8 @@ const healthOffset = computed(() => {
 
 .health-ring {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
 }
 
 .health-text {
@@ -182,19 +185,19 @@ const healthOffset = computed(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   font-family: Consolas, monospace;
 }
 
 .health-label {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
 }
 
 .ship-status-info {
   display: flex;
-  gap: 16px;
+  gap: 18px;
 }
 
 .info-row {
@@ -204,12 +207,12 @@ const healthOffset = computed(() => {
 }
 
 .info-label {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
 }
 
 .info-value {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   font-family: Consolas, monospace;
   color: var(--text-primary);
@@ -218,20 +221,20 @@ const healthOffset = computed(() => {
 .device-summary {
   margin-left: auto;
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .summary-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 5px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
 .summary-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
 }
 
@@ -243,14 +246,15 @@ const healthOffset = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(180deg, #E8EDF2 0%, #DCE3EA 100%);
 }
 
 .scan-grid-overlay {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0,188,212,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,188,212,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
@@ -260,7 +264,7 @@ const healthOffset = computed(() => {
   inset: 0;
   background: linear-gradient(to bottom,
     transparent 0%,
-    rgba(24,144,255,0.03) 50%,
+    rgba(22,119,255,0.04) 50%,
     transparent 100%
   );
   animation: scan-line 3s ease-in-out infinite;
@@ -270,7 +274,7 @@ const healthOffset = computed(() => {
 .scan-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, rgba(24,144,255,0.05) 0%, transparent 70%);
+  background: radial-gradient(ellipse at 50% 50%, rgba(22,119,255,0.06) 0%, transparent 70%);
   animation: scan-glow 3s ease-in-out infinite;
   pointer-events: none;
 }
@@ -288,41 +292,44 @@ const healthOffset = computed(() => {
 }
 
 @keyframes scan-glow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.4; }
 }
 
 /* Floating device cards */
 .float-dev-card {
   position: absolute;
-  background: rgba(15,31,56,0.85);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(0,188,212,0.4);
-  border-radius: 8px;
-  padding: 8px 12px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 10;
-  min-width: 80px;
+  min-width: 90px;
+  box-shadow: var(--shadow-sm);
 }
 .float-dev-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(24,144,255,0.15);
+  box-shadow: var(--shadow-md);
 }
 .float-dev-card.danger {
-  border-color: rgba(255,77,79,0.5);
+  border-color: rgba(245,63,63,0.3);
+  box-shadow: 0 2px 8px rgba(245,63,63,0.08);
 }
 .float-dev-card.warning {
-  border-color: rgba(250,173,20,0.5);
+  border-color: rgba(255,125,0,0.3);
+  box-shadow: 0 2px 8px rgba(255,125,0,0.08);
 }
 
 .fdc-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .fdc-dot {
@@ -335,14 +342,15 @@ const healthOffset = computed(() => {
 .fdc-dot.normal { background: var(--success); }
 
 .fdc-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .fdc-status {
-  font-size: 10px;
+  font-size: 11px;
   text-align: right;
+  font-weight: 500;
 }
 .fdc-status.danger { color: var(--danger); }
 .fdc-status.warning { color: var(--warning); }

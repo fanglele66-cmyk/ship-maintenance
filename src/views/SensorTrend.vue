@@ -51,12 +51,12 @@
         </div>
         <div class="st-ai-body" v-show="showAiAnalysis">
           <div class="ai-line" v-if="sensorStore.selectedSensor.status !== 'normal'">
-            传感器 <b style="color: #FF4D4F">{{ sensorStore.selectedSensor.nameCn }}</b>
+            传感器 <b style="color: var(--danger)">{{ sensorStore.selectedSensor.nameCn }}</b>
             当前值为 <b>{{ sensorStore.selectedSensor.value }}{{ sensorStore.selectedSensor.unit }}</b>，
             超出{{ sensorStore.selectedSensor.status === 'over' ? '阈值' : '预警范围' }}。
           </div>
           <div class="ai-line" v-else>
-            传感器 <b style="color: #52C41A">{{ sensorStore.selectedSensor.nameCn }}</b>
+            传感器 <b style="color: var(--success)">{{ sensorStore.selectedSensor.nameCn }}</b>
             运行正常，当前值 {{ sensorStore.selectedSensor.value }}{{ sensorStore.selectedSensor.unit }}。
           </div>
           <div class="ai-line" style="margin-top:6px">
@@ -107,22 +107,22 @@ function renderChart() {
       grid: { left: 50, right: 16, top: 20, bottom: 28 },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#0F1F38',
-        borderColor: '#1E3A5F',
-        textStyle: { color: '#E8F0FF', fontSize: 11 }
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E5E6EB',
+        textStyle: { color: '#1D2129', fontSize: 12 }
       },
       xAxis: {
         type: 'category',
         data: data.map(d => d.time),
-        axisLine: { lineStyle: { color: '#1E3A5F' } },
-        axisLabel: { color: '#5A7A92', fontSize: 10 },
+        axisLine: { lineStyle: { color: '#E5E6EB' } },
+        axisLabel: { color: '#8B919A', fontSize: 10 },
         splitLine: { show: false }
       },
       yAxis: {
         type: 'value',
-        axisLine: { lineStyle: { color: '#1E3A5F' } },
-        axisLabel: { color: '#5A7A92', fontSize: 10 },
-        splitLine: { lineStyle: { color: '#1E3A5F', type: 'dashed' } }
+        axisLine: { lineStyle: { color: '#E5E6EB' } },
+        axisLabel: { color: '#8B919A', fontSize: 10 },
+        splitLine: { lineStyle: { color: '#F2F3F5', type: 'dashed' } }
       },
       series: [
         {
@@ -130,11 +130,11 @@ function renderChart() {
           data: data.map(d => d.value),
           smooth: true,
           symbol: 'none',
-          lineStyle: { color: '#1890FF', width: 2 },
+          lineStyle: { color: '#1677FF', width: 2 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(24,144,255,0.25)' },
-              { offset: 1, color: 'rgba(24,144,255,0.02)' }
+              { offset: 0, color: 'rgba(22,119,255,0.18)' },
+              { offset: 1, color: 'rgba(22,119,255,0.02)' }
             ])
           }
         }
@@ -149,10 +149,10 @@ function renderChart() {
           yAxis: threshold,
           label: {
             formatter: `阈值 ${threshold}`,
-            color: '#FF4D4F',
+            color: '#F53F3F',
             fontSize: 10
           },
-          lineStyle: { color: '#FF4D4F', type: 'dashed', width: 1 }
+          lineStyle: { color: '#F53F3F', type: 'dashed', width: 1 }
         }]
       }
     }
@@ -184,8 +184,8 @@ onMounted(() => {
 .st-sidebar {
   width: 200px;
   min-width: 200px;
-  background: var(--bg-card);
-  border-right: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-primary);
   overflow-y: auto;
 }
 
@@ -193,24 +193,24 @@ onMounted(() => {
   font-size: 10px;
   color: var(--text-muted);
   text-align: center;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 10px;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .st-list-item {
   display: flex;
-  padding: 8px 10px;
-  border-bottom: 1px solid #0F1F38;
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border-secondary);
   cursor: pointer;
   transition: all 0.15s;
   gap: 6px;
 }
 .st-list-item:hover {
-  background: rgba(24,144,255,0.05);
+  background: var(--bg-hover);
 }
 .st-list-item.selected {
-  background: rgba(24,144,255,0.15);
-  border-left: 2px solid var(--accent);
+  background: var(--bg-selected);
+  border-left: 3px solid var(--accent);
 }
 
 .stl-left-bar {
@@ -268,9 +268,9 @@ onMounted(() => {
   flex-shrink: 0;
   align-self: flex-start;
 }
-.stl-badge.over { background: rgba(255,77,79,0.15); color: var(--danger); }
-.stl-badge.warning { background: rgba(250,173,20,0.15); color: var(--warning); }
-.stl-badge.normal { background: rgba(82,196,26,0.15); color: var(--success); }
+.stl-badge.over { background: var(--danger-bg); color: var(--danger); }
+.stl-badge.warning { background: var(--warning-bg); color: var(--warning); }
+.stl-badge.normal { background: var(--success-bg); color: var(--success); }
 
 /* Right chart area */
 .st-chart-area {
@@ -316,55 +316,57 @@ onMounted(() => {
   flex: 1;
   min-height: 200px;
   margin: 0 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 /* AI Analysis */
 .st-ai-summary {
   margin: 8px 16px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .st-ai-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: 10px 14px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
 }
 
 .st-ai-toggle {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
 }
 
 .st-ai-body {
-  padding: 0 12px 10px;
-  font-size: 11px;
+  padding: 0 14px 12px;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.6;
 }
 
 .btn-ghost-sm {
-  font-size: 10px;
-  padding: 3px 10px;
-  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--accent);
   color: var(--accent);
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 36px;
 }
 .btn-ghost-sm:hover {
-  border-color: var(--accent);
-  background: rgba(24,144,255,0.1);
+  background: var(--accent-bg);
 }
 </style>

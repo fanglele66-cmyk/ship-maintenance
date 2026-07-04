@@ -1,12 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import { mockEvents } from '@/mock/events'
 
 export const useEventStore = defineStore('event', () => {
   const events = ref([...mockEvents])
   const selectedEventId = ref(null)
-  const filterStatus = ref('all') // all | pending | processing | resolved
+  const filterStatus = ref('all')
   const isDrawerOpen = ref(false)
+
+  // 未读计数（全局共享）
+  const eventUnread = reactive({})
+  const totalUnread = computed(() => Object.values(eventUnread).reduce((a, b) => a + b, 0))
 
   // 筛选后的事件列表
   const filteredEvents = computed(() => {
@@ -114,23 +118,10 @@ export const useEventStore = defineStore('event', () => {
   }
 
   return {
-    events,
-    selectedEventId,
-    filterStatus,
-    isDrawerOpen,
-    filteredEvents,
-    sortedEvents,
-    selectedEvent,
-    stats,
-    selectEvent,
-    closeDrawer,
-    setFilter,
-    updateEventStatus,
-    reorderEvents,
-    sessions,
-    activeSessionKey,
-    getSessionMessages,
-    addMessage,
-    switchSession
+    events, selectedEventId, filterStatus, isDrawerOpen,
+    filteredEvents, sortedEvents, selectedEvent, stats,
+    eventUnread, totalUnread,
+    selectEvent, closeDrawer, setFilter, updateEventStatus, reorderEvents,
+    sessions, activeSessionKey, getSessionMessages, addMessage, switchSession
   }
 })

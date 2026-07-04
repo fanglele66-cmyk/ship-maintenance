@@ -52,13 +52,11 @@
         </header>
 
         <div v-show="aiExpanded" class="prod-body">
-          <!-- ① 结论与建议 -->
-          <div class="block">
+          <!-- ① 结论与建议（始终先出） -->
+          <div class="block reveal-block" :class="{ revealed: revealedSubs.ai_conclusion }">
             <div class="block-title">结论与建议</div>
             <div class="verdict">
-              <div class="verdict-row">
-                <span class="verdict-label">判定结论</span>
-              </div>
+              <div class="verdict-row"><span class="verdict-label">判定结论</span></div>
               <div class="verdict-text">{{ product.ai.verdict }}</div>
             </div>
             <div class="snapshot-mini">
@@ -71,16 +69,12 @@
                 </li>
               </ul>
             </div>
-            <div class="data-line">
-              <span class="data-label">数据：</span>{{ product.ai.dataLine }}
-            </div>
-            <div class="advice-line">
-              <span class="advice-label">建议：</span>{{ product.ai.advice }}
-            </div>
+            <div class="data-line"><span class="data-label">数据：</span>{{ product.ai.dataLine }}</div>
+            <div class="advice-line"><span class="advice-label">建议：</span>{{ product.ai.advice }}</div>
           </div>
 
-          <!-- ② 数据分析 -->
-          <div class="block">
+          <!-- ② 数据分析指标卡（snapshot 触发） -->
+          <div v-if="revealedSubs.ai_data" class="block reveal-block revealed">
             <div class="block-title">数据分析</div>
             <div class="metric-grid">
               <div v-for="(m, i) in product.ai.metrics" :key="i" class="metric">
@@ -90,58 +84,45 @@
                 </div>
                 <div class="metric-range">范围 {{ m.range }}</div>
                 <div class="metric-row">
-                  <span class="metric-current">{{ m.current }}</span>
-                  <span class="metric-unit">{{ m.unit }}</span>
+                  <span class="metric-current">{{ m.current }}</span><span class="metric-unit">{{ m.unit }}</span>
                 </div>
                 <div class="metric-analyze">{{ m.analyze }}</div>
               </div>
             </div>
           </div>
 
-          <!-- ③ 趋势图 -->
-          <div class="block">
+          <!-- ③ 趋势图（snapshot 触发 + 加载动画） -->
+          <div v-if="revealedSubs.ai_trend" class="block reveal-block revealed">
             <div class="block-title">趋势图</div>
             <div class="trend-meta">事发前 24h · {{ event.snapshot?.sensors?.[0]?.name || '出口温度' }}</div>
-            <svg class="trend-svg" viewBox="0 0 600 140" preserveAspectRatio="none">
-              <!-- 网格 -->
-              <line v-for="y in 4" :key="'g'+y" :x1="0" :y1="y*30" :x2="600" :y2="y*30" stroke="#eef0f4" stroke-width="1" />
-              <!-- 阈值线 -->
-              <line :x1="0" :y1="40" :x2="600" :y2="40" stroke="#ff4d4f" stroke-width="1" stroke-dasharray="4 4" />
-              <text x="595" y="36" text-anchor="end" font-size="10" fill="#ff4d4f">阈值 85°C</text>
-              <!-- 曲线 -->
-              <polyline
-                v-if="trendPoints"
-                :points="trendPoints"
-                fill="none"
-                stroke="#1677ff"
-                stroke-width="2"
-              />
-              <!-- 异常点 -->
-              <circle
-                v-for="(p, i) in alertPoints"
-                :key="'a'+i"
-                :cx="p.x" :cy="p.y" r="3.5"
-                fill="#ff4d4f" stroke="#fff" stroke-width="1.5"
-              />
+            <!-- 加载骨架 -->
+            <div v-if="!revealedSubs.ai_trend_loaded" class="trend-skeleton">
+              <div class="trend-skel-pulse"></div>
+              <span class="trend-skel-text">正在加载趋势数据…</span>
+            </div>
+            <!-- 实际图表 -->
+            <svg v-else class="trend-svg" viewBox="0 0 600 140" preserveAspectRatio="none">
+              <line v-for="y in 4" :key="'g'+y" :x1="0" :y1="y*30" :x2="600" :y2="y*30" stroke="var(--border-secondary)" stroke-width="1" />
+              <line :x1="0" :y1="40" :x2="600" :y2="40" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4 4" />
+              <text x="595" y="36" text-anchor="end" font-size="10" fill="var(--danger)">阈值 85°C</text>
+              <polyline v-if="trendPoints" :points="trendPoints" fill="none" stroke="var(--accent)" stroke-width="2" />
+              <circle v-for="(p, i) in alertPoints" :key="'a'+i" :cx="p.x" :cy="p.y" r="3.5" fill="var(--danger)" stroke="var(--bg-surface)" stroke-width="1.5" />
             </svg>
             <div class="trend-legend">
-              <span class="lg-item"><span class="lg-dot" style="background:#1677ff"></span>实测值</span>
-              <span class="lg-item"><span class="lg-dot" style="background:#ff4d4f"></span>超阈值点</span>
+              <span class="lg-item"><span class="lg-dot" style="background:var(--accent)"></span>实测值</span>
+              <span class="lg-item"><span class="lg-dot" style="background:var(--danger)"></span>超阈值点</span>
             </div>
           </div>
 
-          <!-- ④ 工程机理分析 -->
-          <div class="block">
+          <!-- ④ 工程机理分析（diagnosis 触发） -->
+          <div v-if="revealedSubs.ai_mechanism" class="block reveal-block revealed">
             <div class="block-title">工程机理分析</div>
             <div class="mechanism">
               <div class="mech-label">本次诊断：</div>
               <div class="mech-text">{{ product.ai.mechanism }}</div>
             </div>
             <div class="fault-match">
-              <div class="fm-row fm-head">
-                <span class="fm-name">候选故障</span>
-                <span class="fm-match">匹配度</span>
-              </div>
+              <div class="fm-row fm-head"><span class="fm-name">候选故障</span><span class="fm-match">匹配度</span></div>
               <div v-for="(f, i) in product.ai.faultMatch" :key="i" class="fm-row">
                 <span class="fm-name">{{ f.name }}</span>
                 <span class="fm-bar">
@@ -152,20 +133,13 @@
             </div>
           </div>
 
-          <!-- ⑤ 可能原因与后果 -->
-          <div class="block">
+          <!-- ⑤ 可能原因（diagnosis 触发） -->
+          <div v-if="revealedSubs.ai_reasons" class="block reveal-block revealed">
             <div class="block-title">可能的原因与后果</div>
             <div class="reason-table">
-              <div class="rt-row rt-head">
-                <span class="rt-col rt-fault">候选故障</span>
-                <span class="rt-col rt-cause">可能原因</span>
-                <span class="rt-col rt-effect">直接后果</span>
-              </div>
+              <div class="rt-row rt-head"><span class="rt-col rt-fault">候选故障</span><span class="rt-col rt-cause">可能原因</span><span class="rt-col rt-effect">直接后果</span></div>
               <div v-for="(r, i) in product.ai.reasons" :key="i" class="rt-row">
-                <span class="rt-col rt-fault">
-                  <span class="rt-prob" :class="r.prob">{{ r.probLabel }}</span>
-                  {{ r.fault }}
-                </span>
+                <span class="rt-col rt-fault"><span class="rt-prob" :class="r.prob">{{ r.probLabel }}</span>{{ r.fault }}</span>
                 <span class="rt-col rt-cause">{{ r.cause }}</span>
                 <span class="rt-col rt-effect">{{ r.effect }}</span>
               </div>
@@ -428,6 +402,7 @@ const sectionMap = {
 }
 
 const eventStage = inject('eventStage', reactive({}))
+const eventAssistantAction = inject('eventAssistantAction', reactive({}))
 
 const currentStage = computed(() => eventStage[props.event?.id] || 'S1')
 const currentStageIdx = computed(() => stageOrder.findIndex(s => s.key === currentStage.value))
@@ -441,11 +416,47 @@ const visibleSections = computed(() => ({
   report: currentStageIdx.value >= 3
 }))
 
-// ============ 折叠状态：默认全部折叠；当前阶段对应 section 自动展开 ============
+// ============ 折叠状态 ============
 const aiExpanded = ref(false)
 const checkExpanded = ref(false)
 const repairExpanded = ref(false)
 const reportExpanded = ref(false)
+
+// ============ 子模块渐进展示 ============
+// 钥匙：assistant 动作 → 解锁 sub-section
+const revealedSubs = reactive({
+  ai_conclusion: false,   // 结论与建议
+  ai_data: false,         // 数据分析（指标卡）
+  ai_trend: false,        // 趋势图
+  ai_trend_loaded: false, // 趋势图加载完成
+  ai_mechanism: false,    // 工程机理分析
+  ai_reasons: false,      // 可能原因
+  check_warn: false,      // 排查-注意事项
+  check_steps: false,     // 排查-步骤
+  repair_recap: false,    // 维修-前情
+  repair_flows: false,    // 维修-流程
+  repair_accept: false,   // 维修-验收
+  report_content: false   // 报告内容
+})
+
+function resetSubs() {
+  Object.keys(revealedSubs).forEach(k => { revealedSubs[k] = false })
+}
+
+// 延迟展现某个 sub（模拟异步加载）
+function revealSub(key, delay = 0) {
+  if (delay) {
+    setTimeout(() => { revealedSubs[key] = true }, delay)
+  } else {
+    revealedSubs[key] = true
+  }
+}
+
+function revealSubsSequence(keys, baseDelay = 150, stagger = 100) {
+  keys.forEach((k, i) => {
+    setTimeout(() => { revealedSubs[k] = true }, baseDelay + i * stagger)
+  })
+}
 
 // ============ 流式状态（仅作为"新产物入场"的视觉提示，0.9s 闪一下后自动收尾）============
 const streaming = reactive({ section: null })
@@ -693,9 +704,10 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     checkExpanded.value = false
     repairExpanded.value = false
     reportExpanded.value = false
+    resetSubs()
   }
 
-  // 阶段变化：把所有"已生成但非当前阶段"的产物折叠成 ▶
+  // 阶段变化：折叠非当前产物
   if (isStageChanged) {
     const cur = sectionMap[stage]
     if (cur !== 'ai') aiExpanded.value = false
@@ -704,20 +716,78 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     if (cur !== 'report') reportExpanded.value = false
   }
 
-  // 当前阶段对应产物自动展开 + 脉冲
+  // 当前阶段产物展开 + 渐进展示子内容
   if (isStageChanged || isEventChanged) {
     const cur = sectionMap[stage]
+
+    // 展开卡片
     if (cur === 'ai') aiExpanded.value = true
     if (cur === 'check') checkExpanded.value = true
     if (cur === 'repair') repairExpanded.value = true
     if (cur === 'report') reportExpanded.value = true
 
-    // 新产物入场脉冲（视觉提示）
-    if (isStageChanged) {
-      pulseInto(cur, 900)
+    // 渐进展示子模块（事件切换时）
+    if (isEventChanged && cur === 'ai') {
+      revealSub('ai_conclusion', 50)
+      revealSubsSequence(['ai_mechanism', 'ai_reasons'], 700, 120)
     }
+    if (isEventChanged && cur === 'check') {
+      revealSubsSequence(['check_warn', 'check_steps'], 100, 100)
+    }
+
+    // 脉冲
+    if (isStageChanged) pulseInto(cur, 900)
   }
 }, { immediate: true })
+
+// ============ 助手卡片联动：渐进展开子模块 ============
+const cardToSection = {
+  diagnosis: 'ai',
+  snapshot: 'ai',
+  guide: 'check',
+  warning: 'check',
+  report: 'report'
+}
+watch(() => eventAssistantAction[props.event?.id], (action) => {
+  if (!action || !props.event) return
+  stopStream()
+  const section = cardToSection[action]
+  if (!section) return
+
+  // 展开目标 section
+  aiExpanded.value = (section === 'ai')
+  checkExpanded.value = (section === 'check')
+  repairExpanded.value = (section === 'repair')
+  reportExpanded.value = (section === 'report')
+
+  // 渐进展示子模块
+  if (action === 'diagnosis') {
+    revealedSubs.ai_conclusion = true
+    revealSubsSequence(['ai_mechanism', 'ai_reasons'], 400, 150)
+  }
+  if (action === 'snapshot') {
+    revealedSubs.ai_data = true
+    revealSub('ai_trend', 600)
+    // 趋势图加载模拟：600ms 出现 → 再 800ms 加载完成
+    setTimeout(() => { revealedSubs.ai_trend_loaded = true }, 1400)
+  }
+  if (action === 'guide') {
+    revealedSubs.check_steps = true
+    revealSub('check_warn', 300)
+  }
+  if (action === 'warning') {
+    revealedSubs.check_warn = true
+  }
+  if (action === 'repair') {
+    // 从 check_done 进 S4
+    revealSubsSequence(['repair_recap', 'repair_flows', 'repair_accept'], 200, 180)
+  }
+  if (action === 'report') {
+    revealedSubs.report_content = true
+  }
+
+  pulseInto(section, 700)
+})
 
 function handleBack() { emit('back') }
 function formatTime(t) {
@@ -734,8 +804,8 @@ function formatTime(t) {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--drawer-bg, #f7f8fa);
-  border-left: 1px solid var(--border-color, #e8eaed);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-primary);
 }
 
 /* ============ Header ============ */
@@ -744,20 +814,20 @@ function formatTime(t) {
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid var(--border-color, #e8eaed);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
 }
 .back-btn {
   border: none;
   background: transparent;
-  color: var(--text-secondary, #5b6573);
+  color: var(--text-secondary, var(--text-secondary));
   cursor: pointer;
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 4px;
 }
-.back-btn:hover { background: #f0f1f3; }
+.back-btn:hover { background: var(--bg-hover); }
 
 /* ============ 阶段进度条 ============ */
 .stage-progress {
@@ -781,36 +851,36 @@ function formatTime(t) {
   border-radius: 50%;
   font-size: 11px;
   font-weight: 600;
-  background: #e8eaed;
-  color: #8c8c8c;
-  border: 2px solid #e8eaed;
+  background: var(--border-primary);
+  color: var(--text-muted);
+  border: 2px solid var(--border-primary);
   transition: all 0.3s;
 }
 .sp-item.done .sp-dot {
-  background: #52c41a;
+  background: var(--success);
   color: #fff;
-  border-color: #52c41a;
+  border-color: var(--success);
 }
 .sp-item.active .sp-dot {
-  background: #1677ff;
+  background: var(--accent);
   color: #fff;
-  border-color: #1677ff;
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.15);
 }
 .sp-label {
   margin: 0 6px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-muted);
 }
-.sp-item.done .sp-label { color: #52c41a; }
-.sp-item.active .sp-label { color: #1677ff; font-weight: 600; }
+.sp-item.done .sp-label { color: var(--success); }
+.sp-item.active .sp-label { color: var(--accent); font-weight: 600; }
 .sp-line {
   width: 50px;
   height: 2px;
-  background: #e8eaed;
+  background: var(--border-primary);
   margin: 0 2px;
 }
-.sp-item.done .sp-line { background: #52c41a; }
+.sp-item.done .sp-line { background: var(--success); }
 .sp-cursor {
   position: absolute;
   top: -2px;
@@ -818,8 +888,8 @@ function formatTime(t) {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1677ff;
-  box-shadow: 0 0 6px #1677ff;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
   animation: cursorPulse 1s infinite;
 }
 @keyframes cursorPulse {
@@ -836,15 +906,15 @@ function formatTime(t) {
 
 /* ============ 产物卡片 ============ */
 .prod-card {
-  background: #fff;
-  border: 1px solid var(--border-color, #e8eaed);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   margin-bottom: 12px;
   overflow: hidden;
   transition: all 0.3s;
 }
 .prod-card.card-current {
-  border-color: #1677ff;
+  border-color: var(--accent);
   border-left-width: 3px;
   box-shadow: 0 2px 8px rgba(22, 119, 255, 0.1);
 }
@@ -857,12 +927,12 @@ function formatTime(t) {
   padding: 12px 14px;
   cursor: pointer;
   user-select: none;
-  background: linear-gradient(to right, #fafbfc, #fff);
+  background: linear-gradient(to right, var(--bg-hover), var(--bg-surface));
   border-bottom: 1px solid transparent;
   transition: all 0.2s;
 }
-.prod-head:hover { background: #f0f5ff; }
-.prod-card.card-current .prod-head { background: linear-gradient(to right, #e6f4ff, #f0f8ff); border-bottom-color: #e8eaed; }
+.prod-head:hover { background: var(--accent-bg); }
+.prod-card.card-current .prod-head { background: linear-gradient(to right, var(--accent-bg), var(--accent-bg)); border-bottom-color: var(--border-primary); }
 .prod-card.card-collapsed .prod-head { border-bottom-color: transparent; }
 
 .prod-icon { font-size: 20px; }
@@ -870,15 +940,15 @@ function formatTime(t) {
 .prod-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2329;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.prod-card.card-current .prod-title { color: #1677ff; }
+.prod-card.card-current .prod-title { color: var(--accent); }
 .prod-sub {
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 .prod-gen {
@@ -887,7 +957,7 @@ function formatTime(t) {
   padding: 1px 6px;
   border-radius: 3px;
   background: rgba(22, 119, 255, 0.12);
-  color: #1677ff;
+  color: var(--accent);
   animation: genPulse 1.2s infinite;
 }
 @keyframes genPulse {
@@ -896,7 +966,7 @@ function formatTime(t) {
 }
 .prod-toggle {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-muted);
 }
 
 .prod-body { padding: 14px; }
@@ -907,36 +977,36 @@ function formatTime(t) {
 .block-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1f2329;
+  color: var(--text-primary);
   margin-bottom: 8px;
   padding-left: 8px;
-  border-left: 3px solid #1677ff;
+  border-left: 3px solid var(--accent);
 }
-.warn-block .block-title { border-left-color: #faad14; }
-.danger-block .block-title { border-left-color: #ff4d4f; }
-.recap-block .block-title { border-left-color: #722ed1; }
-.accept-block .block-title { border-left-color: #52c41a; }
+.warn-block .block-title { border-left-color: var(--warning); }
+.danger-block .block-title { border-left-color: var(--danger); }
+.recap-block .block-title { border-left-color: var(--accent); }
+.accept-block .block-title { border-left-color: var(--success); }
 
 /* ============ AI 块 ============ */
 .verdict { margin-bottom: 10px; }
 .verdict-label {
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-muted);
   display: block;
   margin-bottom: 4px;
 }
 .verdict-text {
   font-size: 13px;
   line-height: 1.7;
-  color: #1f2329;
-  background: #f0f8ff;
-  border-left: 3px solid #1677ff;
+  color: var(--text-primary);
+  background: var(--accent-bg);
+  border-left: 3px solid var(--accent);
   padding: 8px 10px;
   border-radius: 0 4px 4px 0;
 }
 .snapshot-mini {
-  background: #fafbfc;
-  border: 1px solid #e8eaed;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 10px;
@@ -944,12 +1014,12 @@ function formatTime(t) {
 .snapshot-mini-title {
   font-size: 12px;
   font-weight: 600;
-  color: #5b6573;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 .snapshot-mini-time {
   font-size: 10px;
-  color: #8c8c8c;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 .snapshot-mini-list {
@@ -966,19 +1036,19 @@ function formatTime(t) {
   justify-content: space-between;
   padding: 2px 0;
 }
-.sm-name { color: #5b6573; }
+.sm-name { color: var(--text-secondary); }
 .sm-val { font-weight: 600; font-family: monospace; }
-.sm-val.over { color: #ff4d4f; }
-.sm-val.normal { color: #52c41a; }
+.sm-val.over { color: var(--danger); }
+.sm-val.normal { color: var(--success); }
 
 .data-line, .advice-line {
   font-size: 12px;
   line-height: 1.7;
-  color: #1f2329;
+  color: var(--text-primary);
   margin-bottom: 6px;
 }
-.data-label, .advice-label { color: #8c8c8c; margin-right: 4px; }
-.advice-line { color: #1f2329; }
+.data-label, .advice-label { color: var(--text-muted); margin-right: 4px; }
+.advice-line { color: var(--text-primary); }
 
 /* 指标卡 */
 .metric-grid {
@@ -987,12 +1057,12 @@ function formatTime(t) {
   gap: 8px;
 }
 .metric {
-  background: #fafbfc;
-  border: 1px solid #e8eaed;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 8px 10px;
 }
-.metric-name { font-size: 12px; font-weight: 600; color: #1f2329; }
+.metric-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .metric-trend {
   display: inline-block;
   font-size: 10px;
@@ -1000,34 +1070,34 @@ function formatTime(t) {
   padding: 1px 5px;
   border-radius: 3px;
 }
-.metric-trend.up { background: #fff1f0; color: #ff4d4f; }
-.metric-trend.down { background: #fff7e6; color: #faad14; }
-.metric-trend.flat { background: #f6ffed; color: #52c41a; }
-.metric-range { font-size: 10px; color: #8c8c8c; margin: 2px 0 4px; }
+.metric-trend.up { background: var(--bg-surface)1f0; color: var(--danger); }
+.metric-trend.down { background: var(--bg-surface)7e6; color: var(--warning); }
+.metric-trend.flat { background: var(--success-bg); color: var(--success); }
+.metric-range { font-size: 10px; color: var(--text-muted); margin: 2px 0 4px; }
 .metric-row {
   display: flex;
   align-items: baseline;
   gap: 2px;
   margin-bottom: 2px;
 }
-.metric-current { font-size: 18px; font-weight: 700; color: #1f2329; font-family: monospace; }
-.metric-unit { font-size: 10px; color: #5b6573; }
-.metric-analyze { font-size: 10px; color: #5b6573; line-height: 1.4; }
+.metric-current { font-size: 18px; font-weight: 700; color: var(--text-primary); font-family: monospace; }
+.metric-unit { font-size: 10px; color: var(--text-secondary); }
+.metric-analyze { font-size: 10px; color: var(--text-secondary); line-height: 1.4; }
 
 /* 趋势图 */
-.trend-meta { font-size: 11px; color: #8c8c8c; margin-bottom: 6px; }
+.trend-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
 .trend-svg {
   width: 100%;
   height: 140px;
-  background: #fafbfc;
-  border: 1px solid #e8eaed;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
 }
 .trend-legend {
   display: flex;
   gap: 16px;
   font-size: 11px;
-  color: #5b6573;
+  color: var(--text-secondary);
   margin-top: 6px;
   justify-content: center;
 }
@@ -1036,21 +1106,21 @@ function formatTime(t) {
 
 /* 工程机理 */
 .mechanism { margin-bottom: 10px; }
-.mech-label { font-size: 12px; font-weight: 600; color: #1f2329; margin-bottom: 4px; }
-.mech-text { font-size: 12px; line-height: 1.7; color: #1f2329; }
+.mech-label { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.mech-text { font-size: 12px; line-height: 1.7; color: var(--text-primary); }
 
-.fault-match { background: #fafbfc; border: 1px solid #e8eaed; border-radius: 6px; padding: 8px 10px; }
+.fault-match { background: var(--bg-hover); border: 1px solid var(--border-primary); border-radius: 6px; padding: 8px 10px; }
 .fm-row {
   display: flex;
   align-items: center;
   font-size: 12px;
   padding: 4px 0;
-  border-bottom: 1px dashed #e8eaed;
+  border-bottom: 1px dashed var(--border-primary);
 }
 .fm-row:last-child { border-bottom: none; }
-.fm-row.fm-head { font-weight: 600; color: #8c8c8c; border-bottom: 1px solid #e8eaed; }
+.fm-row.fm-head { font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-primary); }
 .fm-name { flex: 1; }
-.fm-bar { position: relative; width: 120px; height: 16px; background: #f0f1f3; border-radius: 8px; overflow: hidden; }
+.fm-bar { position: relative; width: 120px; height: 16px; background: var(--bg-hover); border-radius: 8px; overflow: hidden; }
 .fm-bar-fill {
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -1063,13 +1133,13 @@ function formatTime(t) {
   transform: translateY(-50%);
   font-size: 10px;
   font-weight: 600;
-  color: #1f2329;
+  color: var(--text-primary);
   z-index: 1;
 }
 
 /* 原因表 */
 .reason-table {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1079,10 +1149,10 @@ function formatTime(t) {
   gap: 8px;
   padding: 8px 10px;
   font-size: 11px;
-  border-bottom: 1px solid #e8eaed;
+  border-bottom: 1px solid var(--border-primary);
 }
 .rt-row:last-child { border-bottom: none; }
-.rt-row.rt-head { background: #fafbfc; font-weight: 600; color: #5b6573; }
+.rt-row.rt-head { background: var(--bg-hover); font-weight: 600; color: var(--text-secondary); }
 .rt-col { line-height: 1.5; }
 .rt-fault { display: flex; align-items: center; gap: 4px; }
 .rt-prob {
@@ -1091,30 +1161,30 @@ function formatTime(t) {
   border-radius: 2px;
   font-weight: 600;
 }
-.rt-prob.high { background: #fff1f0; color: #ff4d4f; }
-.rt-prob.medium { background: #fff7e6; color: #faad14; }
-.rt-prob.low { background: #f6ffed; color: #52c41a; }
+.rt-prob.high { background: var(--bg-surface)1f0; color: var(--danger); }
+.rt-prob.medium { background: var(--bg-surface)7e6; color: var(--warning); }
+.rt-prob.low { background: var(--success-bg); color: var(--success); }
 
 /* ============ 排查块 ============ */
-.warn-block, .danger-block { background: #fff7e6; border-radius: 6px; padding: 10px 12px; }
-.danger-block { background: #fff1f0; }
+.warn-block, .danger-block { background: var(--bg-surface)7e6; border-radius: 6px; padding: 10px 12px; }
+.danger-block { background: var(--bg-surface)1f0; }
 .warn-block .block-title, .danger-block .block-title { border-left: none; padding-left: 0; }
 .warn-list, .danger-list {
   margin: 0;
   padding-left: 20px;
   font-size: 12px;
   line-height: 1.8;
-  color: #1f2329;
+  color: var(--text-primary);
 }
-.warn-list li::marker { color: #faad14; font-weight: 600; }
-.danger-list li::marker { color: #ff4d4f; font-weight: 600; }
+.warn-list li::marker { color: var(--warning); font-weight: 600; }
+.danger-list li::marker { color: var(--danger); font-weight: 600; }
 
 .step {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 10px 12px;
   margin-bottom: 8px;
-  background: #fafbfc;
+  background: var(--bg-hover);
 }
 .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .step-num {
@@ -1123,13 +1193,13 @@ function formatTime(t) {
   justify-content: center;
   width: 20px; height: 20px;
   border-radius: 50%;
-  background: #1677ff;
+  background: var(--accent);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
 }
-.step-title { font-size: 13px; font-weight: 600; color: #1f2329; }
-.step-target { font-size: 11px; color: #5b6573; margin-bottom: 6px; }
+.step-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.step-target { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
 .step-sub { list-style: none; padding: 0; margin: 0 0 8px; }
 .step-sub li {
   display: flex;
@@ -1147,25 +1217,25 @@ function formatTime(t) {
   flex-shrink: 0;
   margin-top: 2px;
 }
-.sub-tag.must { background: #fff1f0; color: #ff4d4f; }
-.sub-tag.suggest { background: #e6f4ff; color: #1677ff; }
-.sub-tag.photo { background: #f9f0ff; color: #722ed1; }
-.sub-tag.data { background: #f6ffed; color: #52c41a; }
-.sub-tag.test { background: #fff7e6; color: #faad14; }
-.sub-text { color: #1f2329; }
+.sub-tag.must { background: var(--bg-surface)1f0; color: var(--danger); }
+.sub-tag.suggest { background: var(--accent-bg); color: var(--accent); }
+.sub-tag.photo { background: rgba(22, 119, 255, 0.06); color: var(--accent); }
+.sub-tag.data { background: var(--success-bg); color: var(--success); }
+.sub-tag.test { background: var(--bg-surface)7e6; color: var(--warning); }
+.sub-text { color: var(--text-primary); }
 
 .step-photo { margin-top: 4px; }
 .photo-placeholder {
-  border: 1px dashed #c0c4cc;
+  border: 1px dashed var(--border-primary);
   border-radius: 4px;
   padding: 16px;
   text-align: center;
   font-size: 11px;
-  color: #8c8c8c;
-  background: #fff;
+  color: var(--text-muted);
+  background: var(--bg-surface);
   cursor: pointer;
 }
-.photo-placeholder:hover { border-color: #1677ff; color: #1677ff; }
+.photo-placeholder:hover { border-color: var(--accent); color: var(--accent); }
 
 /* 排查项 checklist */
 .check-item {
@@ -1173,7 +1243,7 @@ function formatTime(t) {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   margin-bottom: 4px;
   cursor: pointer;
@@ -1181,32 +1251,32 @@ function formatTime(t) {
   user-select: none;
   transition: all 0.15s;
 }
-.check-item:hover { background: #f0f5ff; }
-.check-item.done { background: #f6ffed; border-color: #b7eb8f; }
+.check-item:hover { background: var(--accent-bg); }
+.check-item.done { background: var(--success-bg); border-color: var(--success-bg-hover); }
 .check-box { font-size: 14px; }
-.check-item.done .check-box { color: #52c41a; }
-.check-item.done .check-text { text-decoration: line-through; color: #8c8c8c; }
+.check-item.done .check-box { color: var(--success); }
+.check-item.done .check-text { text-decoration: line-through; color: var(--text-muted); }
 .check-text { flex: 1; }
 .check-flag {
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 2px;
-  background: #fff1f0;
-  color: #ff4d4f;
+  background: var(--bg-surface)1f0;
+  color: var(--danger);
   font-weight: 600;
 }
 
 /* ============ 维修块 ============ */
-.recap-block { background: #f9f0ff; border-radius: 6px; padding: 10px 12px; }
-.recap-block .block-title { border-left: none; padding-left: 0; color: #722ed1; }
-.recap-text { font-size: 12px; line-height: 1.7; color: #1f2329; }
+.recap-block { background: rgba(22, 119, 255, 0.06); border-radius: 6px; padding: 10px 12px; }
+.recap-block .block-title { border-left: none; padding-left: 0; color: var(--accent); }
+.recap-text { font-size: 12px; line-height: 1.7; color: var(--text-primary); }
 
 .flow {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 10px 12px;
   margin-bottom: 8px;
-  background: #fafbfc;
+  background: var(--bg-hover);
 }
 .flow-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 .flow-num {
@@ -1215,25 +1285,25 @@ function formatTime(t) {
   justify-content: center;
   width: 20px; height: 20px;
   border-radius: 50%;
-  background: #fa8c16;
+  background: var(--warning);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
 }
-.flow-title { font-size: 13px; font-weight: 600; color: #1f2329; flex: 1; }
-.flow-target { font-size: 11px; color: #ff4d4f; background: #fff1f0; padding: 1px 6px; border-radius: 3px; }
-.flow-steps { margin: 6px 0; padding-left: 20px; font-size: 12px; line-height: 1.7; color: #1f2329; }
+.flow-title { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.flow-target { font-size: 11px; color: var(--danger); background: var(--bg-surface)1f0; padding: 1px 6px; border-radius: 3px; }
+.flow-steps { margin: 6px 0; padding-left: 20px; font-size: 12px; line-height: 1.7; color: var(--text-primary); }
 .flow-result {
   font-size: 11px;
-  color: #52c41a;
-  background: #f6ffed;
+  color: var(--success);
+  background: var(--success-bg);
   border-radius: 3px;
   padding: 4px 8px;
   margin-top: 4px;
 }
 
-.accept-block { background: #f6ffed; border-radius: 6px; padding: 10px 12px; }
-.accept-block .block-title { border-left: none; padding-left: 0; color: #52c41a; }
+.accept-block { background: var(--success-bg); border-radius: 6px; padding: 10px 12px; }
+.accept-block .block-title { border-left: none; padding-left: 0; color: var(--success); }
 .accept-list { list-style: none; padding: 0; margin: 0; }
 .accept-list li {
   display: flex;
@@ -1241,12 +1311,12 @@ function formatTime(t) {
   gap: 8px;
   font-size: 11px;
   padding: 4px 0;
-  border-bottom: 1px dashed #d9f7be;
+  border-bottom: 1px dashed rgba(0, 180, 42, 0.3);
 }
 .accept-list li:last-child { border-bottom: none; }
-.accept-name { font-weight: 600; color: #1f2329; min-width: 120px; }
-.accept-req { color: #fa8c16; }
-.accept-method { color: #5b6573; flex: 1; min-width: 120px; text-align: right; }
+.accept-name { font-weight: 600; color: var(--text-primary); min-width: 120px; }
+.accept-req { color: var(--warning); }
+.accept-method { color: var(--text-secondary); flex: 1; min-width: 120px; text-align: right; }
 
 /* ============ 报告块 ============ */
 .report-summary { }
@@ -1254,7 +1324,7 @@ function formatTime(t) {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(135deg, #52c41a, #73d13d);
+  background: linear-gradient(135deg, var(--success), #73d13d);
   color: #fff;
   padding: 12px 16px;
   border-radius: 6px;
@@ -1279,55 +1349,55 @@ function formatTime(t) {
   margin-bottom: 12px;
 }
 .rs-item {
-  background: #fafbfc;
-  border: 1px solid #e8eaed;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   padding: 8px 10px;
 }
-.rs-label { font-size: 10px; color: #8c8c8c; }
-.rs-value { font-size: 13px; font-weight: 600; color: #1f2329; margin-top: 2px; }
-.rs-value.success { color: #52c41a; }
+.rs-label { font-size: 10px; color: var(--text-muted); }
+.rs-value { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.rs-value.success { color: var(--success); }
 
 .report-key {
-  background: #fafbfc;
-  border: 1px solid #e8eaed;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 8px 12px;
 }
-.rk-row { padding: 6px 0; border-bottom: 1px dashed #e8eaed; font-size: 12px; }
+.rk-row { padding: 6px 0; border-bottom: 1px dashed var(--border-primary); font-size: 12px; }
 .rk-row:last-child { border-bottom: none; }
 .rk-label {
   display: inline-block;
   font-size: 10px;
   font-weight: 600;
-  color: #1677ff;
-  background: #e6f4ff;
+  color: var(--accent);
+  background: var(--accent-bg);
   padding: 1px 6px;
   border-radius: 2px;
   margin-right: 6px;
   min-width: 60px;
   text-align: center;
 }
-.rk-text { color: #1f2329; line-height: 1.6; }
+.rk-text { color: var(--text-primary); line-height: 1.6; }
 
 .report-footer {
   text-align: center;
   font-size: 10px;
-  color: #8c8c8c;
+  color: var(--text-muted);
   margin-top: 12px;
   padding-top: 8px;
-  border-top: 1px dashed #e8eaed;
+  border-top: 1px dashed var(--border-primary);
 }
 
 /* 流式提示 */
 .stream-tip {
   margin-top: 8px;
   padding: 6px 10px;
-  background: #f0f8ff;
-  border: 1px solid #91caff;
+  background: var(--accent-bg);
+  border: 1px solid rgba(22, 119, 255, 0.3);
   border-radius: 4px;
   font-size: 11px;
-  color: #1677ff;
+  color: var(--accent);
   text-align: center;
   animation: streamPulse 1.2s infinite;
 }
@@ -1337,12 +1407,67 @@ function formatTime(t) {
 }
 .cursor-blink {
   display: inline-block;
-  color: #1677ff;
+  color: var(--accent);
   animation: cursorBlink 0.8s infinite step-end;
   margin-right: 2px;
 }
 @keyframes cursorBlink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
+}
+
+/* ============ 子模块渐进展示动画 ============ */
+.reveal-block {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+  transition: max-height 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+              opacity 0.4s ease,
+              margin-bottom 0.3s ease;
+}
+.reveal-block.revealed {
+  max-height: 800px;
+  opacity: 1;
+  margin-bottom: 16px;
+}
+
+/* ============ 趋势图加载骨架 ============ */
+.trend-skeleton {
+  width: 100%;
+  height: 140px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.trend-skel-pulse {
+  width: 60%;
+  height: 4px;
+  background: linear-gradient(90deg, var(--border-primary) 0%, var(--accent-bg) 50%, var(--border-primary) 100%);
+  background-size: 200% 100%;
+  border-radius: 2px;
+  animation: skel-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.trend-skel-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  animation: skel-fade 1.5s ease-in-out infinite;
+}
+
+@keyframes skel-fade {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
 </style>

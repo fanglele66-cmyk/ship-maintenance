@@ -3,555 +3,947 @@
     <!-- Header -->
     <div class="assistant-header">
       <span class="mode-tag" :class="modeClass">{{ modeLabel }}</span>
-      <span class="assistant-title">AI 助手</span>
+      <span class="assistant-title">
+        <svg class="sparkle-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 1.5l.8 2.5a5.5 5.5 0 0 0 3.2 3.2l2.5.8-2.5.8a5.5 5.5 0 0 0-3.2 3.2L8 14.5l-.8-2.5a5.5 5.5 0 0 0-3.2-3.2L1.5 8l2.5-.8a5.5 5.5 0 0 0 3.2-3.2L8 1.5z"/>
+        </svg>
+        AI 助手
+      </span>
       <span v-if="currentStageLabel" class="stage-pill">{{ currentStageLabel }}</span>
     </div>
 
-    <!-- 🆕 事件上下文条（事件模式下显示事件名 + 状态） -->
+    <!-- 事件上下文条 -->
     <div v-if="props.mode === 'event' && props.eventContext" class="event-context-bar">
       <div class="ecb-row">
-        <span class="ecb-icon">📋</span>
+        <svg class="ecb-clip" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="1" width="8" height="2" rx="0.5"/><rect x="3" y="3" width="10" height="12" rx="1.5"/>
+          <line x1="6" y1="7" x2="10" y2="7"/><line x1="6" y1="10" x2="10" y2="10"/>
+        </svg>
         <span class="ecb-name" :title="props.eventContext.title">{{ props.eventContext.title }}</span>
       </div>
       <div class="ecb-row ecb-meta">
-        <span class="ecb-tag" :class="props.eventContext.priority">
-          {{ priorityLabels[props.eventContext.priority] }}
-        </span>
-        <span class="ecb-tag" :class="props.eventContext.status">
-          {{ statusLabels[props.eventContext.status] }}
-        </span>
+        <span class="ecb-tag" :class="props.eventContext.priority">{{ priorityLabels[props.eventContext.priority] }}</span>
+        <span class="ecb-tag" :class="props.eventContext.status">{{ statusLabels[props.eventContext.status] }}</span>
         <span class="ecb-id">#{{ props.eventContext.id }}</span>
       </div>
     </div>
 
     <!-- Messages -->
     <div class="messages-area" ref="messagesRef">
-      <!-- Welcome / Greeting -->
-      <div v-if="messages.length === 0" class="msg msg-ai welcome-msg">
-        {{ greetingText }}
-      </div>
+      <!-- 空态：欢迎 + 概览 -->
+      <template v-if="messages.length === 0">
+        <div class="msg msg-ai welcome-msg">{{ greetingText }}</div>
+        <div v-if="summaryHtml" class="msg msg-ai summary-msg" v-html="summaryHtml"></div>
+      </template>
 
-      <!-- Summary (HTML) -->
-      <div v-if="messages.length === 0 && summaryHtml" class="msg msg-ai summary-msg" v-html="summaryHtml">
-      </div>
+      <!-- 消息列表（带入场动画） -->
+      <template v-for="(msg, idx) in messages" :key="idx">
+        <div class="msg" :class="msg.role === 'user' ? 'msg-user' : 'msg-ai'">
+          <!-- AI 头像 -->
+          <div v-if="msg.role === 'assistant'" class="assistant-avatar">
+            <span class="avatar-dot"></span><span class="avatar-ring"></span>
+          </div>
 
-      <!-- Chat messages -->
-      <div
-        v-for="(msg, idx) in messages"
-        :key="idx"
-        class="msg"
-        :class="msg.role === 'user' ? 'msg-user' : 'msg-ai'"
-      >
-        <div v-if="msg.role === 'assistant'" class="assistant-avatar">
-          <span class="avatar-dot"></span>
+          <!-- === 6 种消息卡片 === -->
+          <!-- 类型0：普通文本 -->
+          <div v-if="!msg.cardType" class="msg-content" v-html="msg.content"></div>
+
+          <!-- 类型1：诊断分析卡 🧠 -->
+          <div v-else-if="msg.cardType === 'diagnosis'" class="msg-card diagnosis-card">
+            <div class="card-badge">🧠 AI 诊断分析</div>
+            <div class="card-body">
+              <div class="diag-conclusion">
+                <div class="diag-label">判定结论</div>
+                <div class="diag-text">{{ msg.content }}</div>
+              </div>
+              <div v-if="msg.faults && msg.faults.length" class="diag-faults">
+                <div class="diag-label">可能故障</div>
+                <div v-for="(f, i) in msg.faults" :key="i" class="diag-fault-row">
+                  <span class="df-dot" :class="f.probability"></span>
+                  <span class="df-name">{{ f.name }}</span>
+                  <span class="df-bar"><span class="df-bar-fill" :style="{ width: f.match + '%', background: f.color }"></span></span>
+                  <span class="df-pct">{{ f.match }}%</span>
+                </div>
+              </div>
+              <div class="diag-suggestion">{{ msg.suggestion }}</div>
+              <div class="diag-meta">基于 {{ msg.snapshotTime || '事发时' }} 快照数据分析 · 事件关联系统自动触发</div>
+            </div>
+          </div>
+
+          <!-- 类型2：数据快照卡 📊 -->
+          <div v-else-if="msg.cardType === 'snapshot'" class="msg-card snapshot-card">
+            <div class="card-badge">📊 事发数据快照</div>
+            <div class="card-body">
+              <div class="snap-time">🕐 {{ msg.snapshotTime }}</div>
+              <div class="snap-grid">
+                <div v-for="(s, i) in (msg.sensors || [])" :key="i" class="snap-item" :class="'snap-' + s.status">
+                  <div class="snap-name">{{ s.name }}</div>
+                  <div class="snap-val">{{ s.value }}<span class="snap-unit">{{ s.unit }}</span></div>
+                  <div class="snap-ref">{{ s.range ? '范围 ' + s.range : '阈值 ' + s.threshold + s.unit }}</div>
+                  <div class="snap-status">{{ s.status === 'over' ? '⚠ 超限' : s.status === 'warning' ? '⚡ 预警' : '✓ 正常' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 类型3：操作引导卡 ⚡（紧凑版，点击展开） -->
+          <div v-else-if="msg.cardType === 'guide'" class="msg-card guide-card">
+            <div class="card-badge">⚡ {{ msg.guideTitle || '操作指引' }}</div>
+            <div v-if="msg.guideIntro" class="guide-intro">{{ msg.guideIntro }}</div>
+            <div class="guide-steps">
+              <div v-for="(s, i) in (msg.steps || [])" :key="i" class="guide-step" @click="toggleGuideStep(i)">
+                <span class="gs-num">{{ i + 1 }}</span>
+                <div class="gs-body">
+                  <div class="gs-title">{{ s.title }} <span class="gs-toggle">{{ msg._expandedSteps?.[i] ? '▲' : '▼' }}</span></div>
+                  <div v-if="msg._expandedSteps?.[i]" class="gs-detail">{{ s.detail }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="guide-hint">👆 点击各步骤查看详细内容和检查要点</div>
+          </div>
+
+          <!-- 类型4：警告提示卡 ⚠ -->
+          <div v-else-if="msg.cardType === 'warning'" class="msg-card warning-card" :class="'warn-' + (msg.warnLevel || 'danger')">
+            <div class="warn-icon">{{ msg.warnLevel === 'danger' ? '🚨' : '⚠️' }}</div>
+            <div class="warn-body">
+              <div class="warn-title">{{ msg.warnTitle || '注意事项' }}</div>
+              <ul class="warn-list">
+                <li v-for="(w, i) in (msg.items || [])" :key="i">{{ w }}</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 类型6：通用模式主动追问卡（HTML内容） -->
+          <div v-else-if="msg.cardType === 'proactive'" class="msg-content" v-html="msg.content"></div>
+
+          <!-- 类型5：状态报告卡 ✅ -->
+          <div v-else-if="msg.cardType === 'report'" class="msg-card report-card">
+            <div class="report-banner">
+              <span class="rb-icon">✓</span>
+              <span class="rb-text">{{ msg.reportTitle || '处理完成' }}</span>
+            </div>
+            <div class="report-body">
+              <div class="rb-metrics" v-if="msg.metrics && msg.metrics.length">
+                <div v-for="(m, i) in msg.metrics" :key="i" class="rb-metric">
+                  <div class="rbm-label">{{ m.label }}</div>
+                  <div class="rbm-value" :class="m.highlight ? 'rbm-hl' : ''">{{ m.value }}</div>
+                </div>
+              </div>
+              <div v-if="msg.conclusion" class="rb-conclusion">📝 {{ msg.conclusion }}</div>
+            </div>
+          </div>
         </div>
-        <div class="msg-content" v-html="msg.content"></div>
+      </template>
+
+      <!-- 正在输入 -->
+      <div v-if="isTyping" class="msg msg-ai typing-msg">
+        <div class="assistant-avatar"><span class="avatar-dot"></span><span class="avatar-ring"></span></div>
+        <div class="msg-content typing-bubble">
+          <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+        </div>
       </div>
 
-      <!-- Recommended questions (refreshed per message context) -->
+      <!-- 快捷回复 + CTA -->
       <div v-if="recommendedQuestions.length > 0" class="recommended-section">
         <div class="rec-label">{{ recLabel }}</div>
         <div class="rec-chips">
-          <button
-            v-for="(q, idx) in recommendedQuestions"
-            :key="idx"
+          <button v-for="(q, idx) in recommendedQuestions" :key="idx"
             class="rec-chip"
-            @click="handleRecommendedClick(q)"
-          >
+            :class="q.action !== 'send' ? 'rec-chip-cta' : ''"
+            :style="q.highlight ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-bg);font-weight:600' : ''"
+            @click="handleRecommendedClick(q)">
             {{ q.text }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Input area -->
+    <!-- 输入区 -->
     <div class="input-area">
       <div class="input-wrapper">
-        <input
-          v-model="inputText"
-          type="text"
-          class="chat-input"
-          placeholder="描述你的问题..."
-          @keyup.enter="sendMessage"
-        />
-        <button
-          class="mic-btn"
-          :class="{ recording: isRecording }"
-          @click="toggleVoice"
-          title="语音输入"
-        >
-          🎤
+        <input v-model="inputText" type="text" class="chat-input" placeholder="描述你的问题..." @keyup.enter="sendMessage" />
+        <button class="mic-btn" :class="{ recording: isRecording }" @click="toggleVoice" :title="isRecording ? '录音中' : '语音输入'">
+          <svg v-if="!isRecording" class="mic-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 10a6 6 0 0 0 12 0"/><line x1="10" y1="15" x2="10" y2="18"/><line x1="7" y1="18" x2="13" y2="18"/>
+          </svg>
+          <span v-else class="waveform"><span class="wf-bar" v-for="n in 5" :key="n"></span></span>
         </button>
+        <span v-if="isRecording" class="ripple-ring r1"></span>
+        <span v-if="isRecording" class="ripple-ring r2"></span>
+        <span v-if="isRecording" class="ripple-ring r3"></span>
       </div>
-      <button class="send-btn" @click="sendMessage" :disabled="!inputText.trim()">
-        发送
+      <button class="send-btn" @click="sendMessage" :disabled="!inputText.trim() && !isRecording">
+        <svg class="send-svg" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="9" y1="1" x2="9" y2="17"/><polyline points="4 6 9 1 14 6"/>
+        </svg>
       </button>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onUnmounted, reactive, provide } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted, reactive, inject } from 'vue'
 import { useEventStore } from '@/stores/eventStore'
+import { useDeviceStore } from '@/stores/deviceStore'
+import { useSensorStore } from '@/stores/sensorStore'
 import { eventPriorityLabels, eventStatusLabels } from '@/mock/events'
 
-const props = defineProps({
-  mode: {
-    type: String,
-    default: 'general' // general | event | auxiliary
-  },
-  eventContext: {
-    type: Object,
-    default: null
-  }
-})
-
+const props = defineProps({ mode: { type: String, default: 'general' }, eventContext: { type: Object, default: null } })
 const emit = defineEmits(['chip-click'])
-
 const eventStore = useEventStore()
+const deviceStore = useDeviceStore()
+const sensorStore = useSensorStore()
 const messagesRef = ref(null)
 const inputText = ref('')
 const isRecording = ref(false)
-
+const isTyping = ref(false)
 const priorityLabels = eventPriorityLabels
 const statusLabels = eventStatusLabels
 
-// ============ 共享状态：未读 + 阶段（provide 给 EventList / AppNav） ============
-const eventUnread = reactive({})      // { [eventId]: number }
-const eventStage = reactive({})       // { [eventId]: 'S1' | 'S2' | ... }
-const eventStageLastMsgIdx = reactive({}) // { [eventId]: number } 用于判断"是否有新消息触发追问"
-const followupSent = reactive({})     // { [eventId+'|'+stage]: true } 每阶段追问去重
-
-const totalUnread = computed(() => {
-  return Object.values(eventUnread).reduce((a, b) => a + b, 0)
-})
-
-provide('eventUnread', eventUnread)
-provide('totalUnread', totalUnread)
-provide('eventStage', eventStage)
+// ============ 共享状态（从 EventCenterView 注入，兄弟组件共用）============
+const eventUnread = inject('eventUnread', reactive({}))
+const eventStage = inject('eventStage', reactive({}))
+const eventAssistantAction = inject('eventAssistantAction', reactive({}))
+const totalUnread = inject('totalUnread', ref(0))
+// 本地状态
+const followupSent = reactive({})
+let proactiveTimer = null
+// 态势上下文（inject from SituationView）
+const situationContext = inject('situationContext', null)
 
 // ============ 阶段定义 ============
 const STAGES = {
-  S1: { label: '事件关联', followup: '如需进一步分析，可继续追问；也可让我直接为您生成排查方案。' },
-  S2: { label: '排查中', followup: '已为您生成排查方案。**排查中如有异常请反馈；完成请告诉我结果**。' },
-  S3: { label: '等待结果', followup: '正在根据您的反馈生成维修方案…', followup2: '维修方案已生成，**请按规范执行，完成后告诉我，我帮您生成验收报告**。' },
-  S4: { label: '维修中', followup: '维修进行中。**如遇问题请告诉我，完成后请反馈结果**。' },
-  S5: { label: '已闭环', followup: '✅ 事件已闭环，**维修报告已生成在产物区**。' }
+  S1: { label: '事件关联' },
+  S5: { label: '已闭环' }
 }
 
-const stageOrder = ['S1', 'S2', 'S3', 'S4', 'S5']
+// ============ 迭代排查状态机 ============
+const checkItems = reactive({})  // { [eventId]: { 1: {state, result}, 2: ... } }
+const currentCheckIdx = reactive({})  // { [eventId]: number }
+const repairDone = reactive({}) // { [eventId+'|'+idx]: true }
 
-// ============ 模式与显示 ============
+function initCheckItems(eventId) {
+  checkItems[eventId] = {
+    1: { state: 'pending', title: '外观与渗漏检查' },
+    2: { state: 'pending', title: '关键参数测量' },
+    3: { state: 'pending', title: '核心部件拆检' },
+    4: { state: 'pending', title: '数据记录与反馈' }
+  }
+  currentCheckIdx[eventId] = 1
+  Object.keys(repairDone).forEach(k => { if (k.startsWith(eventId + '|')) delete repairDone[k] })
+}
+
+// ============ 显示 ============
 const greetingText = computed(() => {
   const stats = eventStore.stats
-  if (props.mode === 'event' && props.eventContext) {
-    return `已切换到「${props.eventContext.title}」，请问需要什么帮助？`
-  }
-  return `你好，当前共有 ${stats.total} 件事件，其中 ${stats.pending} 件待处理。`
+  return props.mode === 'event' && props.eventContext
+    ? `已切换到「${props.eventContext.title}」，AI 正在为您分析事件数据…`
+    : `你好，当前共有 ${stats.total} 件事件，其中 ${stats.pending} 件待处理。`
 })
 
 const summaryHtml = computed(() => {
   if (props.mode !== 'general') return ''
   const stats = eventStore.stats
-  return `
-    <div class="summary-block">
-      <div class="summary-row">
-        <span class="summary-label">船舶健康分</span>
-        <span class="summary-value" style="color:#52C41A">82</span>
-      </div>
-      <div class="summary-row">
-        <span class="summary-label">事件统计</span>
-        <span class="summary-value">
-          <span style="color:#FF4D4F">紧急 ${stats.critical}</span>
-          / <span style="color:#FAAD14">重要 ${stats.important}</span>
-          / <span style="color:#1890FF">一般 ${stats.normal}</span>
-        </span>
-      </div>
-      <div class="summary-row">
-        <span class="summary-label">重点关注</span>
-        <span class="summary-value" style="color:#FAAD14">主机系统水温异常需优先处理</span>
-      </div>
-    </div>
-  `
+  return `<div class="summary-block">
+    <div class="summary-row"><span class="summary-label">船舶健康分</span><span class="summary-value" style="color:var(--success)">82</span></div>
+    <div class="summary-row"><span class="summary-label">事件统计</span><span class="summary-value"><span style="color:var(--danger)">紧急 ${stats.critical}</span> / <span style="color:var(--warning)">重要 ${stats.important}</span> / <span style="color:var(--accent)">一般 ${stats.normal}</span></span></div>
+    <div class="summary-row"><span class="summary-label">重点关注</span><span class="summary-value" style="color:var(--warning)">主机系统水温异常需优先处理</span></div>
+  </div>`
 })
 
-const modeClass = computed(() => {
-  return props.mode === 'event' ? 'event-mode' : props.mode === 'auxiliary' ? 'aux-mode' : 'gen-mode'
-})
-
-const modeLabel = computed(() => {
-  return props.mode === 'event' ? '事件模式' : props.mode === 'auxiliary' ? '辅助模式' : '通用模式'
-})
-
+const modeClass = computed(() => props.mode === 'event' ? 'event-mode' : props.mode === 'auxiliary' ? 'aux-mode' : 'gen-mode')
+const modeLabel = computed(() => props.mode === 'event' ? '事件模式' : props.mode === 'auxiliary' ? '辅助模式' : '通用模式')
 const currentStageLabel = computed(() => {
   if (props.mode !== 'event' || !props.eventContext) return ''
-  const s = eventStage[props.eventContext.id]
-  if (!s) return ''
+  const s = eventStage[props.eventContext.id]; if (!s) return ''
   return STAGES[s]?.label || ''
 })
 
-// ============ 会话消息 ============
 const messages = computed(() => {
-  const key = props.mode === 'event' && props.eventContext
-    ? props.eventContext.id
-    : props.mode === 'general' ? 'general' : 'situation'
+  const key = props.mode === 'event' && props.eventContext ? props.eventContext.id : props.mode === 'general' ? 'general' : 'situation'
   return eventStore.getSessionMessages(key)
 })
 
-// ============ Chip 池（按"最新一条 AI 消息"上下文刷新）============
+// ============ Chips ============
 const recommendedQuestions = ref([])
-
-const recLabel = computed(() => {
-  return messages.value.length > 0 ? '快捷回复：' : '试试问我：'
-})
+const recLabel = computed(() => messages.value.length > 0 ? '快捷回复' : '试试问我')
 
 function getChipsByContext() {
-  // 通用模式
   if (props.mode === 'general') {
+    const criticalEvents = eventStore.events.filter(e => e.priority === 'critical' && e.status !== 'resolved')
+    const hasProactive = messages.value.some(m => m.role === 'assistant' && (m.content || '').includes('紧急事件'))
+
+    if (hasProactive && criticalEvents.length > 0) {
+      return [
+        { text: '立即进入事件详情处理', action: 'goto_event', eventId: criticalEvents[0].id, highlight: true },
+        { text: '今天有几件紧急事件？', action: 'send' },
+        { text: '有没有重复出现的故障？', action: 'send' }
+      ]
+    }
     return [
       { text: '今天有几件紧急事件？', action: 'send' },
       { text: '最近哪个系统问题最多？', action: 'send' },
       { text: '有没有重复出现的故障？', action: 'send' }
     ]
   }
-  // 事件模式：基于当前阶段 + 是否有对话
   if (props.mode === 'event' && props.eventContext) {
-    const ec = props.eventContext
-    const stage = eventStage[ec.id] || 'S1'
-    const lastMsg = messages.value[messages.value.length - 1]
+    const ec = props.eventContext; const stage = eventStage[ec.id] || 'S1'
     const hasUserMsg = messages.value.some(m => m.role === 'user')
-
-    // S1 初始：去掉"查看可能原因 / 开始排查 / 创建工单"和顶部事件卡 chip 重复，
-    // 只保留"信息流式"引导：追问 AI 推断过程 / 数据快照 / 立即开始排查 / 误报
     if (stage === 'S1' && !hasUserMsg) {
       return [
-        { text: '查看具体推断过程', action: 'send' },
-        { text: '查看当时数据快照', action: 'send' },
-        { text: '立即开始排查，为我生成排查方案', action: 'start_check' },
+        { text: '查看当时的传感器数据', action: 'view_snapshot', highlight: true },
+        { text: '立即开始排查，生成方案', action: 'start_check', highlight: true },
         { text: '标记为误报', action: 'send' }
       ]
     }
-
-    // S1 有过对话：按用户上次消息上下文给推荐
     if (stage === 'S1' && hasUserMsg) {
-      return [
-        { text: '这种原因多久能恢复？', action: 'send' },
-        { text: '还有其他可能原因吗？', action: 'send' },
-        { text: '开始排查，为我生成方案', action: 'start_check' }
-      ]
+      return [{ text: '这种原因多久能恢复？', action: 'send' }, { text: '还有其他可能原因吗？', action: 'send' }, { text: '开始排查，为我生成方案', action: 'start_check' }]
     }
-
     if (stage === 'S2') {
-      return [
-        { text: '查看注意事项', action: 'send' },
-        { text: '查看具体步骤', action: 'send' },
-        { text: '我已完成排查', action: 'check_done' }
-      ]
+      const eid = ec.id
+      const idx = currentCheckIdx[eid] || 1
+      const item = checkItems[eid]?.[idx]
+      if (!item || item.state === 'pending') {
+        return [{ text: '开始逐一排查', action: 'start_check_item', highlight: true }, { text: '查看传感器数据', action: 'view_snapshot' }]
+      }
+      if (item.state === 'checking') {
+        return [{ text: '发现异常了', action: 'check_fault' }, { text: '这项没问题', action: 'check_ok' }]
+      }
+      if (item.state === 'fault_found') {
+        return [{ text: '修好了，验收通过', action: 'repair_fixed', highlight: true }, { text: '没修好，继续排查', action: 'repair_not_fixed' }]
+      }
+      if (item.state === 'no_fault' || item.state === 'verified' || item.state === 'repair_failed') {
+        const nextIdx = idx + 1
+        if (checkItems[eid]?.[nextIdx]) {
+          return [{ text: `继续排查下一项：${checkItems[eid][nextIdx].title}`, action: 'continue_next', highlight: true }, { text: '直接闭环', action: 'send' }]
+        }
+        return [{ text: '全部完成，闭环事件', action: 'send' }]
+      }
+      return [{ text: '查看排查进度', action: 'send' }]
     }
-
-    if (stage === 'S3') {
-      return [
-        { text: '查看维修方案', action: 'send' },
-        { text: '查看备件清单', action: 'send' },
-        { text: '报告：维修已完成', action: 'repair_done' }
-      ]
-    }
-
-    if (stage === 'S4') {
-      return [
-        { text: '报告：维修已完成', action: 'repair_done' },
-        { text: '遇到问题，需要协助', action: 'send' },
-        { text: '查看验收标准', action: 'send' }
-      ]
-    }
-
     if (stage === 'S5') {
-      return [
-        { text: '查看维修报告', action: 'send' },
-        { text: '继续下一个事件', action: 'send' }
-      ]
+      return [{ text: '查看维修报告', action: 'send' }, { text: '继续下一个事件', action: 'send' }]
     }
   }
+  // 辅助模式（态势感知）
+  if (props.mode === 'auxiliary' && situationContext) {
+    const ctx = situationContext
+    if (ctx.layer === 1) {
+      return [
+        { text: '查看主机系统传感器', action: 'send' },
+        { text: '哪些设备有异常？', action: 'send' },
+        { text: '船舶健康状态如何？', action: 'send' }
+      ]
+    }
+    if (ctx.layer === 2 && ctx.device) {
+      return [
+        { text: `查看${ctx.device.name}的详细趋势`, action: 'send' },
+        { text: '生成事件快照', action: 'send' },
+        { text: '该设备历史维保记录', action: 'send' }
+      ]
+    }
+    if (ctx.layer === 3 && ctx.sensor) {
+      const s = ctx.sensor
+      if (s.status !== 'normal') {
+        return [
+          { text: '生成事件快照并跳转', action: 'send' },
+          { text: '查看同类传感器对比', action: 'send' },
+          { text: '异常原因分析', action: 'send' }
+        ]
+      }
+      return [
+        { text: '查看近24小时趋势', action: 'send' },
+        { text: '对比历史同期数据', action: 'send' }
+      ]
+    }
+    return []
+  }
+
   return []
 }
-
-function refreshChips() {
-  recommendedQuestions.value = getChipsByContext()
-}
+function refreshChips() { recommendedQuestions.value = getChipsByContext() }
 
 // ============ 阶段推进 ============
 function setStage(eventId, stage) {
   if (!eventId) return
-  const prev = eventStage[eventId]
-  eventStage[eventId] = stage
-  // 阶段变更时重置追问标记
+  const prev = eventStage[eventId]; eventStage[eventId] = stage
   if (prev !== stage) {
-    delete followupSent[eventId + '|S2']
-    delete followupSent[eventId + '|S3']
-    delete followupSent[eventId + '|S4']
-    delete followupSent[eventId + '|S5']
+    delete followupSent[eventId + '|S2']; delete followupSent[eventId + '|S4']; delete followupSent[eventId + '|S5']
   }
 }
 
-// ============ 未读计数 ============
-function incUnread(eventId) {
-  if (!eventId) return
-  eventUnread[eventId] = (eventUnread[eventId] || 0) + 1
-}
+// ============ 未读 ============
+function incUnread(eventId) { if (eventId) eventUnread[eventId] = (eventUnread[eventId] || 0) + 1 }
+function clearUnread(eventId) { if (eventId) eventUnread[eventId] = 0 }
 
-function clearUnread(eventId) {
+function pushMsg(eventId, msg) {
   if (!eventId) return
-  eventUnread[eventId] = 0
-}
-
-// ============ 推送助手消息（核心）============
-function pushAssistantMessage(eventId, content, options = {}) {
-  if (!eventId) return
-  eventStore.addMessage(eventId, {
-    role: 'assistant',
-    content,
-    ts: Date.now(),
-    isFollowup: options.isFollowup || false
-  })
-  // 不在详情 = 未读 +1
+  eventStore.addMessage(eventId, { role: 'assistant', ts: Date.now(), ...msg, content: msg.content || '' })
   const inDetail = props.mode === 'event' && props.eventContext?.id === eventId
-  if (!inDetail) {
-    incUnread(eventId)
-  }
-  nextTick(() => {
-    if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight
-  })
+  if (!inDetail) incUnread(eventId)
+  // 告知 ProductDrawer 助手动作
+  eventAssistantAction[eventId] = msg.cardType || msg.actionType || 'text'
+  nextTick(() => { if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight })
 }
 
-// ============ 5s 定时追问 ============
-let followupTimers = {} // { [eventId+'|'+stage]: timeoutId }
+function scrollToBottom() { nextTick(() => { if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight }) }
 
+// ============ 定时追问 ============
+let followupTimers = {}
 function clearFollowupTimers(eventId) {
-  Object.keys(followupTimers).forEach(k => {
-    if (k.startsWith(eventId + '|')) {
-      clearTimeout(followupTimers[k])
-      delete followupTimers[k]
-    }
-  })
+  Object.keys(followupTimers).forEach(k => { if (k.startsWith(eventId + '|')) { clearTimeout(followupTimers[k]); delete followupTimers[k] } })
 }
-
 function scheduleFollowup(eventId) {
   if (!eventId) return
-  const stage = eventStage[eventId]
-  if (!stage) return
-  if (stage === 'S1') return // S1 不追问
-  const dedupKey = eventId + '|' + stage
-  if (followupSent[dedupKey]) return
-
-  // 演示用 5s；S3 有第二条追问
-  if (stage === 'S3') {
-    followupTimers[dedupKey + '|a'] = setTimeout(() => {
-      pushAssistantMessage(eventId, STAGES.S3.followup, { isFollowup: true })
-    }, 5000)
-    followupTimers[dedupKey + '|b'] = setTimeout(() => {
-      pushAssistantMessage(eventId, STAGES.S3.followup2, { isFollowup: true })
-    }, 5000 + 3500)
+  const stage = eventStage[eventId]; if (!stage || stage === 'S1') return
+  const dedupKey = eventId + '|' + stage; if (followupSent[dedupKey]) return
+  followupTimers[dedupKey] = setTimeout(() => {
+    pushMsg(eventId, { content: STAGES[stage].followup })
     followupSent[dedupKey] = true
-  } else {
-    followupTimers[dedupKey] = setTimeout(() => {
-      pushAssistantMessage(eventId, STAGES[stage].followup, { isFollowup: true })
-      followupSent[dedupKey] = true
-    }, 5000)
-  }
+  }, 6000)
 }
 
-// ============ 事件切进来时的初始化 ============
+// ============ 初始化 —— 核心：自动推送诊断卡片 ============
 function initEventSession(eventId) {
   if (!eventId) return
-  if (!eventStage[eventId]) {
-    eventStage[eventId] = 'S1'
-  }
+  if (!eventStage[eventId]) eventStage[eventId] = 'S1'
   clearUnread(eventId)
-  // 不清历史消息，但清追问标记让本阶段可重新追问
-  const curStage = eventStage[eventId]
-  delete followupSent[eventId + '|' + curStage]
   clearFollowupTimers(eventId)
-  refreshChips()
-  // 进入事件时立刻给个 S1 欢迎（如果没消息的话）
+  initCheckItems(eventId)
   const sess = eventStore.getSessionMessages(eventId)
   if (sess.length === 0) {
-    setTimeout(() => {
-      pushAssistantMessage(eventId, '已为您关联该事件。<br>AI 初步判断：' + (props.eventContext?.aiAnalysis?.summary || '数据存在异常') + '<br>如需进一步分析，可继续追问；也可直接让我为您生成排查方案。')
-      scheduleFollowup(eventId)
-    }, 200)
-  } else {
-    scheduleFollowup(eventId)
+    incUnread(eventId); incUnread(eventId)
+    pushMsg(eventId, { content: `已关联「${props.eventContext?.title || ''}」，正在分析…`, cardType: null })
+    setTimeout(() => pushDiagnosisCard(eventId, props.eventContext), 400)
   }
+  refreshChips()
 }
 
-// ============ 事件切换监听 ============
+// ============ 构建诊断卡片 ============
+function pushDiagnosisCard(eventId, ev) {
+  const analysis = ev.aiAnalysis
+  pushMsg(eventId, {
+    cardType: 'diagnosis',
+    content: analysis.summary,
+    faults: (analysis.faultTable || []).map(f => ({
+      name: f.name, probability: f.probability,
+      match: f.probability === 'high' ? 82 : f.probability === 'medium' ? 56 : 28,
+      color: f.probability === 'high' ? 'var(--danger)' : f.probability === 'medium' ? 'var(--warning)' : 'var(--success)'
+    })),
+    suggestion: analysis.suggestions,
+    snapshotTime: ev.createdAt ? new Date(ev.createdAt).toLocaleString('zh-CN') : '事发时'
+  })
+}
+
+// ============ 构建快照卡片 ============
+function pushSnapshotCard(eventId, ev) {
+  const sensors = ev.snapshot?.sensors || []
+  pushMsg(eventId, {
+    cardType: 'snapshot',
+    content: '传感器快照',
+    snapshotTime: ev.createdAt ? new Date(ev.createdAt).toLocaleString('zh-CN') : '',
+    sensors: sensors.slice(0, 6)
+  })
+}
+
+// ============ 构建排查引导卡片 ============
+function pushGuideCard(eventId, ev) {
+  const title = ev?.snapshot?.sensors?.[0]?.name || '主参数'
+  pushMsg(eventId, {
+    cardType: 'guide',
+    guideTitle: '排查方案',
+    guideIntro: `针对「${ev.title || ''}」已生成标准排查流程，点击各步骤展开详情：`,
+    _expandedSteps: {}, // 全部默认折叠
+    steps: [
+      { title: '外观与渗漏检查', detail: '目视检查相关管路、接头、焊缝，确认无渗漏。检查支架是否松动，有无异常振动痕迹。使用内窥镜检查管路内壁结垢与腐蚀情况。对异常部位多角度拍照留存。' },
+      { title: '关键参数测量', detail: `使用红外测温仪沿管路扫描，记录各点温度。比对${title}进出口温度差，验证换热效率。使用超声波流量计复核实时流量。导出近 24h 趋势数据，与历史同期对比分析。` },
+      { title: '核心部件拆检', detail: '拆检冷却水滤器，观察滤芯脏污程度并拍照。测量淡水侧换热面温度，判断是否结垢。拆下温控阀检查阀芯是否卡滞、密封是否失效。提取油/水样送化验室检测。' },
+      { title: '数据记录与反馈', detail: '记录所有排查数据，填写《排查记录表》。对异常项标记并拍照。汇总排查结论，完成后在助手中回复"已完成排查"提交结果。' }
+    ]
+  })
+}
+
+// ============ 构建警告卡片 ============
+function pushWarningCard(eventId) {
+  pushMsg(eventId, {
+    cardType: 'warning',
+    warnLevel: 'danger',
+    warnTitle: '重要安全警告',
+    items: [
+      '作业前确保主机停机断电，相关阀门关闭，安全标识已挂',
+      '佩戴防护用具（护目镜、防烫手套），谨防烫伤与机械伤害',
+      '记录所有原始数据后再行拆装，不要直接调整温控阀',
+      '如需进入受限空间，必须办理许可证并落实气体检测'
+    ]
+  })
+}
+
+// ============ 构建状态报告卡片 ============
+function pushReportCard(eventId, ev) {
+  pushMsg(eventId, {
+    cardType: 'report',
+    reportTitle: '维修完成 · 验收通过',
+    metrics: [
+      { label: '维修结果', value: '已修复', highlight: true },
+      { label: '处理耗时', value: '4 小时 32 分' },
+      { label: '开始时间', value: ev?.createdAt ? new Date(ev.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' },
+      { label: '完成时间', value: new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }
+    ],
+    conclusion: '冷却水滤器清洗更换完毕，换热面化学清洗完成，温控阀检修调试通过。出口温度稳定78°C，流量92m³/h，无渗漏，验收通过。建议将滤器纳入月度巡检重点对象。'
+  })
+}
+
+// ============ 监听 ============
+// 态势感知：跟随左侧操作自动分析
+if (situationContext) {
+  let lastAction = null
+  watch(() => situationContext.action, (action) => {
+    if (!action || action === lastAction) return
+    lastAction = action
+    const sessionKey = 'situation'
+    const ctx = situationContext
+
+    if (action === 'enter_layer' && ctx.layer === 1) {
+      setTimeout(() => {
+        const devs = deviceStore.devices
+        const dangerDevs = devs.filter(d => d.status === 'danger')
+        const warnDevs = devs.filter(d => d.status === 'warning')
+        eventStore.addMessage(sessionKey, {
+          role: 'assistant', ts: Date.now(),
+          content: `欢迎查看船舶态势面板。<br><br>📡 <b>设备总览</b>：${devs.length} 台在线<br>${dangerDevs.length ? '🔴 <b style=\"color:var(--danger)\">'+dangerDevs.length+' 台异常</b><br>' : ''}${warnDevs.length ? '🟡 <b style=\"color:var(--warning)\">'+warnDevs.length+' 台预警</b><br>' : ''}✅ 健康分 <b style=\"color:var(--success)\">82</b><br><br>点击浮动设备卡片查看详情。`
+        })
+        refreshChips()
+      }, 500)
+    }
+
+    if (action === 'select_device' && ctx.device) {
+      const d = ctx.device
+      const sensors = sensorStore.filteredSensors
+      const overSensors = sensors.filter(s => s.status === 'over')
+      setTimeout(() => {
+        let msg = `已进入「<b>${d.name}</b>」(${d.system}) 传感器详情。<br><br>📊 共 <b>${sensors.length}</b> 个传感器`
+        if (overSensors.length > 0) {
+          msg += `，<b style="color:var(--danger)">${overSensors.length} 个超限</b>`
+          msg += `<br>⚠️ 重点关注：${overSensors.slice(0, 3).map(s => `<b>${s.nameCn}</b>(${s.value}${s.unit})`).join('、')}`
+        }
+        eventStore.addMessage(sessionKey, { role: 'assistant', ts: Date.now(), content: msg })
+        refreshChips()
+      }, 400)
+    }
+
+    if (action === 'select_sensor' && ctx.sensor) {
+      const s = ctx.sensor
+      setTimeout(() => {
+        let msg = `已选中「<b>${s.nameCn}</b>」(${s.nameEn})<br><br>📈 当前值：<b>${s.value}${s.unit}</b>`
+        if (s.status === 'over') {
+          msg += ` <b style="color:var(--danger)">（超限！阈值 ${s.threshold}${s.unit}）</b>`
+          msg += `<br><br>⚠️ 建议立即生成事件快照进入处置流程。点击左侧 ⚡「生成事件快照」或对我说。`
+        } else if (s.status === 'warning') {
+          msg += ` <b style="color:var(--warning)">（预警中，接近阈值）</b>`
+          msg += `<br>📉 建议持续观察，如趋势恶化可生成事件快照。`
+        } else {
+          msg += `（正常），运行平稳。`
+        }
+        eventStore.addMessage(sessionKey, { role: 'assistant', ts: Date.now(), content: msg })
+        refreshChips()
+      }, 400)
+    }
+  }, { immediate: true })
+}
+
 watch(() => props.eventContext?.id, (newId, oldId) => {
-  if (props.mode !== 'event') {
-    recommendedQuestions.value = getChipsByContext()
-    return
-  }
-  if (oldId && oldId !== newId) {
-    clearFollowupTimers(oldId)
-  }
-  if (newId) {
-    initEventSession(newId)
+  if (props.mode !== 'event') { recommendedQuestions.value = getChipsByContext(); return }
+  if (oldId && oldId !== newId) clearFollowupTimers(oldId)
+  if (newId) initEventSession(newId)
+}, { immediate: true })
+watch(() => props.mode, (newMode) => {
+  if (newMode === 'general') {
+    refreshChips()
+    if (proactiveTimer) clearTimeout(proactiveTimer)
+    proactiveTimer = setTimeout(() => pushGeneralProactive(), 3000)
+  } else {
+    if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null }
   }
 }, { immediate: true })
-
-watch(() => props.mode, () => {
-  if (props.mode === 'general') {
-    refreshChips()
-  }
-})
-
-// ============ 消息长度变化 → 刷新 chips ============
-watch(() => messages.value.length, () => {
-  refreshChips()
-})
-
-// ============ 切事件 / 关闭 drawer 时清理追问 ============
-watch(() => eventStore.selectedEventId, (id) => {
-  if (!id) {
-    // 关闭 drawer
-    Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k]))
-    followupTimers = {}
-  }
-})
-
+watch(() => messages.value.length, () => refreshChips())
+watch(() => eventStore.selectedEventId, (id) => { if (!id) { Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k])); followupTimers = {} } })
 onUnmounted(() => {
   Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k]))
+  if (proactiveTimer) clearTimeout(proactiveTimer)
 })
 
-// ============ Chip 点击 ============
-function handleRecommendedClick(q) {
-  if (q.action === 'start_check') {
-    handleStartCheck()
-    return
-  }
-  if (q.action === 'check_done') {
-    handleCheckDone()
-    return
-  }
-  if (q.action === 'repair_done') {
-    handleRepairDone()
-    return
-  }
-  // 默认：写用户消息 → AI 响应
-  inputText.value = q.text
-  sendMessage()
-}
+// ============ 通用模式主动追问 ============
+function pushGeneralProactive() {
+  const stats = eventStore.stats
+  const criticalEvents = eventStore.events.filter(e => e.priority === 'critical' && e.status !== 'resolved')
+  const importantEvents = eventStore.events.filter(e => e.priority === 'important' && e.status !== 'resolved')
 
-function handleStartCheck() {
-  if (!props.eventContext) return
-  const eid = props.eventContext.id
-  // 写用户消息
-  eventStore.addMessage(eid, { role: 'user', content: '立即开始排查，为我生成排查方案', ts: Date.now() })
-  // 推进阶段
-  setStage(eid, 'S2')
-  // AI 响应
-  setTimeout(() => {
-    pushAssistantMessage(eid, '已为您生成排查方案，**请在左侧产物区查看完整内容**。排查过程如有异常请随时反馈。')
-    refreshChips()
-    scheduleFollowup(eid)
-  }, 600)
-}
-
-function handleCheckDone() {
-  if (!props.eventContext) return
-  const eid = props.eventContext.id
-  eventStore.addMessage(eid, { role: 'user', content: '我已完成排查', ts: Date.now() })
-  setStage(eid, 'S3')
-  setTimeout(() => {
-    pushAssistantMessage(eid, '收到您的排查反馈。**正在根据结果生成维修方案**…')
-    refreshChips()
-    scheduleFollowup(eid)
-  }, 600)
-}
-
-function handleRepairDone() {
-  if (!props.eventContext) return
-  const eid = props.eventContext.id
-  eventStore.addMessage(eid, { role: 'user', content: '报告：维修已完成', ts: Date.now() })
-  setStage(eid, 'S5')
-  setTimeout(() => {
-    pushAssistantMessage(eid, '✅ 已记录维修完成。维修报告已生成在左侧产物区。')
-    refreshChips()
-    scheduleFollowup(eid)
-  }, 600)
-}
-
-// ============ 普通发送消息 ============
-function sendMessage() {
-  const text = inputText.value.trim()
-  if (!text) return
-
-  const sessionKey = props.mode === 'event' && props.eventContext
-    ? props.eventContext.id
-    : props.mode === 'general' ? 'general' : 'situation'
-
-  eventStore.addMessage(sessionKey, {
-    role: 'user',
-    content: text,
-    ts: Date.now()
-  })
-
-  setTimeout(() => {
-    const response = generateAIResponse(text)
+  if (criticalEvents.length > 0) {
+    const ev = criticalEvents[0]
+    const sessionKey = 'general'
+    const html = `<div class="proactive-card">
+      <div class="pac-header">
+        <span class="pac-icon">🔴</span>
+        <span class="pac-title">紧急事件提醒</span>
+        <span class="pac-count">${criticalEvents.length}</span>
+      </div>
+      <div class="pac-body">
+        <div class="pac-event-title">${ev.title}</div>
+        <div class="pac-event-meta">系统：${ev.system} · 时间：${new Date(ev.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+        <div class="pac-question">需要我帮您进入事件详情吗？</div>
+      </div>
+    </div>`
     eventStore.addMessage(sessionKey, {
       role: 'assistant',
-      content: response,
-      ts: Date.now()
+      ts: Date.now(),
+      cardType: 'proactive',
+      content: html
     })
-    if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight
     refreshChips()
-  }, 500)
+  } else if (importantEvents.length > 0) {
+    const ev = importantEvents[0]
+    eventStore.addMessage('general', {
+      role: 'assistant',
+      ts: Date.now(),
+      content: `当前有 <b style="color:var(--warning)">${importantEvents.length} 件重要事件</b>需要关注。最新的是「<b>${ev.title}</b>」。需要我帮您进入详情吗？`
+    })
+    refreshChips()
+  }
+}
 
-  inputText.value = ''
-  nextTick(() => {
-    if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+// ============ 排查步骤展开/折叠 ============
+function toggleGuideStep(stepIdx) {
+  if (messages.value.length === 0) return
+  const lastMsg = messages.value[messages.value.length - 1]
+  if (!lastMsg || lastMsg.cardType !== 'guide') return
+  if (!lastMsg._expandedSteps) lastMsg._expandedSteps = {}
+  lastMsg._expandedSteps[stepIdx] = !lastMsg._expandedSteps[stepIdx]
+  // 触发重渲染
+  refreshChips()
+}
+
+// ============ Chips 点击 ============
+function handleRecommendedClick(q) {
+  if (q.action === 'start_check') { startIterativeCheck(); return }
+  if (q.action === 'start_check_item') { startCheckItem(); return }
+  if (q.action === 'check_fault') { handleCheckResult('fault_found'); return }
+  if (q.action === 'check_ok') { handleCheckResult('no_fault'); return }
+  if (q.action === 'repair_fixed') { handleRepairResult('fixed'); return }
+  if (q.action === 'repair_not_fixed') { handleRepairResult('not_fixed'); return }
+  if (q.action === 'continue_next') { continueNextCheck(); return }
+  if (q.action === 'view_snapshot') { handleViewSnapshot(); return }
+  if (q.action === 'goto_event' && q.eventId) { eventStore.selectEvent(q.eventId); return }
+  inputText.value = q.text; sendMessage()
+}
+
+function handleViewSnapshot() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '查看当时的传感器数据', ts: Date.now() })
+  scrollToBottom()
+  setTimeout(() => pushSnapshotCard(eid, props.eventContext), 400)
+}
+
+// ============ 迭代排查：用户点击"开始排查" → 推第一项 ============
+function startIterativeCheck() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '立即开始排查', ts: Date.now() })
+  eventStage[eid] = 'S2'
+  scrollToBottom()
+  setTimeout(() => {
+    pushMsg(eid, { content: 'AI 分析显示有 <b>4 个可能的排查方向</b>，建议从匹配度最高的开始逐项排查。' })
+    refreshChips()
+  }, 400)
+}
+
+// ============ 开始排查当前项 ============
+function startCheckItem() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '开始排查', ts: Date.now() })
+  setTimeout(() => pushCheckItemGuide(eid), 400)
+}
+
+// ============ 迭代排查：助手推送当前排查项引导 ============
+function pushCheckItemGuide(eventId) {
+  const idx = currentCheckIdx[eventId] || 1
+  checkItems[eventId][idx].state = 'checking'
+  pushMsg(eventId, {
+    cardType: 'guide_item',
+    guideTitle: `排查 ${idx}/4：${checkItems[eventId][idx].title}`,
+    guideIntro: `AI 建议优先排查此项（匹配度第 ${idx}）。执行后请反馈结果：`,
+    steps: getCheckStepDetail(idx)
   })
+  refreshChips()
+}
+
+function getCheckStepDetail(idx) {
+  const all = {
+    1: [{title:'外观与渗漏检查',detail:'目视检查相关管路、接头、焊缝有无渗漏。检查支架是否松动、有无异常振动痕迹。拍摄异常部位照片。'}],
+    2: [{title:'温度与流量测量',detail:'使用红外测温仪沿管路扫描记录各点温度。比对进出口温差，用超声波流量计复核实时流量。'}],
+    3: [{title:'滤器与温控阀拆检',detail:'拆检冷却水滤器观察脏污程度。测量淡水侧换热面温度判断是否结垢。检查温控阀阀芯卡滞情况。'}],
+    4: [{title:'汇总判定',detail:'根据前3项排查结果汇总结论。如已发现根因则直接进入维修，如未发现则建议升级技术支持。'}]
+  }
+  return all[idx] || []
+}
+
+// ============ 迭代排查：用户反馈排查结果 ============
+function handleCheckResult(resultType) {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  const idx = currentCheckIdx[eid] || 1
+  checkItems[eid][idx].result = resultType
+
+  eventStore.addMessage(eid, { role: 'user', content: resultType === 'fault_found' ? '发现了异常' : '这项没问题', ts: Date.now() })
+
+  if (resultType === 'fault_found') {
+    checkItems[eid][idx].state = 'fault_found'
+    eventAssistantAction[eid] = 'repair'
+    setTimeout(() => {
+      pushMsg(eid, {
+        cardType: 'guide',
+        guideTitle: `维修 ${idx}：${checkItems[eid][idx].title}`,
+        guideIntro: `排查项 ${idx} 确认异常，请执行以下维修操作：`,
+        steps: getRepairDetail(idx)
+      })
+      refreshChips()
+    }, 500)
+  } else {
+    checkItems[eid][idx].state = 'no_fault'
+    eventAssistantAction[eid] = 'check_done'
+    setTimeout(() => {
+      const nextIdx = idx + 1
+      if (checkItems[eid][nextIdx]) {
+        pushMsg(eid, { content: `排查项 ${idx} 未发现异常。是否继续排查「<b>${checkItems[eid][nextIdx].title}</b>」？`, cardType: null })
+      } else {
+        pushMsg(eid, { content: '全部排查项已完成，未发现明显故障。如需升级处理请联系岸基技术支持。' })
+      }
+      refreshChips()
+    }, 400)
+  }
+}
+
+function getRepairDetail(idx) {
+  const all = {
+    1: [{title:'清洗管路/更换密封',detail:'关闭阀门系统泄压。对渗漏点焊接修补或更换密封垫片。试压确认无渗漏。'}],
+    2: [{title:'化学清洗换热面',detail:'隔离换热器，5%柠檬酸液加温至50-60°C循环清洗4小时。每30分钟检测pH与含铁量。排空后用清水冲洗至pH=7。'}],
+    3: [{title:'更换滤芯',detail:'关闭进出口阀门泄压。取出旧滤芯检查壳体内壁。安装新滤芯(100μm)，密封圈涂润滑脂。试压无渗漏。'},{title:'检修温控阀',detail:'断电隔离，拆下阀体检查密封面。清理沉积物研磨密封面，更换老化密封圈。通电调试确认阀位反馈线性度。'}],
+    4: [{title:'全面检查与归档',detail:'汇总所有维修记录。执行功能性验证测试。确认所有验收标准达标后归档。'}]
+  }
+  return all[idx] || [{title:'执行标准维修流程',detail:'按SOP操作，完成后功能验证。'}]
+}
+
+// ============ 用户反馈维修结果 ============
+function handleRepairResult(resultType) {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  const idx = currentCheckIdx[eid] || 1
+
+  eventStore.addMessage(eid, { role: 'user', content: resultType === 'fixed' ? '修好了，验收通过' : '没修好，问题还在', ts: Date.now() })
+
+  if (resultType === 'fixed') {
+    checkItems[eid][idx].state = 'verified'
+    eventAssistantAction[eid] = 'repair_verified'
+    setTimeout(() => {
+      const nextIdx = idx + 1
+      if (checkItems[eid][nextIdx]) {
+        pushMsg(eid, { content: `✅ 排查项 ${idx} 已修复并验证通过。<br><br>是否还有其他异常？如需继续排查下一项「<b>${checkItems[eid][nextIdx].title}</b>」请告诉我。` })
+      } else {
+        eventStage[eid] = 'S5'
+        eventAssistantAction[eid] = 'report'
+        pushReportCard(eid, props.eventContext)
+      }
+      refreshChips()
+    }, 500)
+  } else {
+    checkItems[eid][idx].state = 'repair_failed'
+    setTimeout(() => {
+      const nextIdx = idx + 1
+      if (checkItems[eid][nextIdx]) {
+        pushMsg(eid, { content: `⚠️ 排查项 ${idx} 修复后问题未解决。建议继续排查「<b>${checkItems[eid][nextIdx].title}</b>」。` })
+      } else {
+        pushMsg(eid, { content: '所有排查项已尝试修复但问题依然存在。建议升级处理：联系岸基技术支持或安排坞修检查。' })
+      }
+      refreshChips()
+    }, 500)
+  }
+}
+
+// ============ 继续下一项排查 ============
+function continueNextCheck() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  currentCheckIdx[eid] = (currentCheckIdx[eid] || 1) + 1
+  eventStore.addMessage(eid, { role: 'user', content: '继续排查下一项', ts: Date.now() })
+  setTimeout(() => pushCheckItemGuide(eid), 400)
+}
+
+// ============ 普通发送 ============
+function sendMessage() {
+  const text = inputText.value.trim(); if (!text) return
+  const sessionKey = props.mode === 'event' && props.eventContext ? props.eventContext.id : props.mode === 'general' ? 'general' : 'situation'
+  eventStore.addMessage(sessionKey, { role: 'user', content: text, ts: Date.now() })
+  inputText.value = ''; scrollToBottom()
+  isTyping.value = true
+  setTimeout(() => {
+    isTyping.value = false
+    const response = generateAIResponse(text)
+    eventStore.addMessage(sessionKey, { role: 'assistant', content: response, ts: Date.now() })
+    scrollToBottom(); refreshChips()
+  }, 900)
 }
 
 function generateAIResponse(text) {
-  if (text.includes('原因') || text.includes('为什么') || text.includes('推断')) {
-    if (props.eventContext?.aiAnalysis?.faultTable) {
-      const table = props.eventContext.aiAnalysis.faultTable
-      let html = '<div style="font-size:12px;line-height:1.7">根据 AI 诊断，可能原因如下：<br><br>'
-      table.forEach((f, i) => {
-        const probColor = f.probability === 'high' ? '#FF4D4F' : f.probability === 'medium' ? '#FAAD14' : '#8BAAC0'
-        html += `<b>${i + 1}. ${f.name}</b> <span style="color:${probColor}">[${f.probability === 'high' ? '高概率' : f.probability === 'medium' ? '中概率' : '低概率'}]</span><br>`
-        html += `<span style="color:#8BAAC0;font-size:11px">${f.detail}</span><br><br>`
-      })
-      html += '</div>'
-      return html
+  const t = text.toLowerCase()
+
+  if (props.mode === 'general') return generateGeneralResponse(t)
+  if (props.mode === 'event' && props.eventContext) return generateEventResponse(t, props.eventContext)
+  if (props.mode === 'auxiliary') return generateSituationResponse(t)
+
+  return `已收到：「${text}」。`
+}
+
+// ============ 通用模式：4 个故事线 ============
+function generateGeneralResponse(t) {
+  const stats = eventStore.stats
+
+  // 故事线1：询问紧急事件
+  if (/紧急|critical|处理/.test(t)) {
+    if (stats.critical > 0) {
+      const criticalEvents = eventStore.events.filter(e => e.priority === 'critical' && e.status !== 'resolved')
+      const ev = criticalEvents[0]
+      return `目前有 <b style="color:var(--danger)">${stats.critical} 件紧急事件</b>待处理。最新的一件是「<b>${ev?.title || '主机冷却水温异常'}</b>」(${ev?.id || 'EVT-2026-001'})，${ev?.system || '主机系统'}，发生于 ${ev ? new Date(ev.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '14:05'}。建议优先处理这件 — 点击事件查看详情，AI 助手会引导你完成全流程。`
     }
-    return '根据当前数据分析，建议先查看 AI 诊断面板中的候选原因列表。'
+    return '当前没有紧急事件。'
   }
-  if (text.includes('数据快照') || text.includes('快照')) {
-    return '事件快照数据已冻结，**关键指标在左侧产物区"事件快照"section 中**。您可以查看事发时各传感器读数与阈值的对比。'
+
+  // 故事线2：询问系统问题
+  if (/系统|设备|机器/.test(t)) {
+    const sysCount = {}
+    eventStore.events.forEach(e => {
+      if (e.status !== 'resolved' && e.system) sysCount[e.system] = (sysCount[e.system] || 0) + 1
+    })
+    const top = Object.entries(sysCount).sort((a, b) => b[1] - a[1])[0]
+    if (top) {
+      return `最近 <b>${top[0]}</b> 的问题最多，<b>${top[1]}</b> 件相关未解决事件。建议关注该系统的运行参数和维保计划。`
+    }
+    return '当前各系统运行平稳，暂无集中性故障。'
   }
-  if (text.includes('误报')) {
-    return '已标记为疑似误报。事件将转入观察池，**24 小时内若不再触发则自动关闭**。'
+
+  // 故事线3：询问重复故障
+  if (/重复|常见|频率/.test(t)) {
+    return `本月共有 <b>${stats.pending + stats.processing}</b> 件未结事件。冷却系统相关故障占比 <b style="color:var(--warning)">33%</b>，主要集中在主机和辅机系统。建议安排一次系统性的冷却回路检查。`
   }
-  if (text.includes('注意事项')) {
-    return '⚠️ 排查注意事项：<br>1. 作业前确保主机停机断电<br>2. 佩戴防护用具，谨防烫伤<br>3. 记录原始数据，**不要直接调整温控阀**'
+
+  // 故事线4：维保建议
+  if (/维保|维护|保养/.test(t)) {
+    const pendingMaint = eventStore.events.filter(e => e.source === 'maintenance_schedule' && e.status !== 'resolved')
+    return `当前有 <b>${pendingMaint.length} 件维保提醒</b>待处理。最近到期的是「<b>${pendingMaint[0]?.title || '3号泵计划维保'}</b>」，${pendingMaint[0]?.system || '泵系统'}。我建议优先处理冷却泵维保 — 错过维保周期会加速设备老化。`
   }
-  if (text.includes('步骤')) {
-    return '具体排查步骤已在左侧产物区"排查方案"section 中展示。**请按顺序逐项执行并记录结果**。'
+
+  // 故事线5：船舶健康
+  if (/健康|评分|运行/.test(t)) {
+    return `船舶健康分 <b style="color:var(--success)">82</b>分，处于良好区间。但 <b style="color:var(--danger)">${stats.critical} 件紧急事件</b> 正在影响整体评分，建议优先处置。`
   }
-  if (text.includes('维修方案') || text.includes('维修')) {
-    return '维修方案已在左侧产物区"维修方案"section 中生成。**请按规范执行，完成后告诉我结果**。'
+
+  // 故事线6：知识库
+  if (/知识|案例|参考|文档/.test(t)) {
+    return `知识库有 <b>79</b> 篇技术文档：18 篇故障案例、28 篇操作规程、24 篇设备手册、9 篇技术通告。你可以从左侧导航进入「知识」模块浏览。事件详情页也会自动推荐相关案例。`
   }
-  if (text.includes('备件')) {
-    return '所需备件：① 冷却水滤芯 ×1 ② 密封圈 ×2 ③ 高温润滑脂 1 支。**请确认库存后再开始维修**。'
+
+  // 故事线7：流量/数据
+  if (/多少|数量|统计|总/.test(t)) {
+    return `当前总事件数 <b>${stats.total}</b>：待处理 <b style="color:var(--warning)">${stats.pending}</b>、处理中 <b style="color:var(--accent)">${stats.processing}</b>、已解决 <b style="color:var(--success)">${stats.resolved}</b>。按严重程度：紧急 <b style="color:var(--danger)">${stats.critical}</b>、重要 <b style="color:var(--warning)">${stats.important}</b>、一般 <b style="color:var(--accent)">${stats.normal}</b>。`
   }
-  if (text.includes('验收标准')) {
-    return '验收标准：① 出口温度 ≤ 85°C ② 流量 ≥ 80m³/h ③ 系统无渗漏。**达到以上三项方可关闭事件**。'
+
+  // 故事线8：报告/分析
+  if (/报告|分析|总结/.test(t)) {
+    return `我可以帮您生成事件分析报告。点击任意事件进入详情，AI 助手会引导你完成从分析到维修的全流程。报告会自动归档到产物区。`
   }
-  if (text.includes('维修报告')) {
-    return '维修报告已在左侧产物区"维修报告"section 中，**只读，不可编辑**。'
+
+  // 默认
+  return `已收到：「${text}」。我正在分析您的问题…您可以问我：<br>• 紧急/重要事件统计<br>• 各系统故障情况<br>• 重复故障模式<br>• 维保计划状态<br>• 船舶健康评分`
+}
+
+// ============ 事件模式：上下文感知回复 ============
+function generateEventResponse(t, ev) {
+  const analysis = ev.aiAnalysis || {}
+  const sensors = ev.snapshot?.sensors || []
+  const overSensors = sensors.filter(s => s.status === 'over')
+  const warnSensors = sensors.filter(s => s.status === 'warning')
+
+  // 原因/推断
+  if (/原因|为什么|推断/.test(t)) {
+    if (analysis.faultTable?.length) {
+      const f = analysis.faultTable[0]
+      return `根据数据综合分析，<b>${f.name}</b>是可能性最高的原因（匹配度 <b style="color:var(--danger)">82%</b>）。判断依据：${f.detail}<br><br>同时存在 ${analysis.faultTable.length - 1} 个候选原因，完整列表见右侧 AI 诊断卡片。`
+    }
+    return '当前事件为维保提醒类，无故障候选分析。'
   }
-  return `已收到您的提问：「${text}」。正在查询相关数据，请稍候...`
+
+  // 数据/快照
+  if (/快照|传感器|数据|当时/.test(t)) {
+    if (overSensors.length > 0) {
+      const s = overSensors[0]
+      return `关键异常数据：<b style="color:var(--danger)">${s.name}</b> = <b>${s.value}${s.unit}</b>（阈值 ${s.threshold}${s.unit}），超限 <b>${(((s.value - s.threshold) / s.threshold) * 100).toFixed(1)}%</b>。点击「查看当时的传感器数据」按钮查看完整快照。`
+    }
+    return '快照数据已冻结在事发时。可点击「查看当时的传感器数据」按钮查看完整 6 项指标。'
+  }
+
+  // 排查/步骤
+  if (/排查|步骤|怎么做/.test(t)) {
+    if (overSensors.length > 0) {
+      return `建议从<b>${overSensors[0].name}</b>入手排查：<br>1. 检查相关管路外观和渗漏<br>2. 测量进出口温度差<br>3. 拆检关键滤器<br>4. 记录原始数据<br><br>点击「立即开始排查」按钮，我会在产物区生成完整 SOP 文档。`
+    }
+    return '已为您准备好标准排查方案。点击「立即开始排查」按钮，方案会在产物区展开。'
+  }
+
+  // 误报
+  if (/误报|没事|忽略/.test(t)) {
+    return '✅ 已标记为<b>疑似误报</b>。事件将转入观察池，<b>24 小时</b>内若不再触发则自动关闭。如果短期内再次触发，会自动恢复为待处理状态并通知你。'
+  }
+
+  // 维修
+  if (/维修|修复|换|拆/.test(t)) {
+    return '维修方案分三步：① 冷却水滤器清洗更换 ② 淡水侧换热面化学清洗 ③ 温控阀检修调试。完整 SOP 和验收标准见左侧产物区「维修方案」卡片。'
+  }
+
+  // 备件
+  if (/备件|零件|材料/.test(t)) {
+    return '所需备件：<br>• 冷却水滤芯 ×1（型号 XX-100，规格 100μm）<br>• 密封圈 ×2（氟橡胶 NBR 70）<br>• 高温润滑脂 ×1 支（食品级）<br>• 5% 柠檬酸除垢液 ×20L<br><br>请确认库存后再开始维修。'
+  }
+
+  // 验收
+  if (/验收|标准|怎么算好|通过/.test(t)) {
+    return '验收标准：<br>• 出口温度 ≤ <b>85°C</b>（当前 78°C ✓）<br>• 流量 ≥ <b>80m³/h</b>（当前 92m³/h ✓）<br>• 滤器压差 ≤ <b>0.03MPa</b><br>• 系统无可见渗漏<br>• 振动值 ≤ <b>4.5mm/s</b>'
+  }
+
+  // 危险/安全
+  if (/危险|安全|注意/.test(t)) {
+    return '⚠️ 关键安全提示：<br>1. 维修前必须停机断电，办理热工作业许可证<br>2. 化学清洗剂操作时佩戴防酸碱护具<br>3. 进入受限空间前必须做气体检测<br>4. 现场配备灭火器材，专人监护'
+  }
+
+  // 历史/案例
+  if (/历史|案例|以前|类似/.test(t)) {
+    if (ev.relatedCases?.length) {
+      return `知识库推荐了 <b>${ev.relatedCases.length}</b> 篇相关案例：<br>• ${ev.relatedCases[0].title}<br><br>你可以从「知识」模块查看完整内容，或在维修时参考。`
+    }
+    return '知识库暂无类似案例。本次故障特征较为典型，建议维修完成后录入新案例以备参考。'
+  }
+
+  // 时间/紧急程度
+  if (/多久|紧急|时间/.test(t)) {
+    return `本次事件<b>${ev.priority === 'critical' ? '非常紧急' : '需关注'}</b>。如不处置，类似故障通常在 30 分钟内可能触发二级保护。建议：① 立即降负荷运行 ② 按 SOP 排查 ③ 2 小时内完成维修。`
+  }
+
+  // 趋势
+  if (/趋势|变化|历史|走向/.test(t)) {
+    return '从趋势图看，事发前 12 小时数据平稳，<b>事发前 4 小时</b>开始出现轻微上升，<b>事发前 1 小时</b>陡升并突破阈值。AI 已将 24 小时趋势数据呈现在 AI 分析产物区。'
+  }
+
+  // 默认
+  return `已收到您关于「<b>${ev.title || '事件'}</b>」的提问。您可以问：<br>• 这类故障的原因是什么？<br>• 当时的传感器数据？<br>• 怎么排查？<br>• 维修时备件？<br>• 验收标准？<br>• 类似历史案例？`
 }
 
 function toggleVoice() {
@@ -559,395 +951,265 @@ function toggleVoice() {
     isRecording.value = !isRecording.value
     if (isRecording.value) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SpeechRecognition()
-      recognition.lang = 'zh-CN'
-      recognition.continuous = false
-      recognition.interimResults = false
-      recognition.onresult = (event) => {
-        inputText.value = event.results[0][0].transcript
-        isRecording.value = false
-      }
-      recognition.onerror = () => { isRecording.value = false }
-      recognition.start()
+      const r = new SpeechRecognition(); r.lang = 'zh-CN'; r.continuous = false; r.interimResults = false
+      r.onresult = (e) => { inputText.value = e.results[0][0].transcript; isRecording.value = false }
+      r.onerror = () => { isRecording.value = false }
+      r.start()
     }
-  } else {
-    inputText.value = '主机温度现在多少？'
+  } else { inputText.value = '主机温度现在多少？' }
+}
+
+// ============ 态势感知智能回复 ============
+function generateSituationResponse(t) {
+  const ctx = situationContext
+  if (!ctx) return '请从船舶总览页面开始查看。'
+
+  const devs = deviceStore.devices
+  const dangerDevs = devs.filter(d => d.status === 'danger')
+  const sensors = sensorStore.allSensors
+  const overSensors = sensors.filter(s => s.status === 'over')
+
+  if (/异常|设备|哪些/.test(t)) {
+    if (dangerDevs.length > 0) {
+      return `${dangerDevs.map(d => `🔴 <b>${d.name}</b> — ${d.status === 'danger' ? '异常' : ''}`).join('<br>')}<br><br>建议在船舶总览页面点击设备卡片查看详情。`
+    }
+    return '✅ 当前所有设备运行正常，无异常。'
   }
+
+  if (/健康|状态|概述/.test(t)) {
+    return `船舶「<b>${deviceStore.ship.name}</b>」运行中，健康分 <b style="color:var(--success)">${deviceStore.ship.healthScore}</b>。<br>航速 ${deviceStore.ship.speed} 节，航向 ${deviceStore.ship.heading}°。<br>${overSensors.length > 0 ? `有 <b style="color:var(--danger)">${overSensors.length} 个传感器超限</b>需关注。` : '所有传感器正常。'}`
+  }
+
+  if (/详细|趋势/.test(t) && ctx.sensor) {
+    return `传感器「<b>${ctx.sensor.nameCn}</b>」当前 ${ctx.sensor.value}${ctx.sensor.unit}。可在左侧趋势图中调整时间范围查看 1H/6H/24H/7D 数据。`
+  }
+
+  if (/事件快照|生成事件|跳转/.test(t)) {
+    if (ctx.sensor && ctx.sensor.status !== 'normal') {
+      return `可以为「<b>${ctx.sensor.nameCn}</b>」生成事件快照并进入事件中心处理。请点击左侧 ⚡「生成事件快照」按钮。`
+    }
+    if (ctx.device) {
+      return `${ctx.device.name} 当前运行状态为 ${ctx.device.status === 'danger' ? '异常' : ctx.device.status === 'warning' ? '预警' : '正常'}，暂无需生成事件。点击异常传感器后可生成事件。`
+    }
+    return '请先选中一个异常传感器，然后生成事件快照。'
+  }
+
+  if (/维保|历史|记录/.test(t)) {
+    return '维保历史记录功能开发中。当前可通过事件中心查看该设备的过往事件和排查记录。'
+  }
+
+  if (/对比|同期|其他/.test(t)) {
+    return '跨传感器对比分析需要选择两个及以上传感器。您可以在传感器网格中切换系统标签来查看不同系统的传感器数据。'
+  }
+
+  if (/主机|冷却|温度/.test(t)) {
+    return '主机系统共有 9 个传感器，当前有异常传感器。建议点击「1号主机」浮动卡片进入传感器详情查看。'
+  }
+
+  return `已收到：「${text}」。您可以问我：<br>• 哪些设备有异常？<br>• 船舶健康状态如何？<br>• 生成事件快照<br>• 查看详细趋势`
 }
 </script>
 
 <style scoped>
+/* === Panel === */
 .assistant-panel {
-  width: var(--assistant-width);
-  min-width: var(--assistant-width);
-  height: 100%;
-  background: var(--bg-chat);
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--border-color);
-  flex-shrink: 0;
+  width: var(--assistant-width); min-width: var(--assistant-width); height: 100%;
+  background: var(--bg-panel); display: flex; flex-direction: column;
+  border-left: 1px solid var(--border-primary); flex-shrink: 0;
 }
 
+/* === Header === */
 .assistant-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  padding: 12px 14px; border-bottom: 1px solid var(--border-primary);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--bg-surface), #FBFCFD);
 }
+.mode-tag { font-size: 10px; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 500; }
+.gen-mode,.event-mode { background: var(--accent-bg); color: var(--accent); }
+.aux-mode { background: rgba(0,188,212,0.10); color: #0096A0; }
+.assistant-title { font-size: var(--font-md); font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
+.sparkle-icon { width: 14px; height: 14px; color: var(--accent); animation: sparkle-rotate 3s linear infinite; }
+@keyframes sparkle-rotate { 0%{transform:rotate(0deg) scale(1)} 50%{transform:rotate(180deg) scale(1.15)} 100%{transform:rotate(360deg) scale(1)} }
+.stage-pill { margin-left: auto; font-size: 10px; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--success-bg); color: var(--success); font-weight: 500; }
 
-.mode-tag {
-  font-size: 9px;
-  padding: 2px 7px;
-  border-radius: 3px;
-  font-weight: 500;
-}
-.gen-mode { background: rgba(24,144,255,0.15); color: var(--accent); }
-.event-mode { background: rgba(24,144,255,0.2); color: var(--accent); }
-.aux-mode { background: rgba(0,188,212,0.15); color: #00BCD4; }
-
-.assistant-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.stage-pill {
-  margin-left: auto;
-  font-size: 9px;
-  padding: 2px 7px;
-  border-radius: 3px;
-  background: rgba(82,196,26,0.15);
-  color: var(--success);
-  font-weight: 500;
-}
-
-/* 🆕 事件上下文条 */
+/* === 事件上下文条 === */
 .event-context-bar {
-  padding: 10px 14px 12px;
-  background: linear-gradient(135deg, rgba(24,144,255,0.08), rgba(0,188,212,0.04));
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
+  padding: 12px 14px; background: linear-gradient(135deg, #F5F9FF, #EEF4FC);
+  border-bottom: 1px solid var(--border-primary); border-left: 3px solid var(--accent); flex-shrink: 0;
 }
+.ecb-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ecb-clip { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+.ecb-name { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.ecb-meta { margin-top: 6px; }
+.ecb-tag { font-size: 10px; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 500; }
+.ecb-tag.critical { background: var(--danger-bg); color: var(--danger); }
+.ecb-tag.important { background: var(--warning-bg); color: var(--warning); }
+.ecb-tag.normal { background: var(--accent-bg); color: var(--accent); }
+.ecb-tag.pending { background: var(--warning-bg); color: var(--warning); }
+.ecb-tag.processing { background: var(--accent-bg); color: var(--accent); }
+.ecb-tag.resolved { background: var(--success-bg); color: var(--success); }
+.ecb-id { margin-left: auto; font-size: 10px; color: var(--text-muted); font-family: Consolas, monospace; }
 
-.ecb-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
+/* === Messages === */
+.messages-area { flex: 1; overflow-y: auto; padding: 10px 0; display: flex; flex-direction: column; }
+.msg { margin: 0 8px 10px; max-width: 96%; }
+.msg-ai { display: flex; gap: 7px; align-items: flex-start; }
 
-.ecb-icon {
-  font-size: 13px;
-  flex-shrink: 0;
-}
+/* Avatar */
+.assistant-avatar { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #36CFC9); display: flex; align-items: center; justify-content: center; position: relative; }
+.avatar-dot { width: 7px; height: 7px; border-radius: 50%; background: white; z-index: 1; }
+.avatar-ring { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0.2; animation: avatar-glow 2s ease-in-out infinite; }
+@keyframes avatar-glow { 0%,100%{opacity:0.12;transform:scale(1)} 50%{opacity:0.3;transform:scale(1.08)} }
 
-.ecb-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
-}
+/* === 普通文本气泡 === */
+.msg-content { background: var(--bg-surface); border: 1px solid var(--border-primary); border-left: 2px solid var(--accent); border-radius: 4px var(--radius-md) var(--radius-md) 4px; padding: 10px 12px; color: var(--text-secondary); max-width: 240px; font-size: var(--font-base); line-height: 1.6; box-shadow: var(--shadow-sm); }
+.msg-user { display: flex; justify-content: flex-end; }
+.msg-user .msg-content { background: linear-gradient(135deg, var(--accent), #4096FF); border: none; border-radius: var(--radius-md) 4px var(--radius-md) var(--radius-md); color: #fff; }
 
-.ecb-meta {
-  margin-top: 6px;
-  gap: 5px;
-}
+/* 欢迎卡片 */
+.welcome-msg { margin-top: 4px; background: linear-gradient(135deg, #F8FBFF, #F0F5FF); }
+.summary-msg { background: var(--bg-surface); border-radius: var(--radius-lg); padding: 14px; }
+.summary-block { display: flex; flex-direction: column; gap: 8px; }
+.summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.summary-label { color: var(--text-muted); }
+.summary-value { font-weight: 600; }
 
-.ecb-tag {
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-weight: 500;
-}
-.ecb-tag.critical { background: rgba(255,77,79,0.15); color: var(--danger); }
-.ecb-tag.important { background: rgba(250,173,20,0.15); color: var(--warning); }
-.ecb-tag.normal { background: rgba(24,144,255,0.15); color: var(--accent); }
-.ecb-tag.pending { background: rgba(250,173,20,0.15); color: var(--warning); }
-.ecb-tag.processing { background: rgba(24,144,255,0.15); color: var(--accent); }
-.ecb-tag.resolved { background: rgba(82,196,26,0.15); color: var(--success); }
+/* === Typing === */
+.typing-msg { margin-bottom: 6px; }
+.typing-bubble { display: flex; align-items: center; gap: 5px; padding: 14px 16px; min-height: 22px; }
+.typing-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: 0.4; animation: typing-bounce 1.4s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing-bounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-4px);opacity:1} }
 
-.ecb-id {
-  margin-left: auto;
-  font-size: 9px;
-  color: var(--text-muted);
-  font-family: Consolas, monospace;
-}
+/* ======================== */
+/* === 6 种富媒体卡片 === */
+/* ======================== */
+.msg-card { background: var(--bg-surface); border: 1px solid var(--border-primary); border-left: 3px solid var(--accent); border-radius: var(--radius-md); padding: 0; overflow: hidden; box-shadow: var(--shadow-sm); width: 100%; }
+.card-badge { font-size: 11px; font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--border-secondary); color: var(--accent); background: var(--accent-bg); }
+.card-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 
-.messages-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-  display: flex;
-  flex-direction: column;
-}
+/* 1. 诊断卡 */
+.diag-conclusion { }
+.diag-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+.diag-text { font-size: 12px; line-height: 1.7; color: var(--text-primary); }
+.diag-faults { margin-top: 2px; }
+.diag-fault-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--border-secondary); font-size: 11px; }
+.diag-fault-row:last-child { border-bottom: none; }
+.df-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.df-dot.high { background: var(--danger); }
+.df-dot.medium { background: var(--warning); }
+.df-dot.low { background: var(--success); }
+.df-name { flex: 1; color: var(--text-primary); font-weight: 500; }
+.df-bar { width: 48px; height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+.df-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
+.df-pct { font-family: Consolas, monospace; font-size: 10px; color: var(--text-muted); width: 28px; text-align: right; }
+.diag-suggestion { font-size: 11px; line-height: 1.6; color: var(--text-secondary); padding-top: 4px; border-top: 1px solid var(--border-secondary); }
+.diag-meta { font-size: 10px; color: var(--text-muted); text-align: center; }
 
-.welcome-msg {
-  margin: 4px 12px 8px;
-  padding: 10px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-primary);
-}
+/* 2. 快照卡 */
+.snapshot-card { border-left-color: #722ED1; }
+.snapshot-card .card-badge { color: #722ED1; background: rgba(114,46,209,0.06); }
+.snap-time { font-size: 10px; color: var(--text-muted); text-align: center; margin-bottom: 2px; }
+.snap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.snap-item { background: var(--bg-hover); border-radius: 6px; padding: 8px 10px; border: 1px solid var(--border-secondary); }
+.snap-item.snap-over { border-left: 2px solid var(--danger); }
+.snap-item.snap-warning { border-left: 2px solid var(--warning); }
+.snap-name { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+.snap-val { font-size: 16px; font-weight: 700; font-family: Consolas, monospace; color: var(--text-primary); }
+.snap-unit { font-size: 10px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+.snap-ref { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
+.snap-status { font-size: 9px; font-weight: 600; margin-top: 2px; color: var(--text-muted); }
+.snap-item.snap-over .snap-status { color: var(--danger); }
 
-.summary-msg {
-  margin: 0 12px 8px;
-  padding: 10px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
+/* 3. 操作引导卡 */
+.guide-card { border-left-color: #FA8C16; }
+.guide-card .card-badge { color: #FA8C16; background: rgba(250,140,22,0.06); }
+.guide-intro { font-size: 11px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 4px; }
+.guide-steps { display: flex; flex-direction: column; gap: 0; }
+.guide-step { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-secondary); cursor: pointer; transition: background 0.15s; }
+.guide-step:hover { background: rgba(22,119,255,0.03); }
+.guide-step:last-child { border-bottom: none; }
+.gs-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.gs-body { flex: 1; }
+.gs-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+.gs-toggle { font-size: 8px; color: var(--text-muted); flex-shrink: 0; }
+.gs-detail { font-size: 10px; color: var(--text-muted); line-height: 1.5; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-secondary); }
+.guide-hint { margin-top: 8px; font-size: 10px; color: var(--text-muted); text-align: center; font-style: italic; }
 
-.msg {
-  margin: 0 12px 8px;
-  max-width: 95%;
-  font-size: 12px;
-  line-height: 1.6;
-}
+/* 4. 警告卡 */
+.warning-card { border-left-color: var(--danger); background: var(--danger-bg); display: flex; gap: 10px; padding: 12px; border: 1px solid rgba(245,63,63,0.15); }
+.warning-card .card-badge { display: none; }
+.warning-card.warn-danger { border-left-color: var(--danger); background: var(--danger-bg); }
+.warn-icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }
+.warn-body { flex: 1; }
+.warn-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.warn-list { margin: 0; padding-left: 18px; font-size: 11px; line-height: 1.7; color: var(--text-secondary); }
+.warn-list li::marker { color: var(--danger); font-weight: 600; }
 
-.msg-ai {
-  display: flex;
-  gap: 8px;
-}
+/* 5. 状态报告卡 */
+.report-card { border-left-color: var(--success); }
+.report-banner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: linear-gradient(135deg, var(--success), #36D15A); color: #fff; }
+.rb-icon { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+.rb-text { font-size: 14px; font-weight: 600; }
+.report-body { padding: 12px; }
+.rb-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.rb-metric { background: var(--bg-hover); border-radius: 6px; padding: 8px 10px; }
+.rbm-label { font-size: 10px; color: var(--text-muted); }
+.rbm-value { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.rbm-hl { color: var(--success) !important; }
+.rb-conclusion { font-size: 11px; line-height: 1.6; color: var(--text-secondary); border-top: 1px solid var(--border-secondary); padding-top: 8px; }
 
-.assistant-avatar {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1890FF, #00BCD4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* === 快捷回复 === */
+.recommended-section { margin: 8px 8px 12px; }
+.rec-label { font-size: 10px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.rec-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.rec-chip { font-size: 11px; padding: 5px 10px; border-radius: var(--radius-lg); border: 1px solid var(--border-primary); background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; white-space: nowrap; min-height: 32px; }
+.rec-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(22,119,255,0.07); }
+.rec-chip-cta { background: linear-gradient(135deg, var(--accent), #4096FF) !important; color: #fff !important; border: none !important; font-weight: 600; box-shadow: 0 2px 8px rgba(22,119,255,0.25); }
+.rec-chip-cta:hover { background: linear-gradient(135deg, #4096FF, var(--accent)) !important; color: #fff !important; box-shadow: 0 4px 14px rgba(22,119,255,0.4); transform: translateY(-2px); }
 
-.avatar-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: white;
-}
+/* ============ 通用模式主动追问卡 ============ */
+.proactive-card { padding: 12px; min-width: 220px; }
+.pac-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.pac-icon { font-size: 16px; }
+.pac-title { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.pac-count { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); }
+.pac-body { display: flex; flex-direction: column; gap: 6px; }
+.pac-event-title { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+.pac-event-meta { font-size: 11px; color: var(--text-muted); }
+.pac-question { font-size: 12px; color: var(--accent); margin-top: 4px; font-weight: 500; }
 
-.msg-content {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: var(--text-secondary);
-  max-width: 220px;
-  font-size: 12px;
-}
+/* === 输入区 === */
+.input-area { padding: 10px 12px; border-top: 1px solid var(--border-primary); display: flex; gap: 8px; flex-shrink: 0; background: var(--bg-surface); }
+.input-wrapper { flex: 1; display: flex; align-items: center; position: relative; background: var(--bg-panel); border: 1px solid var(--border-primary); border-radius: 22px; transition: border-color 0.25s, box-shadow 0.25s; overflow: visible; }
+.input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,119,255,0.10); }
+.chat-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: var(--font-base); padding: 8px 6px 8px 14px; }
+.chat-input::placeholder { color: var(--text-muted); }
 
-.msg-user {
-  display: flex;
-  justify-content: flex-end;
-}
+/* Mic */
+.mic-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 50%; cursor: pointer; flex-shrink: 0; margin-right: 2px; color: var(--text-muted); z-index: 2; transition: all 0.3s; }
+.mic-btn:hover { color: var(--accent); background: var(--accent-bg); }
+.mic-btn.recording { color: var(--danger); background: var(--danger-bg); }
+.mic-svg { width: 15px; height: 15px; }
+.waveform { display: flex; align-items: center; gap: 2px; height: 14px; }
+.wf-bar { width: 3px; border-radius: 2px; background: var(--danger); animation: wf-bounce 0.8s ease-in-out infinite; }
+.wf-bar:nth-child(1) { height: 7px; animation-delay: 0s; }
+.wf-bar:nth-child(2) { height: 13px; animation-delay: 0.1s; }
+.wf-bar:nth-child(3) { height: 9px; animation-delay: 0.2s; }
+.wf-bar:nth-child(4) { height: 14px; animation-delay: 0.3s; }
+.wf-bar:nth-child(5) { height: 6px; animation-delay: 0.4s; }
+@keyframes wf-bounce { 0%,100%{transform:scaleY(0.6)} 50%{transform:scaleY(1.4)} }
+.ripple-ring { position: absolute; right: 4px; top: 50%; transform: translate(0, -50%); width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--danger); opacity: 0; z-index: 1; pointer-events: none; }
+.ripple-ring.r1 { animation: ripple-out 1.8s ease-out infinite 0s; }
+.ripple-ring.r2 { animation: ripple-out 1.8s ease-out infinite 0.6s; }
+.ripple-ring.r3 { animation: ripple-out 1.8s ease-out infinite 1.2s; }
+@keyframes ripple-out { 0%{transform:translate(0,-50%) scale(1);opacity:0.4} 100%{transform:translate(0,-50%) scale(2.2);opacity:0} }
 
-.msg-user .msg-content {
-  background: rgba(24,144,255,0.15);
-  border: 1px solid rgba(24,144,255,0.3);
-  color: var(--text-primary);
-}
-
-.action-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.action-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.action-desc {
-  font-size: 10px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  line-height: 1.5;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-}
-
-.btn-primary {
-  font-size: 10px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  border: none;
-  background: rgba(24,144,255,0.15);
-  color: var(--accent);
-  cursor: pointer;
-}
-.btn-primary:hover { background: rgba(24,144,255,0.25); }
-
-.btn-danger {
-  font-size: 10px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  border: none;
-  background: rgba(255,77,79,0.15);
-  color: var(--danger);
-  cursor: pointer;
-}
-
-.btn-ghost {
-  font-size: 10px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.summary-block {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-}
-
-.summary-label {
-  color: var(--text-muted);
-}
-
-.summary-value {
-  font-weight: 600;
-}
-
-.recommended-section {
-  margin: 4px 14px 8px;
-}
-
-.rec-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
-.rec-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.rec-chip {
-  font-size: 10px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.rec-chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(24,144,255,0.08);
-}
-
-.input-area {
-  padding: 10px 12px;
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.input-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  transition: border-color 0.2s;
-}
-.input-wrapper:focus-within {
-  border-color: var(--accent);
-}
-
-.chat-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-size: 12px;
-  padding: 7px 10px;
-}
-.chat-input::placeholder {
-  color: var(--text-muted);
-}
-
-.mic-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(24,144,255,0.15);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 14px;
-  flex-shrink: 0;
-  margin-right: 4px;
-  transition: all 0.2s;
-}
-.mic-btn:hover {
-  background: rgba(24,144,255,0.25);
-}
-.mic-btn.recording {
-  background: rgba(255,77,79,0.2);
-  animation: pulse-mic 1s ease-in-out infinite;
-}
-
-@keyframes pulse-mic {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,77,79,0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(255,77,79,0); }
-}
-
-.send-btn {
-  padding: 7px 14px;
-  background: var(--accent);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.send-btn:hover {
-  background: var(--accent-hover);
-}
-.send-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+/* Send */
+.send-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--accent), #4096FF); border: none; border-radius: 50%; color: white; cursor: pointer; flex-shrink: 0; box-shadow: 0 2px 8px rgba(22,119,255,0.3); transition: all 0.25s; }
+.send-btn:hover { box-shadow: 0 4px 16px rgba(22,119,255,0.45); transform: scale(1.06); }
+.send-btn:active { transform: scale(0.95); }
+.send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; transform: scale(0.92); }
+.send-svg { width: 15px; height: 15px; }
 </style>
