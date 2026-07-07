@@ -601,7 +601,13 @@ function submitFeedback() {
 
   closeFeedbackModal()
 
-  // 自动激活下一项
+  // 异常项：展示内联维修卡片，不自动跳下一项
+  if (hasAbnormal) {
+    eventAssistantAction[props.event.id] = 'check_abnormal_' + idx
+    return
+  }
+
+  // 正常项：激活下一项
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
   }
