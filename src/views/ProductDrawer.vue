@@ -275,43 +275,46 @@
           </div>
 
           <!-- 维修方案卡片（异常反馈后独立展开） -->
-          <div
+          <template
             v-for="(item, idx) in product.check.checkItems"
             :key="'rc-' + idx"
-            v-if="item.repair && item.status === 'done-abnormal' && !item.repaired"
-            class="prod-card repair-card-inline"
           >
-            <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
-              <span class="prod-icon"></span>
-              <div class="prod-titles">
-                <div class="prod-title">维修方案 · {{ item.title }}</div>
-                <div class="prod-sub">注意事项 / 维修步骤 / 备件清单 / 验收标准</div>
-              </div>
-              <span class="prod-toggle">{{ repairCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
-            </header>
-            <div v-show="repairCardsExpanded[idx] !== false" class="prod-body">
-              <div class="block">
-                <div class="block-title">注意事项</div>
-                <ul class="repair-list"><li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li></ul>
-              </div>
-              <div class="block">
-                <div class="block-title">维修步骤</div>
-                <ol class="repair-steps"><li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li></ol>
-              </div>
-              <div class="block">
-                <div class="block-title">备件清单</div>
-                <div class="repair-parts">{{ item.repair.parts.join(' / ') }}</div>
-              </div>
-              <div class="block accept-inline">
-                <div class="block-title">验收标准</div>
-                <div class="repair-accept-text">{{ item.repair.acceptance }}</div>
-              </div>
-              <div class="repair-actions">
-                <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">解决了，验收通过</button>
-                <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">没解决，继续排查</button>
+            <div
+              v-if="item.repair && item.status === 'done-abnormal' && !item.repaired"
+              class="prod-card repair-card-inline"
+            >
+              <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
+                <span class="prod-icon"></span>
+                <div class="prod-titles">
+                  <div class="prod-title">维修方案 · {{ item.title }}</div>
+                  <div class="prod-sub">注意事项 / 维修步骤 / 备件清单 / 验收标准</div>
+                </div>
+                <span class="prod-toggle">{{ repairCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
+              </header>
+              <div v-show="repairCardsExpanded[idx] !== false" class="prod-body">
+                <div class="block">
+                  <div class="block-title">注意事项</div>
+                  <ul class="repair-list"><li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li></ul>
+                </div>
+                <div class="block">
+                  <div class="block-title">维修步骤</div>
+                  <ol class="repair-steps"><li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li></ol>
+                </div>
+                <div class="block">
+                  <div class="block-title">备件清单</div>
+                  <div class="repair-parts">{{ item.repair.parts.join(' / ') }}</div>
+                </div>
+                <div class="block accept-inline">
+                  <div class="block-title">验收标准</div>
+                  <div class="repair-accept-text">{{ item.repair.acceptance }}</div>
+                </div>
+                <div class="repair-actions">
+                  <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">解决了，验收通过</button>
+                  <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">没解决，继续排查</button>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
 
           <!-- 流式进行中提示 -->
           <div v-if="currentSection === 'check' && streaming.section === 'check'" class="stream-tip">
@@ -2144,4 +2147,14 @@ function formatTime(t) {
 .ci-rp-fail { color: var(--warning); border-color: var(--warning); }
 .ci-rp-fail:hover { background: var(--warning-bg); }
 .ci-repaired-badge { text-align: center; padding: 8px; font-size: var(--font-sm); color: var(--success); font-weight: 600; border-top: 1px solid var(--success); background: var(--success-bg); }
+
+/* === 独立维修方案卡片 === */
+.repair-card-inline { border-left: 4px solid var(--accent); box-shadow: 0 2px 8px rgba(22,119,255,0.1); }
+.repair-list { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
+.repair-list li { margin-bottom: 2px; }
+.repair-steps { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
+.repair-steps li { margin-bottom: 4px; }
+.repair-parts { font-size: var(--font-sm); color: var(--text-secondary); padding: 6px 10px; background: var(--bg-hover); border-radius: 4px; }
+.repair-accept-text { font-size: var(--font-base); color: var(--success); font-weight: 600; padding: 8px 10px; background: var(--success-bg); border-radius: 4px; border-left: 3px solid var(--success); }
+.accept-inline .block-title { color: var(--success) !important; border-left-color: var(--success) !important; }
 </style>
