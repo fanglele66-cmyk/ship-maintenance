@@ -769,11 +769,27 @@ function handleSnooze() {
 function startIterativeCheck() {
   if (!props.eventContext) return
   const eid = props.eventContext.id
-  eventStore.addMessage(eid, { role: 'user', content: '立即开始排查', ts: Date.now() })
+  const ev = props.eventContext
+  eventStore.addMessage(eid, { role: 'user', content: '立即开始排查，生成方案', ts: Date.now() })
   eventStage[eid] = 'S2'
   scrollToBottom()
   setTimeout(() => {
-    pushMsg(eid, { content: 'AI 分析显示有 <b>4 个可能的排查方向</b>，建议从匹配度最高的开始逐项排查。' })
+    const items = checkItems[eid]
+    const labels = Object.values(items).map(i => i.title).join('、')
+    pushMsg(eid, {
+      cardType: 'guide',
+      guideTitle: '排查方案',
+      guideIntro: `针对「${ev?.title || ''}」已生成标准排查方案。
+AI 按可能性排序 ${Object.keys(items).length} 个排查项：${labels}。
+每个排查项包含多个步骤和关键检查点，系统会自动汇总步骤结果和排查项结果。
+按推荐顺序从 T1 开始，还是你有自己的想法？`,
+      steps: [
+        {title:'T1 · 液压系统故障排查',detail:'涵盖：油箱外观→初始数据→管路接头→荧光检漏→泵吸入→油品化验。建议从T1开始，覆盖面最广且检查成本最低。'},
+        {title:'T2 · 系统或油柜吸口堵塞排查',detail:'涵盖：吸口滤网→负压值→底部沉积物→回油过滤器。若T1未发现异常，重点排查此项。'},
+        {title:'T3 · 压力传感器故障排查',detail:'涵盖：传感器校验→供电信号回路→电磁干扰→机械安装。传感器自身故障概率较低但不可忽视。'},
+        {title:'T4 · 系统管线泄漏排查',detail:'涵盖：高压管路分段→执行机构密封→控制阀内泄→油箱附件→记录拍照。与T1交叉验证。'}
+      ]
+    })
     refreshChips()
   }, 400)
 }
@@ -789,12 +805,19 @@ function startCheckItem() {
 // ============ 迭代排查：助手推送当前排查项引导 ============
 function pushCheckItemGuide(eventId) {
   const idx = currentCheckIdx[eventId] || 1
-  checkItems[eventId][idx].state = 'checking'
+  const item = checkItems[eventId][idx]
+  item.state = 'checking'
+  const ev = props.eventContext
+  const sensor = ev?.snapshot?.sensors?.[0] || {}
+  const eSteps = getCheckStepDetail(idx)
+
   pushMsg(eventId, {
     cardType: 'guide',
-    guideTitle: `排查 ${idx}/4：${checkItems[eventId][idx].title}`,
-    guideIntro: `AI 建议优先排查此项（匹配度第 ${idx}）。执行后请反馈结果：`,
-    steps: getCheckStepDetail(idx)
+    guideTitle: `排查 ${idx}/4：${item.title}`,
+    guideIntro: `基于当前事件「${ev?.title || ''}」
+分 ${eSteps.length} 个步骤，共涉及关键检查点。请逐项检查后标记 ✓正常 或 ⚠异常。
+有异常的关键点可补充文字描述，系统会自动汇总步骤结果和排查项结果。`,
+    steps: eSteps
   })
   refreshChips()
 }
@@ -838,11 +861,15 @@ function handleCheckResult(resultType) {
     eventStage[eid] = 'S4'  // 进入维修阶段
     eventAssistantAction[eid] = 'repair'
     setTimeout(() => {
+      const rd = getRepairDetail(idx)
       pushMsg(eid, {
         cardType: 'guide',
-        guideTitle: `维修 ${idx}：${checkItems[eid][idx].title}`,
-        guideIntro: `排查项 ${idx} 确认异常，请执行以下维修操作：`,
-        steps: getRepairDetail(idx)
+        guideTitle: `维修方案 · ${checkItems[eid][idx].title}`,
+        guideIntro: `排查项 T${idx} 确认异常，根因指向该项相关部位。
+左侧产物区已展开维修方案，包含 ${rd.length} 个维修流程、安全警告和验收标准。
+
+请按步骤执行维修操作。备件清单和注意事项见产物区「维修方案」卡片。`,
+        steps: rd
       })
       refreshChips()
     }, 500)
@@ -852,9 +879,19 @@ function handleCheckResult(resultType) {
     setTimeout(() => {
       const nextIdx = idx + 1
       if (checkItems[eid][nextIdx]) {
-        pushMsg(eid, { content: `排查项 ${idx} 未发现异常。是否继续排查「<b>${checkItems[eid][nextIdx].title}</b>」？`, cardType: null })
+        pushMsg(eid, {
+          cardType: 'guide',
+          guideTitle: `排查 ${idx} 通过 · 下一项：${checkItems[eid][nextIdx].title}`,
+          guideIntro: `排查项 T${idx} 未发现异常，已自动排除。继续排查下一项，是否开始？`,
+          steps: [{title:'已排查通过',detail:'该项所有关键检查点均正常。系统已自动标记为排除。'}]
+        })
       } else {
-        pushMsg(eid, { content: '全部排查项已完成，未发现明显故障。如需升级处理请联系岸基技术支持。' })
+        pushMsg(eid, {
+          cardType: 'guide',
+          guideTitle: '全部排查完成',
+          guideIntro: '4 项排查全部完成。未发现明显故障根因。建议升级处理：联系岸基技术支持或安排坞修检查。',
+          steps: [{title:'升级处理',detail:'请联系岸基技术支持或安排坞修检查。可将排查记录导出供岸基参考。'}]
+        })
       }
       refreshChips()
     }, 400)

@@ -300,13 +300,25 @@
             </div>
           </div>
 
-          <!-- ④ 验收标准 -->
+          <!-- ④ 备件清单 -->
+          <div v-if="product.repair.partsList && product.repair.partsList.length" class="block parts-block">
+            <div class="block-title">📦 备件清单</div>
+            <div class="parts-grid">
+              <div v-for="(p, i) in product.repair.partsList" :key="i" class="parts-item">
+                <span class="parts-name">{{ p.name }}</span>
+                <span class="parts-spec">{{ p.spec }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑤ 验收标准 -->
           <div class="block accept-block">
             <div class="block-title">✅ 验收标准</div>
             <ul class="accept-list">
               <li v-for="(a, i) in product.repair.acceptance" :key="i">
                 <span class="accept-name">{{ a.name }}</span>
                 <span class="accept-req">要求：{{ a.req }}</span>
+                <span class="accept-cur" :class="a.curPass ? 'cur-pass' : 'cur-fail'">{{ a.current || '待测' }}</span>
                 <span class="accept-method">方法：{{ a.method }}</span>
               </li>
             </ul>
@@ -684,59 +696,81 @@ function buildProduct(ev) {
     }))
   }
 
-  // ========== 🔍 排查方案 ==========
+  // ========== 🔍 排查方案 (T1-T4 匹配对话稿) ==========
   const check = {
     warnings: [
-      '作业前确保主机停机断电，相关阀门已关闭，安全标识已挂',
+      '作业前确保停机断电，相关阀门已关闭，安全标识已挂',
       '佩戴防护用具（护目镜、防烫手套），谨防烫伤与机械伤害',
-      '记录所有原始数据后再行拆装，**不要直接调整温控阀**，先排查原因',
-      '如需进入受限空间，必须办理《进入受限空间许可证》并落实气体检测'
+      '记录所有原始数据后再行拆装，不要直接调整关键部件，先排查原因',
+      '如需进入受限空间，必须办理许可证并落实气体检测'
     ],
     steps: [
       {
-        title: '外观与渗漏检查',
-        target: '排除明显的物理损伤与渗漏',
+        title: 'T1 · 液压系统故障排查',
+        target: '排查油箱外观、管路接头、密封件、吸入口状态（6步/21关键点）',
         subs: [
-          { tag: 'must', tagLabel: '必查', text: '目视检查相关管路外观、接头、焊缝' },
-          { tag: 'must', tagLabel: '必查', text: '检查管路支架是否松动、有无异常振动痕迹' },
-          { tag: 'suggest', tagLabel: '建议', text: '使用内窥镜检查管路内壁结垢与腐蚀情况' },
-          { tag: 'photo', tagLabel: '拍照', text: '对异常部位多角度拍照留存' }
+          { tag: 'must', tagLabel: '必查', text: '目视检查油箱外壁焊缝处有无渗漏油渍' },
+          { tag: 'must', tagLabel: '必查', text: '检查油箱底部放油堵有无湿润痕迹' },
+          { tag: 'must', tagLabel: '必查', text: '对比液位计读数与远程监控值是否一致' },
+          { tag: 'must', tagLabel: '必查', text: '检查管路各接头有无油渍，软管段有无鼓包/老化/龟裂' },
+          { tag: 'suggest', tagLabel: '建议', text: '使用荧光检漏剂定位微漏点并拍照标记' },
+          { tag: 'suggest', tagLabel: '建议', text: '听诊泵吸入口有无气蚀噪声，检查吸入滤器压差' },
+          { tag: 'test', tagLabel: '送检', text: '取样化验液压油品质（含水量/颗粒度/粘度）' }
         ]
       },
       {
-        title: '温度与流量分布测量',
-        target: '定位异常热点与流量瓶颈',
+        title: 'T2 · 系统或油柜吸口堵塞排查',
+        target: '排查吸口滤网、负压值、沉积物、回油过滤器（4步/15关键点）',
         subs: [
-          { tag: 'must', tagLabel: '必查', text: '使用红外测温仪沿管路扫描，记录各点温度' },
-          { tag: 'must', tagLabel: '必查', text: '比对进口/出口温度差，验证换热效率' },
-          { tag: 'must', tagLabel: '必查', text: '使用超声波流量计复核实时流量' },
-          { tag: 'data', tagLabel: '数据', text: '导出近 24h 趋势数据，与历史同期对比' }
+          { tag: 'must', tagLabel: '必查', text: '拆检吸口滤器有无堵塞/异物附着，记录滤网表面杂质类型' },
+          { tag: 'must', tagLabel: '必查', text: '在额定流量下读取吸入侧真空表数值' },
+          { tag: 'must', tagLabel: '必查', text: '打开放油旋塞取样底部油液，观察有无金属屑/水分' },
+          { tag: 'suggest', tagLabel: '建议', text: '用磁铁检查铁磁性颗粒含量，评估是否需彻底清洗油箱' }
         ]
       },
       {
-        title: '关键部件拆检',
-        target: '确认滤器、阀门、热交换面状态',
+        title: 'T3 · 压力传感器故障排查',
+        target: '排查传感器校验、供电信号回路、电磁干扰、机械安装（4步/15关键点）',
         subs: [
-          { tag: 'must', tagLabel: '必查', text: '拆检冷却水滤器，观察滤芯脏污程度并拍照' },
-          { tag: 'must', tagLabel: '必查', text: '测量淡水侧换热面温度，判断是否结垢' },
-          { tag: 'suggest', tagLabel: '建议', text: '拆下温控阀检查阀芯是否卡滞、密封是否失效' },
-          { tag: 'test', tagLabel: '送检', text: '提取油/水样送化验室检测' }
+          { tag: 'must', tagLabel: '必查', text: '使用标准传感器对核心监控传感器进行参照校验' },
+          { tag: 'must', tagLabel: '必查', text: '检查传感器供电回路是否稳定（24V±5%）' },
+          { tag: 'suggest', tagLabel: '建议', text: '排查信号回路有无接地或短路，使用示波器观察信号噪声' },
+          { tag: 'suggest', tagLabel: '建议', text: '检查电缆屏蔽层接地，排查附近大功率设备干扰' }
+        ]
+      },
+      {
+        title: 'T4 · 系统管线泄漏排查',
+        target: '排查高压管路、执行机构密封、控制阀内泄、油箱附件（5步/19关键点）',
+        subs: [
+          { tag: 'must', tagLabel: '必查', text: '沿管路走向逐段目视检查接头、焊缝有无油渍' },
+          { tag: 'must', tagLabel: '必查', text: '重点检查弯头、三通等应力集中部位，法兰密封垫片有无湿润' },
+          { tag: 'must', tagLabel: '必查', text: '检查液压缸活塞杆处有无外泄漏，液压马达轴封处有无渗油' },
+          { tag: 'photo', tagLabel: '拍照', text: '对每个可疑泄漏点拍照标记坐标位置，按严重程度分级' }
         ]
       }
     ],
     checklist: [
-      { text: '外观与渗漏检查 — 完成度 100%', done: false, flag: 'normal' },
-      { text: '温度与流量分布测量 — 完成度 100%', done: false, flag: 'normal' },
-      { text: '冷却水滤器拆检 — 滤芯脏污严重（异常）', done: false, flag: 'abnormal' },
-      { text: '淡水侧换热面温度测量 — 偏高 4.2°C（异常）', done: false, flag: 'abnormal' },
-      { text: '温控阀拆检 — 阀芯轻微卡滞（异常）', done: false, flag: 'abnormal' },
-      { text: '油/水样送检 — 报告已回传', done: false, flag: 'normal' }
+      { text: 'T1 · 液压系统故障排查', done: false, flag: 'normal' },
+      { text: 'T1步骤1：油箱外观及液位计', done: false, flag: 'normal' },
+      { text: 'T1步骤3：管路接头 — 法兰接头有油渍（异常）', done: false, flag: 'abnormal' },
+      { text: 'T1步骤4：荧光检漏 — 定位到接头渗漏（异常）', done: false, flag: 'abnormal' },
+      { text: 'T2 · 吸口堵塞排查 — 全部正常', done: false, flag: 'normal' },
+      { text: 'T3 · 压力传感器排查 — 全部正常', done: false, flag: 'normal' },
+      { text: 'T4 · 管线泄漏排查 — 法兰垫片湿润（异常）', done: false, flag: 'abnormal' }
     ]
   }
 
   // ========== 🔧 维修方案 ==========
   const repair = {
-    recap: '排查阶段共发现 3 项关键异常：① 冷却水滤器脏污严重（压差 0.08MPa 超阈值）② 淡水侧换热面温度偏高 4.2°C，疑似结垢 ③ 温控阀阀芯轻微卡滞，开度受限。本方案针对上述 3 项异常分别给出处置流程。',
+    recap: '排查阶段共发现 2 项关键异常：① T1 排查发现法兰接头渗漏（放油堵湿润+荧光定位）② T4 排查确认法兰垫片湿润，与T1交叉验证。根因指向：高压管路法兰接头密封垫片失效。',
+    partsList: [
+      { name: 'ISO VG 46 抗磨液压油', spec: '100L（核对合格证及批次号）' },
+      { name: '法兰密封垫片（NBR丁腈橡胶）', spec: 'Shore A 70±5 × 2片' },
+      { name: 'O型密封圈（匹配法兰尺寸）', spec: '× 4个' },
+      { name: '加油泵（手摇式或电动式）', spec: '× 1台' },
+      { name: '60目过滤漏斗', spec: '× 1个' },
+      { name: '力矩扳手（量程 5-80Nm）', spec: '× 1把' }
+    ],
     safetyWarnings: [
       '【强制】维修前必须办理《热工作业许可证》，现场配备灭火器材，专人监护',
       '【强制】系统泄压至零，确认无残余压力后方可拆装',
@@ -1722,4 +1756,12 @@ function formatTime(t) {
 .tl-dot-report.first { background: var(--accent); width: 10px; height: 10px; box-shadow: 0 0 4px var(--accent); }
 .tl-dot-report.last { background: var(--success); }
 .tl-action-col { font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.5; flex: 1; }
+
+/* === 备件清单 === */
+.parts-block { background: var(--accent-bg); border-radius: 6px; padding: 10px 12px; }
+.parts-block .block-title { border-left: none; padding-left: 0; color: var(--accent); }
+.parts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.parts-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: var(--bg-surface); border-radius: 4px; border: 1px solid var(--border-secondary); }
+.parts-name { font-size: var(--font-sm); font-weight: 600; color: var(--text-primary); }
+.parts-spec { font-size: var(--font-xs); color: var(--text-muted); }
 </style>
