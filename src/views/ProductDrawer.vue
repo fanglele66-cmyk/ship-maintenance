@@ -196,36 +196,7 @@
         </header>
 
         <div v-show="checkExpanded" class="prod-body">
-          <!-- ① 注意事项 -->
-          <div class="block warn-block">
-            <div class="block-title">⚠️ 注意事项</div>
-            <ol class="warn-list">
-              <li v-for="(w, i) in product.check.warnings" :key="i">{{ w }}</li>
-            </ol>
-          </div>
-
-          <!-- ② 排查步骤 1-N -->
-          <div class="block">
-            <div class="block-title">排查步骤</div>
-            <div v-for="(step, i) in product.check.steps" :key="i" class="step">
-              <div class="step-head">
-                <span class="step-num">{{ i + 1 }}</span>
-                <span class="step-title">{{ step.title }}</span>
-              </div>
-              <div class="step-target">目标：{{ step.target }}</div>
-              <ul class="step-sub">
-                <li v-for="(sub, j) in step.subs" :key="j">
-                  <span class="sub-tag" :class="sub.tag">{{ sub.tagLabel }}</span>
-                  <span class="sub-text">{{ sub.text }}</span>
-                </li>
-              </ul>
-              <div class="step-photo">
-                <div class="photo-placeholder">📷 上传排查现场照片</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ③ 排查项卡片列表（截图1/2/3/4/5交互流） -->
+          <!-- 排查项卡片列表（唯一入口，截图1/2/3/4/5交互流） -->
           <div class="check-items-section">
             <div class="check-progress">排查进度 {{ checkProgress.current }}/{{ checkProgress.total }}</div>
             <div
@@ -382,6 +353,12 @@
                 <span class="accept-method">方法：{{ a.method }}</span>
               </li>
             </ul>
+          </div>
+
+          <!-- 维修完成操作按钮 -->
+          <div class="repair-actions">
+            <button class="ra-btn ra-resolved" @click="resolveEvent">✅ 已解决，关闭事件</button>
+            <button class="ra-btn ra-continue" @click="continueCheck"> 未解决异常，继续排查</button>
           </div>
 
           <!-- 流式进行中提示 -->
@@ -649,6 +626,30 @@ function checkAllDone() {
       eventAssistantAction[eid] = 'report'
     }
   }
+}
+
+function resolveEvent() {
+  if (!props.event) return
+  const eid = props.event.id
+  eventStage[eid] = 'S5'
+  eventAssistantAction[eid] = 'report'
+}
+
+function continueCheck() {
+  if (!props.event) return
+  const eid = props.event.id
+  eventStage[eid] = 'S2'
+  // 重置所有排查项状态，开启下一轮
+  const items = product.value?.check?.checkItems
+  if (items) {
+    items.forEach(item => {
+      if (item.status === 'done-abnormal') {
+        item.status = 'active'
+        item.feedback = null
+      }
+    })
+  }
+  eventAssistantAction[eid] = 'restart_check'
 }
 
 // AI 子模块展开状态（主要默认展开，次要默认收起）
@@ -2053,4 +2054,12 @@ function formatTime(t) {
 .fm-cancel { background: var(--bg-surface); color: var(--text-secondary); }
 .fm-submit { background: var(--accent); color: #fff; border-color: var(--accent); }
 .fm-submit:hover { background: var(--accent-hover); }
+
+/* === 维修完成按钮 === */
+.repair-actions { display: flex; gap: 12px; justify-content: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-primary); }
+.ra-btn { font-size: var(--font-base); padding: 10px 24px; border-radius: 20px; border: 2px solid var(--accent); cursor: pointer; font-weight: 600; transition: all 0.2s; background: var(--bg-surface); }
+.ra-resolved { color: var(--success); border-color: var(--success); }
+.ra-resolved:hover { background: var(--success-bg); }
+.ra-continue { color: var(--warning); border-color: var(--warning); }
+.ra-continue:hover { background: var(--warning-bg); }
 </style>

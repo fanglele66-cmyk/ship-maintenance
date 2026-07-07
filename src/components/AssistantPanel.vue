@@ -631,29 +631,42 @@ watch(() => props.mode, (newMode) => {
 watch(() => messages.value.length, () => refreshChips())
 watch(() => eventStore.selectedEventId, (id) => { if (!id) { Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k])); followupTimers = {} } })
 
-// ============ 产物区操作 → 助手响应 ============
+// ============ 产物区操作 → 助手响应（闭环联动）============
 watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
   if (!action || !props.eventContext) return
   const eid = props.eventContext.id
+  const ev = props.eventContext
   if (action === 'repair') {
     // 排查完成有异常 → 推送维修引导
     setTimeout(() => {
-      const rd = getRepairDetail(currentCheckIdx[eid] || 1)
       pushMsg(eid, {
-        cardType: 'guide',
-        guideTitle: '维修方案已生成',
-        guideIntro: '左侧产物区已展开维修方案和备件清单。请按步骤执行维修操作，完成后告知验收结果。',
-        steps: rd
+        cardType: null,
+        content: `排查已全部完成 👈 发现若干异常项，已自动进入维修阶段。<br><br>左侧产物区已生成维修方案，包含备件清单和验收标准。请按步骤执行维修操作。`
       })
+      pushWarningCard(eid)
       refreshChips()
     }, 500)
   }
   if (action === 'report') {
-    // 全部完成 → 推送报告卡片
+    // 事件闭环 → 推送报告卡片
     setTimeout(() => {
-      pushReportCard(eid, props.eventContext)
+      pushReportCard(eid, ev)
+      pushMsg(eid, {
+        cardType: null,
+        content: `✅ 事件已关闭。处理总结见左侧产物区「维修报告」卡片。<br><br>后续仍需关注：${ev?.title || ''}的长期运行趋势，建议安排定期巡检。`
+      })
       refreshChips()
     }, 500)
+  }
+  if (action === 'restart_check') {
+    // 未解决，继续排查
+    setTimeout(() => {
+      pushMsg(eid, {
+        cardType: null,
+        content: `了解，维修未完全解决异常。左侧已回到排查方案，请对异常项进行新一轮排查。`
+      })
+      refreshChips()
+    }, 400)
   }
 })
 onUnmounted(() => {
