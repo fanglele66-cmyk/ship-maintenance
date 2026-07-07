@@ -196,11 +196,11 @@
         </header>
 
         <div v-show="checkExpanded" class="prod-body">
-          <!-- 排查项卡片列表（唯一入口，截图1/2/3/4/5交互流） -->
+          <!-- 排查项卡片列表 -->
           <div class="check-items-section">
             <div class="check-progress">排查进度 {{ checkProgress.current }}/{{ checkProgress.total }}</div>
             <div
-              v-for="(item, idx) in product.check.checkItems"
+              v-for="(item, idx) in visibleCheckItems"
               :key="idx"
               class="check-item-card"
               :class="{
@@ -232,21 +232,7 @@
                   <button class="ci-action-btn ci-action-feedback" @click.stop="openFeedbackModal(idx)">登记反馈</button>
                 </div>
               </div>
-              <!-- 内联维修方案（排查异常后卡片内展开） -->
-              <div v-if="item.repair && item.status === 'done-abnormal' && !item.repaired" class="ci-repair">
-                <div class="ci-repair-title">🔧 维修方案 · {{ item.title }}</div>
-                <div class="ci-repair-row"><b>注意事项：</b>{{ item.repair.safety.join('；') }}</div>
-                <div class="ci-repair-row"><b>维修步骤：</b></div>
-                <ol class="ci-repair-steps">
-                  <li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li>
-                </ol>
-                <div class="ci-repair-row"><b>备件：</b>{{ item.repair.parts.join(' / ') }}</div>
-                <div class="ci-repair-row cb-accept"><b>验收标准：</b>{{ item.repair.acceptance }}</div>
-                <div class="ci-repair-actions">
-                  <button class="ci-rp-btn ci-rp-done" @click.stop="markItemRepaired(idx)">解决了，验收通过</button>
-                  <button class="ci-rp-btn ci-rp-fail" @click.stop="markItemNotFixed(idx)">没解决，继续排查</button>
-                </div>
-              </div>
+              <!-- 内联维修方案 → 已移至独立卡片 -->
               <div v-if="item.repaired" class="ci-repaired-badge">已维修完成</div>
               <div v-if="item.status === 'done-normal' || item.status === 'done-abnormal'" class="ci-summary">
                 <span class="ci-summary-label">留一点反馈的概要</span>
@@ -284,6 +270,45 @@
               <div class="fm-actions">
                 <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
                 <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 维修方案卡片（异常反馈后独立展开） -->
+          <div
+            v-for="(item, idx) in product.check.checkItems"
+            :key="'rc-' + idx"
+            v-if="item.repair && item.status === 'done-abnormal' && !item.repaired"
+            class="prod-card repair-card-inline"
+          >
+            <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
+              <span class="prod-icon"></span>
+              <div class="prod-titles">
+                <div class="prod-title">维修方案 · {{ item.title }}</div>
+                <div class="prod-sub">注意事项 / 维修步骤 / 备件清单 / 验收标准</div>
+              </div>
+              <span class="prod-toggle">{{ repairCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
+            </header>
+            <div v-show="repairCardsExpanded[idx] !== false" class="prod-body">
+              <div class="block">
+                <div class="block-title">注意事项</div>
+                <ul class="repair-list"><li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li></ul>
+              </div>
+              <div class="block">
+                <div class="block-title">维修步骤</div>
+                <ol class="repair-steps"><li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li></ol>
+              </div>
+              <div class="block">
+                <div class="block-title">备件清单</div>
+                <div class="repair-parts">{{ item.repair.parts.join(' / ') }}</div>
+              </div>
+              <div class="block accept-inline">
+                <div class="block-title">验收标准</div>
+                <div class="repair-accept-text">{{ item.repair.acceptance }}</div>
+              </div>
+              <div class="repair-actions">
+                <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">解决了，验收通过</button>
+                <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">没解决，继续排查</button>
               </div>
             </div>
           </div>
@@ -518,6 +543,28 @@ const aiExpanded = ref(true)
 const checkExpanded = ref(false)
 const repairExpanded = ref(false)
 const reportExpanded = ref(false)
+
+// 维修卡片展开状态
+const repairCardsExpanded = reactive({})
+
+// 可见排查项（异常项之后的pending项隐藏，等待维修完成后再显示）
+const visibleCheckItems = computed(() => {
+  const items = product.value?.check?.checkItems || []
+  const result = []
+  let foundAbnormalUnrepaired = false
+  for (const item of items) {
+    if (foundAbnormalUnrepaired) {
+      // 已找到未修复的异常项，后续pending项不显示
+      if (item.status !== 'pending') result.push(item)
+      break
+    }
+    result.push(item)
+    if (item.status === 'done-abnormal' && !item.repaired) {
+      foundAbnormalUnrepaired = true
+    }
+  }
+  return result
+})
 
 // ============ 排查项卡片交互（产物区操作按钮）============
 const feedbackModal = reactive({

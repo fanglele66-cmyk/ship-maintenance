@@ -636,8 +636,54 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
   if (!action || !props.eventContext) return
   const eid = props.eventContext.id
   const ev = props.eventContext
+  const items = product.value?.check?.checkItems || []
+  const item = items[parseInt(action.split('_').pop())]
+
+  // 单项异常 → 弹出维修方案卡片
+  if (action.startsWith('check_abnormal_')) {
+    setTimeout(() => {
+      const idx = parseInt(action.split('_').pop())
+      pushMsg(eid, {
+        cardType: null,
+        content: `排查项 T${idx + 1} 发现异常 👈 左侧已生成专项维修方案。<br><br>包含注意事项、维修步骤、备件清单和验收标准。请按步骤执行维修操作，完成后点击下方按钮反馈结果。`
+      })
+      pushWarningCard(eid)
+      refreshChips()
+    }, 400)
+  }
+
+  // 单项维修通过 → 找下一项或闭环
+  if (action === 'item_repaired_next') {
+    setTimeout(() => {
+      const nextItem = items.find(i => i.status === 'active' && !i.repaired)
+      if (nextItem) {
+        pushMsg(eid, {
+          cardType: null,
+          content: `✅ 维修通过！<br><br>还有其它异常项需要处理：「<b>${nextItem.title}</b>」。已自动激活，请查看左侧继续排查。`
+        })
+      } else {
+        pushMsg(eid, {
+          cardType: null,
+          content: `✅ 所有异常项均已维修完成！<br><br>左侧维修报告已生成，包含处理总结、备件消耗和后续建议。请确认验收结果。`
+        })
+      }
+      refreshChips()
+    }, 400)
+  }
+
+  // 单项维修失败 → 继续排查
+  if (action === 'item_not_fixed') {
+    setTimeout(() => {
+      pushMsg(eid, {
+        cardType: null,
+        content: `了解，该项维修未解决问题。<br><br>建议先排查其它项，或联系岸基技术支持。左侧已激活下一项排查，请继续。`
+      })
+      refreshChips()
+    }, 400)
+  }
+
+  // 全部完成 → 推送报告卡片
   if (action === 'repair') {
-    // 排查完成有异常 → 推送维修引导
     setTimeout(() => {
       pushMsg(eid, {
         cardType: null,
@@ -647,8 +693,9 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
       refreshChips()
     }, 500)
   }
+
+  // 事件闭环 → 推送报告卡片
   if (action === 'report') {
-    // 事件闭环 → 推送报告卡片
     setTimeout(() => {
       pushReportCard(eid, ev)
       pushMsg(eid, {
@@ -658,6 +705,8 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
       refreshChips()
     }, 500)
   }
+
+  // 未解决，继续排查
   if (action === 'restart_check') {
     // 未解决，继续排查
     setTimeout(() => {
