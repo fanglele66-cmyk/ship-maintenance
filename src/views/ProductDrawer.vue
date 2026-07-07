@@ -382,6 +382,17 @@
                 <span class="rk-text">{{ product.report.followup }}</span>
               </div>
             </div>
+            <!-- 处理时间线 -->
+            <div v-if="event.timeline && event.timeline.length" class="report-timeline">
+              <div class="rtl-title">📋 处理时间线</div>
+              <div class="timeline-list">
+                <div v-for="(t, i) in event.timeline" :key="i" class="tl-row">
+                  <div class="tl-time-col">{{ formatTime(t.time) }}</div>
+                  <div class="tl-dot-col"><span class="tl-dot-report" :class="{ first: i === 0, last: i === event.timeline.length - 1 }"></span></div>
+                  <div class="tl-action-col">{{ t.action }}</div>
+                </div>
+              </div>
+            </div>
             <div class="report-footer">本报告由系统自动生成 · 维修完成后写入 · 仅供运维归档</div>
           </div>
 
@@ -774,11 +785,11 @@ function buildProduct(ev) {
       }
     ],
     acceptance: [
-      { name: '冷却水出口温度', req: '≤ 85°C', method: '在线监测持续 1h' },
-      { name: '冷却水流量', req: '≥ 80m³/h', method: '超声波流量计实测' },
-      { name: '滤器压差', req: '≤ 0.03MPa', method: '压差计读数' },
-      { name: '系统渗漏', req: '无可见渗漏', method: '目视 + 试压 0.6MPa 30min' },
-      { name: '振动值', req: '≤ 4.5mm/s', method: '振动仪三向测量' }
+      { name: '冷却水出口温度', req: '≤ 85°C', current: '78°C', curPass: true, method: '在线监测持续 1h' },
+      { name: '冷却水流量', req: '≥ 80m³/h', current: '92m³/h', curPass: true, method: '超声波流量计实测' },
+      { name: '滤器压差', req: '≤ 0.03MPa', current: '0.02MPa', curPass: true, method: '压差计读数' },
+      { name: '系统渗漏', req: '无可见渗漏', current: '无渗漏', curPass: true, method: '目视 + 试压 0.6MPa 30min' },
+      { name: '振动值', req: '≤ 4.5mm/s', current: '3.8mm/s', curPass: true, method: '振动仪三向测量' }
     ]
   }
 
@@ -1693,4 +1704,22 @@ function formatTime(t) {
   justify-content: center;
   gap: 12px;
 }
+
+/* === 验收标准当前值 === */
+.accept-cur { font-size: var(--font-base); font-weight: 600; min-width: 80px; text-align: center; padding: 1px 6px; border-radius: 3px; }
+.cur-pass { color: var(--success); background: var(--success-bg); }
+.cur-fail { color: var(--danger); background: var(--danger-bg); }
+
+/* === 报告时间线 === */
+.report-timeline { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-primary); }
+.rtl-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
+.timeline-list { display: flex; flex-direction: column; }
+.tl-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; position: relative; }
+.tl-row:not(:last-child)::before { content: ''; position: absolute; left: 84px; top: 22px; bottom: 0; width: 1px; background: var(--border-primary); }
+.tl-time-col { font-size: var(--font-xs); color: var(--text-muted); font-family: Consolas, monospace; width: 75px; flex-shrink: 0; text-align: right; }
+.tl-dot-col { display: flex; align-items: center; justify-content: center; width: 20px; flex-shrink: 0; }
+.tl-dot-report { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.tl-dot-report.first { background: var(--accent); width: 10px; height: 10px; box-shadow: 0 0 4px var(--accent); }
+.tl-dot-report.last { background: var(--success); }
+.tl-action-col { font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.5; flex: 1; }
 </style>

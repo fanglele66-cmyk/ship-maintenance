@@ -283,8 +283,10 @@ const situationContext = inject('situationContext', null)
 
 // ============ 阶段定义 ============
 const STAGES = {
-  S1: { label: '事件关联' },
-  S5: { label: '已闭环' }
+  S1: { label: '事件关联', followup: '' },
+  S2: { label: '排查中', followup: '排查进行中，请继续逐项排查。如有任何发现随时告诉我。' },
+  S4: { label: '维修中', followup: '维修方案已生成，请按步骤执行维修操作。完成后告知验收结果。' },
+  S5: { label: '已闭环', followup: '' }
 }
 
 // ============ 迭代排查状态机 ============
@@ -294,10 +296,10 @@ const repairDone = reactive({}) // { [eventId+'|'+idx]: true }
 
 function initCheckItems(eventId) {
   checkItems[eventId] = {
-    1: { state: 'pending', title: '外观与渗漏检查' },
-    2: { state: 'pending', title: '关键参数测量' },
-    3: { state: 'pending', title: '核心部件拆检' },
-    4: { state: 'pending', title: '数据记录与反馈' }
+    1: { state: 'pending', title: 'T1 · 液压系统故障排查' },
+    2: { state: 'pending', title: 'T2 · 系统或油柜吸口堵塞排查' },
+    3: { state: 'pending', title: 'T3 · 压力传感器故障排查' },
+    4: { state: 'pending', title: 'T4 · 系统管线泄漏排查' }
   }
   currentCheckIdx[eventId] = 1
   Object.keys(repairDone).forEach(k => { if (k.startsWith(eventId + '|')) delete repairDone[k] })
@@ -360,10 +362,14 @@ function getChipsByContext() {
     const ec = props.eventContext; const stage = eventStage[ec.id] || 'S1'
     const hasUserMsg = messages.value.some(m => m.role === 'user')
     if (stage === 'S1' && !hasUserMsg) {
-      return [
-        { text: '立即开始排查，生成方案', action: 'start_check', highlight: true },
-        { text: '标记为误报', action: 'send' }
+      const hasRelatedCases = ec.relatedCases && ec.relatedCases.length > 0
+      const chips = [
+        { text: '立即开始排查，生成方案', action: 'start_check', highlight: true }
       ]
+      if (hasRelatedCases) chips.unshift({ text: '查看相似历史案例', action: 'view_cases', highlight: true })
+      chips.push({ text: '暂不处理，稍晚些提醒我', action: 'snooze' })
+      chips.push({ text: '标记为误报', action: 'send' })
+      return chips
     }
     if (stage === 'S1' && hasUserMsg) {
       return [{ text: '这种原因多久能恢复？', action: 'send' }, { text: '还有其他可能原因吗？', action: 'send' }, { text: '开始排查，为我生成方案', action: 'start_check' }]
@@ -373,7 +379,13 @@ function getChipsByContext() {
       const idx = currentCheckIdx[eid] || 1
       const item = checkItems[eid]?.[idx]
       if (!item || item.state === 'pending') {
-        return [{ text: '开始逐一排查', action: 'start_check_item', highlight: true }]
+        const chips = [{ text: '开始逐一排查', action: 'start_check_item', highlight: true }]
+        // 允许跳转到其他排查项
+        const otherItems = Object.entries(checkItems[eid] || {}).filter(([k, v]) => parseInt(k) !== idx && v.state === 'pending')
+        if (otherItems.length > 0) {
+          chips.push({ text: `先排查${otherItems[0][1].title.slice(0, 6)}`, action: 'send' })
+        }
+        return chips
       }
       if (item.state === 'checking') {
         return [{ text: '发现异常了', action: 'check_fault' }, { text: '这项没问题', action: 'check_ok' }]
@@ -702,7 +714,53 @@ function handleRecommendedClick(q) {
   if (q.action === 'repair_not_fixed') { handleRepairResult('not_fixed'); return }
   if (q.action === 'continue_next') { continueNextCheck(); return }
   if (q.action === 'goto_event' && q.eventId) { eventStore.selectEvent(q.eventId); return }
+  if (q.action === 'view_cases') { handleViewCases(); return }
+  if (q.action === 'snooze') { handleSnooze(); return }
   inputText.value = q.text; sendMessage()
+}
+
+// ============ 查看相似历史案例 ============
+function handleViewCases() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '查看相似历史案例', ts: Date.now() })
+  scrollToBottom()
+  setTimeout(() => {
+    const cases = props.eventContext.relatedCases || []
+    if (cases.length > 0) {
+      let html = '<div style="font-size:var(--font-base);line-height:1.7">📄 <b>找到 ' + cases.length + ' 条相似历史案例</b><br><br>'
+      cases.forEach((c, i) => {
+        html += `<div style="margin-bottom:8px;padding:8px 10px;background:var(--bg-hover);border-radius:6px;border:1px solid var(--border-primary)">
+          <b>${c.title}</b><br>
+          <span style="font-size:var(--font-xs);color:var(--text-muted)">#${c.id}</span>
+        </div>`
+      })
+      html += '</div>'
+      pushMsg(eid, { content: html, cardType: null })
+    } else {
+      pushMsg(eid, { content: '未找到相似历史案例，这是一个新类型的故障。建议直接开始排查 👇' })
+    }
+    refreshChips()
+  }, 400)
+}
+
+// ============ 暂不处理 ============
+function handleSnooze() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '暂不处理，稍晚些提醒我', ts: Date.now() })
+  scrollToBottom()
+  setTimeout(() => {
+    pushMsg(eid, { content: '好的，2 小时后提醒你。事件仍可能在持续变化，建议尽快处理 👍。你随时可以在左侧事件列表点击回来继续。' })
+    refreshChips()
+    // 2小时后自动追问
+    setTimeout(() => {
+      if (eventStage[eid] === 'S1') {
+        pushMsg(eid, { content: '⏰ 提醒：2 小时前你暂缓了「<b>' + (props.eventContext?.title || '') + '</b>」。是否需要开始排查？' })
+        refreshChips()
+      }
+    }, 2 * 60 * 60 * 1000) // 2 hours
+  }, 400)
 }
 
 
@@ -733,7 +791,7 @@ function pushCheckItemGuide(eventId) {
   const idx = currentCheckIdx[eventId] || 1
   checkItems[eventId][idx].state = 'checking'
   pushMsg(eventId, {
-    cardType: 'guide_item',
+    cardType: 'guide',
     guideTitle: `排查 ${idx}/4：${checkItems[eventId][idx].title}`,
     guideIntro: `AI 建议优先排查此项（匹配度第 ${idx}）。执行后请反馈结果：`,
     steps: getCheckStepDetail(idx)
@@ -743,10 +801,25 @@ function pushCheckItemGuide(eventId) {
 
 function getCheckStepDetail(idx) {
   const all = {
-    1: [{title:'外观与渗漏检查',detail:'目视检查相关管路、接头、焊缝有无渗漏。检查支架是否松动、有无异常振动痕迹。拍摄异常部位照片。'}],
-    2: [{title:'温度与流量测量',detail:'使用红外测温仪沿管路扫描记录各点温度。比对进出口温差，用超声波流量计复核实时流量。'}],
-    3: [{title:'滤器与温控阀拆检',detail:'拆检冷却水滤器观察脏污程度。测量淡水侧换热面温度判断是否结垢。检查温控阀阀芯卡滞情况。'}],
-    4: [{title:'汇总判定',detail:'根据前3项排查结果汇总结论。如已发现根因则直接进入维修，如未发现则建议升级技术支持。'}]
+    1: [
+      {title:'油箱外观及液位计检查',detail:'目视检查油箱外壁焊缝处有无渗漏油渍。检查油箱底部放油堵有无湿润痕迹。对比液位计读数与远程监控值是否一致。检查液位计上下连通阀是否处于全开位置。'},
+      {title:'初始数据记录',detail:'拍照记录液位计当前读数。记录液压油温度（正常范围40~70℃）。读取系统压力表稳态值（正常16~21MPa）。记录电机运行电流。'},
+      {title:'管路接头及软管段检查',detail:'重点检查高压管路法兰接头有无油渍。检查软管段有无鼓包/老化/龟裂/渗油。检查管路支架/卡箍处有无摩擦磨损痕迹。检查弯头、三通等应力集中部位有无湿润。'}
+    ],
+    2: [
+      {title:'吸油口滤网状态',detail:'拆检吸口滤器有无堵塞/异物附着。记录滤网表面杂质类型和沉积量。评估滤网通流面积减少百分比。检查滤网骨架有无变形/破损。'},
+      {title:'吸口负压值测量',detail:'在额定流量下读取吸入侧真空表数值。对比历史正常负压基准判断有无异常阻力。在不同转速工况下记录负压变化趋势。若负压超过-0.08MPa需立即清洗滤器。'},
+      {title:'油箱底部沉积物检查',detail:'打开放油旋塞取样底部油液。观察有无金属屑/水分/絮状物。用磁铁检查铁磁性颗粒含量。评估是否需要彻底清洗油箱内部。'}
+    ],
+    3: [
+      {title:'压力传感器校验',detail:'使用标准传感器对核心监控传感器进行参照校验。记录校验前后读数偏差。检查传感器供电回路是否稳定（24V±5%）。排查信号回路有无接地或短路。'},
+      {title:'电磁干扰排查',detail:'检查传感器电缆屏蔽层接地是否良好。排查附近有无大功率设备启动干扰。使用示波器观察信号是否存在高频噪声。检查传感器安装支架有无振动松动。'}
+    ],
+    4: [
+      {title:'高压管路分段检查',detail:'沿管路走向逐段目视检查接头、焊缝有无油渍。重点检查弯头、三通等应力集中部位。检查管路固定支架处有无磨损渗漏。检查法兰密封垫片处有无湿润痕迹。'},
+      {title:'执行机构密封检查',detail:'检查液压缸活塞杆处有无外泄漏。检查液压马达轴封处有无渗油。观察执行机构动作是否平稳无爬行。测量执行机构端盖温度判断内部泄漏。'},
+      {title:'记录并拍照',detail:'对每个可疑泄漏点拍照标记坐标位置。在管路图上标注所有泄漏点位置。按严重程度分级（严重/中等/轻微）。整理泄漏点清单供维修参考。'}
+    ]
   }
   return all[idx] || []
 }
@@ -762,6 +835,7 @@ function handleCheckResult(resultType) {
 
   if (resultType === 'fault_found') {
     checkItems[eid][idx].state = 'fault_found'
+    eventStage[eid] = 'S4'  // 进入维修阶段
     eventAssistantAction[eid] = 'repair'
     setTimeout(() => {
       pushMsg(eid, {
