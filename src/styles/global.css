@@ -65,14 +65,16 @@
   --assistant-min-width: 400px; /* 桌面端最小宽度，iPad 下通过媒体查询缩小 */
   --event-list-width: clamp(240px, 18vw, 320px);
 
-  /* ---- Typography (bumped up for readability) ---- */
-  --font-xs: 12px;   /* 10→12 最低可用值 */
-  --font-sm: 13px;   /* 12→13 次要文字 */
-  --font-base: 14px;  /* 13→14 正文默认 */
-  --font-md: 15px;    /* 14→15 面板标题 */
-  --font-lg: 17px;    /* 16→17 区块标题 */
-  --font-xl: 19px;    /* 18→19 页面标题 */
-  --font-2xl: 22px;   /* 保持 */
+  /* ---- Typography（流体 rem，随根字号自适应） ----
+     根字号在 html 上用 clamp 流体缩放（见下方 html 规则），
+     这里全部用 rem，屏幕越大字越大，iPad/手机自动收小。 */
+  --font-xs: 0.8125rem;   /* ~13px@16  原12 */
+  --font-sm: 0.875rem;    /* ~14px@16  原13 */
+  --font-base: 1rem;      /* ~16px@16  原14 ← 正文默认，整体上调 */
+  --font-md: 1.0625rem;   /* ~17px@16  原15 */
+  --font-lg: 1.1875rem;   /* ~19px@16  原17 */
+  --font-xl: 1.3125rem;   /* ~21px@16  原19 */
+  --font-2xl: 1.5rem;     /* ~24px@16  原22 */
 }
 
 /* ===== Responsive Breakpoints =====
@@ -105,6 +107,14 @@
   }
 }
 
+/* ===== 流体根字号（自适应核心）=====
+   随视口宽度在 14px~16.5px 间平滑缩放：
+   手机≈14px / iPad 竖屏≈14.6px / iPad 横屏≈15.6px / 桌面≈16.5px
+   所有 rem 与 --font-* 变量都跟随此值自适应。 */
+html {
+  font-size: clamp(14px, 0.4vw + 10.5px, 16.5px);
+}
+
 /* ===== Global ===== */
 * {
   margin: 0;
@@ -119,7 +129,6 @@ html, body, #app {
   background: var(--bg-app);
   color: var(--text-primary);
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: var(--font-base);
   -webkit-font-smoothing: antialiased;
 }
 

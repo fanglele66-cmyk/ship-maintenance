@@ -195,7 +195,12 @@ import { useDeviceStore } from '@/stores/deviceStore'
 import { useSensorStore } from '@/stores/sensorStore'
 import { eventPriorityLabels, eventStatusLabels } from '@/mock/events'
 
-const props = defineProps({ mode: { type: String, default: 'general' }, eventContext: { type: Object, default: null } })
+const props = defineProps({
+  mode: { type: String, default: 'general' },
+  eventContext: { type: Object, default: null },
+  // true=填满剩余空间（事件中心，已有事件列表占位）；false=按页面占比宽度（态势页，更宽默认）
+  fillRemaining: { type: Boolean, default: false }
+})
 const emit = defineEmits(['chip-click'])
 const eventStore = useEventStore()
 const deviceStore = useDeviceStore()
@@ -207,11 +212,11 @@ const isTyping = ref(false)
 const priorityLabels = eventPriorityLabels
 const statusLabels = eventStatusLabels
 
-// ============ 拖拽调宽（百分比，30%-50%，默认40%）============
+// ============ 拖拽调宽（占比：默认 50%，可拖拽 36%~60%）============
 const RESIZE_STORAGE_KEY = 'assistant-panel-width-pct'
-const MIN_RATIO = 0.30
-const MAX_RATIO = 0.50
-const DEFAULT_RATIO = 0.40
+const MIN_RATIO = 0.36
+const MAX_RATIO = 0.60
+const DEFAULT_RATIO = 0.50
 const customPct = ref(null)
 const windowWidth = ref(window.innerWidth)
 
@@ -221,6 +226,7 @@ function loadSavedWidth() {
   const saved = localStorage.getItem(RESIZE_STORAGE_KEY)
   if (saved) {
     const pct = parseFloat(saved)
+    // 旧存档可能超出新范围，重新 clamp 进来
     if (pct >= MIN_RATIO && pct <= MAX_RATIO) customPct.value = pct
   }
 }
@@ -228,10 +234,12 @@ function loadSavedWidth() {
 const panelStyle = computed(() => {
   // iPad 及以下（≤1024px）：用 flex 自适应填充，不套固定百分比宽度
   if (windowWidth.value <= 1024) return {}
-  // 没有自定义宽度时，让 flex 控制面板尺寸（填满剩余空间）
-  if (!customPct.value) return {}
-  const pct = customPct.value
-  return { flex: `0 0 ${(pct * 100).toFixed(1)}vw`, minWidth: `${(pct * 100).toFixed(1)}vw`, maxWidth: `${(pct * 100).toFixed(1)}vw` }
+  // fillRemaining：事件中心场景，助手填满剩余空间（保持原本的宽显示）
+  if (props.fillRemaining) return {}
+  // 态势页等场景：默认按页面占比 50vw，拖拽后用自定义值；flex:0 0 锁定占比
+  const pct = customPct.value || DEFAULT_RATIO
+  const vw = (pct * 100).toFixed(2)
+  return { flex: `0 0 ${vw}vw`, minWidth: `calc(${vw}vw)`, maxWidth: `calc(${vw}vw)` }
 })
 
 function startResize(e) {

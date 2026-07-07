@@ -23,6 +23,7 @@
     <AssistantPanel
       :mode="assistantMode"
       :event-context="eventStore.selectedEvent"
+      :fill-remaining="true"
       :class="{ 'panel-compact': eventStore.isDrawerOpen && eventStore.selectedEvent }"
       @chip-click="handleChipAction"
     />
@@ -105,7 +106,7 @@ function handleChipAction(action) {
 }
 .event-list-wrapper.collapsed { width: 0; min-width: 0; opacity: 0; border-right: none; }
 
-/* 中间产物区：有内容时 flex:1 占空间，无内容时收缩到 0 */
+/* 中间产物区：有内容时 flex:1 占空间，无内容时收缩到 0（助手区 fill 填充剩余） */
 .drawer-wrapper {
   width: 0;
   min-width: 0;
