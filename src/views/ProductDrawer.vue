@@ -225,19 +225,35 @@
             </div>
           </div>
 
-          <!-- ③ 排查项清单（可勾选） -->
+          <!-- ③ 排查项清单（关键点逐项反馈） -->
           <div class="block">
-            <div class="block-title">排查项清单</div>
+            <div class="block-title">排查项清单 · 关键点逐项反馈</div>
+            <div class="checklist-hint">👆 每个关键点独立标记 ✓正常 或 ⚠异常，步骤结果由关键点汇总</div>
             <div
               v-for="(item, idx) in product.check.checklist"
               :key="idx"
               class="check-item"
-              :class="{ done: item.done }"
-              @click="item.done = !item.done"
+              :class="{ 'ci-done': item.result, 'ci-abnormal': item.result === 'abnormal', 'ci-normal': item.result === 'normal' }"
             >
-              <span class="check-box">{{ item.done ? '☑' : '☐' }}</span>
+              <span class="check-icon">{{ item.result === 'abnormal' ? '⚠' : item.result === 'normal' ? '✓' : '☐' }}</span>
               <span class="check-text">{{ item.text }}</span>
-              <span v-if="item.flag === 'abnormal'" class="check-flag">异常</span>
+              <div class="check-actions" v-if="!item.result">
+                <button class="ca-btn ca-ok" @click.stop="feedbackItem(idx, 'normal')">✓正常</button>
+                <button class="ca-btn ca-abn" @click.stop="feedbackItem(idx, 'abnormal')">⚠异常</button>
+              </div>
+              <span v-else class="check-result-label" :class="item.result">{{ item.result === 'abnormal' ? '异常' : '正常' }}</span>
+            </div>
+
+            <!-- 排查汇总 -->
+            <div v-if="checkSummary.checked > 0" class="check-summary">
+              <div class="cs-title">排查汇总 · {{ checkSummary.checked }}/{{ checkSummary.total }} 项已反馈</div>
+              <div class="cs-stats">
+                <span class="cs-stat cs-abn-count">⚠ {{ checkSummary.abnormal }} 项异常</span>
+                <span class="cs-stat cs-ok-count">✓ {{ checkSummary.normal }} 项正常</span>
+              </div>
+              <div v-if="checkSummary.checked === checkSummary.total" class="cs-actions">
+                <button class="cs-btn cs-btn-done" @click="submitCheckDone">✅ 全部反馈完成，生成维修方案</button>
+              </div>
             </div>
           </div>
 
@@ -465,6 +481,41 @@ const aiExpanded = ref(true)
 const checkExpanded = ref(false)
 const repairExpanded = ref(false)
 const reportExpanded = ref(false)
+
+// ============ 排查项反馈（产物区操作按钮）============
+function feedbackItem(idx, result) {
+  if (!props.event) return
+  const p = getOrCreateProduct(props.event)
+  const checklist = p.check.checklist
+  if (checklist[idx]) {
+    checklist[idx].result = result
+    if (result === 'abnormal') checklist[idx].done = true
+  }
+}
+
+const checkSummary = computed(() => {
+  const items = product.value?.check?.checklist || []
+  const checked = items.filter(i => i.result)
+  return {
+    total: items.length,
+    checked: checked.length,
+    abnormal: checked.filter(i => i.result === 'abnormal').length,
+    normal: checked.filter(i => i.result === 'normal').length
+  }
+})
+
+function submitCheckDone() {
+  if (!props.event) return
+  const eid = props.event.id
+  const abnormal = checkSummary.value.abnormal
+  if (abnormal > 0) {
+    eventStage[eid] = 'S4'
+    eventAssistantAction[eid] = 'repair'
+  } else {
+    eventStage[eid] = 'S5'
+    eventAssistantAction[eid] = 'report'
+  }
+}
 
 // AI 子模块展开状态（主要默认展开，次要默认收起）
 const aiSubs = reactive({
@@ -750,13 +801,15 @@ function buildProduct(ev) {
       }
     ],
     checklist: [
-      { text: 'T1 · 液压系统故障排查', done: false, flag: 'normal' },
-      { text: 'T1步骤1：油箱外观及液位计', done: false, flag: 'normal' },
-      { text: 'T1步骤3：管路接头 — 法兰接头有油渍（异常）', done: false, flag: 'abnormal' },
-      { text: 'T1步骤4：荧光检漏 — 定位到接头渗漏（异常）', done: false, flag: 'abnormal' },
-      { text: 'T2 · 吸口堵塞排查 — 全部正常', done: false, flag: 'normal' },
-      { text: 'T3 · 压力传感器排查 — 全部正常', done: false, flag: 'normal' },
-      { text: 'T4 · 管线泄漏排查 — 法兰垫片湿润（异常）', done: false, flag: 'abnormal' }
+      { text: 'T1步骤1：目视检查油箱外壁焊缝处有无渗漏油渍', result: null, flag: 'normal' },
+      { text: 'T1步骤1：检查油箱底部放油堵有无湿润痕迹', result: null, flag: 'abnormal' },
+      { text: 'T1步骤1：对比液位计读数与远程监控值是否一致', result: null, flag: 'normal' },
+      { text: 'T1步骤3：重点检查高压管路法兰接头有无油渍', result: null, flag: 'abnormal' },
+      { text: 'T1步骤4：UV灯照射观察荧光痕迹定位渗漏点', result: null, flag: 'abnormal' },
+      { text: 'T2 · 吸口滤网/负压/沉积物/过滤器', result: null, flag: 'normal' },
+      { text: 'T3 · 传感器校验/信号回路/干扰/安装', result: null, flag: 'normal' },
+      { text: 'T4步骤1：分段检查高压管路弯头/三通/支架', result: null, flag: 'abnormal' },
+      { text: 'T4步骤1：检查法兰密封垫片处有无湿润痕迹', result: null, flag: 'abnormal' }
     ]
   }
 
@@ -1764,4 +1817,37 @@ function formatTime(t) {
 .parts-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: var(--bg-surface); border-radius: 4px; border: 1px solid var(--border-secondary); }
 .parts-name { font-size: var(--font-sm); font-weight: 600; color: var(--text-primary); }
 .parts-spec { font-size: var(--font-xs); color: var(--text-muted); }
+
+/* === 排查项清单（交互式） === */
+.checklist-hint { font-size: var(--font-xs); color: var(--text-muted); margin-bottom: 8px; font-style: italic; }
+.check-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-primary); border-radius: 6px; margin-bottom: 4px; font-size: var(--font-sm); transition: all 0.2s; }
+.check-item:hover { background: var(--bg-hover); }
+.ci-done { background: var(--bg-hover); opacity: 0.85; }
+.ci-abnormal { border-left: 3px solid var(--danger); }
+.ci-normal { border-left: 3px solid var(--success); }
+.check-icon { width: 20px; text-align: center; font-size: var(--font-md); }
+.ci-abnormal .check-icon { color: var(--danger); }
+.ci-normal .check-icon { color: var(--success); }
+.check-text { flex: 1; color: var(--text-primary); line-height: 1.4; }
+.check-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.ca-btn { font-size: var(--font-xs); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-primary); cursor: pointer; font-weight: 500; transition: all 0.15s; white-space: nowrap; background: var(--bg-surface); }
+.ca-ok { color: var(--success); }
+.ca-ok:hover { background: var(--success-bg); border-color: var(--success); }
+.ca-abn { color: var(--danger); }
+.ca-abn:hover { background: var(--danger-bg); border-color: var(--danger); }
+.check-result-label { font-size: var(--font-xs); font-weight: 600; padding: 2px 8px; border-radius: 3px; flex-shrink: 0; }
+.check-result-label.normal { color: var(--success); background: var(--success-bg); }
+.check-result-label.abnormal { color: var(--danger); background: var(--danger-bg); }
+
+/* 排查汇总 */
+.check-summary { margin-top: 12px; padding: 12px; background: var(--bg-hover); border: 1px solid var(--border-primary); border-radius: 8px; }
+.cs-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+.cs-stats { display: flex; gap: 16px; margin-bottom: 10px; }
+.cs-stat { font-size: var(--font-sm); font-weight: 600; }
+.cs-abn-count { color: var(--danger); }
+.cs-ok-count { color: var(--success); }
+.cs-actions { display: flex; gap: 8px; }
+.cs-btn { font-size: var(--font-base); padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.cs-btn-done { background: var(--accent); color: #fff; }
+.cs-btn-done:hover { background: var(--accent-hover); }
 </style>

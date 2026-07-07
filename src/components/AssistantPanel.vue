@@ -379,26 +379,10 @@ function getChipsByContext() {
       const idx = currentCheckIdx[eid] || 1
       const item = checkItems[eid]?.[idx]
       if (!item || item.state === 'pending') {
-        const chips = [{ text: '开始逐一排查', action: 'start_check_item', highlight: true }]
-        // 允许跳转到其他排查项
-        const otherItems = Object.entries(checkItems[eid] || {}).filter(([k, v]) => parseInt(k) !== idx && v.state === 'pending')
-        if (otherItems.length > 0) {
-          chips.push({ text: `先排查${otherItems[0][1].title.slice(0, 6)}`, action: 'send' })
-        }
-        return chips
+        return [{ text: '查看左侧排查方案并按步骤反馈', action: 'send', highlight: true },
+                { text: '我想直接跳到维修', action: 'send' }]
       }
-      if (item.state === 'checking') {
-        return [{ text: '发现异常了', action: 'check_fault' }, { text: '这项没问题', action: 'check_ok' }]
-      }
-      if (item.state === 'fault_found') {
-        return [{ text: '修好了，验收通过', action: 'repair_fixed', highlight: true }, { text: '没修好，继续排查', action: 'repair_not_fixed' }]
-      }
-      if (item.state === 'no_fault' || item.state === 'verified' || item.state === 'repair_failed') {
-        const nextIdx = idx + 1
-        if (checkItems[eid]?.[nextIdx]) {
-          return [{ text: `继续排查下一项：${checkItems[eid][nextIdx].title}`, action: 'continue_next', highlight: true }, { text: '直接闭环', action: 'send' }]
-        }
-        return [{ text: '全部完成，闭环事件', action: 'send' }]
+      return [{ text: '继续按左侧方案排查', action: 'send' }]
       }
       return [{ text: '查看排查进度', action: 'send' }]
     }
@@ -648,6 +632,32 @@ watch(() => props.mode, (newMode) => {
 }, { immediate: true })
 watch(() => messages.value.length, () => refreshChips())
 watch(() => eventStore.selectedEventId, (id) => { if (!id) { Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k])); followupTimers = {} } })
+
+// ============ 产物区操作 → 助手响应 ============
+watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
+  if (!action || !props.eventContext) return
+  const eid = props.eventContext.id
+  if (action === 'repair') {
+    // 排查完成有异常 → 推送维修引导
+    setTimeout(() => {
+      const rd = getRepairDetail(currentCheckIdx[eid] || 1)
+      pushMsg(eid, {
+        cardType: 'guide',
+        guideTitle: '维修方案已生成',
+        guideIntro: '左侧产物区已展开维修方案和备件清单。请按步骤执行维修操作，完成后告知验收结果。',
+        steps: rd
+      })
+      refreshChips()
+    }, 500)
+  }
+  if (action === 'report') {
+    // 全部完成 → 推送报告卡片
+    setTimeout(() => {
+      pushReportCard(eid, props.eventContext)
+      refreshChips()
+    }, 500)
+  }
+})
 onUnmounted(() => {
   window.removeEventListener('resize', onWindowResize)
   Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k]))
