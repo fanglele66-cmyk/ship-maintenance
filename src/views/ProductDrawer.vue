@@ -52,96 +52,117 @@
         </header>
 
         <div v-show="aiExpanded" class="prod-body">
-          <!-- ① 结论与建议（始终先出） -->
-          <div class="block reveal-block" :class="{ revealed: revealedSubs.ai_conclusion }">
-            <div class="block-title">结论与建议</div>
-            <div class="verdict">
-              <div class="verdict-row"><span class="verdict-label">判定结论</span></div>
-              <div class="verdict-text">{{ product.ai.verdict }}</div>
+          <!-- ① 结论与建议（主要 · 默认展开） -->
+          <div class="block">
+            <div class="sub-head" @click="aiSubs.conclusion = !aiSubs.conclusion">
+              <div class="block-title">结论与建议</div>
+              <span class="sub-toggle">{{ aiSubs.conclusion ? '▼' : '▶' }}</span>
             </div>
-            <div class="snapshot-mini">
-              <div class="snapshot-mini-title">事发时数据快照</div>
-              <div class="snapshot-mini-time">📅 {{ formatTime(event.snapshot?.snapshotTime || event.createdAt) }}</div>
-              <ul class="snapshot-mini-list">
-                <li v-for="(s, i) in event.snapshot?.sensors || []" :key="i">
-                  <span class="sm-name">{{ s.name }}</span>
-                  <span class="sm-val" :class="s.status">{{ s.value }}{{ s.unit }}</span>
-                </li>
-              </ul>
+            <div v-show="aiSubs.conclusion">
+              <div class="verdict">
+                <div class="verdict-row"><span class="verdict-label">判定结论</span></div>
+                <div class="verdict-text">{{ product.ai.verdict }}</div>
+              </div>
+              <div class="data-line"><span class="data-label">数据：</span>{{ product.ai.dataLine }}</div>
+              <div class="advice-line"><span class="advice-label">建议：</span>{{ product.ai.advice }}</div>
             </div>
-            <div class="data-line"><span class="data-label">数据：</span>{{ product.ai.dataLine }}</div>
-            <div class="advice-line"><span class="advice-label">建议：</span>{{ product.ai.advice }}</div>
           </div>
 
-          <!-- ② 数据分析指标卡（snapshot 触发） -->
-          <div v-if="revealedSubs.ai_data" class="block reveal-block revealed">
-            <div class="block-title">数据分析</div>
-            <div class="metric-grid">
-              <div v-for="(m, i) in product.ai.metrics" :key="i" class="metric">
-                <div class="metric-name">{{ m.name }}</div>
-                <div class="metric-trend" :class="m.trend">
-                  {{ m.trend === 'up' ? '↗' : m.trend === 'down' ? '↘' : '→' }} {{ m.trendLabel }}
+          <!-- ② 数据分析（主要 · 默认展开）—— 传感器卡片 + 趋势图 -->
+          <div class="block">
+            <div class="sub-head" @click="aiSubs.data = !aiSubs.data">
+              <div class="block-title">数据分析</div>
+              <span class="sub-toggle">{{ aiSubs.data ? '▼' : '▶' }}</span>
+            </div>
+            <div v-show="aiSubs.data">
+              <!-- 传感器卡片横向排列 -->
+              <div class="sensor-cards-row">
+                <div
+                  v-for="(s, i) in event.snapshot?.sensors || []"
+                  :key="i"
+                  class="sensor-card-h"
+                  :class="{
+                    'sc-selected': selectedSensorIndex === i,
+                    'sc-over': s.status === 'over',
+                    'sc-warning': s.status === 'warning'
+                  }"
+                  @click="selectedSensorIndex = i"
+                >
+                  <div class="sc-header">
+                    <span class="sc-name">{{ s.name }}</span>
+                    <span v-if="s.tag" class="sc-tag">{{ s.tag }}</span>
+                    <span v-if="selectedSensorIndex === i" class="sc-dot"></span>
+                  </div>
+                  <div class="sc-meta">{{ s.sampleCount }}个采样点{{ s.trendHours ? '·' + s.trendHours : '' }}{{ s.normalRange ? '·正常范围 ' + s.normalRange : '' }}</div>
+                  <div class="sc-history">{{ s.historyDesc }}</div>
+                  <div class="sc-status" :class="'st-' + s.status">{{ s.statusDesc }}</div>
                 </div>
-                <div class="metric-range">范围 {{ m.range }}</div>
-                <div class="metric-row">
-                  <span class="metric-current">{{ m.current }}</span><span class="metric-unit">{{ m.unit }}</span>
+              </div>
+              <!-- 趋势图（跟随选中传感器） -->
+              <div class="trend-chart-area">
+                <div class="trend-chart-header">
+                  <span class="tch-title">📈 {{ selectedSensor?.name || '—' }}</span>
+                  <span class="tch-hint">点击上方卡片切换趋势图</span>
                 </div>
-                <div class="metric-analyze">{{ m.analyze }}</div>
+                <div v-if="!trendLoaded" class="trend-skeleton-lg">
+                  <div class="trend-skel-pulse"></div>
+                  <span class="trend-skel-text">正在加载趋势数据…</span>
+                </div>
+                <svg v-else-if="currentTrendPoints" class="trend-svg-lg" viewBox="0 0 800 220" preserveAspectRatio="xMidYMid meet">
+                  <!-- 网格线 -->
+                  <line v-for="y in 5" :key="'g'+y" :x1="60" :y1="20 + (y-1)*36" :x2="780" :y2="20 + (y-1)*36" stroke="var(--border-secondary)" stroke-width="0.5" />
+                  <!-- 阈值线 -->
+                  <line v-if="selectedSensor && (selectedSensor.threshold || selectedSensor.range)" :x1="60" :y1="thresholdYPos" :x2="780" :y2="thresholdYPos" :stroke="trendColor" stroke-width="1" stroke-dasharray="6 4" opacity="0.6" />
+                  <text v-if="selectedSensor && (selectedSensor.threshold || selectedSensor.range)" x="775" :y="thresholdYPos - 5" text-anchor="end" :font-size="11" :fill="trendColor">阈值 {{ trendThresholdLabel }}</text>
+                  <!-- 数据折线 -->
+                  <polyline :points="currentTrendPoints" fill="none" :stroke="trendColor" stroke-width="2.5" />
+                  <!-- 面积填充 -->
+                  <polygon :points="trendAreaPoints" :fill="trendColor" opacity="0.08" />
+                  <!-- 超限点 -->
+                  <circle v-for="(p, i) in alertPoints" :key="'a'+i" :cx="p.x" :cy="p.y" r="4" :fill="trendColor" stroke="var(--bg-surface)" stroke-width="1.5" />
+                </svg>
               </div>
             </div>
           </div>
 
-          <!-- ③ 趋势图（snapshot 触发 + 加载动画） -->
-          <div v-if="revealedSubs.ai_trend" class="block reveal-block revealed">
-            <div class="block-title">趋势图</div>
-            <div class="trend-meta">事发前 24h · {{ event.snapshot?.sensors?.[0]?.name || '出口温度' }}</div>
-            <!-- 加载骨架 -->
-            <div v-if="!revealedSubs.ai_trend_loaded" class="trend-skeleton">
-              <div class="trend-skel-pulse"></div>
-              <span class="trend-skel-text">正在加载趋势数据…</span>
+          <!-- ③ 工程机理分析（次要 · 默认收起） -->
+          <div class="block">
+            <div class="sub-head" @click="aiSubs.mechanism = !aiSubs.mechanism">
+              <div class="block-title">工程机理分析</div>
+              <span class="sub-toggle">{{ aiSubs.mechanism ? '▼' : '▶' }}</span>
             </div>
-            <!-- 实际图表 -->
-            <svg v-else class="trend-svg" viewBox="0 0 600 140" preserveAspectRatio="none">
-              <line v-for="y in 4" :key="'g'+y" :x1="0" :y1="y*30" :x2="600" :y2="y*30" stroke="var(--border-secondary)" stroke-width="1" />
-              <line :x1="0" :y1="40" :x2="600" :y2="40" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4 4" />
-              <text x="595" y="36" text-anchor="end" font-size="10" fill="var(--danger)">阈值 85°C</text>
-              <polyline v-if="trendPoints" :points="trendPoints" fill="none" stroke="var(--accent)" stroke-width="2" />
-              <circle v-for="(p, i) in alertPoints" :key="'a'+i" :cx="p.x" :cy="p.y" r="3.5" fill="var(--danger)" stroke="var(--bg-surface)" stroke-width="1.5" />
-            </svg>
-            <div class="trend-legend">
-              <span class="lg-item"><span class="lg-dot" style="background:var(--accent)"></span>实测值</span>
-              <span class="lg-item"><span class="lg-dot" style="background:var(--danger)"></span>超阈值点</span>
-            </div>
-          </div>
-
-          <!-- ④ 工程机理分析（diagnosis 触发） -->
-          <div v-if="revealedSubs.ai_mechanism" class="block reveal-block revealed">
-            <div class="block-title">工程机理分析</div>
-            <div class="mechanism">
-              <div class="mech-label">本次诊断：</div>
-              <div class="mech-text">{{ product.ai.mechanism }}</div>
-            </div>
-            <div class="fault-match">
-              <div class="fm-row fm-head"><span class="fm-name">候选故障</span><span class="fm-match">匹配度</span></div>
-              <div v-for="(f, i) in product.ai.faultMatch" :key="i" class="fm-row">
-                <span class="fm-name">{{ f.name }}</span>
-                <span class="fm-bar">
-                  <span class="fm-bar-fill" :style="{ width: f.match + '%', background: f.color }"></span>
-                  <span class="fm-bar-text">{{ f.match }}%</span>
-                </span>
+            <div v-show="aiSubs.mechanism">
+              <div class="mechanism">
+                <div class="mech-label">本次诊断：</div>
+                <div class="mech-text">{{ product.ai.mechanism }}</div>
+              </div>
+              <div class="fault-match">
+                <div class="fm-row fm-head"><span class="fm-name">候选故障</span><span class="fm-match">匹配度</span></div>
+                <div v-for="(f, i) in product.ai.faultMatch" :key="i" class="fm-row">
+                  <span class="fm-name">{{ f.name }}</span>
+                  <span class="fm-bar">
+                    <span class="fm-bar-fill" :style="{ width: f.match + '%', background: f.color }"></span>
+                    <span class="fm-bar-text">{{ f.match }}%</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- ⑤ 可能原因（diagnosis 触发） -->
-          <div v-if="revealedSubs.ai_reasons" class="block reveal-block revealed">
-            <div class="block-title">可能的原因与后果</div>
-            <div class="reason-table">
-              <div class="rt-row rt-head"><span class="rt-col rt-fault">候选故障</span><span class="rt-col rt-cause">可能原因</span><span class="rt-col rt-effect">直接后果</span></div>
-              <div v-for="(r, i) in product.ai.reasons" :key="i" class="rt-row">
-                <span class="rt-col rt-fault"><span class="rt-prob" :class="r.prob">{{ r.probLabel }}</span>{{ r.fault }}</span>
-                <span class="rt-col rt-cause">{{ r.cause }}</span>
-                <span class="rt-col rt-effect">{{ r.effect }}</span>
+          <!-- ④ 可能的原因与后果（次要 · 默认收起） -->
+          <div class="block">
+            <div class="sub-head" @click="aiSubs.reasons = !aiSubs.reasons">
+              <div class="block-title">可能的原因与后果</div>
+              <span class="sub-toggle">{{ aiSubs.reasons ? '▼' : '▶' }}</span>
+            </div>
+            <div v-show="aiSubs.reasons">
+              <div class="reason-table">
+                <div class="rt-row rt-head"><span class="rt-col rt-fault">候选故障</span><span class="rt-col rt-cause">可能原因</span><span class="rt-col rt-effect">直接后果</span></div>
+                <div v-for="(r, i) in product.ai.reasons" :key="i" class="rt-row">
+                  <span class="rt-col rt-fault"><span class="rt-prob" :class="r.prob">{{ r.probLabel }}</span>{{ r.fault }}</span>
+                  <span class="rt-col rt-cause">{{ r.cause }}</span>
+                  <span class="rt-col rt-effect">{{ r.effect }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -417,10 +438,22 @@ const visibleSections = computed(() => ({
 }))
 
 // ============ 折叠状态 ============
-const aiExpanded = ref(false)
+const aiExpanded = ref(true)
 const checkExpanded = ref(false)
 const repairExpanded = ref(false)
 const reportExpanded = ref(false)
+
+// AI 子模块展开状态（主要默认展开，次要默认收起）
+const aiSubs = reactive({
+  conclusion: true,   // 结论与建议 - 主要
+  data: true,         // 数据分析 - 主要
+  mechanism: false,   // 工程机理分析 - 次要
+  reasons: false,     // 可能原因与后果 - 次要
+})
+
+// 选中的传感器索引（用于切换趋势图）
+const selectedSensorIndex = ref(0)
+const trendLoaded = ref(false)
 
 // ============ 子模块渐进展示 ============
 // 钥匙：assistant 动作 → 解锁 sub-section
@@ -500,31 +533,104 @@ const product = computed(() => {
   }
 })
 
-// 趋势图：把 trendData 转成 SVG 坐标点
-const trendPoints = computed(() => {
-  const data = props.event?.snapshot?.trendData
+// 选中的传感器
+const selectedSensor = computed(() => {
+  const sensors = props.event?.snapshot?.sensors || []
+  return sensors[selectedSensorIndex.value] || sensors[0] || null
+})
+
+
+
+// 当前选中传感器的趋势数据
+const currentTrendData = computed(() => {
+  const sensors = props.event?.snapshot?.sensors || []
+  const s = sensors[selectedSensorIndex.value]
+  return s?.trendData || []
+})
+
+// 趋势图：把当前传感器的 trendData 转成 SVG 坐标点
+const currentTrendPoints = computed(() => {
+  const data = currentTrendData.value
   if (!data || !data.length) return ''
-  const W = 600, H = 140, PAD = 8
-  const maxV = 100
-  const minV = 60
+  const W = 800, H = 220, PAD_L = 60, PAD_R = 20, PAD_T = 20, PAD_B = 40
+  const values = data.map(d => d.value)
+  const minV = Math.min(...values) * 0.9
+  const maxV = Math.max(...values) * 1.1
   return data.map((d, i) => {
-    const x = (i / (data.length - 1)) * (W - 2 * PAD) + PAD
-    const y = H - PAD - ((d.value - minV) / (maxV - minV)) * (H - 2 * PAD)
+    const x = PAD_L + (i / Math.max(data.length - 1, 1)) * (W - PAD_L - PAD_R)
+    const y = PAD_T + (1 - (d.value - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
     return `${x.toFixed(1)},${y.toFixed(1)}`
   }).join(' ')
 })
+
+// 面积填充多边形
+const trendAreaPoints = computed(() => {
+  const data = currentTrendData.value
+  if (!data || !data.length) return ''
+  const W = 800, H = 220, PAD_L = 60, PAD_R = 20, PAD_T = 20, PAD_B = 40
+  const values = data.map(d => d.value)
+  const minV = Math.min(...values) * 0.9
+  const maxV = Math.max(...values) * 1.1
+  const bottomY = PAD_T + (1 - (minV - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
+  const linePoints = data.map((d, i) => {
+    const x = PAD_L + (i / Math.max(data.length - 1, 1)) * (W - PAD_L - PAD_R)
+    const y = PAD_T + (1 - (d.value - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+  const firstX = PAD_L
+  const lastX = PAD_L + (W - PAD_L - PAD_R)
+  return [...linePoints, `${lastX.toFixed(1)},${bottomY.toFixed(1)}`, `${firstX.toFixed(1)},${bottomY.toFixed(1)}`].join(' ')
+})
+
 const alertPoints = computed(() => {
-  const data = props.event?.snapshot?.trendData
-  if (!data) return []
-  const W = 600, H = 140, PAD = 8
-  const maxV = 100, minV = 60
+  const data = currentTrendData.value
+  if (!data || !data.length) return []
+  const W = 800, H = 220, PAD_L = 60, PAD_R = 20, PAD_T = 20, PAD_B = 40
+  const values = data.map(d => d.value)
+  const minV = Math.min(...values) * 0.9
+  const maxV = Math.max(...values) * 1.1
+  const threshold = selectedSensor.value?.threshold
+  const rangeMax = selectedSensor.value?.range ? parseFloat(selectedSensor.value.range.split('-')[1]) : null
+  const limit = threshold || rangeMax
   return data
     .map((d, i) => {
-      const x = (i / (data.length - 1)) * (W - 2 * PAD) + PAD
-      const y = H - PAD - ((d.value - minV) / (maxV - minV)) * (H - 2 * PAD)
+      const x = PAD_L + (i / Math.max(data.length - 1, 1)) * (W - PAD_L - PAD_R)
+      const y = PAD_T + (1 - (d.value - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
       return { x, y, v: d.value }
     })
-    .filter(p => p.v > 85)
+    .filter(p => limit ? p.v > limit : false)
+})
+
+// 阈值线 Y 坐标
+const thresholdYPos = computed(() => {
+  const s = selectedSensor.value
+  if (!s) return 0
+  const data = currentTrendData.value
+  if (!data.length) return 0
+  const values = data.map(d => d.value)
+  const minV = Math.min(...values) * 0.9
+  const maxV = Math.max(...values) * 1.1
+  const threshold = s.threshold || (s.range ? parseFloat(s.range.split('-')[1]) : null)
+  if (!threshold) return 0
+  const H = 220, PAD_T = 20, PAD_B = 40
+  return PAD_T + (1 - (threshold - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
+})
+
+const trendThresholdLabel = computed(() => {
+  const s = selectedSensor.value
+  if (!s) return ''
+  if (s.threshold) return `${s.threshold}${s.unit}`
+  if (s.range) return `${s.range}${s.unit}`
+  return ''
+})
+
+// 趋势线颜色（根据传感器状态）
+const trendColor = computed(() => {
+  const s = selectedSensor.value
+  if (!s) return 'var(--accent)'
+  if (s.status === 'over') return 'var(--danger)'
+  if (s.status === 'warning') return 'var(--warning)'
+  return 'var(--success)'
 })
 
 // ============ 详尽的产物数据生成 ============
@@ -698,13 +804,20 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
   const isStageChanged = oldStage !== undefined && oldStage !== stage
   const isEventChanged = eid !== oldEid
 
-  // 切事件：重置所有折叠状态
+  // 切事件：重置状态
   if (isEventChanged) {
-    aiExpanded.value = false
+    aiExpanded.value = true
     checkExpanded.value = false
     repairExpanded.value = false
     reportExpanded.value = false
-    resetSubs()
+    // 重置 AI 子模块为主次策略
+    aiSubs.conclusion = true
+    aiSubs.data = true
+    aiSubs.mechanism = false
+    aiSubs.reasons = false
+    selectedSensorIndex.value = 0
+    trendLoaded.value = false
+    setTimeout(() => { trendLoaded.value = true }, 600)
   }
 
   // 阶段变化：折叠非当前产物
@@ -716,24 +829,13 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     if (cur !== 'report') reportExpanded.value = false
   }
 
-  // 当前阶段产物展开 + 渐进展示子内容
+  // 当前阶段产物展开
   if (isStageChanged || isEventChanged) {
     const cur = sectionMap[stage]
-
-    // 展开卡片
     if (cur === 'ai') aiExpanded.value = true
     if (cur === 'check') checkExpanded.value = true
     if (cur === 'repair') repairExpanded.value = true
     if (cur === 'report') reportExpanded.value = true
-
-    // 渐进展示子模块（事件切换时）
-    if (isEventChanged && cur === 'ai') {
-      revealSub('ai_conclusion', 50)
-      revealSubsSequence(['ai_mechanism', 'ai_reasons'], 700, 120)
-    }
-    if (isEventChanged && cur === 'check') {
-      revealSubsSequence(['check_warn', 'check_steps'], 100, 100)
-    }
 
     // 脉冲
     if (isStageChanged) pulseInto(cur, 900)
@@ -760,31 +862,7 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
   repairExpanded.value = (section === 'repair')
   reportExpanded.value = (section === 'report')
 
-  // 渐进展示子模块
-  if (action === 'diagnosis') {
-    revealedSubs.ai_conclusion = true
-    revealSubsSequence(['ai_mechanism', 'ai_reasons'], 400, 150)
-  }
-  if (action === 'snapshot') {
-    revealedSubs.ai_data = true
-    revealSub('ai_trend', 600)
-    // 趋势图加载模拟：600ms 出现 → 再 800ms 加载完成
-    setTimeout(() => { revealedSubs.ai_trend_loaded = true }, 1400)
-  }
-  if (action === 'guide') {
-    revealedSubs.check_steps = true
-    revealSub('check_warn', 300)
-  }
-  if (action === 'warning') {
-    revealedSubs.check_warn = true
-  }
-  if (action === 'repair') {
-    // 从 check_done 进 S4
-    revealSubsSequence(['repair_recap', 'repair_flows', 'repair_accept'], 200, 180)
-  }
-  if (action === 'report') {
-    revealedSubs.report_content = true
-  }
+  // 所有数据默认已展示，无需渐进展开
 
   pulseInto(section, 700)
 })
@@ -823,7 +901,7 @@ function formatTime(t) {
   background: transparent;
   color: var(--text-secondary, var(--text-secondary));
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-base);
   padding: 4px 8px;
   border-radius: 4px;
 }
@@ -849,7 +927,7 @@ function formatTime(t) {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: var(--font-sm);
   font-weight: 600;
   background: var(--border-primary);
   color: var(--text-muted);
@@ -869,7 +947,7 @@ function formatTime(t) {
 }
 .sp-label {
   margin: 0 6px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
 }
 .sp-item.done .sp-label { color: var(--success); }
@@ -938,7 +1016,7 @@ function formatTime(t) {
 .prod-icon { font-size: 20px; }
 .prod-titles { flex: 1; min-width: 0; }
 .prod-title {
-  font-size: 14px;
+  font-size: var(--font-md);
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
@@ -947,12 +1025,12 @@ function formatTime(t) {
 }
 .prod-card.card-current .prod-title { color: var(--accent); }
 .prod-sub {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   margin-top: 2px;
 }
 .prod-gen {
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 500;
   padding: 1px 6px;
   border-radius: 3px;
@@ -965,7 +1043,7 @@ function formatTime(t) {
   50% { opacity: 1; }
 }
 .prod-toggle {
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
 }
 
@@ -975,7 +1053,7 @@ function formatTime(t) {
 .block { margin-bottom: 16px; }
 .block:last-child { margin-bottom: 0; }
 .block-title {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 8px;
@@ -990,13 +1068,13 @@ function formatTime(t) {
 /* ============ AI 块 ============ */
 .verdict { margin-bottom: 10px; }
 .verdict-label {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   display: block;
   margin-bottom: 4px;
 }
 .verdict-text {
-  font-size: 13px;
+  font-size: var(--font-base);
   line-height: 1.7;
   color: var(--text-primary);
   background: var(--accent-bg);
@@ -1012,13 +1090,13 @@ function formatTime(t) {
   margin-bottom: 10px;
 }
 .snapshot-mini-title {
-  font-size: 12px;
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 4px;
 }
 .snapshot-mini-time {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   margin-bottom: 6px;
 }
@@ -1031,7 +1109,7 @@ function formatTime(t) {
   gap: 4px 12px;
 }
 .snapshot-mini-list li {
-  font-size: 11px;
+  font-size: var(--font-sm);
   display: flex;
   justify-content: space-between;
   padding: 2px 0;
@@ -1042,7 +1120,7 @@ function formatTime(t) {
 .sm-val.normal { color: var(--success); }
 
 .data-line, .advice-line {
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.7;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -1062,10 +1140,10 @@ function formatTime(t) {
   border-radius: 6px;
   padding: 8px 10px;
 }
-.metric-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.metric-name { font-size: var(--font-sm); font-weight: 600; color: var(--text-primary); }
 .metric-trend {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--font-xs);
   margin: 2px 0;
   padding: 1px 5px;
   border-radius: 3px;
@@ -1073,7 +1151,7 @@ function formatTime(t) {
 .metric-trend.up { background: var(--bg-surface)1f0; color: var(--danger); }
 .metric-trend.down { background: var(--bg-surface)7e6; color: var(--warning); }
 .metric-trend.flat { background: var(--success-bg); color: var(--success); }
-.metric-range { font-size: 10px; color: var(--text-muted); margin: 2px 0 4px; }
+.metric-range { font-size: var(--font-xs); color: var(--text-muted); margin: 2px 0 4px; }
 .metric-row {
   display: flex;
   align-items: baseline;
@@ -1081,11 +1159,11 @@ function formatTime(t) {
   margin-bottom: 2px;
 }
 .metric-current { font-size: 18px; font-weight: 700; color: var(--text-primary); font-family: monospace; }
-.metric-unit { font-size: 10px; color: var(--text-secondary); }
-.metric-analyze { font-size: 10px; color: var(--text-secondary); line-height: 1.4; }
+.metric-unit { font-size: var(--font-xs); color: var(--text-secondary); }
+.metric-analyze { font-size: var(--font-xs); color: var(--text-secondary); line-height: 1.4; }
 
 /* 趋势图 */
-.trend-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+.trend-meta { font-size: var(--font-sm); color: var(--text-muted); margin-bottom: 6px; }
 .trend-svg {
   width: 100%;
   height: 140px;
@@ -1096,7 +1174,7 @@ function formatTime(t) {
 .trend-legend {
   display: flex;
   gap: 16px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   margin-top: 6px;
   justify-content: center;
@@ -1106,14 +1184,14 @@ function formatTime(t) {
 
 /* 工程机理 */
 .mechanism { margin-bottom: 10px; }
-.mech-label { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
-.mech-text { font-size: 12px; line-height: 1.7; color: var(--text-primary); }
+.mech-label { font-size: var(--font-sm); font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.mech-text { font-size: var(--font-sm); line-height: 1.7; color: var(--text-primary); }
 
 .fault-match { background: var(--bg-hover); border: 1px solid var(--border-primary); border-radius: 6px; padding: 8px 10px; }
 .fm-row {
   display: flex;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--font-sm);
   padding: 4px 0;
   border-bottom: 1px dashed var(--border-primary);
 }
@@ -1131,7 +1209,7 @@ function formatTime(t) {
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 600;
   color: var(--text-primary);
   z-index: 1;
@@ -1148,7 +1226,7 @@ function formatTime(t) {
   grid-template-columns: 1.2fr 1.5fr 1.5fr;
   gap: 8px;
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   border-bottom: 1px solid var(--border-primary);
 }
 .rt-row:last-child { border-bottom: none; }
@@ -1156,7 +1234,7 @@ function formatTime(t) {
 .rt-col { line-height: 1.5; }
 .rt-fault { display: flex; align-items: center; gap: 4px; }
 .rt-prob {
-  font-size: 10px;
+  font-size: var(--font-xs);
   padding: 1px 4px;
   border-radius: 2px;
   font-weight: 600;
@@ -1172,7 +1250,7 @@ function formatTime(t) {
 .warn-list, .danger-list {
   margin: 0;
   padding-left: 20px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.8;
   color: var(--text-primary);
 }
@@ -1195,22 +1273,22 @@ function formatTime(t) {
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--font-sm);
   font-weight: 600;
 }
-.step-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.step-target { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.step-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); }
+.step-target { font-size: var(--font-sm); color: var(--text-secondary); margin-bottom: 6px; }
 .step-sub { list-style: none; padding: 0; margin: 0 0 8px; }
 .step-sub li {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.6;
   padding: 2px 0;
 }
 .sub-tag {
-  font-size: 9px;
+  font-size: var(--font-xs);
   padding: 1px 4px;
   border-radius: 2px;
   font-weight: 600;
@@ -1230,7 +1308,7 @@ function formatTime(t) {
   border-radius: 4px;
   padding: 16px;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   background: var(--bg-surface);
   cursor: pointer;
@@ -1247,18 +1325,18 @@ function formatTime(t) {
   border-radius: 4px;
   margin-bottom: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-sm);
   user-select: none;
   transition: all 0.15s;
 }
 .check-item:hover { background: var(--accent-bg); }
 .check-item.done { background: var(--success-bg); border-color: var(--success-bg-hover); }
-.check-box { font-size: 14px; }
+.check-box { font-size: var(--font-md); }
 .check-item.done .check-box { color: var(--success); }
 .check-item.done .check-text { text-decoration: line-through; color: var(--text-muted); }
 .check-text { flex: 1; }
 .check-flag {
-  font-size: 10px;
+  font-size: var(--font-xs);
   padding: 1px 5px;
   border-radius: 2px;
   background: var(--bg-surface)1f0;
@@ -1269,7 +1347,7 @@ function formatTime(t) {
 /* ============ 维修块 ============ */
 .recap-block { background: rgba(22, 119, 255, 0.06); border-radius: 6px; padding: 10px 12px; }
 .recap-block .block-title { border-left: none; padding-left: 0; color: var(--accent); }
-.recap-text { font-size: 12px; line-height: 1.7; color: var(--text-primary); }
+.recap-text { font-size: var(--font-sm); line-height: 1.7; color: var(--text-primary); }
 
 .flow {
   border: 1px solid var(--border-primary);
@@ -1287,14 +1365,14 @@ function formatTime(t) {
   border-radius: 50%;
   background: var(--warning);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--font-sm);
   font-weight: 600;
 }
-.flow-title { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
-.flow-target { font-size: 11px; color: var(--danger); background: var(--bg-surface)1f0; padding: 1px 6px; border-radius: 3px; }
-.flow-steps { margin: 6px 0; padding-left: 20px; font-size: 12px; line-height: 1.7; color: var(--text-primary); }
+.flow-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); flex: 1; }
+.flow-target { font-size: var(--font-sm); color: var(--danger); background: var(--bg-surface)1f0; padding: 1px 6px; border-radius: 3px; }
+.flow-steps { margin: 6px 0; padding-left: 20px; font-size: var(--font-sm); line-height: 1.7; color: var(--text-primary); }
 .flow-result {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--success);
   background: var(--success-bg);
   border-radius: 3px;
@@ -1309,7 +1387,7 @@ function formatTime(t) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   padding: 4px 0;
   border-bottom: 1px dashed rgba(0, 180, 42, 0.3);
 }
@@ -1340,7 +1418,7 @@ function formatTime(t) {
   font-size: 18px;
   font-weight: 700;
 }
-.report-banner-text { font-size: 16px; font-weight: 600; }
+.report-banner-text { font-size: var(--font-lg); font-weight: 600; }
 
 .report-stat-grid {
   display: grid;
@@ -1354,8 +1432,8 @@ function formatTime(t) {
   border-radius: 4px;
   padding: 8px 10px;
 }
-.rs-label { font-size: 10px; color: var(--text-muted); }
-.rs-value { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.rs-label { font-size: var(--font-xs); color: var(--text-muted); }
+.rs-value { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); margin-top: 2px; }
 .rs-value.success { color: var(--success); }
 
 .report-key {
@@ -1364,11 +1442,11 @@ function formatTime(t) {
   border-radius: 6px;
   padding: 8px 12px;
 }
-.rk-row { padding: 6px 0; border-bottom: 1px dashed var(--border-primary); font-size: 12px; }
+.rk-row { padding: 6px 0; border-bottom: 1px dashed var(--border-primary); font-size: var(--font-sm); }
 .rk-row:last-child { border-bottom: none; }
 .rk-label {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-bg);
@@ -1382,7 +1460,7 @@ function formatTime(t) {
 
 .report-footer {
   text-align: center;
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   margin-top: 12px;
   padding-top: 8px;
@@ -1396,7 +1474,7 @@ function formatTime(t) {
   background: var(--accent-bg);
   border: 1px solid rgba(22, 119, 255, 0.3);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--accent);
   text-align: center;
   animation: streamPulse 1.2s infinite;
@@ -1461,7 +1539,7 @@ function formatTime(t) {
 }
 
 .trend-skel-text {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   animation: skel-fade 1.5s ease-in-out infinite;
 }
@@ -1469,5 +1547,150 @@ function formatTime(t) {
 @keyframes skel-fade {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
+}
+
+/* === 子模块折叠头 === */
+.sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+.sub-head:hover .block-title { color: var(--accent); }
+.sub-toggle { font-size: var(--font-xs); color: var(--text-muted); flex-shrink: 0; }
+
+/* === 可点击传感器卡片 === */
+.sensor-card-clickable {
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sensor-card-clickable:hover { background: var(--accent-bg); }
+.sensor-selected { background: var(--accent-bg); border-left: 2px solid var(--accent); padding-left: 4px; }
+
+/* === 趋势图区域 === */
+.trend-section { margin-top: 12px; }
+
+/* === 横向传感器卡片 === */
+.sensor-cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.sensor-card-h {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.sensor-card-h:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(22,119,255,0.08);
+  transform: translateY(-1px);
+}
+.sc-selected {
+  border-color: var(--accent) !important;
+  border-width: 2px;
+  box-shadow: 0 0 0 3px rgba(22,119,255,0.12);
+}
+.sc-over { border-left: 3px solid var(--danger); }
+.sc-warning { border-left: 3px solid var(--warning); }
+.sc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.sc-name {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.sc-tag {
+  font-size: var(--font-xs);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 500;
+}
+.sc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: auto;
+  box-shadow: 0 0 6px var(--accent);
+  animation: dot-pulse 1.5s infinite;
+}
+@keyframes dot-pulse {
+  0%,100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+.sc-meta {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.sc-history {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.sc-status {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.sc-status.st-over { color: var(--danger); }
+.sc-status.st-warning { color: var(--warning); }
+.sc-status.st-normal { color: var(--success); }
+
+/* === 大尺寸趋势图 === */
+.trend-chart-area {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 16px;
+}
+.trend-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.tch-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.tch-hint {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+.trend-svg-lg {
+  width: 100%;
+  height: auto;
+}
+.trend-skeleton-lg {
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 </style>

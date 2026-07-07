@@ -628,7 +628,7 @@ onUnmounted(() => {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 14px;
+  font-size: var(--font-md);
   color: var(--text-muted);
   pointer-events: none;
 }
@@ -650,7 +650,7 @@ onUnmounted(() => {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-lg);
   line-height: 1;
   padding: 0 4px;
   border-radius: 3px;
@@ -690,7 +690,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 0;
 }
 .adv-icon svg { display: block; }
@@ -718,7 +718,7 @@ onUnmounted(() => {
   gap: 3px;
   padding: 3px 4px 3px 8px;
   border-radius: 10px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   line-height: 1.2;
   border: 1px solid transparent;
   font-weight: 500;
@@ -737,7 +737,7 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-base);
   line-height: 1;
   padding: 0 2px;
   border-radius: 50%;
@@ -749,7 +749,7 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-sm);
   cursor: pointer;
   padding: 3px 8px;
   border-radius: var(--radius-sm);
@@ -781,7 +781,7 @@ onUnmounted(() => {
   gap: 6px;
 }
 .adv-section-title {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   letter-spacing: 0.02em;
   font-weight: 500;
@@ -793,12 +793,12 @@ onUnmounted(() => {
 }
 .adv-options-wrap { flex-wrap: wrap; }
 .opt-empty {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   padding: 4px 0;
 }
 .opt-pill {
-  font-size: 11px;
+  font-size: var(--font-sm);
   padding: 4px 10px;
   border-radius: 10px;
   border: 1px solid var(--border-primary);
@@ -828,7 +828,7 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-sm);
   cursor: pointer;
   padding: 4px 8px;
 }
@@ -837,7 +837,7 @@ onUnmounted(() => {
   background: var(--accent);
   border: none;
   color: #fff;
-  font-size: 12px;
+  font-size: var(--font-sm);
   padding: 5px 16px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -885,7 +885,7 @@ onUnmounted(() => {
 
 /* Priority tag in card */
 .tag {
-  font-size: 10px;
+  font-size: var(--font-xs);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
@@ -941,7 +941,7 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   margin-top: 3px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
 }
 
@@ -966,7 +966,7 @@ onUnmounted(() => {
   border-radius: 9px;
   background: var(--danger);
   color: #fff;
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 600;
   line-height: 1;
   box-shadow: 0 0 0 2px var(--bg-surface);

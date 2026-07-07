@@ -186,7 +186,7 @@ const navItems = [
 }
 
 .nav-label {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   line-height: 1;
   transition: color 0.18s;
@@ -206,7 +206,7 @@ const navItems = [
   border-radius: 8px;
   background: var(--danger);
   color: #fff;
-  font-size: 9px;
+  font-size: var(--font-xs);
   font-weight: 600;
   line-height: 1;
   box-shadow: 0 0 0 2px var(--bg-panel);

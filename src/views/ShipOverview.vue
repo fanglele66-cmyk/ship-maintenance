@@ -191,7 +191,7 @@ const healthOffset = computed(() => {
 }
 
 .health-label {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 
@@ -207,12 +207,12 @@ const healthOffset = computed(() => {
 }
 
 .info-label {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 
 .info-value {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
   font-family: Consolas, monospace;
   color: var(--text-primary);
@@ -228,7 +228,7 @@ const healthOffset = computed(() => {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
@@ -342,13 +342,13 @@ const healthOffset = computed(() => {
 .fdc-dot.normal { background: var(--success); }
 
 .fdc-name {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .fdc-status {
-  font-size: 11px;
+  font-size: var(--font-sm);
   text-align: right;
   font-weight: 500;
 }

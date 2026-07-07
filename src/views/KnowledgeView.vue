@@ -208,7 +208,7 @@ const renderContent = computed(() => {
 }
 
 .sb-section-title {
-  font-size: 11px;
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-muted);
   padding: 8px 16px 6px;
@@ -221,7 +221,7 @@ const renderContent = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   background: transparent;
   border: none;
@@ -244,7 +244,7 @@ const renderContent = computed(() => {
 .sb-item-label { flex: 1; }
 
 .sb-item-count {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   padding: 1px 7px;
   border-radius: 8px;
@@ -325,7 +325,7 @@ const renderContent = computed(() => {
   border: none;
   outline: none;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-sm);
   font-family: inherit;
 }
 
@@ -342,7 +342,7 @@ const renderContent = computed(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--success);
   padding: 5px 14px;
@@ -398,7 +398,7 @@ const renderContent = computed(() => {
 }
 
 .doc-type-badge {
-  font-size: 10px;
+  font-size: var(--font-xs);
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 3px;
@@ -406,7 +406,7 @@ const renderContent = computed(() => {
 }
 
 .doc-card-title {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
@@ -424,12 +424,12 @@ const renderContent = computed(() => {
 }
 
 .doc-card-date {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 
 .doc-card-id {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   font-family: Consolas, monospace;
 }
@@ -439,7 +439,7 @@ const renderContent = computed(() => {
   text-align: center;
   padding: 60px 20px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 /* ============ 文档详情页 ============ */
@@ -464,7 +464,7 @@ const renderContent = computed(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   background: transparent;
   border: none;
@@ -480,7 +480,7 @@ const renderContent = computed(() => {
 }
 
 .detail-title {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -490,7 +490,7 @@ const renderContent = computed(() => {
 }
 
 .detail-meta {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -500,7 +500,7 @@ const renderContent = computed(() => {
   align-items: center;
   gap: 4px;
   padding: 5px 12px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--accent);
   background: transparent;
   border: 1px solid var(--accent);
@@ -544,21 +544,21 @@ const renderContent = computed(() => {
 }
 
 .doc-content-body :deep(h4) {
-  font-size: 14px;
+  font-size: var(--font-md);
   font-weight: 700;
   color: var(--accent);
   margin: 20px 0 8px 0;
 }
 
 .doc-content-body :deep(h5) {
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
   color: var(--accent);
   margin: 16px 0 6px 0;
 }
 
 .doc-content-body :deep(p) {
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   line-height: 1.8;
   margin: 6px 0;
@@ -575,7 +575,7 @@ const renderContent = computed(() => {
 }
 
 .doc-content-body :deep(li) {
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   line-height: 1.8;
   margin: 2px 0;
@@ -585,7 +585,7 @@ const renderContent = computed(() => {
   width: 100%;
   border-collapse: collapse;
   margin: 10px 0;
-  font-size: 12px;
+  font-size: var(--font-sm);
 }
 
 .doc-content-body :deep(thead th) {
@@ -595,7 +595,7 @@ const renderContent = computed(() => {
   text-align: left;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-primary);
-  font-size: 11px;
+  font-size: var(--font-sm);
 }
 
 .doc-content-body :deep(tbody td) {
@@ -612,7 +612,7 @@ const renderContent = computed(() => {
 .doc-content-body :deep(.notice-box) {
   padding: 10px 14px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.6;
   margin: 12px 0;
   display: flex;
@@ -622,7 +622,7 @@ const renderContent = computed(() => {
 
 .doc-content-body :deep(.notice-box::before) {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 .doc-content-body :deep(.notice-box.info) {
@@ -668,7 +668,7 @@ const renderContent = computed(() => {
 
 .doc-content-body :deep(.related-docs h4::before) {
   content: '';
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 .doc-content-body :deep(.related-docs ul) {
@@ -680,7 +680,7 @@ const renderContent = computed(() => {
   padding: 4px 0;
   color: var(--accent);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-sm);
 }
 .doc-content-body :deep(.related-docs li:hover) {
   text-decoration: underline;
@@ -700,7 +700,7 @@ const renderContent = computed(() => {
   background: var(--bg-panel);
   border: 1px solid var(--border-primary);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   font-family: Consolas, monospace;
   margin-bottom: 20px;

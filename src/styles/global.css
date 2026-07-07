@@ -58,20 +58,28 @@
   --radius-xl: 16px;
   --radius-full: 9999px;
 
-  /* ---- Layout (PAD-optimised) ---- */
+  /* ---- Layout (responsive, percentage-based) ---- */
   --nav-width: 64px;
   --header-height: 48px;
-  --assistant-width: 300px;
-  --event-list-width: 280px;
+  --assistant-width: 40vw; /* 默认40%，可拖拽30%-50% */
+  --event-list-width: clamp(240px, 18vw, 320px);
 
-  /* ---- Typography ---- */
-  --font-xs: 10px;
-  --font-sm: 12px;
-  --font-base: 13px;
-  --font-md: 14px;
-  --font-lg: 16px;
-  --font-xl: 18px;
-  --font-2xl: 22px;
+  /* ---- Typography (bumped up for readability) ---- */
+  --font-xs: 12px;   /* 10→12 最低可用值 */
+  --font-sm: 13px;   /* 12→13 次要文字 */
+  --font-base: 14px;  /* 13→14 正文默认 */
+  --font-md: 15px;    /* 14→15 面板标题 */
+  --font-lg: 17px;    /* 16→17 区块标题 */
+  --font-xl: 19px;    /* 18→19 页面标题 */
+  --font-2xl: 22px;   /* 保持 */
+}
+
+/* ===== Responsive Breakpoints ===== */
+@media (max-width: 768px) {
+  :root {
+    --event-list-width: 200px;
+    --assistant-width: 100%;
+  }
 }
 
 /* ===== Global ===== */

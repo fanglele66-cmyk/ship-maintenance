@@ -92,7 +92,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--success);
 }
 

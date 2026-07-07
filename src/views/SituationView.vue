@@ -149,14 +149,14 @@ situationContext.action = 'enter_layer'
 .layer-dots { display: flex; gap: 6px; pointer-events: auto; }
 .layer-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); cursor: pointer; transition: all 0.3s ease; }
 .layer-dot.active { width: 18px; border-radius: 3px; background: var(--accent); }
-.layer-title { font-size: 10px; color: var(--text-muted); }
+.layer-title { font-size: var(--font-xs); color: var(--text-muted); }
 .situation-content { flex: 1; position: relative; overflow: hidden; min-width: 0; }
 .layer { position: absolute; inset: 0; display: flex; flex-direction: column; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; overflow: hidden; }
 .layer-current { transform: translateX(0); opacity: 1; z-index: 2; }
 .layer-hidden-left { transform: translateX(-100%); opacity: 0; pointer-events: none; z-index: 1; }
 .layer-hidden-right { transform: translateX(100%); opacity: 0; pointer-events: none; z-index: 1; }
 .layer-header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border-primary); flex-shrink: 0; z-index: 5; box-shadow: var(--shadow-sm); }
-.back-btn { font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 5px 10px; border-radius: var(--radius-sm); font-weight: 500; }
+.back-btn { font-size: var(--font-sm); color: var(--accent); background: none; border: none; cursor: pointer; padding: 5px 10px; border-radius: var(--radius-sm); font-weight: 500; }
 .back-btn:hover { background: var(--accent-bg); }
 .layer-subtitle { font-size: var(--font-base); color: var(--text-secondary); font-weight: 500; }
 </style>

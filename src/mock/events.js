@@ -13,17 +13,73 @@ export const mockEvents = [
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
-        { name: '冷却水出口温度', value: 92.4, unit: '°C', threshold: 85, status: 'over' },
-        { name: '冷却水进口温度', value: 48.7, unit: '°C', threshold: 55, status: 'normal' },
-        { name: '温差', value: 43.7, unit: '°C', range: '15-25', status: 'over' },
-        { name: '冷却水流量', value: 68.2, unit: 'm³/h', threshold: 80, status: 'over' },
-        { name: '膨胀水箱液位', value: 72.5, unit: '%', range: '50-90', status: 'normal' },
-        { name: '主机转速', value: 450, unit: 'rpm', threshold: 500, status: 'normal' }
+        {
+          name: '冷却水出口温度', tag: '核心监控',
+          value: 92.4, unit: '°C', threshold: 85, status: 'over',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 85°C',
+          historyDesc: '当前 92.4°C，20h前 72°C，平均上升速率 1.02°C/h，近6h加速至 3.4°C/h',
+          statusDesc: '严重偏高 — 存在主机过热保护停机风险',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 72 + i * 0.8 + (i >= 14 ? Math.pow(i - 14, 1.5) * 1.2 : 0)
+          }))
+        },
+        {
+          name: '冷却水进口温度', tag: null,
+          value: 48.7, unit: '°C', threshold: 55, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 55°C',
+          historyDesc: '当前 48.7°C，20h前 45.2°C，变化平稳',
+          statusDesc: '正常 — 进口温度在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 45.2 + i * 0.18 + Math.sin(i / 3) * 0.5
+          }))
+        },
+        {
+          name: '温差', tag: null,
+          value: 43.7, unit: '°C', range: '15-25', status: 'over',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '15~25°C',
+          historyDesc: '当前 43.7°C，正常上限 25°C，超出 74.8%',
+          statusDesc: '严重超标 — 换热效率显著下降',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 18 + i * 1.2 + (i >= 12 ? Math.pow(i - 12, 1.3) * 0.8 : 0)
+          }))
+        },
+        {
+          name: '冷却水流量', tag: null,
+          value: 68.2, unit: 'm³/h', threshold: 80, status: 'over',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≥ 80 m³/h',
+          historyDesc: '当前 68.2m³/h，20h前 92m³/h，平均下降速率 1.19m³/h，近6h加速至 3.97m³/h',
+          statusDesc: '严重偏低 — 可能存在管路堵塞',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 92 - i * 1.0 - (i >= 12 ? Math.pow(i - 12, 1.4) * 0.6 : 0)
+          }))
+        },
+        {
+          name: '膨胀水箱液位', tag: null,
+          value: 72.5, unit: '%', range: '50-90', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '50~90%',
+          historyDesc: '当前 72.5%，运行平稳',
+          statusDesc: '正常 — 液位在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 70 + Math.sin(i / 5) * 3
+          }))
+        },
+        {
+          name: '主机转速', tag: null,
+          value: 450, unit: 'rpm', threshold: 500, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 500 rpm',
+          historyDesc: '当前 450rpm，较额定工况略低',
+          statusDesc: '正常 — 转速在额定范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 460 - i * 0.5 + Math.sin(i / 4) * 5
+          }))
+        }
       ],
-      trendData: Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        value: 72 + Math.sin(i / 3) * 5 + (i >= 20 ? (i - 20) * 2 : 0)
-      })),
       snapshotTime: '2026-07-03T14:05:00'
     },
     aiAnalysis: {
@@ -54,17 +110,73 @@ export const mockEvents = [
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
-        { name: '机油压力', value: 0.18, unit: 'MPa', threshold: 0.25, status: 'over' },
-        { name: '机油温度', value: 68.5, unit: '°C', threshold: 75, status: 'normal' },
-        { name: '机油滤器压差', value: 0.08, unit: 'MPa', threshold: 0.05, status: 'over' },
-        { name: '油底壳液位', value: 82.0, unit: '%', range: '60-90', status: 'normal' },
-        { name: '机油泵出口压力', value: 0.35, unit: 'MPa', range: '0.3-0.5', status: 'normal' },
-        { name: '轴瓦温度', value: 52.3, unit: '°C', threshold: 65, status: 'normal' }
+        {
+          name: '机油压力', tag: '核心监控',
+          value: 0.18, unit: 'MPa', threshold: 0.25, status: 'over',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '0.25~0.45 MPa',
+          historyDesc: '当前 0.18MPa，20h前 0.32MPa，平均下降速率 0.007MPa/h',
+          statusDesc: '严重偏低 — 存在润滑不足风险',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.32 - i * 0.006 - (i >= 14 ? Math.pow(i-14, 1.2) * 0.003 : 0)
+          }))
+        },
+        {
+          name: '机油温度', tag: null,
+          value: 68.5, unit: '°C', threshold: 75, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 75°C',
+          historyDesc: '当前 68.5°C，运行平稳',
+          statusDesc: '正常 — 油温在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 65 + Math.sin(i/5) * 2 + i * 0.1
+          }))
+        },
+        {
+          name: '机油滤器压差', tag: null,
+          value: 0.08, unit: 'MPa', threshold: 0.05, status: 'over',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 0.05 MPa',
+          historyDesc: '当前 0.08MPa，超阈值 60%',
+          statusDesc: '偏高 — 滤器可能堵塞',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.02 + i * 0.003 + (i >= 10 ? Math.pow(i-10, 1.3) * 0.001 : 0)
+          }))
+        },
+        {
+          name: '油底壳液位', tag: null,
+          value: 82.0, unit: '%', range: '60-90', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '60~90%',
+          historyDesc: '当前 82%，运行平稳',
+          statusDesc: '正常 — 液位在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 82 + Math.sin(i/4) * 1.5
+          }))
+        },
+        {
+          name: '机油泵出口压力', tag: null,
+          value: 0.35, unit: 'MPa', range: '0.3-0.5', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '0.3~0.5 MPa',
+          historyDesc: '当前 0.35MPa，在正常范围内',
+          statusDesc: '正常 — 泵出口压力正常',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.35 + Math.sin(i/3) * 0.02
+          }))
+        },
+        {
+          name: '轴瓦温度', tag: null,
+          value: 52.3, unit: '°C', threshold: 65, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 65°C',
+          historyDesc: '当前 52.3°C，运行正常',
+          statusDesc: '正常 — 轴瓦温度在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 50 + i * 0.1 + Math.sin(i/5) * 1.5
+          }))
+        }
       ],
-      trendData: Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        value: 0.28 + Math.sin(i / 4) * 0.03 - (i >= 16 ? (i - 16) * 0.01 : 0)
-      })),
       snapshotTime: '2026-07-03T11:30:00'
     },
     aiAnalysis: {
@@ -92,17 +204,73 @@ export const mockEvents = [
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
-        { name: '液压油温度', value: 78.0, unit: '°C', threshold: 65, status: 'over' },
-        { name: '液压油压力', value: 12.5, unit: 'MPa', range: '10-16', status: 'normal' },
-        { name: '舵角反馈', value: 15.0, unit: '°', range: '-35-35', status: 'normal' },
-        { name: '油位', value: 68.0, unit: '%', range: '50-85', status: 'normal' },
-        { name: '液压油流量', value: 45.2, unit: 'L/min', range: '35-60', status: 'normal' },
-        { name: '冷却水温度', value: 38.5, unit: '°C', threshold: 40, status: 'normal' }
+        {
+          name: '液压油温度', tag: '核心监控',
+          value: 78.0, unit: '°C', threshold: 65, status: 'over',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 65°C',
+          historyDesc: '当前 78.0°C，20h前 55°C，平均上升速率 1.15°C/h，近6h加速至 2.5°C/h',
+          statusDesc: '严重偏高 — 加速油液老化，影响密封件寿命',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 55 + i * 0.9 + (i >= 10 ? Math.pow(i-10, 1.4) * 0.5 : 0)
+          }))
+        },
+        {
+          name: '液压油压力', tag: null,
+          value: 12.5, unit: 'MPa', range: '10-16', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '10~16 MPa',
+          historyDesc: '当前 12.5MPa，在正常范围内',
+          statusDesc: '正常 — 油压在额定范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 12 + Math.sin(i/4) * 0.8
+          }))
+        },
+        {
+          name: '舵角反馈', tag: null,
+          value: 15.0, unit: '°', range: '-35~35', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '-35~35°',
+          historyDesc: '当前 15.0°，运行正常',
+          statusDesc: '正常 — 舵角反馈在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 10 + Math.sin(i/2) * 8
+          }))
+        },
+        {
+          name: '油位', tag: null,
+          value: 68.0, unit: '%', range: '50-85', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '50~85%',
+          historyDesc: '当前 68%，液位正常',
+          statusDesc: '正常 — 液位在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 68 + Math.sin(i/5) * 2
+          }))
+        },
+        {
+          name: '液压油流量', tag: null,
+          value: 45.2, unit: 'L/min', range: '35-60', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '35~60 L/min',
+          historyDesc: '当前 45.2L/min，流量正常',
+          statusDesc: '正常 — 流量在额定范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 45 + Math.sin(i/3) * 3
+          }))
+        },
+        {
+          name: '冷却水温度', tag: null,
+          value: 38.5, unit: '°C', threshold: 40, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 40°C',
+          historyDesc: '当前 38.5°C，接近阈值',
+          statusDesc: '接近上限 — 冷却水温度偏高',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 34 + i * 0.2 + Math.sin(i/4) * 1
+          }))
+        }
       ],
-      trendData: Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        value: 55 + Math.sin(i / 2) * 5 + (i >= 8 ? (i - 8) * 1.5 : 0)
-      })),
       snapshotTime: '2026-07-03T09:15:00'
     },
     aiAnalysis: {
@@ -132,13 +300,44 @@ export const mockEvents = [
     source: 'maintenance_schedule',
     snapshot: {
       sensors: [
-        { name: '累计运行时间', value: 505, unit: 'h', threshold: 500, status: 'over' },
-        { name: '振动值', value: 3.2, unit: 'mm/s', threshold: 7.1, status: 'normal' },
-        { name: '轴承温度', value: 42.5, unit: '°C', threshold: 65, status: 'normal' },
-        { name: '出口压力', value: 0.35, unit: 'MPa', range: '0.25-0.45', status: 'normal' },
-        { name: '电机电流', value: 22.5, unit: 'A', threshold: 30, status: 'normal' }
+        { name: '累计运行时间', value: 505, unit: 'h', threshold: 500, status: 'over',
+          sampleCount: 1, trendHours: '', normalRange: '≤ 500h',
+          historyDesc: '已达 505h，超出维保周期 5h', statusDesc: '超期 — 需安排定期保养',
+          trendData: Array.from({ length: 5 }, (_, i) => ({ time: `Day ${i+1}`, value: 485 + i * 5 }))
+        },
+        { name: '振动值', value: 3.2, unit: 'mm/s', threshold: 7.1, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 7.1mm/s',
+          historyDesc: '当前 3.2mm/s，运行平稳', statusDesc: '正常 — 振动值在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 3.0 + Math.sin(i/3) * 0.3
+          }))
+        },
+        { name: '轴承温度', value: 42.5, unit: '°C', threshold: 65, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 65°C',
+          historyDesc: '当前 42.5°C，运行正常', statusDesc: '正常 — 轴承温度正常',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 40 + i * 0.12 + Math.sin(i/4) * 1
+          }))
+        },
+        { name: '出口压力', value: 0.35, unit: 'MPa', range: '0.25-0.45', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '0.25~0.45 MPa',
+          historyDesc: '当前 0.35MPa，在正常范围内', statusDesc: '正常 — 出口压力正常',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.35 + Math.sin(i/3) * 0.02
+          }))
+        },
+        { name: '电机电流', value: 22.5, unit: 'A', threshold: 30, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 30A',
+          historyDesc: '当前 22.5A，运行正常', statusDesc: '正常 — 电流在额定范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 22 + i * 0.03 + Math.sin(i/5) * 0.5
+          }))
+        }
       ],
-      trendData: [],
       snapshotTime: '2026-07-03T08:00:00'
     },
     aiAnalysis: {
@@ -161,17 +360,73 @@ export const mockEvents = [
     source: 'sensor_alarm',
     snapshot: {
       sensors: [
-        { name: '排气压力', value: 0.82, unit: 'MPa', range: '0.75-0.85', status: 'warning' },
-        { name: '排气温度', value: 65.0, unit: '°C', threshold: 70, status: 'normal' },
-        { name: '冷却水温', value: 38.2, unit: '°C', threshold: 45, status: 'normal' },
-        { name: '润滑油压', value: 0.32, unit: 'MPa', threshold: 0.25, status: 'normal' },
-        { name: '润滑油温', value: 58.5, unit: '°C', threshold: 65, status: 'normal' },
-        { name: '振动', value: 4.5, unit: 'mm/s', threshold: 7.1, status: 'normal' }
+        {
+          name: '排气压力', tag: '核心监控',
+          value: 0.82, unit: 'MPa', range: '0.75-0.85', status: 'warning',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '0.75~0.85 MPa',
+          historyDesc: '当前 0.82MPa，在范围内但波动频繁，标准差 0.04MPa',
+          statusDesc: '波动异常 — 可能存在阀门工作不稳定',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.78 + Math.sin(i / 1.5) * 0.04
+          }))
+        },
+        {
+          name: '排气温度', tag: null,
+          value: 65.0, unit: '°C', threshold: 70, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 70°C',
+          historyDesc: '当前 65.0°C，运行正常',
+          statusDesc: '正常 — 排气温度在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 60 + i * 0.25 + Math.sin(i/3) * 2
+          }))
+        },
+        {
+          name: '冷却水温', tag: null,
+          value: 38.2, unit: '°C', threshold: 45, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 45°C',
+          historyDesc: '当前 38.2°C，冷却系统正常',
+          statusDesc: '正常 — 冷却水温正常',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 36 + Math.sin(i/4) * 1.5
+          }))
+        },
+        {
+          name: '润滑油压', tag: null,
+          value: 0.32, unit: 'MPa', threshold: 0.25, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≥ 0.25 MPa',
+          historyDesc: '当前 0.32MPa，润滑系统正常',
+          statusDesc: '正常 — 油压在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.30 + Math.sin(i/5) * 0.02
+          }))
+        },
+        {
+          name: '润滑油温', tag: null,
+          value: 58.5, unit: '°C', threshold: 65, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 65°C',
+          historyDesc: '当前 58.5°C，油温正常',
+          statusDesc: '正常 — 油温在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 55 + i * 0.18 + Math.sin(i/4) * 1.5
+          }))
+        },
+        {
+          name: '振动', tag: null,
+          value: 4.5, unit: 'mm/s', threshold: 7.1, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 7.1mm/s',
+          historyDesc: '当前 4.5mm/s，运行平稳',
+          statusDesc: '正常 — 振动值在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 4.0 + Math.sin(i/3) * 0.5
+          }))
+        }
       ],
-      trendData: Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        value: 0.78 + Math.sin(i / 2) * 0.04
-      })),
       snapshotTime: '2026-07-02T22:40:00'
     },
     aiAnalysis: {
@@ -202,12 +457,39 @@ export const mockEvents = [
     source: 'maintenance_schedule',
     snapshot: {
       sensors: [
-        { name: '水位', value: 72.0, unit: '%', range: '40-85', status: 'normal' },
-        { name: '蒸汽压力', value: 0.7, unit: 'MPa', range: '0.5-0.8', status: 'normal' },
-        { name: '给水温度', value: 85.0, unit: '°C', threshold: 90, status: 'normal' },
-        { name: '炉膛温度', value: 680, unit: '°C', threshold: 750, status: 'normal' }
+        { name: '水位', value: 72.0, unit: '%', range: '40-85', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '40~85%',
+          historyDesc: '当前 72%，运行平稳', statusDesc: '正常 — 水位在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 72 + Math.sin(i/4) * 2
+          }))
+        },
+        { name: '蒸汽压力', value: 0.7, unit: 'MPa', range: '0.5-0.8', status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '0.5~0.8 MPa',
+          historyDesc: '当前 0.7MPa，运行正常', statusDesc: '正常 — 蒸汽压力正常',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 0.68 + Math.sin(i/5) * 0.03
+          }))
+        },
+        { name: '给水温度', value: 85.0, unit: '°C', threshold: 90, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 90°C',
+          historyDesc: '当前 85.0°C，接近上限', statusDesc: '正常 — 接近阈值但在安全范围内',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 82 + i * 0.15 + Math.sin(i/3) * 1
+          }))
+        },
+        { name: '炉膛温度', value: 680, unit: '°C', threshold: 750, status: 'normal',
+          sampleCount: 20, trendHours: '约20h趋势', normalRange: '≤ 750°C',
+          historyDesc: '当前 680°C，运行正常', statusDesc: '正常 — 炉膛温度正常',
+          trendData: Array.from({ length: 20 }, (_, i) => ({
+            time: i <= 14 ? `06-${20 + Math.floor(i/4)} ${String((i%4)*6).padStart(2,'0')}:00` : `06-26 ${String(2 + (i-14)*4).padStart(2,'0')}:00`,
+            value: 660 + Math.sin(i/3) * 15 + i * 1
+          }))
+        }
       ],
-      trendData: [],
       snapshotTime: '2026-07-02T16:00:00'
     },
     aiAnalysis: {

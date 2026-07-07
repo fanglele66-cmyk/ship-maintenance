@@ -1,5 +1,12 @@
 <template>
-  <aside class="assistant-panel">
+  <aside class="assistant-panel" :style="panelStyle">
+    <!-- 拖拽调宽手柄 -->
+    <div
+      class="resize-handle"
+      @mousedown="startResize"
+      @dblclick="resetWidth"
+      title="拖拽调整宽度 · 双击重置"
+    ></div>
     <!-- Header -->
     <div class="assistant-header">
       <span class="mode-tag" :class="modeClass">{{ modeLabel }}</span>
@@ -182,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onUnmounted, reactive, inject } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, reactive, inject } from 'vue'
 import { useEventStore } from '@/stores/eventStore'
 import { useDeviceStore } from '@/stores/deviceStore'
 import { useSensorStore } from '@/stores/sensorStore'
@@ -199,6 +206,69 @@ const isRecording = ref(false)
 const isTyping = ref(false)
 const priorityLabels = eventPriorityLabels
 const statusLabels = eventStatusLabels
+
+// ============ 拖拽调宽（百分比，30%-50%，默认40%）============
+const RESIZE_STORAGE_KEY = 'assistant-panel-width-pct'
+const MIN_RATIO = 0.30
+const MAX_RATIO = 0.50
+const DEFAULT_RATIO = 0.40
+const customPct = ref(null)
+const windowWidth = ref(window.innerWidth)
+
+function onWindowResize() { windowWidth.value = window.innerWidth }
+
+function loadSavedWidth() {
+  const saved = localStorage.getItem(RESIZE_STORAGE_KEY)
+  if (saved) {
+    const pct = parseFloat(saved)
+    if (pct >= MIN_RATIO && pct <= MAX_RATIO) customPct.value = pct
+  }
+}
+
+const panelStyle = computed(() => {
+  if (windowWidth.value <= 900) return {}
+  // 没有自定义宽度时，让 flex 控制面板尺寸（填满剩余空间）
+  if (!customPct.value) return {}
+  const pct = customPct.value
+  return { flex: `0 0 ${(pct * 100).toFixed(1)}vw`, minWidth: `${(pct * 100).toFixed(1)}vw`, maxWidth: `${(pct * 100).toFixed(1)}vw` }
+})
+
+function startResize(e) {
+  e.preventDefault()
+  e.stopPropagation()
+  const startX = e.clientX
+  const vw = window.innerWidth
+  // 从 DOM 读取实际渲染宽度（flex 填充时比 DEFAULT_RATIO 大得多）
+  const panel = e.target.closest('.assistant-panel')
+  const startW = panel ? panel.getBoundingClientRect().width : vw * DEFAULT_RATIO
+
+  const onMouseMove = (ev) => {
+    const delta = startX - ev.clientX
+    const newPct = (startW + delta) / vw
+    customPct.value = Math.min(Math.max(newPct, MIN_RATIO), MAX_RATIO)
+  }
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    if (customPct.value !== null) localStorage.setItem(RESIZE_STORAGE_KEY, customPct.value.toString())
+  }
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+function resetWidth() {
+  customPct.value = null
+  localStorage.removeItem(RESIZE_STORAGE_KEY)
+}
+
+onMounted(() => {
+  loadSavedWidth()
+  window.addEventListener('resize', onWindowResize)
+})
 
 // ============ 共享状态（从 EventCenterView 注入，兄弟组件共用）============
 const eventUnread = inject('eventUnread', reactive({}))
@@ -291,7 +361,6 @@ function getChipsByContext() {
     const hasUserMsg = messages.value.some(m => m.role === 'user')
     if (stage === 'S1' && !hasUserMsg) {
       return [
-        { text: '查看当时的传感器数据', action: 'view_snapshot', highlight: true },
         { text: '立即开始排查，生成方案', action: 'start_check', highlight: true },
         { text: '标记为误报', action: 'send' }
       ]
@@ -304,7 +373,7 @@ function getChipsByContext() {
       const idx = currentCheckIdx[eid] || 1
       const item = checkItems[eid]?.[idx]
       if (!item || item.state === 'pending') {
-        return [{ text: '开始逐一排查', action: 'start_check_item', highlight: true }, { text: '查看传感器数据', action: 'view_snapshot' }]
+        return [{ text: '开始逐一排查', action: 'start_check_item', highlight: true }]
       }
       if (item.state === 'checking') {
         return [{ text: '发现异常了', action: 'check_fault' }, { text: '这项没问题', action: 'check_ok' }]
@@ -568,6 +637,7 @@ watch(() => props.mode, (newMode) => {
 watch(() => messages.value.length, () => refreshChips())
 watch(() => eventStore.selectedEventId, (id) => { if (!id) { Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k])); followupTimers = {} } })
 onUnmounted(() => {
+  window.removeEventListener('resize', onWindowResize)
   Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k]))
   if (proactiveTimer) clearTimeout(proactiveTimer)
 })
@@ -631,18 +701,11 @@ function handleRecommendedClick(q) {
   if (q.action === 'repair_fixed') { handleRepairResult('fixed'); return }
   if (q.action === 'repair_not_fixed') { handleRepairResult('not_fixed'); return }
   if (q.action === 'continue_next') { continueNextCheck(); return }
-  if (q.action === 'view_snapshot') { handleViewSnapshot(); return }
   if (q.action === 'goto_event' && q.eventId) { eventStore.selectEvent(q.eventId); return }
   inputText.value = q.text; sendMessage()
 }
 
-function handleViewSnapshot() {
-  if (!props.eventContext) return
-  const eid = props.eventContext.id
-  eventStore.addMessage(eid, { role: 'user', content: '查看当时的传感器数据', ts: Date.now() })
-  scrollToBottom()
-  setTimeout(() => pushSnapshotCard(eid, props.eventContext), 400)
-}
+
 
 // ============ 迭代排查：用户点击"开始排查" → 推第一项 ============
 function startIterativeCheck() {
@@ -886,9 +949,9 @@ function generateEventResponse(t, ev) {
   if (/快照|传感器|数据|当时/.test(t)) {
     if (overSensors.length > 0) {
       const s = overSensors[0]
-      return `关键异常数据：<b style="color:var(--danger)">${s.name}</b> = <b>${s.value}${s.unit}</b>（阈值 ${s.threshold}${s.unit}），超限 <b>${(((s.value - s.threshold) / s.threshold) * 100).toFixed(1)}%</b>。点击「查看当时的传感器数据」按钮查看完整快照。`
+      return `关键异常数据：<b style="color:var(--danger)">${s.name}</b> = <b>${s.value}${s.unit}</b>（阈值 ${s.threshold}${s.unit}），超限 <b>${(((s.value - s.threshold) / s.threshold) * 100).toFixed(1)}%</b>。完整快照数据见左侧产物区。`
     }
-    return '快照数据已冻结在事发时。可点击「查看当时的传感器数据」按钮查看完整 6 项指标。'
+    return '快照数据已冻结在事发时。完整快照数据见左侧产物区。'
   }
 
   // 排查/步骤
@@ -1013,9 +1076,22 @@ function generateSituationResponse(t) {
 <style scoped>
 /* === Panel === */
 .assistant-panel {
-  width: var(--assistant-width); min-width: var(--assistant-width); height: 100%;
+  flex: 1;
+  min-width: 400px;
+  height: 100%;
   background: var(--bg-panel); display: flex; flex-direction: column;
-  border-left: 1px solid var(--border-primary); flex-shrink: 0;
+  border-left: 1px solid var(--border-primary);
+  position: relative;
+}
+
+/* === Resize Handle === */
+.resize-handle {
+  position: absolute; left: -3px; top: 0; bottom: 0;
+  width: 6px; cursor: col-resize; z-index: 50;
+  border-radius: 3px; transition: background 0.2s;
+}
+.resize-handle:hover, .resize-handle:active {
+  background: var(--accent); opacity: 0.5;
 }
 
 /* === Header === */
@@ -1024,13 +1100,13 @@ function generateSituationResponse(t) {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
   background: linear-gradient(180deg, var(--bg-surface), #FBFCFD);
 }
-.mode-tag { font-size: 10px; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 500; }
+.mode-tag { font-size: var(--font-xs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 500; }
 .gen-mode,.event-mode { background: var(--accent-bg); color: var(--accent); }
 .aux-mode { background: rgba(0,188,212,0.10); color: #0096A0; }
 .assistant-title { font-size: var(--font-md); font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
 .sparkle-icon { width: 14px; height: 14px; color: var(--accent); animation: sparkle-rotate 3s linear infinite; }
 @keyframes sparkle-rotate { 0%{transform:rotate(0deg) scale(1)} 50%{transform:rotate(180deg) scale(1.15)} 100%{transform:rotate(360deg) scale(1)} }
-.stage-pill { margin-left: auto; font-size: 10px; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--success-bg); color: var(--success); font-weight: 500; }
+.stage-pill { margin-left: auto; font-size: var(--font-xs); padding: 2px 8px; border-radius: var(--radius-sm); background: var(--success-bg); color: var(--success); font-weight: 500; }
 
 /* === 事件上下文条 === */
 .event-context-bar {
@@ -1041,14 +1117,14 @@ function generateSituationResponse(t) {
 .ecb-clip { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
 .ecb-name { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .ecb-meta { margin-top: 6px; }
-.ecb-tag { font-size: 10px; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 500; }
+.ecb-tag { font-size: var(--font-xs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 500; }
 .ecb-tag.critical { background: var(--danger-bg); color: var(--danger); }
 .ecb-tag.important { background: var(--warning-bg); color: var(--warning); }
 .ecb-tag.normal { background: var(--accent-bg); color: var(--accent); }
 .ecb-tag.pending { background: var(--warning-bg); color: var(--warning); }
 .ecb-tag.processing { background: var(--accent-bg); color: var(--accent); }
 .ecb-tag.resolved { background: var(--success-bg); color: var(--success); }
-.ecb-id { margin-left: auto; font-size: 10px; color: var(--text-muted); font-family: Consolas, monospace; }
+.ecb-id { margin-left: auto; font-size: var(--font-xs); color: var(--text-muted); font-family: Consolas, monospace; }
 
 /* === Messages === */
 .messages-area { flex: 1; overflow-y: auto; padding: 10px 0; display: flex; flex-direction: column; }
@@ -1070,7 +1146,7 @@ function generateSituationResponse(t) {
 .welcome-msg { margin-top: 4px; background: linear-gradient(135deg, #F8FBFF, #F0F5FF); }
 .summary-msg { background: var(--bg-surface); border-radius: var(--radius-lg); padding: 14px; }
 .summary-block { display: flex; flex-direction: column; gap: 8px; }
-.summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.summary-row { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-sm); }
 .summary-label { color: var(--text-muted); }
 .summary-value { font-weight: 600; }
 
@@ -1086,15 +1162,15 @@ function generateSituationResponse(t) {
 /* === 6 种富媒体卡片 === */
 /* ======================== */
 .msg-card { background: var(--bg-surface); border: 1px solid var(--border-primary); border-left: 3px solid var(--accent); border-radius: var(--radius-md); padding: 0; overflow: hidden; box-shadow: var(--shadow-sm); width: 100%; }
-.card-badge { font-size: 11px; font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--border-secondary); color: var(--accent); background: var(--accent-bg); }
+.card-badge { font-size: var(--font-sm); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--border-secondary); color: var(--accent); background: var(--accent-bg); }
 .card-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 
 /* 1. 诊断卡 */
 .diag-conclusion { }
-.diag-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
-.diag-text { font-size: 12px; line-height: 1.7; color: var(--text-primary); }
+.diag-label { font-size: var(--font-xs); color: var(--text-muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+.diag-text { font-size: var(--font-sm); line-height: 1.7; color: var(--text-primary); }
 .diag-faults { margin-top: 2px; }
-.diag-fault-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--border-secondary); font-size: 11px; }
+.diag-fault-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--border-secondary); font-size: var(--font-sm); }
 .diag-fault-row:last-child { border-bottom: none; }
 .df-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .df-dot.high { background: var(--danger); }
@@ -1103,39 +1179,39 @@ function generateSituationResponse(t) {
 .df-name { flex: 1; color: var(--text-primary); font-weight: 500; }
 .df-bar { width: 48px; height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
 .df-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
-.df-pct { font-family: Consolas, monospace; font-size: 10px; color: var(--text-muted); width: 28px; text-align: right; }
-.diag-suggestion { font-size: 11px; line-height: 1.6; color: var(--text-secondary); padding-top: 4px; border-top: 1px solid var(--border-secondary); }
-.diag-meta { font-size: 10px; color: var(--text-muted); text-align: center; }
+.df-pct { font-family: Consolas, monospace; font-size: var(--font-xs); color: var(--text-muted); width: 28px; text-align: right; }
+.diag-suggestion { font-size: var(--font-sm); line-height: 1.6; color: var(--text-secondary); padding-top: 4px; border-top: 1px solid var(--border-secondary); }
+.diag-meta { font-size: var(--font-xs); color: var(--text-muted); text-align: center; }
 
 /* 2. 快照卡 */
 .snapshot-card { border-left-color: #722ED1; }
 .snapshot-card .card-badge { color: #722ED1; background: rgba(114,46,209,0.06); }
-.snap-time { font-size: 10px; color: var(--text-muted); text-align: center; margin-bottom: 2px; }
+.snap-time { font-size: var(--font-xs); color: var(--text-muted); text-align: center; margin-bottom: 2px; }
 .snap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .snap-item { background: var(--bg-hover); border-radius: 6px; padding: 8px 10px; border: 1px solid var(--border-secondary); }
 .snap-item.snap-over { border-left: 2px solid var(--danger); }
 .snap-item.snap-warning { border-left: 2px solid var(--warning); }
-.snap-name { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
-.snap-val { font-size: 16px; font-weight: 700; font-family: Consolas, monospace; color: var(--text-primary); }
-.snap-unit { font-size: 10px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
-.snap-ref { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
-.snap-status { font-size: 9px; font-weight: 600; margin-top: 2px; color: var(--text-muted); }
+.snap-name { font-size: var(--font-xs); color: var(--text-muted); margin-bottom: 3px; }
+.snap-val { font-size: var(--font-lg); font-weight: 700; font-family: Consolas, monospace; color: var(--text-primary); }
+.snap-unit { font-size: var(--font-xs); font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+.snap-ref { font-size: var(--font-xs); color: var(--text-muted); margin-top: 1px; }
+.snap-status { font-size: var(--font-xs); font-weight: 600; margin-top: 2px; color: var(--text-muted); }
 .snap-item.snap-over .snap-status { color: var(--danger); }
 
 /* 3. 操作引导卡 */
 .guide-card { border-left-color: #FA8C16; }
 .guide-card .card-badge { color: #FA8C16; background: rgba(250,140,22,0.06); }
-.guide-intro { font-size: 11px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 4px; }
+.guide-intro { font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; margin-bottom: 4px; }
 .guide-steps { display: flex; flex-direction: column; gap: 0; }
 .guide-step { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-secondary); cursor: pointer; transition: background 0.15s; }
 .guide-step:hover { background: rgba(22,119,255,0.03); }
 .guide-step:last-child { border-bottom: none; }
-.gs-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.gs-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: var(--font-xs); font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
 .gs-body { flex: 1; }
-.gs-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
-.gs-toggle { font-size: 8px; color: var(--text-muted); flex-shrink: 0; }
-.gs-detail { font-size: 10px; color: var(--text-muted); line-height: 1.5; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-secondary); }
-.guide-hint { margin-top: 8px; font-size: 10px; color: var(--text-muted); text-align: center; font-style: italic; }
+.gs-title { font-size: var(--font-sm); font-weight: 600; color: var(--text-primary); margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+.gs-toggle { font-size: var(--font-xs); color: var(--text-muted); flex-shrink: 0; }
+.gs-detail { font-size: var(--font-xs); color: var(--text-muted); line-height: 1.5; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-secondary); }
+.guide-hint { margin-top: 8px; font-size: var(--font-xs); color: var(--text-muted); text-align: center; font-style: italic; }
 
 /* 4. 警告卡 */
 .warning-card { border-left-color: var(--danger); background: var(--danger-bg); display: flex; gap: 10px; padding: 12px; border: 1px solid rgba(245,63,63,0.15); }
@@ -1143,28 +1219,28 @@ function generateSituationResponse(t) {
 .warning-card.warn-danger { border-left-color: var(--danger); background: var(--danger-bg); }
 .warn-icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }
 .warn-body { flex: 1; }
-.warn-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
-.warn-list { margin: 0; padding-left: 18px; font-size: 11px; line-height: 1.7; color: var(--text-secondary); }
+.warn-title { font-size: var(--font-sm); font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.warn-list { margin: 0; padding-left: 18px; font-size: var(--font-sm); line-height: 1.7; color: var(--text-secondary); }
 .warn-list li::marker { color: var(--danger); font-weight: 600; }
 
 /* 5. 状态报告卡 */
 .report-card { border-left-color: var(--success); }
 .report-banner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: linear-gradient(135deg, var(--success), #36D15A); color: #fff; }
-.rb-icon { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
-.rb-text { font-size: 14px; font-weight: 600; }
+.rb-icon { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: var(--font-md); font-weight: 700; }
+.rb-text { font-size: var(--font-md); font-weight: 600; }
 .report-body { padding: 12px; }
 .rb-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 .rb-metric { background: var(--bg-hover); border-radius: 6px; padding: 8px 10px; }
-.rbm-label { font-size: 10px; color: var(--text-muted); }
-.rbm-value { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.rbm-label { font-size: var(--font-xs); color: var(--text-muted); }
+.rbm-value { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); margin-top: 2px; }
 .rbm-hl { color: var(--success) !important; }
-.rb-conclusion { font-size: 11px; line-height: 1.6; color: var(--text-secondary); border-top: 1px solid var(--border-secondary); padding-top: 8px; }
+.rb-conclusion { font-size: var(--font-sm); line-height: 1.6; color: var(--text-secondary); border-top: 1px solid var(--border-secondary); padding-top: 8px; }
 
 /* === 快捷回复 === */
 .recommended-section { margin: 8px 8px 12px; }
-.rec-label { font-size: 10px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.rec-label { font-size: var(--font-xs); color: var(--text-muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
 .rec-chips { display: flex; gap: 5px; flex-wrap: wrap; }
-.rec-chip { font-size: 11px; padding: 5px 10px; border-radius: var(--radius-lg); border: 1px solid var(--border-primary); background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; white-space: nowrap; min-height: 32px; }
+.rec-chip { font-size: var(--font-sm); padding: 5px 10px; border-radius: var(--radius-lg); border: 1px solid var(--border-primary); background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; white-space: nowrap; min-height: 32px; }
 .rec-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(22,119,255,0.07); }
 .rec-chip-cta { background: linear-gradient(135deg, var(--accent), #4096FF) !important; color: #fff !important; border: none !important; font-weight: 600; box-shadow: 0 2px 8px rgba(22,119,255,0.25); }
 .rec-chip-cta:hover { background: linear-gradient(135deg, #4096FF, var(--accent)) !important; color: #fff !important; box-shadow: 0 4px 14px rgba(22,119,255,0.4); transform: translateY(-2px); }
@@ -1172,13 +1248,13 @@ function generateSituationResponse(t) {
 /* ============ 通用模式主动追问卡 ============ */
 .proactive-card { padding: 12px; min-width: 220px; }
 .pac-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.pac-icon { font-size: 16px; }
-.pac-title { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
-.pac-count { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); }
+.pac-icon { font-size: var(--font-lg); }
+.pac-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); flex: 1; }
+.pac-count { font-size: var(--font-xs); font-weight: 600; padding: 2px 7px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); }
 .pac-body { display: flex; flex-direction: column; gap: 6px; }
-.pac-event-title { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
-.pac-event-meta { font-size: 11px; color: var(--text-muted); }
-.pac-question { font-size: 12px; color: var(--accent); margin-top: 4px; font-weight: 500; }
+.pac-event-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+.pac-event-meta { font-size: var(--font-sm); color: var(--text-muted); }
+.pac-question { font-size: var(--font-sm); color: var(--accent); margin-top: 4px; font-weight: 500; }
 
 /* === 输入区 === */
 .input-area { padding: 10px 12px; border-top: 1px solid var(--border-primary); display: flex; gap: 8px; flex-shrink: 0; background: var(--bg-surface); }

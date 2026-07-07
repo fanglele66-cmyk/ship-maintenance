@@ -113,7 +113,7 @@ const filteredSensors = computed(() => {
   border-radius: 6px;
   padding: 7px 12px;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-sm);
   outline: none;
   transition: border-color 0.2s;
 }
@@ -136,7 +136,7 @@ const filteredSensors = computed(() => {
 }
 
 .filter-tag {
-  font-size: 11px;
+  font-size: var(--font-sm);
   padding: 4px 12px;
   border-radius: 4px;
   border: none;
@@ -161,7 +161,7 @@ const filteredSensors = computed(() => {
   align-items: center;
   gap: 10px;
   padding: 4px 16px 6px;
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -208,7 +208,7 @@ const filteredSensors = computed(() => {
 }
 
 .sc-name-en {
-  font-size: 12px;
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -217,13 +217,13 @@ const filteredSensors = computed(() => {
 }
 
 .sc-name-cn {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   margin-top: 1px;
 }
 
 .sc-meta {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   margin-top: 2px;
   white-space: nowrap;
@@ -250,13 +250,13 @@ const filteredSensors = computed(() => {
 .sc-value.normal { color: var(--success); }
 
 .sc-unit {
-  font-size: 11px;
+  font-size: var(--font-sm);
   font-weight: 400;
   margin-left: 2px;
 }
 
 .sc-badge {
-  font-size: 9px;
+  font-size: var(--font-xs);
   padding: 1px 6px;
   border-radius: 3px;
   font-weight: 500;
@@ -270,7 +270,7 @@ const filteredSensors = computed(() => {
   grid-column: 1 / -1;
   padding: 32px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
 }
 </style>

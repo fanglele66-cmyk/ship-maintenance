@@ -109,19 +109,19 @@ function renderChart() {
         trigger: 'axis',
         backgroundColor: '#FFFFFF',
         borderColor: '#E5E6EB',
-        textStyle: { color: '#1D2129', fontSize: 12 }
+        textStyle: { color: '#1D2129', fontSize: 14 }
       },
       xAxis: {
         type: 'category',
         data: data.map(d => d.time),
         axisLine: { lineStyle: { color: '#E5E6EB' } },
-        axisLabel: { color: '#8B919A', fontSize: 10 },
+        axisLabel: { color: '#8B919A', fontSize: 12 },
         splitLine: { show: false }
       },
       yAxis: {
         type: 'value',
         axisLine: { lineStyle: { color: '#E5E6EB' } },
-        axisLabel: { color: '#8B919A', fontSize: 10 },
+        axisLabel: { color: '#8B919A', fontSize: 12 },
         splitLine: { lineStyle: { color: '#F2F3F5', type: 'dashed' } }
       },
       series: [
@@ -150,7 +150,7 @@ function renderChart() {
           label: {
             formatter: `阈值 ${threshold}`,
             color: '#F53F3F',
-            fontSize: 10
+            fontSize: 12
           },
           lineStyle: { color: '#F53F3F', type: 'dashed', width: 1 }
         }]
@@ -190,7 +190,7 @@ onMounted(() => {
 }
 
 .st-sidebar-hint {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   text-align: center;
   padding: 10px;
@@ -228,7 +228,7 @@ onMounted(() => {
 }
 
 .stl-name {
-  font-size: 11px;
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -237,12 +237,12 @@ onMounted(() => {
 }
 
 .stl-cn {
-  font-size: 9px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 
 .stl-meta {
-  font-size: 9px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -250,7 +250,7 @@ onMounted(() => {
 }
 
 .stl-value {
-  font-size: 14px;
+  font-size: var(--font-md);
   font-weight: 600;
   font-family: Consolas, monospace;
   margin-top: 2px;
@@ -260,7 +260,7 @@ onMounted(() => {
 .stl-value.normal { color: var(--success); }
 
 .stl-badge {
-  font-size: 8px;
+  font-size: var(--font-xs);
   padding: 1px 5px;
   border-radius: 3px;
   font-weight: 500;
@@ -293,7 +293,7 @@ onMounted(() => {
 }
 
 .st-time-btn {
-  font-size: 10px;
+  font-size: var(--font-xs);
   padding: 3px 10px;
   border-radius: 4px;
   border: 1px solid var(--border-color);
@@ -337,26 +337,26 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 14px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
 }
 
 .st-ai-toggle {
-  font-size: 10px;
+  font-size: var(--font-xs);
   color: var(--text-muted);
 }
 
 .st-ai-body {
   padding: 0 14px 12px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   line-height: 1.6;
 }
 
 .btn-ghost-sm {
-  font-size: 11px;
+  font-size: var(--font-sm);
   padding: 4px 12px;
   border-radius: var(--radius-sm);
   background: transparent;
