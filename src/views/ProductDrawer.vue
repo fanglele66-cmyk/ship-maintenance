@@ -232,6 +232,22 @@
                   <button class="ci-action-btn ci-action-feedback" @click.stop="openFeedbackModal(idx)">登记反馈</button>
                 </div>
               </div>
+              <!-- 内联维修方案（排查异常后卡片内展开） -->
+              <div v-if="item.repair && item.status === 'done-abnormal' && !item.repaired" class="ci-repair">
+                <div class="ci-repair-title">🔧 维修方案 · {{ item.title }}</div>
+                <div class="ci-repair-row"><b>注意事项：</b>{{ item.repair.safety.join('；') }}</div>
+                <div class="ci-repair-row"><b>维修步骤：</b></div>
+                <ol class="ci-repair-steps">
+                  <li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li>
+                </ol>
+                <div class="ci-repair-row"><b>备件：</b>{{ item.repair.parts.join(' / ') }}</div>
+                <div class="ci-repair-row cb-accept"><b>验收标准：</b>{{ item.repair.acceptance }}</div>
+                <div class="ci-repair-actions">
+                  <button class="ci-rp-btn ci-rp-done" @click.stop="markItemRepaired(idx)">解决了，验收通过</button>
+                  <button class="ci-rp-btn ci-rp-fail" @click.stop="markItemNotFixed(idx)">没解决，继续排查</button>
+                </div>
+              </div>
+              <div v-if="item.repaired" class="ci-repaired-badge">已维修完成</div>
               <div v-if="item.status === 'done-normal' || item.status === 'done-abnormal'" class="ci-summary">
                 <span class="ci-summary-label">留一点反馈的概要</span>
                 <div v-if="item.feedback" class="ci-feedback-summary">
@@ -2068,4 +2084,18 @@ function formatTime(t) {
 .ra-resolved:hover { background: var(--success-bg); }
 .ra-continue { color: var(--warning); border-color: var(--warning); }
 .ra-continue:hover { background: var(--warning-bg); }
+
+/* === 内联维修方案 === */
+.ci-repair { padding: 14px; border-top: 2px solid var(--accent); background: var(--accent-bg); border-left: 4px solid var(--accent); }
+.ci-repair-title { font-size: var(--font-base); font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+.ci-repair-row { font-size: var(--font-sm); color: var(--text-secondary); margin-bottom: 6px; line-height: 1.6; }
+.cb-accept { color: var(--success) !important; font-weight: 600; padding: 6px 8px; background: var(--success-bg); border-radius: 4px; }
+.ci-repair-steps { margin: 0 0 6px; padding-left: 20px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
+.ci-repair-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(22,119,255,0.2); }
+.ci-rp-btn { font-size: var(--font-base); padding: 8px 18px; border-radius: 16px; border: 2px solid; cursor: pointer; font-weight: 600; transition: all 0.2s; background: var(--bg-surface); }
+.ci-rp-done { color: var(--success); border-color: var(--success); }
+.ci-rp-done:hover { background: var(--success-bg); }
+.ci-rp-fail { color: var(--warning); border-color: var(--warning); }
+.ci-rp-fail:hover { background: var(--warning-bg); }
+.ci-repaired-badge { text-align: center; padding: 8px; font-size: var(--font-sm); color: var(--success); font-weight: 600; border-top: 1px solid var(--success); background: var(--success-bg); }
 </style>
