@@ -383,8 +383,6 @@ function getChipsByContext() {
                 { text: '我想直接跳到维修', action: 'send' }]
       }
       return [{ text: '继续按左侧方案排查', action: 'send' }]
-      }
-      return [{ text: '查看排查进度', action: 'send' }]
     }
     if (stage === 'S5') {
       return [{ text: '查看维修报告', action: 'send' }, { text: '继续下一个事件', action: 'send' }]
