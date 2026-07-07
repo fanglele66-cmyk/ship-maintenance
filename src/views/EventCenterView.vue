@@ -96,7 +96,13 @@ function handleChipAction(action) {
 
 <style scoped>
 .event-center { flex: 1; display: flex; height: 100%; overflow: hidden; }
-.event-list-wrapper { transition: all 0.3s ease; overflow: hidden; flex-shrink: 0; }
+.event-list-wrapper {
+  width: var(--event-list-width);
+  min-width: var(--event-list-width);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
 .event-list-wrapper.collapsed { width: 0; min-width: 0; opacity: 0; border-right: none; }
 
 /* 中间产物区：有内容时 flex:1 占空间，无内容时收缩到 0 */

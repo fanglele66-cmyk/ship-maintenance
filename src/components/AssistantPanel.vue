@@ -636,8 +636,6 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
   if (!action || !props.eventContext) return
   const eid = props.eventContext.id
   const ev = props.eventContext
-  const items = product.value?.check?.checkItems || []
-  const item = items[parseInt(action.split('_').pop())]
 
   // 单项异常 → 弹出维修方案卡片
   if (action.startsWith('check_abnormal_')) {
@@ -655,18 +653,10 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
   // 单项维修通过 → 找下一项或闭环
   if (action === 'item_repaired_next') {
     setTimeout(() => {
-      const nextItem = items.find(i => i.status === 'active' && !i.repaired)
-      if (nextItem) {
-        pushMsg(eid, {
-          cardType: null,
-          content: `✅ 维修通过！<br><br>还有其它异常项需要处理：「<b>${nextItem.title}</b>」。已自动激活，请查看左侧继续排查。`
-        })
-      } else {
-        pushMsg(eid, {
-          cardType: null,
-          content: `✅ 所有异常项均已维修完成！<br><br>左侧维修报告已生成，包含处理总结、备件消耗和后续建议。请确认验收结果。`
-        })
-      }
+      pushMsg(eid, {
+        cardType: null,
+        content: `✅ 维修通过！<br><br>左侧已自动进入下一流程。如有其它异常项目需继续排查，或所有项目均处理完毕可进入维修报告闭环。`
+      })
       refreshChips()
     }, 400)
   }
