@@ -702,26 +702,53 @@ function checkAllDone() {
 
 function resolveEvent() {
   if (!props.event) return
-  const eid = props.event.id
-  eventStage[eid] = 'S5'
-  eventAssistantAction[eid] = 'report'
+  eventStage[props.event.id] = 'S5'
+  eventAssistantAction[props.event.id] = 'report'
 }
 
 function continueCheck() {
   if (!props.event) return
   const eid = props.event.id
   eventStage[eid] = 'S2'
-  // 重置所有排查项状态，开启下一轮
   const items = product.value?.check?.checkItems
   if (items) {
     items.forEach(item => {
-      if (item.status === 'done-abnormal') {
+      if (item.status === 'done-abnormal' && !item.repaired) {
         item.status = 'active'
         item.feedback = null
       }
     })
   }
   eventAssistantAction[eid] = 'restart_check'
+}
+
+function markItemRepaired(idx) {
+  if (!props.event) return
+  const items = product.value?.check?.checkItems
+  if (!items || !items[idx]) return
+  items[idx].repaired = true
+  items[idx].status = 'done-normal'
+  const eid = props.event.id
+  const remaining = items.filter(i => i !== items[idx] && i.status === 'done-abnormal' && !i.repaired)
+  if (remaining.length > 0) {
+    remaining[0].status = 'active'
+    eventAssistantAction[eid] = 'item_repaired_next'
+  } else {
+    eventStage[eid] = 'S5'
+    eventAssistantAction[eid] = 'report'
+  }
+}
+
+function markItemNotFixed(idx) {
+  if (!props.event) return
+  const items = product.value?.check?.checkItems
+  if (!items || !items[idx]) return
+  items[idx].repaired = false
+  const eid = props.event.id
+  if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
+    items[idx + 1].status = 'active'
+  }
+  eventAssistantAction[eid] = 'item_not_fixed'
 }
 
 // AI 子模块展开状态（主要默认展开，次要默认收起）
