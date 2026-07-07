@@ -5,22 +5,18 @@
       <button class="back-btn" @click="handleBack">← 返回列表</button>
       <div class="stage-progress">
         <div
-          v-for="(s, idx) in stageOrder"
+          v-for="(s, idx) in displayStages"
           :key="s.key"
           class="sp-item"
           :class="{
-            done: idx < currentStageIdx,
-            active: idx === currentStageIdx,
-            pending: idx > currentStageIdx
+            done: idx < currentDisplayIdx,
+            active: idx === currentDisplayIdx,
+            pending: idx > currentDisplayIdx
           }"
         >
-          <span class="sp-dot">{{ idx < currentStageIdx ? '✓' : (idx + 1) }}</span>
+          <span class="sp-dot">{{ idx < currentDisplayIdx ? '✓' : (idx + 1) }}</span>
           <span class="sp-label">{{ s.label }}</span>
-          <span v-if="idx < stageOrder.length - 1" class="sp-line"></span>
-          <span
-            v-if="idx === currentStageIdx && streaming.section === sectionMap[s.key]"
-            class="sp-cursor"
-          ></span>
+          <span v-if="idx < displayStages.length - 1" class="sp-line"></span>
         </div>
       </div>
     </div>
@@ -174,275 +170,148 @@
         </div>
       </section>
 
-      <!-- 🔍 排查方案 -->
-      <section
-        v-if="visibleSections.check"
-        class="prod-card"
-        :class="{
-          'card-current': currentSection === 'check',
-          'card-collapsed': !checkExpanded
-        }"
-      >
-        <header class="prod-head" @click="checkExpanded = !checkExpanded">
-          <span class="prod-icon">🔍</span>
-          <div class="prod-titles">
-            <div class="prod-title">
-              排查方案
-              <span v-if="currentSection === 'check' && streaming.section === 'check'" class="prod-gen">生成中</span>
+      <!-- ============================================= -->
+      <!-- 🔍 排查-维修 顺序配对（T1→R1→T2→R2→T3→R3→T4→R4） -->
+      <!-- ============================================= -->
+      <template v-for="(item, idx) in (product.check?.checkItems || [])" :key="'pair-' + idx">
+        <!-- 排查项卡片 -->
+        <section
+          v-if="isCheckVisible(idx)"
+          class="prod-card"
+          :class="{ 'card-collapsed': !checkCardsExpanded[idx] }"
+        >
+          <header class="prod-head" @click="checkCardsExpanded[idx] = !checkCardsExpanded[idx]">
+            <span class="prod-icon">🔍</span>
+            <div class="prod-titles">
+              <div class="prod-title">排查项 · {{ cleanTitle(item.title) }}</div>
+              <div class="prod-sub">{{ item.target || ('针对' + cleanTitle(item.title) + '的标准排查流程') }}</div>
             </div>
-            <div class="prod-sub">针对 {{ product.check.steps.length }} 个排查项的标准处置流程</div>
-          </div>
-          <span class="prod-toggle">{{ checkExpanded ? '▼' : '▶' }}</span>
-        </header>
-
-        <div v-show="checkExpanded" class="prod-body">
-          <!-- 排查项卡片列表 -->
-          <div class="check-items-section">
-            <div class="check-progress">排查进度 {{ checkProgress.current }}/{{ checkProgress.total }}</div>
-            <div
-              v-for="(item, idx) in visibleCheckItems"
-              :key="idx"
-              class="check-item-card"
-              :class="{
-                'ci-pending': item.status === 'pending',
-                'ci-active': item.status === 'active',
-                'ci-done-normal': item.status === 'done-normal',
-                'ci-done-abnormal': item.status === 'done-abnormal'
-              }"
-            >
-              <div class="ci-header" @click="toggleCheckItem(idx)">
-                <span class="ci-title">排查项：{{ item.title }}</span>
-                <span class="ci-toggle">{{ item.status === 'active' ? '▼' : '▶' }}</span>
+            <span class="prod-status" :class="checkItemStatusClass(item)">{{ checkItemStatusText(item) }}</span>
+            <span class="prod-toggle">{{ checkCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
+          </header>
+          <div v-show="checkCardsExpanded[idx] !== false" class="prod-body">
+            <div class="ci-warning"><span class="ci-warning-label">注意事项：</span><span>{{ item.warning }}</span></div>
+            <div class="ci-steps-label">排查步骤：</div>
+            <div v-for="(step, si) in item.steps" :key="si" class="ci-step">
+              <div class="ci-step-num">{{ si + 1 }}. {{ step.title }}</div>
+              <ul class="ci-step-details">
+                <li v-for="(d, di) in step.details" :key="di">{{ d }}</li>
+              </ul>
+              <div class="ci-step-diagram">[可能有示意图]</div>
+            </div>
+            <div v-if="item.feedback && item.feedback.length" class="ci-feedback-summary">
+              <div class="ci-summary-label">登记反馈摘要</div>
+              <div v-for="(f, fi) in item.feedback" :key="fi" class="ci-feedback-row">
+                <span>{{ f.item }} → </span>
+                <span :class="f.status === 'abnormal' ? 'ci-f-abnormal' : 'ci-f-normal'">{{ f.display }}</span>
               </div>
-              <div v-show="item.status === 'active'" class="ci-body">
-                <div class="ci-warning">
-                  <span class="ci-warning-label">注意事项：</span>
-                  <span>{{ item.warning }}</span>
-                </div>
-                <div class="ci-steps-label">排查步骤：</div>
-                <div v-for="(step, si) in item.steps" :key="si" class="ci-step">
-                  <div class="ci-step-num">{{ si + 1 }}. {{ step.title }}</div>
-                  <ul class="ci-step-details">
-                    <li v-for="(d, di) in step.details" :key="di">{{ d }}</li>
-                  </ul>
-                  <div class="ci-step-diagram">[可能有示意图]</div>
-                </div>
-                <div class="ci-actions">
-                  <button class="ci-action-btn ci-action-ok" @click.stop="markNormal(idx)">该项正常</button>
-                  <button class="ci-action-btn ci-action-feedback" @click.stop="openFeedbackModal(idx)">登记反馈</button>
-                </div>
-              </div>
-              <!-- 内联维修方案 → 已移至独立卡片 -->
-              <div v-if="item.repaired" class="ci-repaired-badge">已维修完成</div>
-              <div v-if="item.status === 'done-normal' || item.status === 'done-abnormal'" class="ci-summary">
-                <span class="ci-summary-label">留一点反馈的概要</span>
-                <div v-if="item.feedback" class="ci-feedback-summary">
-                  <div v-for="(f, fi) in item.feedback" :key="fi" class="ci-feedback-row">
-                    <span>{{ f.item }} → </span>
-                    <span :class="f.status === 'abnormal' ? 'ci-f-abnormal' : 'ci-f-normal'">{{ f.display }}</span>
-                  </div>
-                </div>
-              </div>
+              <div v-if="item.notes" class="ci-notes">备注：{{ item.notes }}</div>
+            </div>
+            <!-- 操作按钮：仅 active 时显示 -->
+            <div v-if="item.status === 'active'" class="ci-actions">
+              <button class="ci-action-btn ci-action-ok" @click.stop="markNormal(idx)">正常</button>
+              <button class="ci-action-btn ci-action-feedback" @click.stop="openFeedbackModal(idx)">登记反馈</button>
             </div>
           </div>
+        </section>
 
-          <!-- 反馈弹窗（截图3） -->
-          <div v-if="feedbackModal.open" class="feedback-modal-overlay" @click.self="closeFeedbackModal">
-            <div class="feedback-modal">
-              <div class="fm-title">排查反馈</div>
-              <div class="fm-section">
-                <div class="fm-section-label">快速标记</div>
-                <div class="fm-items">
-                  <div v-for="(fm, fmi) in feedbackModal.items" :key="fmi" class="fm-row">
-                    <span class="fm-item-name">{{ fm.name }}</span>
-                    <div class="fm-options">
-                      <label v-for="(opt, oi) in fm.options" :key="oi" class="fm-opt">
-                        <input type="radio" :name="'fm-' + fmi" v-model="fm.selected" :value="oi" /> {{ opt }}
-                      </label>
-                    </div>
-                  </div>
+        <!-- 维修项卡片（反馈异常后才展示） -->
+        <section
+          v-if="item.repair && item.status === 'done-abnormal'"
+          class="prod-card repair-card-section"
+        >
+          <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
+            <span class="prod-icon">🔧</span>
+            <div class="prod-titles">
+              <div class="prod-title">维修项 · {{ cleanTitle(item.title) }}</div>
+              <div class="prod-sub">注意事项 / 维修步骤 / 备件清单 / 验收标准</div>
+            </div>
+            <span class="prod-status" :class="repairItemStatusClass(item)">{{ repairItemStatusText(item) }}</span>
+            <span class="prod-toggle">{{ repairCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
+          </header>
+          <div v-show="repairCardsExpanded[idx] !== false" class="prod-body">
+            <div class="block">
+              <div class="block-title">注意事项</div>
+              <ul class="repair-list"><li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li></ul>
+            </div>
+            <div class="block">
+              <div class="block-title">维修步骤</div>
+              <ol class="repair-steps"><li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li></ol>
+            </div>
+            <div class="block">
+              <div class="block-title">备件清单</div>
+              <div class="repair-parts">{{ item.repair.parts.join(' / ') }}</div>
+            </div>
+            <div class="block accept-inline">
+              <div class="block-title">验收标准</div>
+              <div class="repair-accept-text">{{ item.repair.acceptance }}</div>
+            </div>
+            <div v-if="item.repaired === undefined" class="repair-actions">
+              <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">解决了，验收通过</button>
+              <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">没解决，继续排查</button>
+            </div>
+          </div>
+        </section>
+      </template>
+
+      <!-- 反馈弹窗 -->
+      <div v-if="feedbackModal.open" class="feedback-modal-overlay" @click.self="closeFeedbackModal">
+        <div class="feedback-modal">
+          <div class="fm-title">排查反馈</div>
+          <div class="fm-section">
+            <div class="fm-section-label">快速标记</div>
+            <div class="fm-items">
+              <div v-for="(fm, fmi) in feedbackModal.items" :key="fmi" class="fm-row">
+                <span class="fm-item-name">{{ fm.name }}</span>
+                <div class="fm-options">
+                  <label v-for="(opt, oi) in fm.options" :key="oi" class="fm-opt">
+                    <input type="radio" :name="'fm-' + fmi" v-model="fm.selected" :value="oi" /> {{ opt }}
+                  </label>
                 </div>
-              </div>
-              <div class="fm-section">
-                <div class="fm-section-label">备注</div>
-                <textarea v-model="feedbackModal.notes" class="fm-notes" placeholder="其它发现或备注"></textarea>
-              </div>
-              <div class="fm-actions">
-                <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
-                <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
               </div>
             </div>
           </div>
-
-          <!-- 维修方案卡片（异常反馈后独立展开） -->
-          <template
-            v-for="(item, idx) in product.check.checkItems"
-            :key="'rc-' + idx"
-          >
-            <div
-              v-if="item.repair && item.status === 'done-abnormal' && !item.repaired"
-              class="prod-card repair-card-inline"
-            >
-              <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
-                <span class="prod-icon"></span>
-                <div class="prod-titles">
-                  <div class="prod-title">维修方案 · {{ item.title }}</div>
-                  <div class="prod-sub">注意事项 / 维修步骤 / 备件清单 / 验收标准</div>
-                </div>
-                <span class="prod-toggle">{{ repairCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
-              </header>
-              <div v-show="repairCardsExpanded[idx] !== false" class="prod-body">
-                <div class="block">
-                  <div class="block-title">注意事项</div>
-                  <ul class="repair-list"><li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li></ul>
-                </div>
-                <div class="block">
-                  <div class="block-title">维修步骤</div>
-                  <ol class="repair-steps"><li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li></ol>
-                </div>
-                <div class="block">
-                  <div class="block-title">备件清单</div>
-                  <div class="repair-parts">{{ item.repair.parts.join(' / ') }}</div>
-                </div>
-                <div class="block accept-inline">
-                  <div class="block-title">验收标准</div>
-                  <div class="repair-accept-text">{{ item.repair.acceptance }}</div>
-                </div>
-                <div class="repair-actions">
-                  <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">解决了，验收通过</button>
-                  <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">没解决，继续排查</button>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <!-- 流式进行中提示 -->
-          <div v-if="currentSection === 'check' && streaming.section === 'check'" class="stream-tip">
-            <span class="cursor-blink">▍</span> 正在生成排查方案…
+          <div class="fm-section">
+            <div class="fm-section-label">备注</div>
+            <textarea v-model="feedbackModal.notes" class="fm-notes" placeholder="其它发现或备注"></textarea>
+          </div>
+          <div class="fm-actions">
+            <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
+            <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- 🔧 维修方案 -->
+      <!-- 全部排查完成 → 事件小结 -->
+      <template v-if="allChecksDone && !hasActiveRepair">
+        <div class="pair-divider"></div>
+      </template>
+
+      <!-- ✅ 事件记录 -->
       <section
-        v-if="visibleSections.repair"
+        v-if="showReportCard || currentStage === 'S5'"
         class="prod-card"
-        :class="{
-          'card-current': currentSection === 'repair',
-          'card-collapsed': !repairExpanded
-        }"
-      >
-        <header class="prod-head" @click="repairExpanded = !repairExpanded">
-          <span class="prod-icon">🔧</span>
-          <div class="prod-titles">
-            <div class="prod-title">
-              维修方案
-              <span v-if="currentSection === 'repair' && streaming.section === 'repair'" class="prod-gen">生成中</span>
-            </div>
-            <div class="prod-sub">针对排查发现的 {{ product.repair.flows.length }} 项异常的标准处理流程</div>
-          </div>
-          <span class="prod-toggle">{{ repairExpanded ? '▼' : '▶' }}</span>
-        </header>
-
-        <div v-show="repairExpanded" class="prod-body">
-          <!-- ① 前情提要 -->
-          <div class="block recap-block">
-            <div class="block-title">📋 前情提要</div>
-            <div class="recap-text">{{ product.repair.recap }}</div>
-          </div>
-
-          <!-- ② 重要安全警告 -->
-          <div class="block danger-block">
-            <div class="block-title">🚨 重要安全警告</div>
-            <ol class="danger-list">
-              <li v-for="(w, i) in product.repair.safetyWarnings" :key="i">{{ w }}</li>
-            </ol>
-          </div>
-
-          <!-- ③ 标准处理流程 1-N -->
-          <div class="block">
-            <div class="block-title">标准处理流程</div>
-            <div v-for="(flow, i) in product.repair.flows" :key="i" class="flow">
-              <div class="flow-head">
-                <span class="flow-num">{{ i + 1 }}</span>
-                <span class="flow-title">{{ flow.title }}</span>
-                <span class="flow-target">针对：{{ flow.target }}</span>
-              </div>
-              <ol class="flow-steps">
-                <li v-for="(s, j) in flow.steps" :key="j">{{ s }}</li>
-              </ol>
-              <div class="flow-result">预期结果：{{ flow.expectedResult }}</div>
-            </div>
-          </div>
-
-          <!-- ④ 备件清单 -->
-          <div v-if="product.repair.partsList && product.repair.partsList.length" class="block parts-block">
-            <div class="block-title">📦 备件清单</div>
-            <div class="parts-grid">
-              <div v-for="(p, i) in product.repair.partsList" :key="i" class="parts-item">
-                <span class="parts-name">{{ p.name }}</span>
-                <span class="parts-spec">{{ p.spec }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ⑤ 验收标准 -->
-          <div class="block accept-block">
-            <div class="block-title">✅ 验收标准</div>
-            <ul class="accept-list">
-              <li v-for="(a, i) in product.repair.acceptance" :key="i">
-                <span class="accept-name">{{ a.name }}</span>
-                <span class="accept-req">要求：{{ a.req }}</span>
-                <span class="accept-cur" :class="a.curPass ? 'cur-pass' : 'cur-fail'">{{ a.current || '待测' }}</span>
-                <span class="accept-method">方法：{{ a.method }}</span>
-              </li>
-            </ul>
-          </div>
-
-          <!-- 维修完成操作按钮 -->
-          <div class="repair-actions">
-            <button class="ra-btn ra-resolved" @click="resolveEvent">✅ 已解决，关闭事件</button>
-            <button class="ra-btn ra-continue" @click="continueCheck"> 未解决异常，继续排查</button>
-          </div>
-
-          <!-- 流式进行中提示 -->
-          <div v-if="currentSection === 'repair' && streaming.section === 'repair'" class="stream-tip">
-            <span class="cursor-blink">▍</span> 正在生成维修方案…
-          </div>
-        </div>
-      </section>
-
-      <!-- ✅ 维修报告 -->
-      <section
-        v-if="visibleSections.report"
-        class="prod-card"
-        :class="{
-          'card-current': currentSection === 'report',
-          'card-collapsed': !reportExpanded
-        }"
+        :class="{ 'card-collapsed': !reportExpanded }"
       >
         <header class="prod-head" @click="reportExpanded = !reportExpanded">
           <span class="prod-icon">✅</span>
           <div class="prod-titles">
-            <div class="prod-title">
-              维修报告
-              <span v-if="currentSection === 'report' && streaming.section === 'report'" class="prod-gen">生成中</span>
-            </div>
-            <div class="prod-sub">本事件已闭环 · 共耗时 {{ product.report.elapsed }}</div>
+            <div class="prod-title">事件记录</div>
+            <div class="prod-sub">本事件处理过程 · 共耗时 {{ product.report.elapsed }}</div>
           </div>
           <span class="prod-toggle">{{ reportExpanded ? '▼' : '▶' }}</span>
         </header>
 
         <div v-show="reportExpanded" class="prod-body">
           <div class="report-summary">
-            <div class="report-banner">
-              <div class="report-banner-icon">✓</div>
-              <div class="report-banner-text">维修完成 · 验收通过</div>
+            <div class="report-banner" :class="{ 'banner-needs-manual': needsManualClose }">
+              <div class="report-banner-icon">{{ needsManualClose ? '!' : '✓' }}</div>
+              <div class="report-banner-text">{{ needsManualClose ? '全部排查已完成，仍需手动处理' : '维修完成 · 验收通过' }}</div>
             </div>
             <div class="report-stat-grid">
               <div class="rs-item">
                 <div class="rs-label">维修结果</div>
-                <div class="rs-value success">已修复</div>
+                <div class="rs-value" :class="{ success: !needsManualClose, warning: needsManualClose }">{{ needsManualClose ? '未解决' : '已修复' }}</div>
               </div>
               <div class="rs-item">
                 <div class="rs-label">开始时间</div>
@@ -475,7 +344,6 @@
                 <span class="rk-text">{{ product.report.followup }}</span>
               </div>
             </div>
-            <!-- 处理时间线 -->
             <div v-if="event.timeline && event.timeline.length" class="report-timeline">
               <div class="rtl-title">📋 处理时间线</div>
               <div class="timeline-list">
@@ -488,13 +356,40 @@
             </div>
             <div class="report-footer">本报告由系统自动生成 · 维修完成后写入 · 仅供运维归档</div>
           </div>
-
-          <!-- 流式进行中提示 -->
-          <div v-if="currentSection === 'report' && streaming.section === 'report'" class="stream-tip">
-            <span class="cursor-blink">▍</span> 正在生成维修报告…
+          <!-- 按钮区 -->
+          <div v-if="currentStage !== 'S5' || needsManualClose" class="repair-actions">
+            <template v-if="needsManualClose">
+              <button class="ra-btn ra-manual" @click="openManualCloseModal">请手动登记处理反馈</button>
+            </template>
+            <template v-else>
+              <button class="ra-btn ra-resolved" @click="confirmCloseEvent">确认闭环</button>
+            </template>
           </div>
         </div>
       </section>
+
+      <!-- 手动闭环弹窗 -->
+      <div v-if="manualCloseModal.open" class="feedback-modal-overlay" @click.self="closeManualCloseModal">
+        <div class="feedback-modal">
+          <div class="fm-title">手动登记处理反馈</div>
+          <div class="fm-section">
+            <div class="fm-section-label">实际异常情况</div>
+            <textarea v-model="manualCloseModal.actualFault" class="fm-notes" placeholder="请描述最终确认的异常情况、原因分析等"></textarea>
+          </div>
+          <div class="fm-section">
+            <div class="fm-section-label">处理方式</div>
+            <textarea v-model="manualCloseModal.handlingMethod" class="fm-notes" placeholder="请描述采取的处理措施、维修方案、验收结果等"></textarea>
+          </div>
+          <div class="fm-section">
+            <div class="fm-section-label">备注</div>
+            <textarea v-model="manualCloseModal.notes" class="fm-notes" placeholder="其它补充说明"></textarea>
+          </div>
+          <div class="fm-actions">
+            <button class="fm-btn fm-cancel" @click="closeManualCloseModal">取消</button>
+            <button class="fm-btn fm-submit" @click="submitManualClose">提交闭环</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -511,14 +406,21 @@ const props = defineProps({
 
 const emit = defineEmits(['back'])
 
-// ============ 阶段定义（4 段：S1 / S2 / S4 / S5）============
-const stageOrder = [
-  { key: 'S1', label: '事件关联' },
-  { key: 'S2', label: '排查中' },
-  { key: 'S4', label: '维修中' },
-  { key: 'S5', label: '已闭环' }
+// ============ 阶段定义（外显 3 段：AI分析 / 处理中 / 已完成）============
+// 内部仍是 4 个折叠产物：AI分析 → 排查方案 → 维修方案 → 事件小结
+const displayStages = [
+  { key: 'ai', label: 'AI分析' },
+  { key: 'mid', label: '处理中' },
+  { key: 'done', label: '已完成' }
 ]
-// 阶段 → 主产物
+
+const currentDisplayIdx = computed(() => {
+  if (currentStage.value === 'S1') return 0
+  if (currentStage.value === 'S2' || currentStage.value === 'S4') return 1
+  return 2
+})
+
+// 阶段 → 主产物（4 个折叠面板的内部映射）
 const sectionMap = {
   S1: 'ai',
   S2: 'check',
@@ -530,43 +432,108 @@ const eventStage = inject('eventStage', reactive({}))
 const eventAssistantAction = inject('eventAssistantAction', reactive({}))
 
 const currentStage = computed(() => eventStage[props.event?.id] || 'S1')
-const currentStageIdx = computed(() => stageOrder.findIndex(s => s.key === currentStage.value))
 const currentSection = computed(() => sectionMap[currentStage.value])
 
-// 各产物可见性：S1 之后能看到 AI；S2 之后能看到排查；S4 之后能看到维修；S5 之后能看到报告
+// 各产物可见性（AI 分析 + 排查-维修对 + 事件小结）
 const visibleSections = computed(() => ({
-  ai: currentStageIdx.value >= 0,
-  check: currentStageIdx.value >= 1,
-  repair: currentStageIdx.value >= 2,
-  report: currentStageIdx.value >= 3
+  ai: currentDisplayIdx.value >= 0
 }))
 
 // ============ 折叠状态 ============
 const aiExpanded = ref(true)
-const checkExpanded = ref(false)
-const repairExpanded = ref(false)
 const reportExpanded = ref(false)
+const showReportCard = ref(false)
+const needsManualClose = ref(false)
 
 // 维修卡片展开状态
 const repairCardsExpanded = reactive({})
+// 排查卡片展开状态
+const checkCardsExpanded = reactive({})
 
-// 可见排查项（异常项之后的pending项隐藏，等待维修完成后再显示）
-const visibleCheckItems = computed(() => {
+// 标题清理：去掉"排查"后缀
+function cleanTitle(title) {
+  return (title || '').replace(/排查$/, '')
+}
+
+// ============ 排查-维修 顺序配对逻辑 ============
+function isCheckVisible(idx) {
+  if (currentStage.value === 'S1') return false
   const items = product.value?.check?.checkItems || []
-  const result = []
-  let foundAbnormalUnrepaired = false
-  for (const item of items) {
-    if (foundAbnormalUnrepaired) {
-      // 已找到未修复的异常项，后续pending项不显示
-      if (item.status !== 'pending') result.push(item)
-      break
-    }
-    result.push(item)
-    if (item.status === 'done-abnormal' && !item.repaired) {
-      foundAbnormalUnrepaired = true
-    }
-  }
-  return result
+  if (idx === 0) return true
+  const prev = items[idx - 1]
+  if (!prev) return false
+  // 正常 → 下一项可见
+  if (prev.status === 'done-normal') return true
+  // 异常且点了"没解决"(repaired===false) → 下一项可见
+  if (prev.status === 'done-abnormal' && prev.repaired === false) return true
+  return false
+}
+
+function checkItemStatusClass(item) {
+  if (item.status === 'done-normal') return 'done'
+  if (item.status === 'done-abnormal' && item.repaired) return 'done'
+  if (item.status === 'done-abnormal') return 'abnormal'
+  if (item.status === 'active') return 'active'
+  return 'pending'
+}
+
+function checkItemStatusText(item) {
+  if (item.status === 'done-normal') return '✓ 正常'
+  if (item.status === 'done-abnormal' && item.repaired) return '✓ 已修复'
+  if (item.status === 'done-abnormal') return '⚠ 异常'
+  if (item.status === 'active') return '进行中'
+  return ''
+}
+
+function repairItemStatusClass(item) {
+  if (item.repaired === true) return 'done'
+  if (item.repaired === false) return 'abnormal'
+  return ''
+}
+
+function repairItemStatusText(item) {
+  if (item.repaired === true) return '✓ 已解决'
+  if (item.repaired === false) return '⚠ 未解决'
+  return ''
+}
+
+const allChecksDone = computed(() => {
+  const items = product.value?.check?.checkItems || []
+  return items.length > 0 && items.every(i => i.status === 'done-normal' || i.status === 'done-abnormal')
+})
+
+const hasActiveRepair = computed(() => {
+  const items = product.value?.check?.checkItems || []
+  return items.some(i => i.status === 'done-abnormal' && i.repaired === undefined)
+})
+
+// 所有卡片已打光，仍然未解决
+const allRepairsExhausted = computed(() => {
+  if (!allChecksDone.value) return false
+  if (hasActiveRepair.value) return false
+  const items = product.value?.check?.checkItems || []
+  const hasAbnormal = items.some(i => i.status === 'done-abnormal')
+  const allAbnormalResolved = hasAbnormal && items.every(i => i.status !== 'done-abnormal' || i.repaired === true)
+  if (!hasAbnormal || allAbnormalResolved) return false
+  return items.some(i => i.status === 'done-abnormal' && i.repaired === false)
+})
+
+// 全部排查正常（无异常项）
+const allChecksNormal = computed(() => {
+  if (!allChecksDone.value) return false
+  const items = product.value?.check?.checkItems || []
+  return items.length > 0 && items.every(i => i.status === 'done-normal')
+})
+
+// 是否全部排查已走完（S5阶段展示事件小结）
+const shouldShowReport = computed(() => currentStage.value === 'S5')
+
+// 手动闭环弹窗
+const manualCloseModal = reactive({
+  open: false,
+  actualFault: '',
+  handlingMethod: '',
+  notes: ''
 })
 
 // ============ 排查项卡片交互（产物区操作按钮）============
@@ -576,6 +543,26 @@ const feedbackModal = reactive({
   items: [],
   notes: ''
 })
+
+function openManualCloseModal() {
+  manualCloseModal.open = true
+  manualCloseModal.actualFault = ''
+  manualCloseModal.handlingMethod = ''
+  manualCloseModal.notes = ''
+}
+
+function closeManualCloseModal() {
+  manualCloseModal.open = false
+}
+
+function submitManualClose() {
+  if (!props.event) return
+  // 写入 eventStage 作为手动闭环标记
+  eventStage[props.event.id] = 'S5'
+  eventAssistantAction[props.event.id] = 'manual_close'
+  closeManualCloseModal()
+  reportExpanded.value = true
+}
 
 // 反馈项配置（每个排查项的关键检查点）
 const feedbackConfig = {
@@ -604,22 +591,6 @@ const feedbackConfig = {
   ]
 }
 
-const checkProgress = computed(() => {
-  const items = product.value?.check?.checkItems || []
-  const done = items.filter(i => i.status === 'done-normal' || i.status === 'done-abnormal').length
-  return { total: items.length, current: done }
-})
-
-function toggleCheckItem(idx) {
-  const items = product.value?.check?.checkItems
-  if (!items || !items[idx]) return
-  if (items[idx].status === 'pending') {
-    items[idx].status = 'active'
-  } else if (items[idx].status === 'active') {
-    items[idx].status = 'pending'
-  }
-}
-
 function openFeedbackModal(idx) {
   const config = feedbackConfig[idx] || []
   feedbackModal.currentIdx = idx
@@ -638,9 +609,12 @@ function markNormal(idx) {
   if (!items || !items[idx]) return
   items[idx].status = 'done-normal'
   items[idx].feedback = []
-  // 自动激活下一项
+  // 折叠当前排查卡片
+  checkCardsExpanded[idx] = false
+  // 激活下一项
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
+    checkCardsExpanded[idx + 1] = true
   }
   // 全部完成检查
   checkAllDone()
@@ -667,15 +641,22 @@ function submitFeedback() {
 
   closeFeedbackModal()
 
-  // 异常项：展示内联维修卡片，不自动跳下一项
+  // 异常项：折叠当前排查卡片，展开对应维修卡片
   if (hasAbnormal) {
-    eventAssistantAction[props.event.id] = 'check_abnormal_' + idx
+    checkCardsExpanded[idx] = false
+    repairCardsExpanded[idx] = true
+    if (props.event) {
+      eventStage[props.event.id] = 'S4'
+      eventAssistantAction[props.event.id] = 'check_abnormal_' + idx
+    }
     return
   }
 
-  // 正常项：激活下一项
+  // 正常项：折叠当前排查卡片，激活下一项
+  checkCardsExpanded[idx] = false
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
+    checkCardsExpanded[idx + 1] = true
   }
 
   // 全部完成检查
@@ -688,38 +669,12 @@ function checkAllDone() {
   if (!items) return
   const done = items.filter(i => i.status === 'done-normal' || i.status === 'done-abnormal').length
   if (done === items.length) {
-    const abnormal = items.filter(i => i.status === 'done-abnormal').length
-    const eid = props.event.id
-    if (abnormal > 0) {
-      eventStage[eid] = 'S4'
-      eventAssistantAction[eid] = 'repair'
-    } else {
-      eventStage[eid] = 'S5'
-      eventAssistantAction[eid] = 'report'
+    const hasActive = items.some(i => i.status === 'done-abnormal' && i.repaired === undefined)
+    if (hasActive) {
+      eventStage[props.event.id] = 'S4'
     }
+    // 全部正常/全部已解决/全部未解决 → 由 allChecksNormal / allRepairsExhausted watch 处理
   }
-}
-
-function resolveEvent() {
-  if (!props.event) return
-  eventStage[props.event.id] = 'S5'
-  eventAssistantAction[props.event.id] = 'report'
-}
-
-function continueCheck() {
-  if (!props.event) return
-  const eid = props.event.id
-  eventStage[eid] = 'S2'
-  const items = product.value?.check?.checkItems
-  if (items) {
-    items.forEach(item => {
-      if (item.status === 'done-abnormal' && !item.repaired) {
-        item.status = 'active'
-        item.feedback = null
-      }
-    })
-  }
-  eventAssistantAction[eid] = 'restart_check'
 }
 
 function markItemRepaired(idx) {
@@ -727,16 +682,10 @@ function markItemRepaired(idx) {
   const items = product.value?.check?.checkItems
   if (!items || !items[idx]) return
   items[idx].repaired = true
-  items[idx].status = 'done-normal'
-  const eid = props.event.id
-  const remaining = items.filter(i => i !== items[idx] && i.status === 'done-abnormal' && !i.repaired)
-  if (remaining.length > 0) {
-    remaining[0].status = 'active'
-    eventAssistantAction[eid] = 'item_repaired_next'
-  } else {
-    eventStage[eid] = 'S5'
-    eventAssistantAction[eid] = 'report'
-  }
+  repairCardsExpanded[idx] = false
+  // 激活事件记录卡并展开
+  showReportCard.value = true
+  reportExpanded.value = true
 }
 
 function markItemNotFixed(idx) {
@@ -744,11 +693,17 @@ function markItemNotFixed(idx) {
   const items = product.value?.check?.checkItems
   if (!items || !items[idx]) return
   items[idx].repaired = false
-  const eid = props.event.id
+  repairCardsExpanded[idx] = false
+  // 激活下一个排查项
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
+    checkCardsExpanded[idx + 1] = true
   }
-  eventAssistantAction[eid] = 'item_not_fixed'
+}
+
+function confirmCloseEvent() {
+  if (!props.event) return
+  eventStage[props.event.id] = 'S5'
 }
 
 // AI 子模块展开状态（主要默认展开，次要默认收起）
@@ -1044,7 +999,7 @@ function buildProduct(ev) {
           { title: '目视检查管路各接头及软管段', details: ['重点检查高压管路法兰接头有无油渍', '检查软管段有无鼓包/老化/龟裂/渗油', '检查管路支架/卡箍处有无摩擦磨损痕迹', '检查弯头、三通等应力集中部位有无湿润'] },
           { title: '使用荧光检漏剂定位微漏点', details: ['在油液中按规定比例加入紫外荧光示踪剂', '系统循环运行15min使示踪剂充分扩散', '在疑似渗漏区域用UV灯照射观察荧光痕迹', '标记所有发现的微漏点位置并拍照记录'] }
         ],
-        status: 'pending', feedback: null, repaired: false,
+        status: 'pending', feedback: null,
         repair: { safety: ['确认锚机已停机系统已泄压至零', '佩戴防油手套和护目镜'], steps: ['关闭相关阀门系统泄压', '更换法兰密封垫片NBR Shore A 70±5', '力矩紧固50±2Nm分3次对角', '试压确认无渗漏', '恢复运行持续监控24h'], parts: ['法兰密封垫片×2', 'O型密封圈×4', '力矩扳手5-80Nm'], acceptance: '法兰接头无渗漏，压力稳定在16~21MPa' }
       },
       {
@@ -1055,7 +1010,7 @@ function buildProduct(ev) {
           { title: '测量吸口负压值', details: ['在额定流量下读取吸入侧真空表数值', '对比历史正常负压基准判断有无异常阻力', '在不同转速工况下记录负压变化趋势', '若负压超过-0.08MPa需立即清洗滤器'] },
           { title: '检查油箱底部沉积物', details: ['打开放油旋塞取样底部油液', '观察有无金属屑/水分/絮状物', '用磁铁检查铁磁性颗粒含量', '评估是否需要彻底清洗油箱内部'] }
         ],
-        status: 'pending', feedback: null, repaired: false,
+        status: 'pending', feedback: null,
         repair: { safety: ['停机泄压后操作', '佩戴防护手套'], steps: ['清洗吸口滤网', '清除油箱底部沉积物', '更换回油过滤器滤芯', '补油至正常液位60~70%'], parts: ['回油过滤器滤芯×1', '液压油×20L'], acceptance: '滤器压差≤0.03MPa，吸口负压正常，油位≥60%' }
       },
       {
@@ -1065,7 +1020,7 @@ function buildProduct(ev) {
           { title: '传感器校验', details: ['使用标准传感器对核心监控传感器进行参照校验', '记录校验前后读数偏差', '检查传感器供电回路是否稳定（24V±5%）', '排查信号回路有无接地或短路'] },
           { title: '电磁干扰排查', details: ['检查传感器电缆屏蔽层接地是否良好', '排查附近有无大功率设备启动干扰', '使用示波器观察信号是否存在高频噪声', '检查传感器安装支架有无振动松动'] }
         ],
-        status: 'pending', feedback: null, repaired: false,
+        status: 'pending', feedback: null,
         repair: { safety: ['确认供电已断开', '防静电损坏传感器'], steps: ['更换故障传感器', '重新校准零量和量程', '检查屏蔽接地', '通电测试读数一致性'], parts: ['压力传感器×1', '屏蔽电缆×5m'], acceptance: '读数偏差≤2%，无噪声干扰' }
       },
       {
@@ -1076,7 +1031,7 @@ function buildProduct(ev) {
           { title: '执行机构密封检查', details: ['检查液压缸活塞杆处有无外泄漏', '检查液压马达轴封处有无渗油', '观察执行机构动作是否平稳无爬行', '测量执行机构端盖温度判断内部泄漏'] },
           { title: '记录并拍照', details: ['对每个可疑泄漏点拍照标记坐标位置', '在管路图上标注所有泄漏点位置', '按严重程度分级（严重/中等/轻微）', '整理泄漏点清单供维修参考'] }
         ],
-        status: 'pending', feedback: null, repaired: false,
+        status: 'pending', feedback: null,
         repair: { safety: ['确认系统泄压至零', '准备接油及消防设备'], steps: ['更换渗漏部位密封件', '力矩紧固分3次对角', '恢复运行试压检漏', '24h跟踪验证'], parts: ['法兰密封垫片×2', 'O型密封圈×4', '力矩扳手'], acceptance: '无可见渗漏，24h油位变化<2%' }
       }
     ],
@@ -1165,7 +1120,6 @@ function buildProduct(ev) {
 watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
   const [eid, stage] = newVal
   const [oldEid, oldStage] = oldVal || [undefined, undefined]
-  console.log('[ProductDrawer] watch fired', { eid, stage, oldEid, oldStage, propsEvent: props.event?.id })
   if (!eid) return
 
   const isStageChanged = oldStage !== undefined && oldStage !== stage
@@ -1174,10 +1128,7 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
   // 切事件：重置状态
   if (isEventChanged) {
     aiExpanded.value = true
-    checkExpanded.value = false
-    repairExpanded.value = false
     reportExpanded.value = false
-    // 重置 AI 子模块为主次策略
     aiSubs.conclusion = true
     aiSubs.data = true
     aiSubs.mechanism = false
@@ -1185,29 +1136,51 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     selectedSensorIndex.value = 0
     trendLoaded.value = false
     setTimeout(() => { trendLoaded.value = true }, 600)
+    // 重置排查和维修卡片
+    Object.keys(checkCardsExpanded).forEach(k => delete checkCardsExpanded[k])
+    Object.keys(repairCardsExpanded).forEach(k => delete repairCardsExpanded[k])
   }
 
-  // 阶段变化：折叠非当前产物
+  // 阶段变化
   if (isStageChanged) {
-    const cur = sectionMap[stage]
-    if (cur !== 'ai') aiExpanded.value = false
-    if (cur !== 'check') checkExpanded.value = false
-    if (cur !== 'repair') repairExpanded.value = false
-    if (cur !== 'report') reportExpanded.value = false
+    if (stage !== 'S1') aiExpanded.value = false
+    if (stage === 'S5') reportExpanded.value = true
+    pulseInto(sectionMap[stage], 900)
   }
 
-  // 当前阶段产物展开
-  if (isStageChanged || isEventChanged) {
-    const cur = sectionMap[stage]
-    if (cur === 'ai') aiExpanded.value = true
-    if (cur === 'check') checkExpanded.value = true
-    if (cur === 'repair') repairExpanded.value = true
-    if (cur === 'report') reportExpanded.value = true
-
-    // 脉冲
-    if (isStageChanged) pulseInto(cur, 900)
+  // 初始化 S2：激活第一项排查
+  if ((isStageChanged || isEventChanged) && stage === 'S2') {
+    const items = product.value?.check?.checkItems
+    if (items && items.length > 0 && items[0].status === 'pending') {
+      items[0].status = 'active'
+      checkCardsExpanded[0] = true
+    }
   }
 }, { immediate: true })
+
+// 全部正常 → 仍需手动闭环（排查不等于维修完成）
+watch(allChecksNormal, (normal) => {
+  if (normal) {
+    showReportCard.value = true
+    reportExpanded.value = true
+    needsManualClose.value = true
+    if (props.event) {
+      eventStage[props.event.id] = 'S4'
+    }
+  }
+})
+
+// 所有牌打光 → 触发事件记录 + 手动闭环入口
+watch(allRepairsExhausted, (exhausted) => {
+  if (exhausted) {
+    showReportCard.value = true
+    reportExpanded.value = true
+    needsManualClose.value = true
+    if (props.event) {
+      eventStage[props.event.id] = 'S4'
+    }
+  }
+})
 
 // ============ 助手卡片联动：渐进展开子模块 ============
 const cardToSection = {
@@ -1226,8 +1199,8 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
     const items = product.value?.check?.checkItems
     if (items && items.length > 0 && items[0].status === 'pending') {
       items[0].status = 'active'
+      checkCardsExpanded[0] = true
     }
-    checkExpanded.value = true
     pulseInto('check', 700)
     return
   }
@@ -1235,12 +1208,8 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
   const section = cardToSection[action]
   if (!section) return
 
-  // 展开目标 section
   aiExpanded.value = (section === 'ai')
-  checkExpanded.value = (section === 'check')
-  repairExpanded.value = (section === 'repair')
   reportExpanded.value = (section === 'report')
-
   pulseInto(section, 700)
 })
 
@@ -1423,6 +1392,19 @@ function formatTime(t) {
   font-size: var(--font-sm);
   color: var(--text-muted);
 }
+
+.prod-status {
+  font-size: var(--font-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  margin-left: auto;
+  margin-right: 8px;
+}
+.prod-status.done { background: var(--success-bg); color: var(--success); }
+.prod-status.abnormal { background: var(--danger-bg); color: var(--danger); }
+.prod-status.active { background: var(--accent-bg); color: var(--accent); }
+.prod-status.pending { background: var(--bg-panel); color: var(--text-muted); }
 
 .prod-body { padding: 14px; }
 
@@ -1796,6 +1778,12 @@ function formatTime(t) {
   font-weight: 700;
 }
 .report-banner-text { font-size: var(--font-lg); font-weight: 600; }
+.banner-needs-manual {
+  background: linear-gradient(135deg, var(--warning), #ff9c6e);
+}
+.banner-needs-manual .report-banner-icon {
+  background: rgba(255,255,255,0.3);
+}
 
 .report-stat-grid {
   display: grid;
@@ -2160,6 +2148,32 @@ function formatTime(t) {
 .ra-resolved:hover { background: var(--success-bg); }
 .ra-continue { color: var(--warning); border-color: var(--warning); }
 .ra-continue:hover { background: var(--warning-bg); }
+.ra-manual { color: var(--warning); border-color: var(--warning); background: var(--warning-bg); width: 100%; }
+.ra-manual:hover { background: #fff0e6; }
+.ra-resolved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--success);
+  padding: 10px 24px;
+  border-radius: 20px;
+  background: var(--success-bg);
+  border: 2px solid var(--success);
+}
+.ra-notfixed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--warning);
+  padding: 10px 24px;
+  border-radius: 20px;
+  background: var(--warning-bg);
+  border: 2px solid var(--warning);
+}
 
 /* === 内联维修方案 === */
 .ci-repair { padding: 14px; border-top: 2px solid var(--accent); background: var(--accent-bg); border-left: 4px solid var(--accent); }
@@ -2175,8 +2189,9 @@ function formatTime(t) {
 .ci-rp-fail:hover { background: var(--warning-bg); }
 .ci-repaired-badge { text-align: center; padding: 8px; font-size: var(--font-sm); color: var(--success); font-weight: 600; border-top: 1px solid var(--success); background: var(--success-bg); }
 
-/* === 独立维修方案卡片 === */
+/* === 排查项维修卡片（独立于排查方案）=== */
 .repair-card-inline { border-left: 4px solid var(--accent); box-shadow: 0 2px 8px rgba(22,119,255,0.1); }
+.repair-card-section { border-left: 4px solid var(--accent); box-shadow: 0 2px 8px rgba(22,119,255,0.1); }
 .repair-list { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
 .repair-list li { margin-bottom: 2px; }
 .repair-steps { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
