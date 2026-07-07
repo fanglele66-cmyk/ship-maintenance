@@ -226,7 +226,8 @@ function loadSavedWidth() {
 }
 
 const panelStyle = computed(() => {
-  if (windowWidth.value <= 900) return {}
+  // iPad 及以下（≤1024px）：用 flex 自适应填充，不套固定百分比宽度
+  if (windowWidth.value <= 1024) return {}
   // 没有自定义宽度时，让 flex 控制面板尺寸（填满剩余空间）
   if (!customPct.value) return {}
   const pct = customPct.value
@@ -581,15 +582,9 @@ if (situationContext) {
 
     if (action === 'select_device' && ctx.device) {
       const d = ctx.device
-      const sensors = sensorStore.filteredSensors
-      const overSensors = sensors.filter(s => s.status === 'over')
       setTimeout(() => {
-        let msg = `已进入「<b>${d.name}</b>」(${d.system}) 传感器详情。<br><br>📊 共 <b>${sensors.length}</b> 个传感器`
-        if (overSensors.length > 0) {
-          msg += `，<b style="color:var(--danger)">${overSensors.length} 个超限</b>`
-          msg += `<br>⚠️ 重点关注：${overSensors.slice(0, 3).map(s => `<b>${s.nameCn}</b>(${s.value}${s.unit})`).join('、')}`
-        }
-        eventStore.addMessage(sessionKey, { role: 'assistant', ts: Date.now(), content: msg })
+        const content = generateDeviceAnalysisHtml(d)
+        eventStore.addMessage(sessionKey, { role: 'assistant', ts: Date.now(), content })
         refreshChips()
       }, 400)
     }
@@ -1236,13 +1231,86 @@ function generateSituationResponse(t) {
 
   return `已收到：「${text}」。您可以问我：<br>• 哪些设备有异常？<br>• 船舶健康状态如何？<br>• 生成事件快照<br>• 查看详细趋势`
 }
+
+// ============ 设备 AI 分析摘要（点击设备卡片触发）============
+function generateDeviceAnalysisHtml(d) {
+  const ship = deviceStore.ship
+  const shipStatusMap = { sailing: '机动航行', anchoring: '锚泊', docking: '靠港' }
+  const shipStatus = shipStatusMap[ship.status] || '航行'
+  const statusLabel = d.status === 'danger' ? '异常' : d.status === 'warning' ? '预警' : '正常'
+  const statusColor = d.status === 'danger' ? 'var(--danger)' : d.status === 'warning' ? 'var(--warning)' : 'var(--success)'
+
+  // 健康度计算
+  const metrics = d.metrics || []
+  const overCount = metrics.filter(m => m.status === 'over').length
+  const warnCount = metrics.filter(m => m.status === 'warning').length
+  let healthScore = 100 - overCount * 20 - warnCount * 10
+  healthScore = Math.max(0, Math.min(100, healthScore))
+  const healthLabel = healthScore >= 80 ? '整体良好' : healthScore >= 60 ? '存在隐患' : '需立即关注'
+  const scoreColor = healthScore >= 80 ? 'var(--success)' : healthScore >= 60 ? 'var(--warning)' : 'var(--danger)'
+
+  // 关注点
+  const abnormalMetrics = metrics.filter(m => m.status === 'over' || m.status === 'warning')
+  const focusSystem = abnormalMetrics.length > 0 ? d.system : '各系统'
+  const focusDetail = abnormalMetrics.length > 0
+    ? abnormalMetrics.map(m => m.label).join('、')
+    : '无明显异常'
+
+  // 结论
+  let conclusion = ''
+  if (d.status === 'danger') {
+    conclusion = `当前<b style="color:var(--danger)">${d.name}存在异常</b>，${abnormalMetrics.map(m => `${m.label}（${m.value}${m.unit}）超限`).join('，')}。建议立即安排检查，必要时停机维修。`
+  } else if (d.status === 'warning') {
+    conclusion = `当前运行基本正常，但<b style="color:var(--warning)">${focusSystem}效能呈下降趋势</b>（${focusDetail}接近预警阈值），建议近期安排检查。`
+  } else {
+    conclusion = `当前运行正常，各系统关键参数均在安全范围内，${d.name}状态良好。建议按计划执行预防性维护。`
+  }
+
+  // 建议
+  let suggestionsHtml = ''
+  if (d.status === 'danger') {
+    suggestionsHtml = abnormalMetrics.map((m, i) =>
+      `<div style="margin:5px 0">${i + 1}. <b>${m.label}</b>：当前 ${m.value}${m.unit} 已超限，需立即检查并确认是否需要紧急停机处理</div>`
+    ).join('')
+    const base = abnormalMetrics.length
+    suggestionsHtml += `
+      <div style="margin:5px 0">${base + 1}. 对比历史数据，分析异常趋势并记录排查结果</div>
+      <div style="margin:5px 0">${base + 2}. 必要时通知维修人员到场，按照SOP执行排查步骤</div>`
+  } else if (d.status === 'warning') {
+    suggestionsHtml = abnormalMetrics.map((m, i) =>
+      `<div style="margin:5px 0">${i + 1}. <b>${m.label}</b>：当前 ${m.value}${m.unit} 接近预警阈值，持续关注变化趋势</div>`
+    ).join('')
+    const base = abnormalMetrics.length
+    suggestionsHtml += `
+      <div style="margin:5px 0">${base + 1}. 检查设备运行环境是否正常，准备备件以防情况恶化</div>
+      <div style="margin:5px 0">${base + 2}. 记录当前状态以便后续分析，后续靠港可安排详细检查</div>`
+  } else {
+    suggestionsHtml = `
+      <div style="margin:5px 0">1. 定期巡检，保持设备良好状态</div>
+      <div style="margin:5px 0">2. 按计划执行预防性维护</div>
+      <div style="margin:5px 0">3. 记录运行数据用于趋势分析</div>`
+  }
+
+  return `<div style="font-size:var(--font-base);line-height:1.8">
+    <div style="font-weight:700;font-size:var(--font-lg);color:var(--text-primary);margin-bottom:10px">${d.name}AI分析摘要</div>
+    <div style="margin:6px 0"><span style="color:var(--text-muted)">工况：</span><span style="color:var(--accent);font-weight:600">${shipStatus}</span></div>
+    <div style="margin:6px 0"><span style="color:var(--text-muted)">设备状态：</span><span style="color:${statusColor};font-weight:600">${statusLabel}</span></div>
+    <div style="margin:6px 0"><span style="color:var(--text-muted)">设备健康度：</span><span style="color:${scoreColor};font-weight:700;font-size:var(--font-lg)">${healthScore}%</span> · <span style="color:${scoreColor}">${healthLabel}</span></div>
+    <div style="margin:6px 0"><span style="color:var(--text-muted)">建议关注：</span><span style="color:var(--warning);font-weight:600">${focusSystem}</span> <span style="color:var(--text-muted)">（${focusDetail}）</span></div>
+    <div style="margin:10px 0 4px;font-weight:600;color:var(--text-primary)">结论：</div>
+    <div style="margin:4px 0;color:var(--text-secondary)">${conclusion}</div>
+    <div style="margin:10px 0 4px;font-weight:600;color:var(--text-primary)">关注点：<span style="color:var(--warning)">${focusDetail}</span></div>
+    <div style="margin:10px 0 4px;font-weight:600;color:var(--text-primary)">建议：</div>
+    ${suggestionsHtml}
+  </div>`
+}
 </script>
 
 <style scoped>
 /* === Panel === */
 .assistant-panel {
   flex: 1;
-  min-width: 400px;
+  min-width: var(--assistant-min-width);
   height: 100%;
   background: var(--bg-panel); display: flex; flex-direction: column;
   border-left: 1px solid var(--border-primary);

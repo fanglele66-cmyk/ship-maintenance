@@ -128,4 +128,22 @@ function handleChipAction(action) {
   min-width: 500px !important;
   max-width: 500px !important;
 }
+
+/* iPad 横屏：助手区收紧到 420px */
+@media (max-width: 1366px) {
+  .panel-compact {
+    flex: 0 0 420px !important;
+    min-width: 420px !important;
+    max-width: 420px !important;
+  }
+}
+
+/* iPad 竖屏：助手区改为 flex 自适应，不再固定宽度 */
+@media (max-width: 1024px) {
+  .panel-compact {
+    flex: 1 1 320px !important;
+    min-width: 300px !important;
+    max-width: none !important;
+  }
+}
 </style>

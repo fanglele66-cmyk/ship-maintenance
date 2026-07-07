@@ -89,19 +89,21 @@ function handleDeviceClick(device) {
   selectedDeviceId.value = device.id
   selectedDeviceName.value = device.name + ' · ' + device.system
   sensorStore.setSystem(device.system)
+  goToLayer(2)
+  // 注意：必须在 goToLayer 之后设置 action，否则会被 goToLayer 覆盖为 'back'
   situationContext.layer = 2
   situationContext.device = { ...device }
   situationContext.action = 'select_device'
-  goToLayer(2)
 }
 
 function handleSensorClick(sensor) {
   sensorStore.selectSensor(sensor.id)
   selectedSensorName.value = sensor.nameEn + ' · ' + sensor.nameCn
+  goToLayer(3)
+  // 同上，在 goToLayer 之后设置
   situationContext.layer = 3
   situationContext.sensor = { ...sensor }
   situationContext.action = 'select_sensor'
-  goToLayer(3)
 }
 
 function handleGenerateEvent() {

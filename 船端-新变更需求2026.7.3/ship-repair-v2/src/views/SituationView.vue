@@ -63,6 +63,7 @@
 
     <!-- Right: AI Assistant -->
     <AssistantPanel
+      ref="assistantPanelRef"
       mode="auxiliary"
       :event-context="null"
     />
@@ -85,6 +86,7 @@ const currentLayer = ref(1)
 const selectedDeviceId = ref(null)
 const selectedDeviceName = ref('')
 const selectedSensorName = ref('')
+const assistantPanelRef = ref(null)
 
 const layerLabels = ['船舶总览', '设备传感器', '趋势分析']
 
@@ -103,6 +105,15 @@ function handleDeviceClick(device) {
   // Filter sensors by this device's system
   sensorStore.setSystem(device.system)
   goToLayer(2)
+  // 调用助手发送设备分析消息
+  console.log('[handleDeviceClick] device:', device.name)
+  console.log('[handleDeviceClick] assistantPanelRef:', assistantPanelRef.value)
+  if (assistantPanelRef.value) {
+    console.log('[handleDeviceClick] calling sendDeviceAnalysis...')
+    assistantPanelRef.value.sendDeviceAnalysis(device)
+  } else {
+    console.error('[handleDeviceClick] assistantPanelRef is null!')
+  }
 }
 
 function handleSensorClick(sensor) {

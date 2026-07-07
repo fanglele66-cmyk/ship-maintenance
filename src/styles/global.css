@@ -62,6 +62,7 @@
   --nav-width: 64px;
   --header-height: 48px;
   --assistant-width: 40vw; /* 默认40%，可拖拽30%-50% */
+  --assistant-min-width: 400px; /* 桌面端最小宽度，iPad 下通过媒体查询缩小 */
   --event-list-width: clamp(240px, 18vw, 320px);
 
   /* ---- Typography (bumped up for readability) ---- */
@@ -74,11 +75,33 @@
   --font-2xl: 22px;   /* 保持 */
 }
 
-/* ===== Responsive Breakpoints ===== */
+/* ===== Responsive Breakpoints =====
+   iPad Pro 12.9" 横屏 1366 / iPad Air 横屏 1180 / iPad 竖屏 768~834
+   分三档：≤1366 横屏微调 / ≤1024 竖屏收紧 / ≤768 手机堆叠 */
+
+/* iPad 横屏 & 小屏笔记本 (≤1366px) */
+@media (max-width: 1366px) {
+  :root {
+    --event-list-width: clamp(220px, 16vw, 280px);
+  }
+}
+
+/* iPad 竖屏 (≤1024px) */
+@media (max-width: 1024px) {
+  :root {
+    --nav-width: 60px;
+    --header-height: 44px;
+    --event-list-width: clamp(200px, 22vw, 240px);
+    --assistant-min-width: 300px;
+  }
+}
+
+/* 手机 / 小平板 (≤768px) —— 内容堆叠 */
 @media (max-width: 768px) {
   :root {
     --event-list-width: 200px;
     --assistant-width: 100%;
+    --assistant-min-width: 0;
   }
 }
 

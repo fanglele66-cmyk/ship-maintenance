@@ -16,13 +16,13 @@
 
     <!-- Messages -->
     <div class="messages-area" ref="messagesRef">
+      <!-- Summary (HTML) -->
+      <div v-if="messages.length === 0 && summaryHtml" class="msg msg-ai summary-msg" v-html="summaryHtml">
+      </div>
+
       <!-- Welcome / Greeting -->
       <div v-if="messages.length === 0" class="msg msg-ai welcome-msg">
         {{ greetingText }}
-      </div>
-
-      <!-- Summary (HTML) -->
-      <div v-if="messages.length === 0 && summaryHtml" class="msg msg-ai summary-msg" v-html="summaryHtml">
       </div>
 
       <!-- Chat messages -->
@@ -99,6 +99,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useEventStore } from '@/stores/eventStore'
+import { useDeviceStore } from '@/stores/deviceStore'
 
 const props = defineProps({
   mode: {
@@ -114,6 +115,7 @@ const props = defineProps({
 const emit = defineEmits(['chip-click'])
 
 const eventStore = useEventStore()
+const deviceStore = useDeviceStore()
 const messagesRef = ref(null)
 const inputText = ref('')
 const isRecording = ref(false)
@@ -198,40 +200,97 @@ const greetingText = computed(() => {
   if (props.mode === 'event' && props.eventContext) {
     return `已切换到「${props.eventContext.title}」，请问需要什么帮助？`
   }
+  if (props.mode === 'auxiliary') {
+    return '欢迎查看船舶态势面板，有需要可以随时问我。'
+  }
   return `你好，当前共有 ${stats.total} 件事件，其中 ${stats.pending} 件待处理。`
 })
 
-// Summary HTML (general mode)
+// Summary HTML (general / auxiliary mode)
 const summaryHtml = computed(() => {
-  if (props.mode !== 'general') return ''
-  const stats = eventStore.stats
-  return `
-    <div class="summary-block">
-      <div class="summary-row">
-        <span class="summary-label">船舶健康分</span>
-        <span class="summary-value" style="color:#52C41A">82</span>
+  if (props.mode === 'general') {
+    const stats = eventStore.stats
+    return `
+      <div class="summary-block">
+        <div class="summary-row">
+          <span class="summary-label">船舶健康分</span>
+          <span class="summary-value" style="color:#52C41A">82</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">事件统计</span>
+          <span class="summary-value">
+            <span style="color:#FF4D4F">紧急 ${stats.critical}</span>
+            / <span style="color:#FAAD14">重要 ${stats.important}</span>
+            / <span style="color:#1890FF">一般 ${stats.normal}</span>
+          </span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">重点关注</span>
+          <span class="summary-value" style="color:#FAAD14">主机系统水温异常需优先处理</span>
+        </div>
       </div>
-      <div class="summary-row">
-        <span class="summary-label">事件统计</span>
-        <span class="summary-value">
-          <span style="color:#FF4D4F">紧急 ${stats.critical}</span>
-          / <span style="color:#FAAD14">重要 ${stats.important}</span>
-          / <span style="color:#1890FF">一般 ${stats.normal}</span>
-        </span>
+    `
+  }
+  if (props.mode === 'auxiliary') {
+    const ship = deviceStore.ship
+    const danger = deviceStore.dangerDevices.length
+    const warning = deviceStore.warningDevices.length
+    const normal = deviceStore.devices.length - danger - warning
+    const statusText = { sailing: '航行中', anchoring: '锚泊中', docking: '靠港中' }[ship.status] || ship.status
+    const statusColor = { sailing: '#52C41A', anchoring: '#FAAD14', docking: '#1890FF' }[ship.status] || '#8BAAC0'
+    const riskLevel = ship.healthScore >= 80 ? '低' : ship.healthScore >= 60 ? '中' : '高'
+    const riskColor = ship.healthScore >= 80 ? '#52C41A' : ship.healthScore >= 60 ? '#FAAD14' : '#FF4D4F'
+    const scoreColor = ship.healthScore >= 80 ? '#52C41A' : ship.healthScore >= 60 ? '#FAAD14' : '#FF4D4F'
+    return `
+      <div class="summary-block">
+        <div class="summary-row">
+          <span class="summary-label">船名 / 状态</span>
+          <span class="summary-value">${ship.name} · <span style="color:${statusColor}">${statusText}</span></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">位置 / 航向航速</span>
+          <span class="summary-value">${ship.latitude} ${ship.longitude} · ${ship.heading}° · ${ship.speed} kn</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">设备在线</span>
+          <span class="summary-value">${ship.onlineDevices}/${ship.totalDevices} 台</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">运行概览</span>
+          <span class="summary-value">
+            <span style="color:#FF4D4F">${danger} 异常</span>
+            / <span style="color:#FAAD14">${warning} 预警</span>
+            / <span style="color:#52C41A">${normal} 正常</span>
+          </span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">健康分 / 风险等级</span>
+          <span class="summary-value">
+            <span style="color:${scoreColor};font-weight:700">${ship.healthScore}</span>
+            · <span style="color:${riskColor}">${riskLevel}风险</span>
+          </span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">分析结论</span>
+          <span class="summary-value" style="color:#FAAD14">主机水温与舵机油温偏高，建议优先关注主机系统。</span>
+        </div>
       </div>
-      <div class="summary-row">
-        <span class="summary-label">重点关注</span>
-        <span class="summary-value" style="color:#FAAD14">主机系统水温异常需优先处理</span>
-      </div>
-    </div>
-  `
+    `
+  }
+  return ''
 })
 
 // Recommended questions
 const recommendedQuestions = ref([])
 
 function generateRecommendedQuestions() {
-  if (props.mode === 'general') {
+  if (props.mode === 'auxiliary') {
+    recommendedQuestions.value = [
+      { text: '查看主机系统传感器', clicked: false },
+      { text: '哪些设备有异常？', clicked: false },
+      { text: '船舶健康状态如何？', clicked: false }
+    ].map(q => ({ ...q }))
+  } else if (props.mode === 'general') {
     recommendedQuestions.value = [
       { text: '今天有几件紧急事件？', clicked: false },
       { text: '最近哪个系统问题最多？', clicked: false },
@@ -257,11 +316,17 @@ function generateRecommendedQuestions() {
 watch(() => props.mode, generateRecommendedQuestions, { immediate: true })
 watch(() => props.eventContext, generateRecommendedQuestions)
 
+// 本地消息列表（用于 auxiliary 模式直接推送）
+const localMessages = ref([])
+
 // Session messages
 const messages = computed(() => {
   const key = props.mode === 'event' && props.eventContext
     ? props.eventContext.id
     : props.mode === 'general' ? 'general' : 'situation'
+  if (props.mode === 'auxiliary') {
+    return localMessages.value
+  }
   return eventStore.getSessionMessages(key)
 })
 
@@ -334,7 +399,7 @@ function generateAIResponse(text) {
         <div style="font-size:var(--text-sm);line-height:1.7;color:#8BAAC0;margin:6px 0">
           1️⃣ 检查相关设备运行参数<br>
           2️⃣ 对比历史数据判断趋势<br>
-          3️⃣ 按照SOP执行排查步骤<br>
+          3️ 按照SOP执行排查步骤<br>
           4️⃣ 记录排查结果
         </div>
         <div class="action-buttons">
@@ -357,6 +422,107 @@ function generateAIResponse(text) {
     `
   }
   return `已收到您的提问：「${text}」。正在查询相关数据，请稍候...`
+}
+
+// 设备分析消息生成
+function sendDeviceAnalysis(device) {
+  console.log('[sendDeviceAnalysis] called with device:', device.name)
+
+  // 添加用户消息到本地列表
+  localMessages.value.push({
+    role: 'user',
+    content: `查看${device.name}分析`
+  })
+
+  // 模拟AI回复
+  setTimeout(() => {
+    const response = generateDeviceAnalysisContent(device)
+    localMessages.value.push({
+      role: 'assistant',
+      content: response
+    })
+    scrollToBottom()
+  }, 500)
+
+  scrollToBottom()
+  console.log('[sendDeviceAnalysis] messages count:', localMessages.value.length)
+}
+
+// 暴露方法给父组件调用
+defineExpose({ sendDeviceAnalysis })
+
+function generateDeviceAnalysisContent(device) {
+  const ship = deviceStore.ship
+  const shipStatus = { sailing: '机动航行', anchoring: '锚泊', docking: '靠港' }[ship.status] || '航行'
+  const statusLabel = device.status === 'danger' ? '异常' : device.status === 'warning' ? '预警' : '正常'
+  const statusColor = device.status === 'danger' ? '#FF4D4F' : device.status === 'warning' ? '#FAAD14' : '#52C41A'
+
+  // 计算健康度
+  const metrics = device.metrics || []
+  const overCount = metrics.filter(m => m.status === 'over').length
+  const warningCount = metrics.filter(m => m.status === 'warning').length
+  let healthScore = 100 - overCount * 20 - warningCount * 10
+  healthScore = Math.max(0, Math.min(100, healthScore))
+  const healthLabel = healthScore >= 80 ? '整体良好' : healthScore >= 60 ? '存在隐患' : '需立即关注'
+  const scoreColor = healthScore >= 80 ? '#52C41A' : healthScore >= 60 ? '#FAAD14' : '#FF4D4F'
+
+  // 异常/预警指标
+  const abnormalMetrics = metrics.filter(m => m.status === 'over' || m.status === 'warning')
+  const focusSystem = abnormalMetrics.length > 0 ? device.system : '各系统'
+  const focusDetail = abnormalMetrics.length > 0
+    ? abnormalMetrics.map(m => `${m.label}`).join('、')
+    : '无明显异常'
+
+  // 结论
+  let conclusion = ''
+  if (device.status === 'danger') {
+    conclusion = `当前<strong style="color:#FF4D4F">${device.name}存在异常</strong>，${abnormalMetrics.map(m => `${m.label}（${m.value}${m.unit}）超限`).join('，')}。建议立即安排检查，必要时停机维修。`
+  } else if (device.status === 'warning') {
+    conclusion = `当前运行基本正常，但<strong style="color:#FAAD14">${focusSystem}效能呈下降趋势</strong>（${focusDetail}接近预警阈值），建议近期安排检查。`
+  } else {
+    conclusion = `当前运行正常，各系统关键参数均在安全范围内，${device.name}状态良好。建议按计划执行预防性维护。`
+  }
+
+  // 建议
+  let suggestionsHtml = ''
+  if (device.status === 'danger') {
+    const items = abnormalMetrics.map((m, i) => {
+      return `<div style="margin:4px 0">${i + 1}. <strong>${m.label}</strong>：当前 ${m.value}${m.unit} 已超限，需立即检查并确认是否需要紧急停机处理</div>`
+    }).join('')
+    suggestionsHtml = items + `
+      <div style="margin:4px 0">${abnormalMetrics.length + 1}. 对比历史数据，分析异常趋势并记录排查结果</div>
+      <div style="margin:4px 0">${abnormalMetrics.length + 2}. 必要时通知维修人员到场，按照SOP执行排查步骤</div>
+    `
+  } else if (device.status === 'warning') {
+    const items = abnormalMetrics.map((m, i) => {
+      return `<div style="margin:4px 0">${i + 1}. <strong>${m.label}</strong>：当前 ${m.value}${m.unit} 接近预警阈值，持续关注变化趋势</div>`
+    }).join('')
+    suggestionsHtml = items + `
+      <div style="margin:4px 0">${abnormalMetrics.length + 1}. 检查设备运行环境是否正常，准备备件以防情况恶化</div>
+      <div style="margin:4px 0">${abnormalMetrics.length + 2}. 记录当前状态以便后续分析，后续靠港可安排详细检查</div>
+    `
+  } else {
+    suggestionsHtml = `
+      <div style="margin:4px 0">1. 定期巡检，保持设备良好状态</div>
+      <div style="margin:4px 0">2. 按计划执行预防性维护</div>
+      <div style="margin:4px 0">3. 记录运行数据用于趋势分析</div>
+    `
+  }
+
+  return `
+    <div style="font-size:var(--text-base);line-height:1.8">
+      <div style="font-weight:700;font-size:var(--text-lg);color:var(--text-primary);margin-bottom:10px">${device.name}AI分析摘要</div>
+      <div style="margin:6px 0"><span style="color:#8BAAC0">工况：</span><span style="color:#1890FF;font-weight:600">${shipStatus}</span></div>
+      <div style="margin:6px 0"><span style="color:#8BAAC0">设备状态：</span><span style="color:${statusColor};font-weight:600">${statusLabel}</span></div>
+      <div style="margin:6px 0"><span style="color:#8BAAC0">设备健康度：</span><span style="color:${scoreColor};font-weight:700;font-size:var(--text-lg)">${healthScore}%</span> · <span style="color:${scoreColor}">${healthLabel}</span></div>
+      <div style="margin:6px 0"><span style="color:#8BAAC0">建议关注：</span><span style="color:#FAAD14;font-weight:600">${focusSystem}</span> <span style="color:#8BAAC0">（${focusDetail}）</span></div>
+      <div style="margin:10px 0 4px;font-weight:600;color:var(--text-primary)">结论：</div>
+      <div style="margin:4px 0;color:var(--text-secondary)">${conclusion}</div>
+      <div style="margin:10px 0 4px;font-weight:600;color:var(--text-primary)">关注点：<span style="color:#FAAD14">${focusDetail}</span></div>
+      <div style="margin:10px 0 4px;font-weight:600;color:var(--text-primary)">建议：</div>
+      ${suggestionsHtml}
+    </div>
+  `
 }
 
 function toggleVoice() {
