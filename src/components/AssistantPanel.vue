@@ -782,22 +782,16 @@ function startIterativeCheck() {
   eventStage[eid] = 'S2'
   scrollToBottom()
   setTimeout(() => {
-    const items = checkItems[eid]
-    const labels = Object.values(items).map(i => i.title).join('、')
     pushMsg(eid, {
-      cardType: 'guide',
-      guideTitle: '排查方案',
-      guideIntro: `针对「${ev?.title || ''}」已生成标准排查方案。
-AI 按可能性排序 ${Object.keys(items).length} 个排查项：${labels}。
-每个排查项包含多个步骤和关键检查点，系统会自动汇总步骤结果和排查项结果。
-按推荐顺序从 T1 开始，还是你有自己的想法？`,
-      steps: [
-        {title:'T1 · 液压系统故障排查',detail:'涵盖：油箱外观→初始数据→管路接头→荧光检漏→泵吸入→油品化验。建议从T1开始，覆盖面最广且检查成本最低。'},
-        {title:'T2 · 系统或油柜吸口堵塞排查',detail:'涵盖：吸口滤网→负压值→底部沉积物→回油过滤器。若T1未发现异常，重点排查此项。'},
-        {title:'T3 · 压力传感器故障排查',detail:'涵盖：传感器校验→供电信号回路→电磁干扰→机械安装。传感器自身故障概率较低但不可忽视。'},
-        {title:'T4 · 系统管线泄漏排查',detail:'涵盖：高压管路分段→执行机构密封→控制阀内泄→油箱附件→记录拍照。与T1交叉验证。'}
-      ]
+      cardType: null,
+      content: `排查方案已生成。推断有 4 个可能项，建议从液压系统开始排查。<br><br>按推荐顺序逐项排查，还是你有自己的想法？`
     })
+    // 激活第一个排查项卡片
+    const p = eventStore.events.find(e => e.id === eid)
+    if (p?.snapshot) {
+      // 通过 eventAssistantAction 通知 ProductDrawer 激活第一项
+      eventAssistantAction[eid] = 'check_activate_first'
+    }
     refreshChips()
   }, 400)
 }

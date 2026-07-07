@@ -1121,6 +1121,18 @@ const cardToSection = {
 watch(() => eventAssistantAction[props.event?.id], (action) => {
   if (!action || !props.event) return
   stopStream()
+
+  // 激活第一个排查项
+  if (action === 'check_activate_first') {
+    const items = product.value?.check?.checkItems
+    if (items && items.length > 0 && items[0].status === 'pending') {
+      items[0].status = 'active'
+    }
+    checkExpanded.value = true
+    pulseInto('check', 700)
+    return
+  }
+
   const section = cardToSection[action]
   if (!section) return
 
@@ -1129,8 +1141,6 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
   checkExpanded.value = (section === 'check')
   repairExpanded.value = (section === 'repair')
   reportExpanded.value = (section === 'report')
-
-  // 所有数据默认已展示，无需渐进展开
 
   pulseInto(section, 700)
 })
