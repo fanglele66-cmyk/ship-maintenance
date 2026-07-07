@@ -1,98 +1,56 @@
 <template>
   <div class="ship-overview">
-    <!-- Ship Health Info -->
-    <div class="ship-info-bar">
-      <div class="health-score">
-        <div class="health-ring">
-          <svg width="44" height="44" viewBox="0 0 44 44">
-            <circle cx="22" cy="22" r="18" fill="none" stroke="#1E3A5F" stroke-width="3" />
+    <!-- 顶部：设备态势状态条 -->
+    <div class="status-header">
+      <div class="sh-left">
+        <div class="sh-bar"></div>
+        <span class="sh-title">设备态势</span>
+      </div>
+      <div class="sh-meta">
+        <div class="sh-meta-item">
+          <span class="sh-meta-label">JADE STAR</span>
+        </div>
+        <div class="sh-meta-item">
+          <span class="sh-meta-label">在线情况</span>
+          <span class="sh-meta-value online">在线</span>
+        </div>
+        <div class="sh-meta-item">
+          <span class="sh-meta-label">监测设备</span>
+          <span class="sh-meta-value">8 点位</span>
+        </div>
+        <div class="sh-meta-item">
+          <span class="sh-meta-label">最近巡检时间</span>
+          <span class="sh-meta-value">2026-06-26 08:00</span>
+        </div>
+        <div class="sh-meta-item">
+          <span class="sh-meta-label">累计作业次数</span>
+          <span class="sh-meta-value">5680 次</span>
+        </div>
+        <div class="sh-meta-health">
+          <svg width="56" height="56" viewBox="0 0 56 56">
+            <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(82,196,26,0.15)" stroke-width="4" />
             <circle
-              cx="22" cy="22" r="18"
-              fill="none"
-              :stroke="healthColor"
-              stroke-width="3"
-              stroke-linecap="round"
+              cx="28" cy="28" r="22"
+              fill="none" stroke="#52C41A" stroke-width="4" stroke-linecap="round"
               :stroke-dasharray="circumference"
               :stroke-dashoffset="healthOffset"
-              transform="rotate(-90, 22, 22)"
+              transform="rotate(-90, 28, 28)"
             />
           </svg>
-          <span class="health-text" :style="{ color: healthColor }">{{ deviceStore.ship.healthScore }}</span>
-        </div>
-        <div class="health-label">健康分</div>
-      </div>
-      <div class="ship-status-info">
-        <div class="info-row">
-          <span class="info-label">航速</span>
-          <span class="info-value">{{ deviceStore.ship.speed }} kn</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">航向</span>
-          <span class="info-value">{{ deviceStore.ship.heading }}°</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">位置</span>
-          <span class="info-value">{{ deviceStore.ship.latitude }} {{ deviceStore.ship.longitude }}</span>
-        </div>
-      </div>
-      <div class="device-summary">
-        <div class="summary-item">
-          <span class="summary-dot" style="background:#FF4D4F"></span>
-          <span>{{ dangerCount }} 异常</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-dot" style="background:#FAAD14"></span>
-          <span>{{ warningCount }} 预警</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-dot" style="background:#52C41A"></span>
-          <span>{{ normalCount }} 正常</span>
+          <span class="sh-health-text">86%</span>
         </div>
       </div>
     </div>
 
-    <!-- Ship Body canvas area -->
+    <!-- 中部：船舶 + 浮动设备卡 -->
     <div class="ship-body-container">
-      <!-- Grid overlay -->
       <div class="scan-grid-overlay"></div>
-      <!-- Scan line -->
-      <div class="scan-line"></div>
       <div class="scan-glow"></div>
 
-      <!-- Ship SVG outline -->
-      <svg class="ship-svg" viewBox="0 0 680 460" xmlns="http://www.w3.org/2000/svg">
-        <!-- Hull -->
-        <path d="M340 120 L120 340 L80 380 L600 380 L560 340 Z"
-          fill="none" stroke="rgba(0,188,212,0.25)" stroke-width="2" />
-        <!-- Deck -->
-        <line x1="160" y1="300" x2="520" y2="300" stroke="rgba(0,188,212,0.15)" stroke-width="1" />
-        <!-- Superstructure -->
-        <rect x="260" y="120" width="160" height="180" rx="4"
-          fill="none" stroke="rgba(0,188,212,0.2)" stroke-width="1.5" />
-        <!-- Cabin -->
-        <rect x="280" y="140" width="120" height="60" rx="3"
-          fill="none" stroke="rgba(0,188,212,0.15)" stroke-width="1" />
-        <!-- Windows -->
-        <rect x="290" y="150" width="18" height="14" rx="2" fill="rgba(24,144,255,0.3)" />
-        <rect x="314" y="150" width="18" height="14" rx="2" fill="rgba(24,144,255,0.3)" />
-        <rect x="338" y="150" width="18" height="14" rx="2" fill="rgba(24,144,255,0.3)" />
-        <rect x="362" y="150" width="18" height="14" rx="2" fill="rgba(24,144,255,0.3)" />
-        <!-- Funnel / Chimney -->
-        <rect x="320" y="80" width="40" height="42" rx="2"
-          fill="none" stroke="rgba(0,188,212,0.2)" stroke-width="1.5" />
-        <line x1="330" y1="85" x2="330" y2="118" stroke="rgba(0,188,212,0.1)" stroke-width="1" />
-        <line x1="350" y1="85" x2="350" y2="118" stroke="rgba(0,188,212,0.1)" stroke-width="1" />
-        <!-- Bow -->
-        <path d="M340 120 Q380 200 480 340" fill="none" stroke="rgba(0,188,212,0.15)" stroke-width="1" />
-        <path d="M340 120 Q300 200 200 340" fill="none" stroke="rgba(0,188,212,0.15)" stroke-width="1" />
-        <!-- Waterline -->
-        <line x1="60" y1="390" x2="620" y2="390" stroke="rgba(24,144,255,0.15)" stroke-width="1" stroke-dasharray="4,4" />
-        <!-- Engine room area indicator -->
-        <rect x="200" y="240" width="60" height="40" rx="3" fill="none" stroke="rgba(255,77,79,0.2)" stroke-width="1" />
-        <text x="212" y="262" fill="rgba(255,77,79,0.3)" font-size="9" font-family="monospace">ENGINE</text>
-      </svg>
+      <!-- 船舶线框图（衬底） -->
+      <img src="/ship-blueprint.png" class="ship-img" alt="ship blueprint" />
 
-      <!-- Floating device cards on ship -->
+      <!-- 浮动设备卡 -->
       <div
         v-for="device in floatingDevices"
         :key="device.id"
@@ -101,13 +59,37 @@
         :style="{ left: device.position.x, top: device.position.y }"
         @click="$emit('selectDevice', device)"
       >
-        <div class="fdc-header">
+        <div class="fdc-name">{{ device.name }}</div>
+        <div class="fdc-status-row">
           <span class="fdc-dot" :class="device.status"></span>
-          <span class="fdc-name">{{ device.name }}</span>
+          <span class="fdc-status" :class="device.status">
+            {{ device.status === 'danger' ? '异常' : device.status === 'warning' ? '预警' : '正常' }}
+          </span>
         </div>
-        <div class="fdc-status" :class="device.status">
-          {{ device.status === 'danger' ? '异常' : device.status === 'warning' ? '预警' : '正常' }}
-        </div>
+        <div v-if="device.eventCount" class="fdc-event">{{ device.eventCount }} 事件</div>
+      </div>
+    </div>
+
+    <!-- 底部：船舶工况条 -->
+    <div class="ship-work-cond">
+      <div class="wc-item">
+        <span class="wc-label">工况</span>
+        <span class="wc-value sailing">航行中</span>
+      </div>
+      <div class="wc-divider"></div>
+      <div class="wc-item">
+        <span class="wc-label">航向</span>
+        <span class="wc-value">185°</span>
+      </div>
+      <div class="wc-divider"></div>
+      <div class="wc-item">
+        <span class="wc-label">航速</span>
+        <span class="wc-value">14.2 kn</span>
+      </div>
+      <div class="wc-divider"></div>
+      <div class="wc-item">
+        <span class="wc-label">主机转速</span>
+        <span class="wc-value">78 rpm</span>
       </div>
     </div>
   </div>
@@ -121,28 +103,28 @@ const emit = defineEmits(['selectDevice'])
 
 const deviceStore = useDeviceStore()
 
+// 4 个关键设备的浮动位置（按截图复刻）
 const floatingDevices = computed(() => {
-  // Only show 4 key devices on the ship overview
-  return deviceStore.devices.filter(d =>
+  const devices = deviceStore.devices.filter(d =>
     ['main-engine-1', 'boiler', 'steering-gear', 'air-compressor'].includes(d.id)
   )
+  // 给每个设备定位（相对于 720x360 viewBox 的近似百分比转 vw）
+  const positions = {
+    'main-engine-1': { x: '32%', y: '50%' },
+    'boiler':         { x: '64%', y: '20%' },
+    'steering-gear':  { x: '8%',  y: '44%' },
+    'air-compressor': { x: '18%', y: '42%' }
+  }
+  return devices.map(d => ({
+    ...d,
+    position: positions[d.id] || { x: '50%', y: '50%' },
+    eventCount: d.id === 'main-engine-1' ? 1 : 0
+  }))
 })
 
-const dangerCount = computed(() => deviceStore.dangerDevices.length)
-const warningCount = computed(() => deviceStore.warningDevices.length)
-const normalCount = computed(() => {
-  return deviceStore.devices.length - dangerCount.value - warningCount.value
-})
-
-const circumference = 2 * Math.PI * 18 // ~113.1
-const healthColor = computed(() => {
-  const score = deviceStore.ship.healthScore
-  if (score >= 80) return '#52C41A'
-  if (score >= 60) return '#FAAD14'
-  return '#FF4D4F'
-})
+const circumference = 2 * Math.PI * 22 // ~138.2
 const healthOffset = computed(() => {
-  return circumference - (deviceStore.ship.healthScore / 100) * circumference
+  return circumference - (0.86 * circumference)
 })
 </script>
 
@@ -155,183 +137,150 @@ const healthOffset = computed(() => {
   overflow: hidden;
 }
 
-.ship-info-bar {
+/* ===== 顶部状态条 ===== */
+.status-header {
+  background: var(--bg-surface);
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px 20px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-primary);
+  gap: 24px;
   flex-shrink: 0;
   box-shadow: var(--shadow-sm);
-  z-index: 5;
 }
-
-.health-score {
+.sh-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sh-bar {
+  width: 3px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.sh-title {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.sh-meta {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex: 1;
+}
+.sh-meta-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
 }
-
-.health-ring {
-  position: relative;
-  width: 48px;
-  height: 48px;
+.sh-meta-label {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
 }
-
-.health-text {
+.sh-meta-value {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: Consolas, monospace;
+}
+.sh-meta-value.online {
+  color: var(--success);
+}
+.sh-meta-health {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.sh-health-text {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 15px;
-  font-weight: 700;
-  font-family: Consolas, monospace;
-}
-
-.health-label {
-  font-size: var(--font-xs);
-  color: var(--text-muted);
-}
-
-.ship-status-info {
-  display: flex;
-  gap: 18px;
-}
-
-.info-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.info-label {
-  font-size: var(--font-xs);
-  color: var(--text-muted);
-}
-
-.info-value {
-  font-size: var(--font-base);
-  font-weight: 600;
-  font-family: Consolas, monospace;
-  color: var(--text-primary);
-}
-
-.device-summary {
-  margin-left: auto;
-  display: flex;
-  gap: 14px;
-}
-
-.summary-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
   font-size: var(--font-sm);
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--success);
+  font-family: Consolas, monospace;
 }
 
-.summary-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-/* Ship body */
+/* ===== 中部船体 ===== */
 .ship-body-container {
   flex: 1;
   position: relative;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: linear-gradient(180deg, #E8EDF2 0%, #DCE3EA 100%);
 }
-
 .scan-grid-overlay {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
-
-.scan-line {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    rgba(22,119,255,0.04) 50%,
-    transparent 100%
-  );
-  animation: scan-line 3s ease-in-out infinite;
-  pointer-events: none;
-}
-
 .scan-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, rgba(22,119,255,0.06) 0%, transparent 70%);
-  animation: scan-glow 3s ease-in-out infinite;
+  background: radial-gradient(ellipse at 50% 50%, rgba(0,229,255,0.08) 0%, transparent 70%);
   pointer-events: none;
 }
-
-.ship-svg {
-  width: 80%;
-  max-width: 600px;
+.ship-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 720px;
   height: auto;
-  z-index: 0;
+  filter: drop-shadow(0 8px 24px rgba(0, 188, 212, 0.15));
 }
 
-@keyframes scan-line {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
-}
-
-@keyframes scan-glow {
-  0%, 100% { opacity: 0.15; }
-  50% { opacity: 0.4; }
-}
-
-/* Floating device cards */
+/* ===== 浮动设备卡 ===== */
 .float-dev-card {
   position: absolute;
-  background: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.95);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
+  border-radius: 6px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 10;
-  min-width: 90px;
+  min-width: 92px;
   box-shadow: var(--shadow-sm);
+  transform: translate(-50%, -50%);
 }
 .float-dev-card:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
+  transform: translate(-50%, calc(-50% - 2px));
   box-shadow: var(--shadow-md);
 }
 .float-dev-card.danger {
-  border-color: rgba(245,63,63,0.3);
-  box-shadow: 0 2px 8px rgba(245,63,63,0.08);
+  border-color: rgba(245,63,63,0.4);
+  box-shadow: 0 2px 8px rgba(245,63,63,0.1);
 }
 .float-dev-card.warning {
-  border-color: rgba(255,125,0,0.3);
-  box-shadow: 0 2px 8px rgba(255,125,0,0.08);
+  border-color: rgba(255,125,0,0.4);
+  box-shadow: 0 2px 8px rgba(255,125,0,0.1);
 }
 
-.fdc-header {
+.fdc-name {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.fdc-status-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 3px;
+  gap: 5px;
 }
-
 .fdc-dot {
   width: 6px;
   height: 6px;
@@ -341,18 +290,49 @@ const healthOffset = computed(() => {
 .fdc-dot.warning { background: var(--warning); }
 .fdc-dot.normal { background: var(--success); }
 
-.fdc-name {
-  font-size: var(--font-base);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
 .fdc-status {
   font-size: var(--font-sm);
-  text-align: right;
   font-weight: 500;
 }
 .fdc-status.danger { color: var(--danger); }
 .fdc-status.warning { color: var(--warning); }
 .fdc-status.normal { color: var(--success); }
+.fdc-event {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ===== 底部工况条 ===== */
+.ship-work-cond {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+  font-family: Consolas, monospace;
+}
+.wc-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-sm);
+}
+.wc-label {
+  color: var(--text-muted);
+}
+.wc-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.wc-value.sailing {
+  color: var(--success);
+}
+.wc-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border-primary);
+}
 </style>

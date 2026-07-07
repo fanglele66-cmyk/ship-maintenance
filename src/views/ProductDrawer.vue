@@ -177,6 +177,7 @@
         <!-- 排查项卡片 -->
         <section
           v-if="isCheckVisible(idx)"
+          :id="'check-card-' + idx"
           class="prod-card"
           :class="{ 'card-collapsed': !checkCardsExpanded[idx] }"
         >
@@ -218,6 +219,7 @@
         <!-- 维修项卡片（反馈异常后才展示） -->
         <section
           v-if="item.repair && item.status === 'done-abnormal'"
+          :id="'repair-card-' + idx"
           class="prod-card repair-card-section"
         >
           <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
@@ -275,6 +277,17 @@
             <div class="fm-section-label">备注</div>
             <textarea v-model="feedbackModal.notes" class="fm-notes" placeholder="其它发现或备注"></textarea>
           </div>
+          <div class="fm-section">
+            <div class="fm-section-label">上传图片 <span class="fm-optional">（非必填）</span></div>
+            <div class="fm-upload">
+              <label class="fm-upload-btn">
+                <input type="file" accept="image/*" multiple style="display:none" @change="handleImageUpload" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>选择图片</span>
+              </label>
+              <span class="fm-upload-hint">支持 JPG / PNG，单张不超过 10MB</span>
+            </div>
+          </div>
           <div class="fm-actions">
             <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
             <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
@@ -290,6 +303,7 @@
       <!-- ✅ 事件记录 -->
       <section
         v-if="showReportCard || currentStage === 'S5'"
+        id="event-record-card"
         class="prod-card"
         :class="{ 'card-collapsed': !reportExpanded }"
       >
@@ -304,14 +318,14 @@
 
         <div v-show="reportExpanded" class="prod-body">
           <div class="report-summary">
-            <div class="report-banner" :class="{ 'banner-needs-manual': needsManualClose }">
-              <div class="report-banner-icon">{{ needsManualClose ? '!' : '✓' }}</div>
-              <div class="report-banner-text">{{ needsManualClose ? '全部排查已完成，仍需手动处理' : '维修完成 · 验收通过' }}</div>
+            <div class="report-banner" :class="{ 'banner-needs-manual': needsManualClose, 'banner-false-alarm': isFalseAlarm }">
+              <div class="report-banner-icon">{{ needsManualClose ? '!' : isFalseAlarm ? 'ℹ' : '✓' }}</div>
+              <div class="report-banner-text">{{ needsManualClose ? '全部排查已完成，仍需手动处理' : isFalseAlarm ? '已标记为误报' : '维修完成 · 验收通过' }}</div>
             </div>
             <div class="report-stat-grid">
               <div class="rs-item">
                 <div class="rs-label">维修结果</div>
-                <div class="rs-value" :class="{ success: !needsManualClose, warning: needsManualClose }">{{ needsManualClose ? '未解决' : '已修复' }}</div>
+                <div class="rs-value" :class="{ success: !needsManualClose && !isFalseAlarm, warning: needsManualClose, muted: isFalseAlarm }">{{ needsManualClose ? '未解决' : isFalseAlarm ? '误报' : '已修复' }}</div>
               </div>
               <div class="rs-item">
                 <div class="rs-label">开始时间</div>
@@ -444,6 +458,14 @@ const aiExpanded = ref(true)
 const reportExpanded = ref(false)
 const showReportCard = ref(false)
 const needsManualClose = ref(false)
+const isFalseAlarm = ref(false)
+
+function scrollIntoCard(id, delay = 50) {
+  setTimeout(() => {
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, delay)
+}
 
 // 维修卡片展开状态
 const repairCardsExpanded = reactive({})
@@ -457,6 +479,8 @@ function cleanTitle(title) {
 
 // ============ 排查-维修 顺序配对逻辑 ============
 function isCheckVisible(idx) {
+  // 误报 → 不再展示排查卡
+  if (isFalseAlarm.value) return false
   if (currentStage.value === 'S1') return false
   const items = product.value?.check?.checkItems || []
   if (idx === 0) return true
@@ -604,6 +628,11 @@ function closeFeedbackModal() {
   feedbackModal.currentIdx = -1
 }
 
+function handleImageUpload(e) {
+  const files = Array.from(e.target.files || [])
+  feedbackModal.images = files.map(f => ({ name: f.name, size: f.size }))
+}
+
 function markNormal(idx) {
   const items = product.value?.check?.checkItems
   if (!items || !items[idx]) return
@@ -615,6 +644,7 @@ function markNormal(idx) {
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
     checkCardsExpanded[idx + 1] = true
+    scrollIntoCard('check-card-' + (idx + 1))
   }
   // 全部完成检查
   checkAllDone()
@@ -645,6 +675,7 @@ function submitFeedback() {
   if (hasAbnormal) {
     checkCardsExpanded[idx] = false
     repairCardsExpanded[idx] = true
+    scrollIntoCard('repair-card-' + idx)
     if (props.event) {
       eventStage[props.event.id] = 'S4'
       eventAssistantAction[props.event.id] = 'check_abnormal_' + idx
@@ -657,6 +688,7 @@ function submitFeedback() {
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
     checkCardsExpanded[idx + 1] = true
+    scrollIntoCard('check-card-' + (idx + 1))
   }
 
   // 全部完成检查
@@ -686,6 +718,7 @@ function markItemRepaired(idx) {
   // 激活事件记录卡并展开
   showReportCard.value = true
   reportExpanded.value = true
+  scrollIntoCard('event-record-card')
 }
 
 function markItemNotFixed(idx) {
@@ -698,6 +731,7 @@ function markItemNotFixed(idx) {
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
     checkCardsExpanded[idx + 1] = true
+    scrollIntoCard('check-card-' + (idx + 1))
   }
 }
 
@@ -1129,6 +1163,9 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
   if (isEventChanged) {
     aiExpanded.value = true
     reportExpanded.value = false
+    needsManualClose.value = false
+    isFalseAlarm.value = false
+    showReportCard.value = false
     aiSubs.conclusion = true
     aiSubs.data = true
     aiSubs.mechanism = false
@@ -1164,6 +1201,7 @@ watch(allChecksNormal, (normal) => {
     showReportCard.value = true
     reportExpanded.value = true
     needsManualClose.value = true
+    scrollIntoCard('event-record-card')
     if (props.event) {
       eventStage[props.event.id] = 'S4'
     }
@@ -1176,6 +1214,7 @@ watch(allRepairsExhausted, (exhausted) => {
     showReportCard.value = true
     reportExpanded.value = true
     needsManualClose.value = true
+    scrollIntoCard('event-record-card')
     if (props.event) {
       eventStage[props.event.id] = 'S4'
     }
@@ -1202,6 +1241,18 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
       checkCardsExpanded[0] = true
     }
     pulseInto('check', 700)
+    return
+  }
+
+  // 标记为误报：折叠 AI 分析，展开事件记录
+  if (action === 'false_alarm_closed') {
+    aiExpanded.value = false
+    showReportCard.value = true
+    reportExpanded.value = true
+    needsManualClose.value = false
+    isFalseAlarm.value = true
+    scrollIntoCard('event-record-card')
+    if (props.event) eventStage[props.event.id] = 'S5'
     return
   }
 
@@ -1784,6 +1835,12 @@ function formatTime(t) {
 .banner-needs-manual .report-banner-icon {
   background: rgba(255,255,255,0.3);
 }
+.banner-false-alarm {
+  background: linear-gradient(135deg, #8c8c8c, #bfbfbf);
+}
+.banner-false-alarm .report-banner-icon {
+  background: rgba(255,255,255,0.25);
+}
 
 .report-stat-grid {
   display: grid;
@@ -2135,6 +2192,17 @@ function formatTime(t) {
 .fm-opt { font-size: var(--font-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 4px; }
 .fm-opt input { cursor: pointer; }
 .fm-notes { width: 100%; min-height: 60px; padding: 10px; border: 1px solid var(--border-primary); border-radius: 6px; font-size: var(--font-sm); color: var(--text-primary); background: var(--bg-hover); resize: vertical; font-family: inherit; }
+
+.fm-optional { color: var(--text-muted); font-weight: 400; font-size: var(--font-sm); }
+.fm-upload { display: flex; align-items: center; gap: 12px; }
+.fm-upload-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border: 1px dashed var(--border-primary);
+  border-radius: 8px; background: var(--bg-hover); color: var(--text-secondary);
+  font-size: var(--font-sm); cursor: pointer; transition: all 0.15s;
+}
+.fm-upload-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.fm-upload-hint { font-size: var(--font-xs); color: var(--text-muted); }
 .fm-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--border-primary); }
 .fm-btn { font-size: var(--font-base); padding: 8px 24px; border-radius: 20px; border: 2px solid var(--accent); cursor: pointer; font-weight: 600; }
 .fm-cancel { background: var(--bg-surface); color: var(--text-secondary); }

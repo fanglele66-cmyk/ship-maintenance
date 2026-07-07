@@ -19,14 +19,19 @@
       </transition>
     </div>
 
-    <!-- Right: AI Assistant（直接放 flex 容器，和态势页一致） -->
-    <AssistantPanel
-      :mode="assistantMode"
-      :event-context="eventStore.selectedEvent"
-      :fill-remaining="true"
-      :class="{ 'panel-compact': eventStore.isDrawerOpen && eventStore.selectedEvent }"
-      @chip-click="handleChipAction"
-    />
+    <!-- Right: 首页 general 模式 → 专用空态；事件模式 → AssistantPanel -->
+    <template v-if="eventStore.isDrawerOpen && eventStore.selectedEvent">
+      <AssistantPanel
+        mode="event"
+        :event-context="eventStore.selectedEvent"
+        :fill-remaining="true"
+        class="panel-compact"
+        @chip-click="handleChipAction"
+      />
+    </template>
+    <div v-else class="home-assistant-slot">
+      <HomeAssistant />
+    </div>
   </div>
 </template>
 
@@ -36,6 +41,7 @@ import { useEventStore } from '@/stores/eventStore'
 import EventList from './EventList.vue'
 import ProductDrawer from './ProductDrawer.vue'
 import AssistantPanel from '@/components/AssistantPanel.vue'
+import HomeAssistant from './HomeAssistant.vue'
 
 const eventStore = useEventStore()
 
@@ -146,5 +152,13 @@ function handleChipAction(action) {
     min-width: 300px !important;
     max-width: none !important;
   }
+}
+
+/* 首页助手区：fill 剩余空间 */
+.home-assistant-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
 }
 </style>

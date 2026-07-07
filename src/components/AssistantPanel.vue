@@ -53,7 +53,7 @@
 
           <!-- === 6 种消息卡片 === -->
           <!-- 类型0：普通文本 -->
-          <div v-if="!msg.cardType" class="msg-content" v-html="msg.content"></div>
+          <div v-if="!msg.cardType" class="msg-content" v-html="getStreamContent(msg, idx)"></div>
 
           <!-- 类型1：诊断分析卡 🧠 -->
           <div v-else-if="msg.cardType === 'diagnosis'" class="msg-card diagnosis-card">
@@ -121,7 +121,7 @@
           </div>
 
           <!-- 类型6：通用模式主动追问卡（HTML内容） -->
-          <div v-else-if="msg.cardType === 'proactive'" class="msg-content" v-html="msg.content"></div>
+          <div v-else-if="msg.cardType === 'proactive'" class="msg-content" v-html="getStreamContent(msg, idx)"></div>
 
           <!-- 类型5：状态报告卡 ✅ -->
           <div v-else-if="msg.cardType === 'report'" class="msg-card report-card">
@@ -345,6 +345,44 @@ const messages = computed(() => {
   return eventStore.getSessionMessages(key)
 })
 
+// ============ 流式输出 ============
+const streamingState = reactive({})  // { idx: 'current typed text' }
+let prevMsgLen = 0
+
+function startStream(idx, fullText) {
+  // 按词/tag切分，保证 HTML 标签完整性
+  const parts = fullText.split(/(<[^>]+>|\s+)/g).filter(Boolean)
+  let pos = 0
+  streamingState[idx] = ''
+  const timer = setInterval(() => {
+    streamingState[idx] = parts.slice(0, pos + 1).join('')
+    pos++
+    if (pos >= parts.length) {
+      clearInterval(timer)
+      delete streamingState[idx]
+    }
+  }, 16)
+}
+
+function getStreamContent(msg, idx) {
+  if (msg.role !== 'assistant') return msg.content
+  if (streamingState[idx] !== undefined) {
+    return streamingState[idx] + '<span class="cursor-blink">▍</span>'
+  }
+  return msg.content
+}
+
+watch(messages, (list) => {
+  if (list.length > prevMsgLen) {
+    for (let i = prevMsgLen; i < list.length; i++) {
+      if (list[i].role === 'assistant') {
+        startStream(i, list[i].content)
+      }
+    }
+  }
+  prevMsgLen = list.length
+}, { immediate: true })
+
 // ============ Chips ============
 const recommendedQuestions = ref([])
 const recLabel = computed(() => messages.value.length > 0 ? '快捷回复' : '试试问我')
@@ -371,30 +409,23 @@ function getChipsByContext() {
     const ec = props.eventContext; const stage = eventStage[ec.id] || 'S1'
     const hasUserMsg = messages.value.some(m => m.role === 'user')
     if (stage === 'S1' && !hasUserMsg) {
-      const hasRelatedCases = ec.relatedCases && ec.relatedCases.length > 0
       const chips = [
         { text: '立即开始排查，生成方案', action: 'start_check', highlight: true }
       ]
-      if (hasRelatedCases) chips.unshift({ text: '查看相似历史案例', action: 'view_cases', highlight: true })
       chips.push({ text: '暂不处理，稍晚些提醒我', action: 'snooze' })
-      chips.push({ text: '标记为误报', action: 'send' })
+      chips.push({ text: '标记为误报', action: 'mark_false_alarm' })
       return chips
     }
     if (stage === 'S1' && hasUserMsg) {
       return [{ text: '这种原因多久能恢复？', action: 'send' }, { text: '还有其他可能原因吗？', action: 'send' }, { text: '开始排查，为我生成方案', action: 'start_check' }]
     }
     if (stage === 'S2') {
-      const eid = ec.id
-      const idx = currentCheckIdx[eid] || 1
-      const item = checkItems[eid]?.[idx]
-      if (!item || item.state === 'pending') {
-        return [{ text: '查看左侧排查方案并按步骤反馈', action: 'send', highlight: true },
-                { text: '我想直接跳到维修', action: 'send' }]
-      }
-      return [{ text: '继续按左侧方案排查', action: 'send' }]
+      // 排查阶段，操作在左侧产物区，助手无需推荐提问
+      return []
     }
     if (stage === 'S5') {
-      return [{ text: '查看维修报告', action: 'send' }, { text: '继续下一个事件', action: 'send' }]
+      // 已闭环，无需推荐提问
+      return []
     }
   }
   // 辅助模式（态势感知）
@@ -777,32 +808,21 @@ function handleRecommendedClick(q) {
   if (q.action === 'repair_not_fixed') { handleRepairResult('not_fixed'); return }
   if (q.action === 'continue_next') { continueNextCheck(); return }
   if (q.action === 'goto_event' && q.eventId) { eventStore.selectEvent(q.eventId); return }
-  if (q.action === 'view_cases') { handleViewCases(); return }
   if (q.action === 'snooze') { handleSnooze(); return }
+  if (q.action === 'mark_false_alarm') { handleMarkFalseAlarm(); return }
   inputText.value = q.text; sendMessage()
 }
 
-// ============ 查看相似历史案例 ============
-function handleViewCases() {
+// ============ 标记为误报 ============
+function handleMarkFalseAlarm() {
   if (!props.eventContext) return
   const eid = props.eventContext.id
-  eventStore.addMessage(eid, { role: 'user', content: '查看相似历史案例', ts: Date.now() })
+  eventStore.addMessage(eid, { role: 'user', content: '标记为误报', ts: Date.now() })
   scrollToBottom()
   setTimeout(() => {
-    const cases = props.eventContext.relatedCases || []
-    if (cases.length > 0) {
-      let html = '<div style="font-size:var(--font-base);line-height:1.7">📄 <b>找到 ' + cases.length + ' 条相似历史案例</b><br><br>'
-      cases.forEach((c, i) => {
-        html += `<div style="margin-bottom:8px;padding:8px 10px;background:var(--bg-hover);border-radius:6px;border:1px solid var(--border-primary)">
-          <b>${c.title}</b><br>
-          <span style="font-size:var(--font-xs);color:var(--text-muted)">#${c.id}</span>
-        </div>`
-      })
-      html += '</div>'
-      pushMsg(eid, { content: html, cardType: null })
-    } else {
-      pushMsg(eid, { content: '未找到相似历史案例，这是一个新类型的故障。建议直接开始排查 👇' })
-    }
+    pushMsg(eid, { content: '请描述一下<b>实际工况或现场情况</b>，我会记录在事件报告中。例如：该告警触发时设备处于停机检修状态，并非实际故障。' })
+    // 标记进入误报追问状态，等待用户输入
+    eventAssistantAction[eid] = 'false_alarm_followup'
     refreshChips()
   }, 400)
 }
@@ -1016,6 +1036,24 @@ function sendMessage() {
   const sessionKey = props.mode === 'event' && props.eventContext ? props.eventContext.id : props.mode === 'general' ? 'general' : 'situation'
   eventStore.addMessage(sessionKey, { role: 'user', content: text, ts: Date.now() })
   inputText.value = ''; scrollToBottom()
+
+  // 误报追问中 → 用户回复后完成误报闭环
+  if (props.eventContext && eventAssistantAction[props.eventContext.id] === 'false_alarm_followup') {
+    isTyping.value = true
+    setTimeout(() => {
+      isTyping.value = false
+      const response = '✅ 已记录你的反馈：<b>"' + text + '"</b>。该事件已标记为<b>误报</b>并闭环。'
+      eventStore.addMessage(sessionKey, { role: 'assistant', content: response, ts: Date.now() })
+      scrollToBottom(); refreshChips()
+      // 触发产物区：事件记录卡片展开
+      eventAssistantAction[props.eventContext.id] = 'false_alarm_closed'
+      if (eventStage[props.eventContext.id]) {
+        eventStage[props.eventContext.id] = 'false_alarm'
+      }
+    }, 600)
+    return
+  }
+
   isTyping.value = true
   setTimeout(() => {
     isTyping.value = false
@@ -1379,7 +1417,7 @@ function generateDeviceAnalysisHtml(d) {
 @keyframes avatar-glow { 0%,100%{opacity:0.12;transform:scale(1)} 50%{opacity:0.3;transform:scale(1.08)} }
 
 /* === 普通文本气泡 === */
-.msg-content { background: var(--bg-surface); border: 1px solid var(--border-primary); border-left: 2px solid var(--accent); border-radius: 4px var(--radius-md) var(--radius-md) 4px; padding: 10px 12px; color: var(--text-secondary); max-width: 240px; font-size: var(--font-base); line-height: 1.6; box-shadow: var(--shadow-sm); }
+.msg-content { background: var(--bg-surface); border: 1px solid var(--border-primary); border-left: 2px solid var(--accent); border-radius: 4px var(--radius-md) var(--radius-md) 4px; padding: 10px 12px; color: var(--text-secondary); max-width: 100%; font-size: var(--font-base); line-height: 1.6; box-shadow: var(--shadow-sm); }
 .msg-user { display: flex; justify-content: flex-end; }
 .msg-user .msg-content { background: linear-gradient(135deg, var(--accent), #4096FF); border: none; border-radius: var(--radius-md) 4px var(--radius-md) var(--radius-md); color: #fff; }
 
@@ -1529,4 +1567,15 @@ function generateDeviceAnalysisHtml(d) {
 .send-btn:active { transform: scale(0.95); }
 .send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; transform: scale(0.92); }
 .send-svg { width: 15px; height: 15px; }
+
+/* 流式输出光标 */
+:deep(.cursor-blink) {
+  animation: blink 0.8s ease-in-out infinite;
+  color: var(--accent);
+  font-weight: 700;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
 </style>
