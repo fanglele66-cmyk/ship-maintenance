@@ -1212,6 +1212,26 @@ function sendMessage() {
     return
   }
 
+  // 排查阶段自然语言反馈 → 先自动填充左侧当前排查卡，不直接提交
+  if (props.eventContext && props.mode === 'event' && eventStage[props.eventContext.id] === 'S2') {
+    const parsed = parseCheckFeedbackText(text)
+    if (parsed) {
+      const eid = props.eventContext.id
+      eventAssistantCommand[eid] = `nl_check_feedback|${parsed.key}|${encodeURIComponent(text)}|${Date.now()}`
+      isTyping.value = true
+      setTimeout(() => {
+        isTyping.value = false
+        eventStore.addMessage(sessionKey, {
+          role: 'assistant',
+          content: `已识别到排查反馈：<b>${parsed.label}</b>。<br><br>我已先帮你填到左侧当前排查步骤里，请确认后点击左侧「提交排查结果」。`,
+          ts: Date.now()
+        })
+        scrollToBottom(); refreshChips()
+      }, 500)
+      return
+    }
+  }
+
   isTyping.value = true
   setTimeout(() => {
     isTyping.value = false
@@ -1219,6 +1239,43 @@ function sendMessage() {
     eventStore.addMessage(sessionKey, { role: 'assistant', content: response, ts: Date.now() })
     scrollToBottom(); refreshChips()
   }, 900)
+}
+
+function parseCheckFeedbackText(text) {
+  const t = String(text || '').toLowerCase()
+  const rules = [
+    {
+      key: 'tank_weld_leak_obvious',
+      label: '油箱焊缝有明显渗漏油渍',
+      test: () => /油箱|外壁|焊缝/.test(t) && /明显|严重|持续/.test(t) && /渗漏|漏油|油渍/.test(t)
+    },
+    {
+      key: 'tank_weld_wet',
+      label: '油箱焊缝有湿润痕迹',
+      test: () => /油箱|外壁|焊缝/.test(t) && /湿润|潮湿|油痕/.test(t)
+    },
+    {
+      key: 'hose_crack_leak',
+      label: '软管段龟裂或渗油',
+      test: () => /软管/.test(t) && /龟裂|裂纹|渗油|漏油/.test(t)
+    },
+    {
+      key: 'flange_oil_stain',
+      label: '法兰接头发现油渍',
+      test: () => /法兰|接头/.test(t) && /油渍|渗油|漏油/.test(t)
+    },
+    {
+      key: 'filter_block_severe',
+      label: '吸口滤网严重堵塞',
+      test: () => /滤网|滤器|吸口/.test(t) && /严重堵塞|堵死|大量杂质/.test(t)
+    },
+    {
+      key: 'sensor_deviation_obvious',
+      label: '传感器读数明显偏差',
+      test: () => /传感器|读数|校验/.test(t) && /明显偏差|偏差很大|失准/.test(t)
+    }
+  ]
+  return rules.find(r => r.test()) || null
 }
 
 function generateAIResponse(text) {

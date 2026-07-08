@@ -89,7 +89,7 @@
                     <span v-if="s.tag" class="sc-tag">{{ s.tag }}</span>
                     <span v-if="selectedSensorIndex === i" class="sc-dot"></span>
                   </div>
-                  <div class="sc-meta">{{ s.sampleCount }}个采样点{{ s.trendHours ? '·' + s.trendHours : '' }}{{ s.normalRange ? '·正常范围 ' + s.normalRange : '' }}</div>
+                  <div class="sc-meta">{{ s.sampleCount }}个采样点{{ s.trendHours ? '·' + s.trendHours : '' }}</div>
                   <div class="sc-history">{{ s.historyDesc }}</div>
                   <div class="sc-status" :class="'st-' + s.status">{{ s.statusDesc }}</div>
                 </div>
@@ -107,15 +107,10 @@
                 <svg v-else-if="currentTrendPoints" class="trend-svg-lg" viewBox="0 0 800 220" preserveAspectRatio="xMidYMid meet">
                   <!-- 网格线 -->
                   <line v-for="y in 5" :key="'g'+y" :x1="60" :y1="20 + (y-1)*36" :x2="780" :y2="20 + (y-1)*36" stroke="var(--border-secondary)" stroke-width="0.5" />
-                  <!-- 阈值线 -->
-                  <line v-if="selectedSensor && (selectedSensor.threshold || selectedSensor.range)" :x1="60" :y1="thresholdYPos" :x2="780" :y2="thresholdYPos" :stroke="trendColor" stroke-width="1" stroke-dasharray="6 4" opacity="0.6" />
-                  <text v-if="selectedSensor && (selectedSensor.threshold || selectedSensor.range)" x="775" :y="thresholdYPos - 5" text-anchor="end" :font-size="11" :fill="trendColor">阈值 {{ trendThresholdLabel }}</text>
                   <!-- 数据折线 -->
                   <polyline :points="currentTrendPoints" fill="none" :stroke="trendColor" stroke-width="2.5" />
                   <!-- 面积填充 -->
                   <polygon :points="trendAreaPoints" :fill="trendColor" opacity="0.08" />
-                  <!-- 超限点 -->
-                  <circle v-for="(p, i) in alertPoints" :key="'a'+i" :cx="p.x" :cy="p.y" r="4" :fill="trendColor" stroke="var(--bg-surface)" stroke-width="1.5" />
                 </svg>
               </div>
             </div>
@@ -192,13 +187,25 @@
           </header>
           <div v-show="checkCardsExpanded[idx] !== false" class="prod-body">
             <div class="ci-warning"><span class="ci-warning-label">注意事项：</span><span>{{ item.warning }}</span></div>
-            <div class="ci-steps-label">排查步骤：</div>
+            <div class="ci-steps-label">排查步骤与反馈：</div>
             <div v-for="(step, si) in item.steps" :key="si" class="ci-step">
               <div class="ci-step-num">{{ si + 1 }}. {{ step.title }}</div>
               <ul class="ci-step-details">
-                <li v-for="(d, di) in step.details" :key="di">{{ d }}</li>
+                <li v-for="(d, di) in step.details" :key="di" class="ci-detail-row" :class="{ 'ci-detail-with-feedback': item.status === 'active' && getDetailFeedbackItem(item, si, di) }">
+                  <span class="ci-detail-text">{{ d }}</span>
+                  <span v-if="item.status === 'active' && getDetailFeedbackItem(item, si, di)" class="ci-detail-feedback">
+                    <label v-for="(opt, oi) in getDetailFeedbackItem(item, si, di).options" :key="oi" class="ci-inline-opt">
+                      <input type="radio" :name="'check-' + idx + '-' + si + '-' + di" v-model="getDetailFeedbackItem(item, si, di).selected" :value="oi" />
+                      <span>{{ opt }}</span>
+                    </label>
+                  </span>
+                </li>
               </ul>
               <div class="ci-step-diagram">[可能有示意图]</div>
+            </div>
+            <div v-if="item.status === 'active'" :id="'check-feedback-' + idx" class="ci-inline-note">
+              <div class="ci-inline-note-label">现场备注</div>
+              <textarea v-model="item.feedbackNotes" class="ci-inline-textarea" placeholder="边查边记录现场现象、读数、照片编号等，可为空"></textarea>
             </div>
             <div v-if="item.feedback && item.feedback.length" class="ci-feedback-summary">
               <div class="ci-summary-label">登记反馈摘要</div>
@@ -210,8 +217,7 @@
             </div>
             <!-- 操作按钮：仅 active 时显示 -->
             <div v-if="item.status === 'active'" class="ci-actions">
-              <button class="ci-action-btn ci-action-ok" @click.stop="markNormal(idx)">正常</button>
-              <button class="ci-action-btn ci-action-feedback" @click.stop="openFeedbackModal(idx)">登记反馈</button>
+              <button class="ci-action-btn ci-action-feedback" @click.stop="submitInlineFeedback(idx)">提交排查结果</button>
             </div>
           </div>
         </section>
@@ -256,44 +262,6 @@
         </section>
       </template>
 
-      <!-- 反馈弹窗 -->
-      <div v-if="feedbackModal.open" class="feedback-modal-overlay" @click.self="closeFeedbackModal">
-        <div class="feedback-modal">
-          <div class="fm-title">排查反馈</div>
-          <div class="fm-section">
-            <div class="fm-section-label">快速标记</div>
-            <div class="fm-items">
-              <div v-for="(fm, fmi) in feedbackModal.items" :key="fmi" class="fm-row">
-                <span class="fm-item-name">{{ fm.name }}</span>
-                <div class="fm-options">
-                  <label v-for="(opt, oi) in fm.options" :key="oi" class="fm-opt">
-                    <input type="radio" :name="'fm-' + fmi" v-model="fm.selected" :value="oi" /> {{ opt }}
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="fm-section">
-            <div class="fm-section-label">备注</div>
-            <textarea v-model="feedbackModal.notes" class="fm-notes" placeholder="其它发现或备注"></textarea>
-          </div>
-          <div class="fm-section">
-            <div class="fm-section-label">上传图片 <span class="fm-optional">（非必填）</span></div>
-            <div class="fm-upload">
-              <label class="fm-upload-btn">
-                <input type="file" accept="image/*" multiple style="display:none" @change="handleImageUpload" />
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span>选择图片</span>
-              </label>
-              <span class="fm-upload-hint">支持 JPG / PNG，单张不超过 10MB</span>
-            </div>
-          </div>
-          <div class="fm-actions">
-            <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
-            <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
-          </div>
-        </div>
-      </div>
 
       <!-- 全部排查完成 → 事件小结 -->
       <template v-if="allChecksDone && !hasActiveRepair">
@@ -380,44 +348,6 @@
         </div>
       </section>
 
-      <!-- 反馈弹窗（保留：排查项登记反馈用） -->
-      <div v-if="feedbackModal.open" class="feedback-modal-overlay" @click.self="closeFeedbackModal">
-        <div class="feedback-modal">
-          <div class="fm-title">排查反馈</div>
-          <div class="fm-section">
-            <div class="fm-section-label">快速标记</div>
-            <div class="fm-items">
-              <div v-for="(fm, fmi) in feedbackModal.items" :key="fmi" class="fm-row">
-                <span class="fm-item-name">{{ fm.name }}</span>
-                <div class="fm-options">
-                  <label v-for="(opt, oi) in fm.options" :key="oi" class="fm-opt">
-                    <input type="radio" :name="'fm-' + fmi" v-model="fm.selected" :value="oi" /> {{ opt }}
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="fm-section">
-            <div class="fm-section-label">备注</div>
-            <textarea v-model="feedbackModal.notes" class="fm-notes" placeholder="其它发现或备注"></textarea>
-          </div>
-          <div class="fm-section">
-            <div class="fm-section-label">上传图片 <span class="fm-optional">（非必填）</span></div>
-            <div class="fm-upload">
-              <label class="fm-upload-btn">
-                <input type="file" accept="image/*" multiple style="display:none" @change="handleImageUpload" />
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span>选择图片</span>
-              </label>
-              <span class="fm-upload-hint">支持 JPG / PNG，单张不超过 10MB</span>
-            </div>
-          </div>
-          <div class="fm-actions">
-            <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
-            <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -575,39 +505,79 @@ const feedbackModal = reactive({
   notes: ''
 })
 
-// 反馈项配置（每个排查项的关键检查点）
+// 反馈项配置：按具体步骤明细行挂载，判断类明细才展示选项
 const feedbackConfig = {
-  0: [  // T1 液压系统故障排查
-    { name: '液压油箱外观及液位计外观', options: ['无异常', '有渗漏', '有湿润痕迹'] },
-    { name: '液压油箱外观及液位计数值一致性', options: ['一致', '不一致__(数值)'] },
-    { name: '检查软管段有无鼓包/老化/龟裂/渗油', options: ['无异常', '鼓包', '老化'] },
-    { name: '听诊泵吸入口有无气蚀噪声', options: ['无异常', '有噪声'] },
-    { name: '泵体有无异常温升', options: ['无异常', '异常__(数值)'] }
+  0: [
+    { stepIdx: 0, detailIdx: 0, name: '油箱焊缝渗漏', options: ['无渗漏油渍', '有湿润痕迹', '有明显渗漏'] },
+    { stepIdx: 0, detailIdx: 1, name: '放油堵状态', options: ['无湿润痕迹', '有湿润痕迹', '有滴漏'] },
+    { stepIdx: 0, detailIdx: 2, name: '液位计读数', options: ['读数一致', '读数不一致', '远程值异常'] },
+    { stepIdx: 0, detailIdx: 3, name: '连通阀状态', options: ['全开', '未全开', '卡滞'] },
+    { stepIdx: 2, detailIdx: 0, name: '法兰接头油渍', options: ['无油渍', '有油渍', '持续渗油'] },
+    { stepIdx: 2, detailIdx: 1, name: '软管段状态', options: ['无异常', '鼓包/老化', '龟裂/渗油'] },
+    { stepIdx: 2, detailIdx: 2, name: '支架/卡箍磨损', options: ['无磨损', '有磨损', '固定松动'] },
+    { stepIdx: 2, detailIdx: 3, name: '应力部位湿润', options: ['无湿润', '有湿润', '有渗油'] }
   ],
-  1: [  // T2 吸口堵塞
-    { name: '吸口滤网状态', options: ['无堵塞', '轻微堵塞', '严重堵塞'] },
-    { name: '吸口负压值', options: ['正常', '偏高__(数值)'] },
-    { name: '底部沉积物', options: ['无异常', '有金属屑', '有水分'] }
+  1: [
+    { stepIdx: 0, detailIdx: 0, name: '滤器堵塞', options: ['无堵塞', '轻微堵塞', '严重堵塞'] },
+    { stepIdx: 0, detailIdx: 1, name: '杂质沉积量', options: ['少量/正常', '较多', '大量堆积'] },
+    { stepIdx: 0, detailIdx: 2, name: '通流面积', options: ['基本正常', '轻度减少', '明显减少'] },
+    { stepIdx: 0, detailIdx: 3, name: '滤网骨架', options: ['无变形破损', '轻微变形', '破损需更换'] },
+    { stepIdx: 1, detailIdx: 0, name: '额定流量负压', options: ['正常记录', '偏高', '超过处置值'] },
+    { stepIdx: 1, detailIdx: 1, name: '历史基准对比', options: ['接近基准', '高于基准', '明显异常'] },
+    { stepIdx: 1, detailIdx: 2, name: '负压趋势', options: ['趋势平稳', '异常升高', '波动明显'] },
+    { stepIdx: 2, detailIdx: 1, name: '底部油液状态', options: ['无异常', '有水分', '有絮状物'] },
+    { stepIdx: 2, detailIdx: 2, name: '铁磁性颗粒', options: ['未见金属屑', '少量金属屑', '明显金属屑'] }
   ],
-  2: [  // T3 传感器
-    { name: '传感器校验', options: ['正常', '偏差__(数值)'] },
-    { name: '供电回路', options: ['正常', '不稳定'] },
-    { name: '电磁干扰', options: ['无干扰', '有干扰'] }
+  2: [
+    { stepIdx: 0, detailIdx: 0, name: '参照校验', options: ['读数一致', '轻微偏差', '明显偏差'] },
+    { stepIdx: 0, detailIdx: 1, name: '读数偏差', options: ['偏差可接受', '偏差偏大', '偏差失准'] },
+    { stepIdx: 0, detailIdx: 2, name: '供电回路', options: ['正常稳定', '电压波动', '供电异常'] },
+    { stepIdx: 0, detailIdx: 3, name: '信号回路', options: ['无异常', '接地异常', '短路异常'] },
+    { stepIdx: 1, detailIdx: 0, name: '屏蔽接地', options: ['正常可靠', '接地不良', '屏蔽层破损'] },
+    { stepIdx: 1, detailIdx: 1, name: '大功率设备干扰', options: ['未见干扰', '偶发干扰', '明显干扰'] },
+    { stepIdx: 1, detailIdx: 2, name: '信号噪声', options: ['无高频噪声', '偶发噪声', '持续噪声'] },
+    { stepIdx: 1, detailIdx: 3, name: '安装支架', options: ['无松动', '轻微松动', '振动明显'] }
   ],
-  3: [  // T4 管线泄漏
-    { name: '高压管路接头/焊缝', options: ['无异常', '有渗漏', '有湿润'] },
-    { name: '执行机构密封', options: ['无外泄漏', '有外泄漏'] },
-    { name: '控制阀内泄', options: ['无内泄', '有内泄'] },
-    { name: '法兰密封垫片', options: ['无异常', '湿润', '渗油'] }
+  3: [
+    { stepIdx: 0, detailIdx: 0, name: '接头/焊缝油渍', options: ['无油渍', '有湿润痕迹', '有明显渗漏'] },
+    { stepIdx: 0, detailIdx: 1, name: '应力集中部位', options: ['无异常', '有湿润', '有裂纹/渗漏'] },
+    { stepIdx: 0, detailIdx: 2, name: '支架磨损渗漏', options: ['无磨损', '有磨损痕迹', '磨损伴随渗漏'] },
+    { stepIdx: 0, detailIdx: 3, name: '法兰垫片湿润', options: ['无异常', '湿润', '渗油'] },
+    { stepIdx: 1, detailIdx: 0, name: '液压缸外泄漏', options: ['无外泄漏', '轻微渗油', '明显外泄漏'] },
+    { stepIdx: 1, detailIdx: 1, name: '马达轴封渗油', options: ['无渗油', '轻微渗油', '明显渗油'] },
+    { stepIdx: 1, detailIdx: 2, name: '执行机构动作', options: ['动作平稳', '轻微爬行', '卡滞/冲击'] },
+    { stepIdx: 1, detailIdx: 3, name: '端盖温度', options: ['正常记录', '偏高', '异常升温'] }
   ]
 }
 
+function createFeedbackDraft(idx) {
+  return (feedbackConfig[idx] || []).map(c => ({ ...c, selected: 0 }))
+}
+
+function ensureFeedbackDraft(item, idx) {
+  if (!item.feedbackDraft || !item.feedbackDraft.length) {
+    item.feedbackDraft = createFeedbackDraft(idx)
+  }
+  if (item.feedbackNotes === undefined) item.feedbackNotes = ''
+  return item.feedbackDraft
+}
+
+function getDetailFeedbackItem(item, stepIdx, detailIdx) {
+  const idx = product.value?.check?.checkItems?.indexOf(item) ?? -1
+  const draft = ensureFeedbackDraft(item, idx)
+  return draft.find(f => f.stepIdx === stepIdx && f.detailIdx === detailIdx)
+}
+
+function isFeedbackOptionAbnormal(feedbackItem) {
+  return Number(feedbackItem?.selected || 0) !== 0
+}
+
 function openFeedbackModal(idx) {
-  const config = feedbackConfig[idx] || []
-  feedbackModal.currentIdx = idx
-  feedbackModal.items = config.map(c => ({ name: c.name, options: c.options, selected: 0 }))
-  feedbackModal.notes = ''
-  feedbackModal.open = true
+  const item = product.value?.check?.checkItems?.[idx]
+  if (!item) return
+  ensureFeedbackDraft(item, idx)
+  checkCardsExpanded[idx] = true
+  scrollIntoCard('check-feedback-' + idx)
 }
 
 function closeFeedbackModal() {
@@ -623,40 +593,33 @@ function handleImageUpload(e) {
 function markNormal(idx) {
   const items = product.value?.check?.checkItems
   if (!items || !items[idx]) return
-  items[idx].status = 'done-normal'
-  items[idx].feedback = []
-  // 折叠当前排查卡片
-  checkCardsExpanded[idx] = false
-  // 激活下一项
-  if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
-    items[idx + 1].status = 'active'
-    checkCardsExpanded[idx + 1] = true
-    scrollIntoCard('check-card-' + (idx + 1))
-    // 通知助手：正常，进入下一项
-    eventAssistantAction[props.event.id] = 'check_normal_' + idx + '|' + (idx + 1)
-  }
-  // 全部完成检查
-  checkAllDone()
+  const draft = ensureFeedbackDraft(items[idx], idx)
+  draft.forEach(f => { f.selected = 0 })
+  items[idx].feedbackNotes = ''
+  submitInlineFeedback(idx)
 }
 
 function submitFeedback() {
-  const idx = feedbackModal.currentIdx
+  if (feedbackModal.currentIdx < 0) return
+  submitInlineFeedback(feedbackModal.currentIdx)
+}
+
+function submitInlineFeedback(idx) {
   const items = product.value?.check?.checkItems
   if (!items || !items[idx]) return
+  const item = items[idx]
+  const draft = ensureFeedbackDraft(item, idx)
 
-  const hasAbnormal = feedbackModal.items.some(f => {
-    const opt = f.options[f.selected]
-    return opt && !opt.startsWith('无') && !opt.startsWith('一致') && !opt.startsWith('正常')
-  })
+  const hasAbnormal = draft.some(f => isFeedbackOptionAbnormal(f))
 
-  items[idx].status = hasAbnormal ? 'done-abnormal' : 'done-normal'
-  items[idx].feedback = feedbackModal.items.map(f => ({
+  item.status = hasAbnormal ? 'done-abnormal' : 'done-normal'
+  item.feedback = draft.map(f => ({
     item: f.name,
     selectedIdx: f.selected,
     display: f.options[f.selected],
-    status: f.options[f.selected] && !f.options[f.selected].startsWith('无') && !f.options[f.selected].startsWith('一致') && !f.options[f.selected].startsWith('正常') ? 'abnormal' : 'normal'
+    status: isFeedbackOptionAbnormal(f) ? 'abnormal' : 'normal'
   }))
-  items[idx].notes = feedbackModal.notes
+  item.notes = item.feedbackNotes || ''
 
   closeFeedbackModal()
 
@@ -676,6 +639,7 @@ function submitFeedback() {
   checkCardsExpanded[idx] = false
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
+    ensureFeedbackDraft(items[idx + 1], idx + 1)
     checkCardsExpanded[idx + 1] = true
     scrollIntoCard('check-card-' + (idx + 1))
     // 通知助手
@@ -723,6 +687,7 @@ function markItemNotFixed(idx) {
   // 激活下一个排查项
   if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
     items[idx + 1].status = 'active'
+    ensureFeedbackDraft(items[idx + 1], idx + 1)
     checkCardsExpanded[idx + 1] = true
     scrollIntoCard('check-card-' + (idx + 1))
     // 通知助手
@@ -869,48 +834,6 @@ const trendAreaPoints = computed(() => {
   return [...linePoints, `${lastX.toFixed(1)},${bottomY.toFixed(1)}`, `${firstX.toFixed(1)},${bottomY.toFixed(1)}`].join(' ')
 })
 
-const alertPoints = computed(() => {
-  const data = currentTrendData.value
-  if (!data || !data.length) return []
-  const W = 800, H = 220, PAD_L = 60, PAD_R = 20, PAD_T = 20, PAD_B = 40
-  const values = data.map(d => d.value)
-  const minV = Math.min(...values) * 0.9
-  const maxV = Math.max(...values) * 1.1
-  const threshold = selectedSensor.value?.threshold
-  const rangeMax = selectedSensor.value?.range ? parseFloat(selectedSensor.value.range.split('-')[1]) : null
-  const limit = threshold || rangeMax
-  return data
-    .map((d, i) => {
-      const x = PAD_L + (i / Math.max(data.length - 1, 1)) * (W - PAD_L - PAD_R)
-      const y = PAD_T + (1 - (d.value - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
-      return { x, y, v: d.value }
-    })
-    .filter(p => limit ? p.v > limit : false)
-})
-
-// 阈值线 Y 坐标
-const thresholdYPos = computed(() => {
-  const s = selectedSensor.value
-  if (!s) return 0
-  const data = currentTrendData.value
-  if (!data.length) return 0
-  const values = data.map(d => d.value)
-  const minV = Math.min(...values) * 0.9
-  const maxV = Math.max(...values) * 1.1
-  const threshold = s.threshold || (s.range ? parseFloat(s.range.split('-')[1]) : null)
-  if (!threshold) return 0
-  const H = 220, PAD_T = 20, PAD_B = 40
-  return PAD_T + (1 - (threshold - minV) / (maxV - minV)) * (H - PAD_T - PAD_B)
-})
-
-const trendThresholdLabel = computed(() => {
-  const s = selectedSensor.value
-  if (!s) return ''
-  if (s.threshold) return `${s.threshold}${s.unit}`
-  if (s.range) return `${s.range}${s.unit}`
-  return ''
-})
-
 // 趋势线颜色（根据传感器状态）
 const trendColor = computed(() => {
   const s = selectedSensor.value
@@ -928,22 +851,20 @@ function buildProduct(ev) {
   const firstSensor = ev.snapshot?.sensors?.[0] || { name: '主参数', value: 0, unit: '' }
 
   // ========== 🧠 AI 初步分析 ==========
+  const relatedNames = (ev.snapshot?.sensors || []).slice(1, 3).map(s => s.name).join('、') || '辅助参数'
   const ai = {
-    verdict: firstSensor.value > (firstSensor.threshold || 0)
-      ? `${firstSensor.name}达到 ${firstSensor.value}${firstSensor.unit}，超过阈值 ${firstSensor.threshold}${firstSensor.unit}，系统已自动触发本次事件。`
-      : `${title}已触发阈值告警，需结合多维数据综合判断。`,
-    dataLine: `本次事件发生时，${firstSensor.name}为 ${firstSensor.value}${firstSensor.unit}，突破安全阈值 ${firstSensor.threshold}${firstSensor.unit}，且持续 12 分钟未见回落；同时关联的${(ev.snapshot?.sensors || []).slice(1, 3).map(s => s.name).join('、') || '辅助参数'}也呈现偏离。`,
+    verdict: `${firstSensor.name}当前为 ${firstSensor.value}${firstSensor.unit}，系统结合多项传感器实际数据与短时趋势判定本次事件需要处置。`,
+    dataLine: `本次事件发生时，${firstSensor.name}为 ${firstSensor.value}${firstSensor.unit}，近 12 分钟未见回落；同时关联的${relatedNames}也出现同步偏离，需联合评估整体运行状态。`,
     advice: `建议立即按"诊断-隔离-排查-维修-验收"流程处置，优先排查与${firstSensor.name}直接耦合的回路与执行机构，避免故障扩散。`,
     metrics: (ev.snapshot?.sensors || []).slice(0, 4).map((s, idx) => ({
       name: s.name,
       trend: s.status === 'over' ? 'up' : (idx === 1 ? 'down' : 'flat'),
       trendLabel: s.status === 'over' ? '上升' : (idx === 1 ? '下降' : '稳定'),
-      range: s.range || `正常 ≤ ${s.threshold}${s.unit}`,
       current: s.value,
       unit: s.unit,
       analyze: s.status === 'over'
-        ? `已超阈值 ${(((s.value - s.threshold) / s.threshold) * 100).toFixed(1)}%，需要紧急处理`
-        : `处于正常区间，运行平稳`
+        ? `与关联参数共同偏离，需纳入联合诊断`
+        : `走势相对平稳，可作为对照参数`
     })),
     mechanism: `${sys}在工况下出现${firstSensor.name}异常，结合物理机理分析：冷却介质流量下降、换热效率降低或执行机构卡滞均可能引发类似表征；当前数据更倾向于"流量不足 + 换热下降"复合原因。`,
     faultMatch: (ev.aiAnalysis?.faultTable || []).map(f => ({
@@ -1181,6 +1102,7 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     const items = product.value?.check?.checkItems
     if (items && items.length > 0 && items[0].status === 'pending') {
       items[0].status = 'active'
+      ensureFeedbackDraft(items[0], 0)
       checkCardsExpanded[0] = true
     }
   }
@@ -1233,6 +1155,7 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
     const items = product.value?.check?.checkItems
     if (items && items.length > 0 && items[0].status === 'pending') {
       items[0].status = 'active'
+      ensureFeedbackDraft(items[0], 0)
       checkCardsExpanded[0] = true
     }
     pulseInto('check', 700)
@@ -1267,11 +1190,42 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
   pulseInto(section, 700)
 })
 
-// 右侧 chip 快速反馈 → 只触发左侧原有按钮函数，不修改额外阶段状态
+function applyNaturalLanguageCheckFeedback(key, rawText = '') {
+  const items = product.value?.check?.checkItems || []
+  const activeIdx = items.findIndex(i => i.status === 'active')
+  if (activeIdx < 0) return false
+  const item = items[activeIdx]
+  const draft = ensureFeedbackDraft(item, activeIdx)
+  const rules = {
+    tank_weld_leak_obvious: { names: ['油箱焊缝渗漏'], option: 2 },
+    tank_weld_wet: { names: ['油箱焊缝渗漏'], option: 1 },
+    hose_crack_leak: { names: ['软管段状态'], option: 2 },
+    flange_oil_stain: { names: ['法兰接头油渍', '接头/焊缝油渍'], option: 1 },
+    filter_block_severe: { names: ['滤器堵塞'], option: 2 },
+    sensor_deviation_obvious: { names: ['参照校验', '读数偏差'], option: 2 }
+  }
+  const rule = rules[key]
+  if (!rule) return false
+  const target = draft.find(f => rule.names.some(name => f.name.includes(name)))
+  if (!target) return false
+  target.selected = Math.min(rule.option, target.options.length - 1)
+  item.feedbackNotes = rawText ? `右侧助手识别：${rawText}` : item.feedbackNotes
+  checkCardsExpanded[activeIdx] = true
+  scrollIntoCard('check-card-' + activeIdx)
+  return true
+}
+
+// 右侧 chip / 自然语言快速反馈 → 只触发左侧原有按钮函数，不修改额外阶段状态
 watch(() => eventAssistantCommand[props.event?.id], (command) => {
   if (!command) return
-  const action = String(command).split('|')[0]
+  const parts = String(command).split('|')
+  const action = parts[0]
   const items = product.value?.check?.checkItems || []
+
+  if (action === 'nl_check_feedback') {
+    applyNaturalLanguageCheckFeedback(parts[1], decodeURIComponent(parts[2] || ''))
+    return
+  }
 
   if (action === 'chip_check_normal') {
     const activeIdx = items.findIndex(i => i.status === 'active')
@@ -2192,9 +2146,25 @@ function formatTime(t) {
 .ci-steps-label { font-size: var(--font-sm); font-weight: 700; color: var(--warning); margin-bottom: 8px; }
 .ci-step { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-secondary); }
 .ci-step:last-child { border-bottom: none; }
-.ci-step-num { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
-.ci-step-details { margin: 0; padding-left: 20px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.7; }
-.ci-step-details li { margin-bottom: 2px; }
+.ci-step-num { font-size: var(--font-sm); font-weight: 700; color: var(--text-primary); margin-bottom: 5px; line-height: 1.5; }
+.ci-step-details { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.62; }
+.ci-detail-row { margin-bottom: 5px; }
+.ci-detail-with-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  padding: 2px 0;
+}
+.ci-detail-text { min-width: 0; flex: 1 1 auto; line-height: 1.62; }
+.ci-detail-feedback {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
 .ci-step-diagram { font-size: var(--font-xs); color: var(--text-muted); margin-top: 6px; font-style: italic; }
 .ci-actions { display: flex; gap: 12px; justify-content: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-primary); }
 .ci-action-btn { font-size: var(--font-base); padding: 10px 28px; border-radius: 20px; border: 2px solid var(--accent); cursor: pointer; font-weight: 600; transition: all 0.2s; background: var(--bg-surface); }
@@ -2209,36 +2179,89 @@ function formatTime(t) {
 .ci-f-abnormal { color: var(--danger); font-weight: 600; }
 .ci-f-normal { color: var(--success); }
 
-/* === 反馈弹窗（截图3样式） === */
-.feedback-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.feedback-modal { background: var(--bg-surface); border-radius: 12px; width: 90%; max-width: 560px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-.fm-title { font-size: var(--font-lg); font-weight: 700; color: var(--text-primary); padding: 20px 20px 16px; border-bottom: 1px solid var(--border-primary); }
-.fm-section { padding: 16px 20px; }
-.fm-section-label { font-size: var(--font-base); font-weight: 700; color: var(--text-primary); margin-bottom: 10px; background: rgba(250,173,20,0.1); padding: 4px 8px; border-radius: 4px; display: inline-block; }
-.fm-items { display: flex; flex-direction: column; gap: 8px; }
-.fm-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border-secondary); }
-.fm-item-name { flex: 1; min-width: 200px; font-size: var(--font-sm); color: var(--text-primary); }
-.fm-options { display: flex; gap: 12px; flex-wrap: wrap; }
-.fm-opt { font-size: var(--font-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.fm-opt input { cursor: pointer; }
-.fm-notes { width: 100%; min-height: 60px; padding: 10px; border: 1px solid var(--border-primary); border-radius: 6px; font-size: var(--font-sm); color: var(--text-primary); background: var(--bg-hover); resize: vertical; font-family: inherit; }
-
-.fm-optional { color: var(--text-muted); font-weight: 400; font-size: var(--font-sm); }
-.fm-upload { display: flex; align-items: center; gap: 12px; }
-.fm-upload-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border: 1px dashed var(--border-primary);
-  border-radius: 8px; background: var(--bg-hover); color: var(--text-secondary);
-  font-size: var(--font-sm); cursor: pointer; transition: all 0.15s;
+/* === 排查明细行内反馈 === */
+.ci-inline-opt {
+  min-height: 23px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s;
 }
-.fm-upload-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
-.fm-upload-hint { font-size: var(--font-xs); color: var(--text-muted); }
-.fm-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--border-primary); }
-.fm-btn { font-size: var(--font-base); padding: 8px 24px; border-radius: 20px; border: 2px solid var(--accent); cursor: pointer; font-weight: 600; }
-.fm-cancel { background: var(--bg-surface); color: var(--text-secondary); }
-.fm-submit { background: var(--accent); color: #fff; border-color: var(--accent); }
-.fm-submit:hover { background: var(--accent-hover); }
-
+.ci-inline-opt:has(input:checked) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  font-weight: 600;
+}
+.ci-inline-opt input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 1180px) {
+  .ci-detail-with-feedback {
+    gap: 6px;
+  }
+  .ci-inline-opt {
+    min-height: 22px;
+    padding: 2px 5px;
+    gap: 2px;
+    font-size: 11px;
+  }
+}
+@media (max-width: 860px) {
+  .ci-detail-with-feedback {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .ci-detail-feedback {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+.ci-inline-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+.ci-inline-note-label {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.ci-inline-textarea {
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+}
+.ci-inline-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12);
+}
 /* === 维修完成按钮 === */
 .repair-actions { display: flex; gap: 12px; justify-content: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-primary); }
 .ra-btn { font-size: var(--font-base); padding: 10px 24px; border-radius: 20px; border: 2px solid var(--accent); cursor: pointer; font-weight: 600; transition: all 0.2s; background: var(--bg-surface); }
