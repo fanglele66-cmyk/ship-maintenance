@@ -358,6 +358,12 @@
                 <span class="rk-text">{{ product.report.followup }}</span>
               </div>
             </div>
+            <div v-if="manualFeedback" class="report-key" style="margin-top:10px">
+              <div class="rk-row">
+                <span class="rk-label">手动反馈</span>
+                <span class="rk-text">{{ manualFeedback }}</span>
+              </div>
+            </div>
             <div v-if="event.timeline && event.timeline.length" class="report-timeline">
               <div class="rtl-title">📋 处理时间线</div>
               <div class="timeline-list">
@@ -370,37 +376,45 @@
             </div>
             <div class="report-footer">本报告由系统自动生成 · 维修完成后写入 · 仅供运维归档</div>
           </div>
-          <!-- 按钮区 -->
-          <div v-if="currentStage !== 'S5' || needsManualClose" class="repair-actions">
-            <template v-if="needsManualClose">
-              <button class="ra-btn ra-manual" @click="openManualCloseModal">请手动登记处理反馈</button>
-            </template>
-            <template v-else>
-              <button class="ra-btn ra-resolved" @click="confirmCloseEvent">确认闭环</button>
-            </template>
-          </div>
+          <!-- 按钮已移至右侧助手对话 -->
         </div>
       </section>
 
-      <!-- 手动闭环弹窗 -->
-      <div v-if="manualCloseModal.open" class="feedback-modal-overlay" @click.self="closeManualCloseModal">
+      <!-- 反馈弹窗（保留：排查项登记反馈用） -->
+      <div v-if="feedbackModal.open" class="feedback-modal-overlay" @click.self="closeFeedbackModal">
         <div class="feedback-modal">
-          <div class="fm-title">手动登记处理反馈</div>
+          <div class="fm-title">排查反馈</div>
           <div class="fm-section">
-            <div class="fm-section-label">实际异常情况</div>
-            <textarea v-model="manualCloseModal.actualFault" class="fm-notes" placeholder="请描述最终确认的异常情况、原因分析等"></textarea>
-          </div>
-          <div class="fm-section">
-            <div class="fm-section-label">处理方式</div>
-            <textarea v-model="manualCloseModal.handlingMethod" class="fm-notes" placeholder="请描述采取的处理措施、维修方案、验收结果等"></textarea>
+            <div class="fm-section-label">快速标记</div>
+            <div class="fm-items">
+              <div v-for="(fm, fmi) in feedbackModal.items" :key="fmi" class="fm-row">
+                <span class="fm-item-name">{{ fm.name }}</span>
+                <div class="fm-options">
+                  <label v-for="(opt, oi) in fm.options" :key="oi" class="fm-opt">
+                    <input type="radio" :name="'fm-' + fmi" v-model="fm.selected" :value="oi" /> {{ opt }}
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="fm-section">
             <div class="fm-section-label">备注</div>
-            <textarea v-model="manualCloseModal.notes" class="fm-notes" placeholder="其它补充说明"></textarea>
+            <textarea v-model="feedbackModal.notes" class="fm-notes" placeholder="其它发现或备注"></textarea>
+          </div>
+          <div class="fm-section">
+            <div class="fm-section-label">上传图片 <span class="fm-optional">（非必填）</span></div>
+            <div class="fm-upload">
+              <label class="fm-upload-btn">
+                <input type="file" accept="image/*" multiple style="display:none" @change="handleImageUpload" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>选择图片</span>
+              </label>
+              <span class="fm-upload-hint">支持 JPG / PNG，单张不超过 10MB</span>
+            </div>
           </div>
           <div class="fm-actions">
-            <button class="fm-btn fm-cancel" @click="closeManualCloseModal">取消</button>
-            <button class="fm-btn fm-submit" @click="submitManualClose">提交闭环</button>
+            <button class="fm-btn fm-cancel" @click="closeFeedbackModal">取消</button>
+            <button class="fm-btn fm-submit" @click="submitFeedback">提交</button>
           </div>
         </div>
       </div>
@@ -444,6 +458,7 @@ const sectionMap = {
 
 const eventStage = inject('eventStage', reactive({}))
 const eventAssistantAction = inject('eventAssistantAction', reactive({}))
+const eventAssistantCommand = inject('eventAssistantCommand', reactive({}))
 
 const currentStage = computed(() => eventStage[props.event?.id] || 'S1')
 const currentSection = computed(() => sectionMap[currentStage.value])
@@ -459,6 +474,7 @@ const reportExpanded = ref(false)
 const showReportCard = ref(false)
 const needsManualClose = ref(false)
 const isFalseAlarm = ref(false)
+const manualFeedback = ref('')
 
 function scrollIntoCard(id, delay = 50) {
   setTimeout(() => {
@@ -531,15 +547,14 @@ const hasActiveRepair = computed(() => {
   return items.some(i => i.status === 'done-abnormal' && i.repaired === undefined)
 })
 
-// 所有卡片已打光，仍然未解决
+// 所有卡片已打光，且异常项全部未解决 → 才需要手动登记
 const allRepairsExhausted = computed(() => {
   if (!allChecksDone.value) return false
   if (hasActiveRepair.value) return false
   const items = product.value?.check?.checkItems || []
-  const hasAbnormal = items.some(i => i.status === 'done-abnormal')
-  const allAbnormalResolved = hasAbnormal && items.every(i => i.status !== 'done-abnormal' || i.repaired === true)
-  if (!hasAbnormal || allAbnormalResolved) return false
-  return items.some(i => i.status === 'done-abnormal' && i.repaired === false)
+  const abnormalItems = items.filter(i => i.status === 'done-abnormal')
+  if (abnormalItems.length === 0) return false
+  return abnormalItems.every(i => i.repaired === false)
 })
 
 // 全部排查正常（无异常项）
@@ -552,14 +567,6 @@ const allChecksNormal = computed(() => {
 // 是否全部排查已走完（S5阶段展示事件小结）
 const shouldShowReport = computed(() => currentStage.value === 'S5')
 
-// 手动闭环弹窗
-const manualCloseModal = reactive({
-  open: false,
-  actualFault: '',
-  handlingMethod: '',
-  notes: ''
-})
-
 // ============ 排查项卡片交互（产物区操作按钮）============
 const feedbackModal = reactive({
   open: false,
@@ -567,26 +574,6 @@ const feedbackModal = reactive({
   items: [],
   notes: ''
 })
-
-function openManualCloseModal() {
-  manualCloseModal.open = true
-  manualCloseModal.actualFault = ''
-  manualCloseModal.handlingMethod = ''
-  manualCloseModal.notes = ''
-}
-
-function closeManualCloseModal() {
-  manualCloseModal.open = false
-}
-
-function submitManualClose() {
-  if (!props.event) return
-  // 写入 eventStage 作为手动闭环标记
-  eventStage[props.event.id] = 'S5'
-  eventAssistantAction[props.event.id] = 'manual_close'
-  closeManualCloseModal()
-  reportExpanded.value = true
-}
 
 // 反馈项配置（每个排查项的关键检查点）
 const feedbackConfig = {
@@ -645,6 +632,8 @@ function markNormal(idx) {
     items[idx + 1].status = 'active'
     checkCardsExpanded[idx + 1] = true
     scrollIntoCard('check-card-' + (idx + 1))
+    // 通知助手：正常，进入下一项
+    eventAssistantAction[props.event.id] = 'check_normal_' + idx + '|' + (idx + 1)
   }
   // 全部完成检查
   checkAllDone()
@@ -689,6 +678,8 @@ function submitFeedback() {
     items[idx + 1].status = 'active'
     checkCardsExpanded[idx + 1] = true
     scrollIntoCard('check-card-' + (idx + 1))
+    // 通知助手
+    eventAssistantAction[props.event.id] = 'check_normal_' + idx + '|' + (idx + 1)
   }
 
   // 全部完成检查
@@ -719,6 +710,8 @@ function markItemRepaired(idx) {
   showReportCard.value = true
   reportExpanded.value = true
   scrollIntoCard('event-record-card')
+  // 通知助手：维修已解决
+  eventAssistantAction[props.event.id] = 'repair_solved'
 }
 
 function markItemNotFixed(idx) {
@@ -732,12 +725,9 @@ function markItemNotFixed(idx) {
     items[idx + 1].status = 'active'
     checkCardsExpanded[idx + 1] = true
     scrollIntoCard('check-card-' + (idx + 1))
+    // 通知助手
+    eventAssistantAction[props.event.id] = 'repair_not_fixed_' + idx + '|' + (idx + 1)
   }
-}
-
-function confirmCloseEvent() {
-  if (!props.event) return
-  eventStage[props.event.id] = 'S5'
 }
 
 // AI 子模块展开状态（主要默认展开，次要默认收起）
@@ -1165,6 +1155,7 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     reportExpanded.value = false
     needsManualClose.value = false
     isFalseAlarm.value = false
+    manualFeedback.value = ''
     showReportCard.value = false
     aiSubs.conclusion = true
     aiSubs.data = true
@@ -1204,19 +1195,23 @@ watch(allChecksNormal, (normal) => {
     scrollIntoCard('event-record-card')
     if (props.event) {
       eventStage[props.event.id] = 'S4'
+      eventAssistantAction[props.event.id] = 'needs_manual_close'
     }
   }
 })
 
-// 所有牌打光 → 触发事件记录 + 手动闭环入口
+// 所有牌打光且均未解决 → 触发事件记录 + 手动闭环入口
 watch(allRepairsExhausted, (exhausted) => {
   if (exhausted) {
+    const hasResolvedRepair = (product.value?.check?.checkItems || []).some(i => i.status === 'done-abnormal' && i.repaired === true)
+    if (hasResolvedRepair) return
     showReportCard.value = true
     reportExpanded.value = true
     needsManualClose.value = true
     scrollIntoCard('event-record-card')
     if (props.event) {
       eventStage[props.event.id] = 'S4'
+      eventAssistantAction[props.event.id] = 'needs_manual_close'
     }
   }
 })
@@ -1256,12 +1251,47 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
     return
   }
 
+  // 手动闭环：记录用户反馈文本
+  if (action.startsWith('manual_close_done')) {
+    const feedback = action.split('|').slice(1).join('|')
+    manualFeedback.value = feedback
+    return
+  }
+
+
   const section = cardToSection[action]
   if (!section) return
 
   aiExpanded.value = (section === 'ai')
   reportExpanded.value = (section === 'report')
   pulseInto(section, 700)
+})
+
+// 右侧 chip 快速反馈 → 只触发左侧原有按钮函数，不修改额外阶段状态
+watch(() => eventAssistantCommand[props.event?.id], (command) => {
+  if (!command) return
+  const action = String(command).split('|')[0]
+  const items = product.value?.check?.checkItems || []
+
+  if (action === 'chip_check_normal') {
+    const activeIdx = items.findIndex(i => i.status === 'active')
+    if (activeIdx >= 0) markNormal(activeIdx)
+    return
+  }
+  if (action === 'chip_open_feedback') {
+    const activeIdx = items.findIndex(i => i.status === 'active')
+    if (activeIdx >= 0) openFeedbackModal(activeIdx)
+    return
+  }
+  if (action === 'chip_repair_solved') {
+    const activeIdx = items.findIndex(i => i.status === 'done-abnormal' && i.repaired === undefined)
+    if (activeIdx >= 0) markItemRepaired(activeIdx)
+    return
+  }
+  if (action === 'chip_repair_not_fixed') {
+    const activeIdx = items.findIndex(i => i.status === 'done-abnormal' && i.repaired === undefined)
+    if (activeIdx >= 0) markItemNotFixed(activeIdx)
+  }
 })
 
 function handleBack() { emit('back') }

@@ -49,12 +49,14 @@ const eventStore = useEventStore()
 const eventUnread = eventStore.eventUnread
 const eventStage = reactive({})
 const eventAssistantAction = reactive({})
+const eventAssistantCommand = reactive({})
 const totalUnread = computed(() => Object.values(eventUnread).reduce((a, b) => a + b, 0))
 
 provide('eventUnread', eventUnread)
 provide('totalUnread', totalUnread)
 provide('eventStage', eventStage)
 provide('eventAssistantAction', eventAssistantAction)
+provide('eventAssistantCommand', eventAssistantCommand)
 
 // 初始化未读计数：有 AI 分析的事件 = 2 条未读
 eventStore.events.forEach(ev => {

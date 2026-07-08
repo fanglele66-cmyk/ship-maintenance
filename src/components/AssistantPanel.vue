@@ -286,6 +286,7 @@ onMounted(() => {
 const eventUnread = inject('eventUnread', reactive({}))
 const eventStage = inject('eventStage', reactive({}))
 const eventAssistantAction = inject('eventAssistantAction', reactive({}))
+const eventAssistantCommand = inject('eventAssistantCommand', reactive({}))
 const totalUnread = inject('totalUnread', ref(0))
 // 本地状态
 const followupSent = reactive({})
@@ -423,7 +424,40 @@ function getChipsByContext() {
       return [{ text: '这种原因多久能恢复？', action: 'send' }, { text: '还有其他可能原因吗？', action: 'send' }, { text: '开始排查，为我生成方案', action: 'start_check' }]
     }
     if (stage === 'S2') {
-      // 排查阶段，操作在左侧产物区，助手无需推荐提问
+      const action = eventAssistantAction[ec.id]
+      if (action === 'check_activate_first' || action?.startsWith('check_normal_') || action?.startsWith('repair_not_fixed_')) {
+        return [
+          { text: '一切正常，继续排查', action: 'chip_check_normal', highlight: true },
+          { text: '登记异常反馈', action: 'chip_open_feedback' }
+        ]
+      }
+      return []
+    }
+    if (stage === 'S4') {
+      const action = eventAssistantAction[ec.id]
+      // 维修没解决 → 左侧已跳到下一项排查，chip 切到排查态
+      if (action?.startsWith('repair_not_fixed_')) {
+        return [
+          { text: '一切正常，继续排查', action: 'chip_check_normal', highlight: true },
+          { text: '登记异常反馈', action: 'chip_open_feedback' }
+        ]
+      }
+      // 活跃维修态（异常刚发现 → 维修卡展开中）
+      if (action === 'warning' || action?.startsWith('check_abnormal_')) {
+        return [
+          { text: '修好了，事件已解决', action: 'chip_repair_solved', highlight: true },
+          { text: '维修了，但事件仍异常', action: 'chip_repair_not_fixed' }
+        ]
+      }
+      if (action === 'repair_solved') {
+        return [
+          { text: '确认闭环，无需补充', action: 'confirm_close', highlight: true },
+          { text: '还有其它要补充', action: 'manual_close_form' }
+        ]
+      }
+      if (action === 'needs_manual_close') {
+        return [{ text: '手动登记处理反馈', action: 'manual_close_form', highlight: true }]
+      }
       return []
     }
     if (stage === 'S5') {
@@ -487,8 +521,10 @@ function pushMsg(eventId, msg) {
   eventStore.addMessage(eventId, { role: 'assistant', ts: Date.now(), ...msg, content: msg.content || '' })
   const inDetail = props.mode === 'event' && props.eventContext?.id === eventId
   if (!inDetail) incUnread(eventId)
-  // 告知 ProductDrawer 助手动作
-  eventAssistantAction[eventId] = msg.cardType || msg.actionType || 'text'
+  // 有 cardType 的信号才传给产物区，避免覆盖 chip 用的 eventAssistantAction
+  if (msg.cardType) {
+    eventAssistantAction[eventId] = msg.cardType
+  }
   nextTick(() => { if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight })
 }
 
@@ -652,19 +688,56 @@ watch(() => props.mode, (newMode) => {
 watch(() => messages.value.length, () => refreshChips())
 watch(() => eventStore.selectedEventId, (id) => { if (!id) { Object.keys(followupTimers).forEach(k => clearTimeout(followupTimers[k])); followupTimers = {} } })
 
-// ============ 产物区操作 → 助手响应（闭环联动）============
+// ============ 排查/维修伴随消息库 ============
+const CHECK_NORMAL_MSGS = {
+  0: `✅ <b>液压系统故障排查</b> —— 油箱外观、管路接头、密封件各检查点均无异常，外观及液位数值一致。<br><br>已自动进入 <b>吸口堵塞排查</b>（4步 · 15个关键点），重点检查吸口滤网、负压值、沉积物和回油过滤器状态。请继续按左侧方案执行。`,
+  1: `✅ <b>吸口堵塞排查</b> —— 滤网通畅、负压正常、油液品质无异常表现，成功排除了堵塞类因素。<br><br>接下来排查 <b>压力传感器故障</b>（4步 · 15个关键点），核心确认传感器校验、供电回路与信号干扰情况。结合 AI 分析，根因可能出在采集环节而非机械本体。`,
+  2: `✅ <b>压力传感器故障排查</b> —— 读数校验通过、供电电压稳定 24V±3%、信号无噪声干扰，传感器及回路均无异常。<br><br>进入最后一环 <b>系统管线泄漏排查</b>（5步 · 19个关键点），沿管路走向逐段检查接头焊缝、执行机构密封和油箱附件。排查进入收官阶段。`,
+  3: `✅ <b>系统管线泄漏排查</b> —— 各接头焊缝、执行机构密封均无泄漏痕迹，管线状态良好。<br><br>四项排查已全部完成，左侧已生成事件记录报告。请通过下方快捷回复完成闭环。`
+}
+
+const REPAIR_NOT_FIXED_MSGS = {
+  0: `⚠️ <b>液压系统</b> 维修后问题仍未消除。建议结合维修记录升级处理策略，必要时联系岸基技术支持。<br><br>已自动进入下一排查项 <b>吸口堵塞排查</b>（4步 · 15个关键点），请继续按左侧方案逐项排查其它可能原因。`,
+  1: `⚠️ <b>吸口堵塞</b> 维修未解决。滤网已清洁、油液已更换，但症状依旧——原因很可能不在管路侧。<br><br>已进入 <b>压力传感器故障排查</b>（4步 · 15个关键点），重点校验传感器本体的准确性和信号回路。`,
+  2: `⚠️ <b>压力传感器</b> 换新后问题仍复现，已彻底排除传感器本体故障。<br><br>已进入最后一环 <b>系统管线泄漏排查</b>（5步 · 19个关键点），沿管路逐段排查接头焊缝与密封件状态。`,
+  3: `⚠️ <b>系统管线</b> 维修后仍未根除。四项排查均已尝试维修但问题依旧。<br><br>建议升级处置：联系岸基技术支持或安排坞修检查。左侧已生成事件记录，请通过下方快捷回复完成手动闭环。`
+}
 watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
   if (!action || !props.eventContext) return
   const eid = props.eventContext.id
   const ev = props.eventContext
 
+  // ========== 排查项正常 → 下一项 ==========
+  if (action.startsWith('check_normal_')) {
+    const parts = action.split('|')
+    const idx = parseInt(parts[0].split('_').pop())  // 当前项
+    const nextIdx = parseInt(parts[1])                // 下一项
+    setTimeout(() => {
+      pushMsg(eid, { cardType: null, content: CHECK_NORMAL_MSGS[idx] || `✅ T${idx + 1} 排查正常，已进入 T${nextIdx + 1}。` })
+      refreshChips()
+    }, 400)
+  }
+
+  // ========== 维修未解决 → 下一项 ==========
+  if (action.startsWith('repair_not_fixed_')) {
+    const parts = action.split('|')
+    const idx = parseInt(parts[0].split('_').pop())
+    const nextIdx = parseInt(parts[1])
+    setTimeout(() => {
+      pushMsg(eid, { cardType: null, content: REPAIR_NOT_FIXED_MSGS[idx] || `⚠️ T${idx + 1} 维修未解决，已进入 T${nextIdx + 1}。` })
+      refreshChips()
+    }, 400)
+  }
+
   // 单项异常 → 弹出维修方案卡片
   if (action.startsWith('check_abnormal_')) {
     setTimeout(() => {
       const idx = parseInt(action.split('_').pop())
+      const titles = ['液压系统故障', '吸口堵塞', '压力传感器故障', '管线泄漏']
+      const title = titles[idx] || ('T' + (idx + 1))
       pushMsg(eid, {
         cardType: null,
-        content: `排查项 T${idx + 1} 发现异常 👈 左侧已生成专项维修方案。<br><br>包含注意事项、维修步骤、备件清单和验收标准。请按步骤执行维修操作，完成后点击下方按钮反馈结果。`
+        content: `⚠️ <b>${title}</b> 排查发现异常 👈 左侧已生成专项维修方案，包含注意事项、维修步骤、备件清单与验收标准。<br><br>请按步骤执行维修操作，完成后反馈结果。`
       })
       pushWarningCard(eid)
       refreshChips()
@@ -715,6 +788,30 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
       })
       refreshChips()
     }, 500)
+  }
+
+  // 维修已解决 → 推送确认闭环 chip
+  if (action === 'repair_solved') {
+    setTimeout(() => {
+      pushMsg(eid, {
+        cardType: null,
+        content: `✅ 维修已完成！左侧产物区已生成事件记录报告，包含故障根因、维修内容、关键验收及遗留建议。`
+      })
+      // 确保不被后续 watch 覆盖
+      eventAssistantAction[eid] = 'repair_solved'
+      refreshChips()
+    }, 400)
+  }
+
+  // 需手动闭环 → 推送手动登记 chip
+  if (action === 'needs_manual_close') {
+    setTimeout(() => {
+      pushMsg(eid, {
+        cardType: null,
+        content: `⚠️ 全部排查已完成。左侧已生成事件记录报告，请通过下方快捷回复完成闭环。`
+      })
+      refreshChips()
+    }, 400)
   }
 
   // 未解决，继续排查
@@ -797,7 +894,31 @@ function handleRecommendedClick(q) {
   if (q.action === 'goto_event' && q.eventId) { eventStore.selectEvent(q.eventId); return }
   if (q.action === 'snooze') { handleSnooze(); return }
   if (q.action === 'mark_false_alarm') { handleMarkFalseAlarm(); return }
+  if (q.action === 'confirm_close') { handleConfirmClose(); return }
+  if (q.action === 'manual_close_form') { handleManualCloseForm(); return }
+  // 排查/维修 chip → 通过 eventAssistantAction 通知 ProductDrawer
+  if (q.action === 'chip_check_normal' || q.action === 'chip_open_feedback' || q.action === 'chip_repair_solved' || q.action === 'chip_repair_not_fixed') {
+    handleChipAction(q.action)
+    return
+  }
   inputText.value = q.text; sendMessage()
+}
+
+// ============ 排查/维修快速反馈 chip → 通知 ProductDrawer ============
+const CHIP_LABELS = {
+  chip_check_normal: '一切正常，继续排查',
+  chip_open_feedback: '登记异常反馈',
+  chip_repair_solved: '修好了，事件已解决',
+  chip_repair_not_fixed: '维修了，但事件仍异常'
+}
+function handleChipAction(chipAction) {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  const label = CHIP_LABELS[chipAction] || chipAction
+  eventStore.addMessage(eid, { role: 'user', content: label, ts: Date.now() })
+  scrollToBottom()
+  eventAssistantCommand[eid] = chipAction + '|' + Date.now()
+  refreshChips()
 }
 
 // ============ 标记为误报 ============
@@ -833,7 +954,41 @@ function handleSnooze() {
   }, 400)
 }
 
+// ============ 确认闭环 ============
+function handleConfirmClose() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '确认闭环，无需补充', ts: Date.now() })
+  scrollToBottom()
+  setTimeout(() => {
+    pushMsg(eid, { content: '✅ 已确认闭环。事件处理完成，左侧产物区已生成完整事件记录。' })
+    eventStage[eid] = 'S5'
+    refreshChips()
+  }, 400)
+}
 
+// ============ 手动登记处理反馈 ============
+function handleManualCloseForm() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '手动登记处理反馈', ts: Date.now() })
+  scrollToBottom()
+  setTimeout(() => {
+    pushMsg(eid, {
+      cardType: null,
+      content: `📝 <b>请描述实际异常情况与处理方式</b>，完成后自动记录并闭环。<br><br>
+        <div style="padding:10px;background:var(--bg-hover);border-radius:6px;border:1px dashed var(--border-primary);color:var(--text-muted);font-size:var(--font-base);line-height:1.7">
+        <b>格式参考：</b><br>
+        实际异常：___<br>
+        处理方式：___<br>
+        备注：___
+        </div><br>
+        请直接在输入框描述，例如："<b>检查发现传感器接头松动，已重新紧固并校准，当前读数正常。</b>"`
+    })
+    eventAssistantAction[eid] = 'manual_close_followup'
+    refreshChips()
+  }, 400)
+}
 
 // ============ 迭代排查：用户点击"开始排查" → 推第一项 ============
 function startIterativeCheck() {
@@ -846,7 +1001,7 @@ function startIterativeCheck() {
   setTimeout(() => {
     pushMsg(eid, {
       cardType: null,
-      content: `排查方案已生成。推断有 4 个可能项，建议从液压系统开始排查。<br><br>按推荐顺序逐项排查，还是你有自己的想法？`
+      content: `📋 排查方案已生成。根据 AI 分析，症状最可能指向<b>液压系统</b> —— 涉及油箱、管路接头、密封件及吸入口状态（6 步 · 21 个关键点），建议优先从该项入手。<br><br>执行顺序：液压系统 → 吸口堵塞排查 → 压力传感器 → 系统管线泄漏，逐项推进直至定位根因。左侧卡片已展开，按步骤反馈即可。有什么问题随时问我。`
     })
     // 激活第一个排查项卡片
     const p = eventStore.events.find(e => e.id === eid)
@@ -1037,6 +1192,22 @@ function sendMessage() {
       if (eventStage[props.eventContext.id]) {
         eventStage[props.eventContext.id] = 'false_alarm'
       }
+    }, 600)
+    return
+  }
+
+  // 手动闭环追问中 → 用户回复后完成闭环
+  if (props.eventContext && eventAssistantAction[props.eventContext.id] === 'manual_close_followup') {
+    isTyping.value = true
+    setTimeout(() => {
+      isTyping.value = false
+      const feedbackText = text
+      const response = '✅ 已记录处理反馈，事件已手动闭环。<br><br>左侧产物区事件记录已更新。'
+      eventStore.addMessage(sessionKey, { role: 'assistant', content: response, ts: Date.now() })
+      scrollToBottom(); refreshChips()
+      // 把反馈内容传给产物区
+      eventAssistantAction[props.eventContext.id] = 'manual_close_done|' + feedbackText
+      eventStage[props.eventContext.id] = 'S5'
     }, 600)
     return
   }
