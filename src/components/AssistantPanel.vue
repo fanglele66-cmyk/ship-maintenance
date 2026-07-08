@@ -1,7 +1,8 @@
 <template>
   <aside class="assistant-panel" :style="panelStyle">
-    <!-- 拖拽调宽手柄 -->
+    <!-- 拖拽调宽手柄（auxiliary 模式下由父级 SituationView 控制） -->
     <div
+      v-if="mode !== 'auxiliary'"
       class="resize-handle"
       @mousedown="startResize"
       @dblclick="resetWidth"
@@ -232,11 +233,13 @@ function loadSavedWidth() {
 }
 
 const panelStyle = computed(() => {
-  // iPad 及以下（≤1024px）：用 flex 自适应填充，不套固定百分比宽度
+  // auxiliary 模式：宽度由 SituationView 父级控制
+  if (props.mode === 'auxiliary') return {}
+  // iPad 及以下（≤1024px）：用 flex 自适应填充
   if (windowWidth.value <= 1024) return {}
-  // fillRemaining：事件中心场景，助手填满剩余空间（保持原本的宽显示）
+  // fillRemaining：事件中心场景，助手填满剩余空间
   if (props.fillRemaining) return {}
-  // 态势页等场景：默认按页面占比 50vw，拖拽后用自定义值；flex:0 0 锁定占比
+  // 其他场景：按百分比宽度
   const pct = customPct.value || DEFAULT_RATIO
   const vw = (pct * 100).toFixed(2)
   return { flex: `0 0 ${vw}vw`, minWidth: `calc(${vw}vw)`, maxWidth: `calc(${vw}vw)` }
@@ -628,23 +631,7 @@ if (situationContext) {
       }, 400)
     }
 
-    if (action === 'select_sensor' && ctx.sensor) {
-      const s = ctx.sensor
-      setTimeout(() => {
-        let msg = `已选中「<b>${s.nameCn}</b>」(${s.nameEn})<br><br>📈 当前值：<b>${s.value}${s.unit}</b>`
-        if (s.status === 'over') {
-          msg += ` <b style="color:var(--danger)">（超限！阈值 ${s.threshold}${s.unit}）</b>`
-          msg += `<br><br>⚠️ 建议立即生成事件快照进入处置流程。点击左侧 ⚡「生成事件快照」或对我说。`
-        } else if (s.status === 'warning') {
-          msg += ` <b style="color:var(--warning)">（预警中，接近阈值）</b>`
-          msg += `<br>📉 建议持续观察，如趋势恶化可生成事件快照。`
-        } else {
-          msg += `（正常），运行平稳。`
-        }
-        eventStore.addMessage(sessionKey, { role: 'assistant', ts: Date.now(), content: msg })
-        refreshChips()
-      }, 400)
-    }
+    // 点击传感器不再自动推送助手消息
   }, { immediate: true })
 }
 

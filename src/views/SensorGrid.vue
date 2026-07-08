@@ -10,30 +10,40 @@
       />
     </div>
 
-    <!-- System filter tabs -->
+    <!-- Subsystem filter tabs (设备级) / System filter tabs (全局级) -->
     <div class="sg-tabs-wrapper">
+      <div class="sg-tabs-label" v-if="sensorStore.currentDeviceId">按子系统筛选</div>
       <div class="sg-tabs" ref="tabsRef">
-        <button
-          v-for="tag in systemTags"
-          :key="tag"
-          class="filter-tag"
-          :class="{ active: sensorStore.currentSystem === tag }"
-          @click="sensorStore.setSystem(tag)"
-        >
-          {{ tag }}
-        </button>
+        <!-- 设备级：子系统 tab -->
+        <template v-if="sensorStore.currentDeviceId">
+          <button
+            v-for="tag in sensorStore.currentSubsystemTags"
+            :key="tag"
+            class="filter-tag"
+            :class="{ active: sensorStore.currentSubsystem === tag }"
+            @click="sensorStore.setSubsystem(tag)"
+          >
+            {{ tag }}
+          </button>
+        </template>
+        <!-- 全局级：系统 tab（兼容旧逻辑） -->
+        <template v-else>
+          <button
+            v-for="tag in systemTags"
+            :key="tag"
+            class="filter-tag"
+            :class="{ active: sensorStore.currentSystem === tag }"
+            @click="sensorStore.setSystem(tag)"
+          >
+            {{ tag }}
+          </button>
+        </template>
       </div>
     </div>
 
     <!-- Stats bar -->
     <div class="sg-stats">
       <span>{{ sensorStore.sensorStats.total }} 个传感器</span>
-      <span v-if="sensorStore.sensorStats.over > 0" class="stat-over">
-        🔴 超限 {{ sensorStore.sensorStats.over }}
-      </span>
-      <span v-if="sensorStore.sensorStats.warning > 0" class="stat-warning">
-        🟡 预警 {{ sensorStore.sensorStats.warning }}
-      </span>
     </div>
 
     <!-- Sensor cards grid (3 columns) -->
@@ -42,21 +52,15 @@
         v-for="sensor in filteredSensors"
         :key="sensor.id"
         class="sensor-card"
-        :class="sensor.status"
         @click="$emit('selectSensor', sensor)"
       >
-        <div class="sc-left-bar" :class="sensor.status"></div>
         <div class="sc-body">
           <div class="sc-name-en">{{ sensor.nameEn }}</div>
           <div class="sc-name-cn">{{ sensor.nameCn }}</div>
-          <div class="sc-meta">{{ sensor.system }} · {{ sensor.device }}</div>
           <div class="sc-value-row">
-            <span class="sc-value" :class="sensor.status">
+            <span class="sc-value">
               {{ sensor.value }}
               <span class="sc-unit">{{ sensor.unit }}</span>
-            </span>
-            <span class="sc-badge" :class="sensor.status">
-              {{ sensor.status === 'over' ? '超限' : sensor.status === 'warning' ? '预警' : '正常' }}
             </span>
           </div>
         </div>
@@ -130,6 +134,13 @@ const filteredSensors = computed(() => {
   overflow-x: auto;
 }
 
+.sg-tabs-label {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  padding-left: 2px;
+}
+
 .sg-tabs {
   display: flex;
   gap: 6px;
@@ -166,9 +177,6 @@ const filteredSensors = computed(() => {
   flex-shrink: 0;
 }
 
-.stat-over { color: var(--danger); }
-.stat-warning { color: var(--warning); }
-
 .sg-grid {
   flex: 1;
   display: grid;
@@ -181,8 +189,9 @@ const filteredSensors = computed(() => {
 
 .sensor-card {
   display: flex;
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(22, 119, 255, 0.03) 100%);
   border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
@@ -190,16 +199,9 @@ const filteredSensors = computed(() => {
 }
 .sensor-card:hover {
   border-color: var(--accent);
-  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(22, 119, 255, 0.12);
+  transform: translateY(-2px);
 }
-
-.sc-left-bar {
-  width: 3px;
-  flex-shrink: 0;
-}
-.sc-left-bar.over { background: var(--danger); }
-.sc-left-bar.warning { background: var(--warning); }
-.sc-left-bar.normal { background: var(--success); }
 
 .sc-body {
   flex: 1;
@@ -222,15 +224,6 @@ const filteredSensors = computed(() => {
   margin-top: 1px;
 }
 
-.sc-meta {
-  font-size: var(--font-xs);
-  color: var(--text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .sc-value-row {
   display: flex;
   align-items: baseline;
@@ -245,26 +238,12 @@ const filteredSensors = computed(() => {
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
-.sc-value.over { color: var(--danger); }
-.sc-value.warning { color: var(--warning); }
-.sc-value.normal { color: var(--success); }
 
 .sc-unit {
   font-size: var(--font-sm);
   font-weight: 400;
   margin-left: 2px;
 }
-
-.sc-badge {
-  font-size: var(--font-xs);
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.sc-badge.over { background: var(--danger-bg); color: var(--danger); }
-.sc-badge.warning { background: var(--warning-bg); color: var(--warning); }
-.sc-badge.normal { background: var(--success-bg); color: var(--success); }
 
 .empty-state {
   grid-column: 1 / -1;

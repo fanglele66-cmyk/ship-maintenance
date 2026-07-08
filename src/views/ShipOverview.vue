@@ -103,17 +103,17 @@ const emit = defineEmits(['selectDevice'])
 
 const deviceStore = useDeviceStore()
 
-// 4 个关键设备的浮动位置（按截图复刻）
+// 4 个关键设备的浮动位置（侧视图船体：船头朝左，船尾朝右）
 const floatingDevices = computed(() => {
   const devices = deviceStore.devices.filter(d =>
     ['main-engine-1', 'boiler', 'steering-gear', 'air-compressor'].includes(d.id)
   )
-  // 给每个设备定位（相对于 720x360 viewBox 的近似百分比转 vw）
+  // 基于新船舶侧视图（720x360 近似）的设备定位
   const positions = {
-    'main-engine-1': { x: '32%', y: '50%' },
-    'boiler':         { x: '64%', y: '20%' },
-    'steering-gear':  { x: '8%',  y: '44%' },
-    'air-compressor': { x: '18%', y: '42%' }
+    'main-engine-1': { x: '60%', y: '60%' },   // 机舱中下部
+    'boiler':         { x: '74%', y: '22%' },   // 上层建筑/烟囱附近
+    'steering-gear':  { x: '86%', y: '65%' },   // 船尾舵/螺旋桨区域
+    'air-compressor': { x: '48%', y: '54%' }    // 机舱偏前
   }
   return devices.map(d => ({
     ...d,
