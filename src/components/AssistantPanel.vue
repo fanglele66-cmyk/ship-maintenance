@@ -911,6 +911,7 @@ const CHIP_LABELS = {
   chip_repair_solved: '修好了，事件已解决',
   chip_repair_not_fixed: '维修了，但事件仍异常'
 }
+const feedbackGuideTs = reactive({})
 function handleChipAction(chipAction) {
   if (!props.eventContext) return
   const eid = props.eventContext.id
@@ -919,6 +920,19 @@ function handleChipAction(chipAction) {
   scrollToBottom()
   eventAssistantCommand[eid] = chipAction + '|' + Date.now()
   refreshChips()
+
+  // 登记异常反馈：左侧只会滚到反馈区不会回消息，需要助手立即补一条引导
+  if (chipAction === 'chip_open_feedback') {
+    const now = Date.now()
+    if (!feedbackGuideTs[eid] || now - feedbackGuideTs[eid] > 2000) {
+      feedbackGuideTs[eid] = now
+      pushMsg(eid, {
+        content: '左侧排查卡已展开，<b>请按步骤逐项反馈</b>，也可以直接告诉我，我帮您填写。' +
+          '<div style="margin-top:4px;padding:4px 8px;background:var(--bg-hover);border-radius:4px;font-size:12px;color:var(--text-muted);">例如：油箱外壁焊缝处有明显渗漏油渍。</div>'
+      })
+      scrollToBottom()
+    }
+  }
 }
 
 // ============ 标记为误报 ============
