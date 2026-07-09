@@ -18,7 +18,7 @@ const routes = [
     path: '/inspection',
     name: 'Inspection',
     component: () => import('@/views/InspectionReportView.vue'),
-    meta: { title: '巡检报告', icon: '' }
+    meta: { title: '日志', icon: '' }
   },
   {
     path: '/knowledge',

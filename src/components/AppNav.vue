@@ -96,7 +96,7 @@ onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
 const navItems = [
   { path: '/event', label: '事件' },
   { path: '/situation', label: '态势' },
-  { path: '/inspection', label: '巡检' },
+  { path: '/inspection', label: '日志' },
   { path: '/knowledge', label: '知识' }
 ]
 </script>

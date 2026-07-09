@@ -84,7 +84,7 @@
         <div class="detail-page">
           <!-- 顶部导航栏 -->
           <div class="detail-topbar">
-            <button class="back-btn" @click="selectedDoc = null">
+            <button class="back-btn" @click="goBackFromDoc">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
               返回
             </button>
@@ -105,6 +105,16 @@
         </div>
       </template>
     </main>
+
+    <!-- ===== AI 问答助手 ===== -->
+    <KnowledgeAIPanel
+      :search-query="searchQuery"
+      :selected-device="selectedDevice"
+      :selected-doc-type="selectedDocType"
+      :filtered-doc-count="filteredDocs.length"
+      :filtered-docs="filteredDocs"
+      @open-doc="handleOpenDocById"
+    />
   </div>
 </template>
 
@@ -114,6 +124,7 @@ import {
   knowledgeDocs, DEVICE_TYPES, DOC_TYPE_STATS,
   docTypeColors
 } from '@/mock/knowledge'
+import KnowledgeAIPanel from '@/components/KnowledgeAIPanel.vue'
 
 const deviceTypes = DEVICE_TYPES
 const docTypeKeys = Object.keys(DOC_TYPE_STATS)
@@ -159,6 +170,17 @@ function badgeStyle(type) {
     background: c.bg,
     border: `1px solid ${c.border}`
   }
+}
+
+// 从 AI 面板的文档引用跳转
+function handleOpenDocById(docId) {
+  const doc = knowledgeDocs.find(d => d.id === docId)
+  if (doc) selectedDoc.value = doc
+}
+
+// 从文档详情返回列表
+function goBackFromDoc() {
+  selectedDoc.value = null
 }
 
 // 渲染文档内容 HTML
