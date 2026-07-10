@@ -65,13 +65,20 @@
       <!-- 输入区 -->
       <div class="kap-input">
         <div class="kap-input-wrapper">
+          <button class="kap-voice-btn" :class="{ 'is-recording': isVoiceRecording }" @click="toggleVoice" title="语音输入">
+            <svg class="kv-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="7" y="2" width="6" height="9" rx="3"/>
+              <path d="M4 11a6 6 0 0012 0M10 17v3"/>
+            </svg>
+            <span v-if="isVoiceRecording" class="kv-pulse"></span>
+          </button>
           <input
             v-model="inputText" class="kap-input-field"
             placeholder="输入追问..." @keyup.enter="sendMessage"
           />
-          <button class="kap-send-btn" :disabled="!inputText.trim()" @click="sendMessage">
-            <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="9" y1="1" x2="9" y2="17"/><polyline points="4 6 9 1 14 6"/>
+          <button class="kap-send-btn" :disabled="!inputText.trim()" @click="sendMessage" title="发送">
+            <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M1 9l15-6-6 15-3-6-6-3z"/>
             </svg>
           </button>
         </div>
@@ -462,6 +469,23 @@ watch(() => props.searchQuery, (val) => {
   }
 })
 
+// 监听设备类型/文档类型筛选变化 → 同步更新助手对话
+watch([() => props.selectedDevice, () => props.selectedDocType], ([dev, type], [oldDev, oldType]) => {
+  // 首次挂载时不触发
+  if (oldDev === undefined && oldType === undefined) return
+
+  if (isOpen.value) {
+    // 面板打开时：清空对话，重新生成首条消息，对齐当前筛选信息
+    messages.value = []
+    nextTick(() => generateInitialResponse())
+  } else {
+    // 面板关闭时：显示未读红点提示
+    showUnreadDot.value = true
+    if (unreadTimer) clearTimeout(unreadTimer)
+    unreadTimer = setTimeout(() => { showUnreadDot.value = false }, 3 * 60 * 1000)
+  }
+})
+
 function getMsgContent(m) {
   if (m.streamed !== undefined) return m.streamed + '<span class="cursor-blink">▍</span>'
   return m.content
@@ -475,6 +499,85 @@ function handleDocRefClick(e) {
     if (docId) emit('open-doc', docId)
   }
 }
+
+// ============ 语音输入 ============
+const isVoiceRecording = ref(false)
+let recognition = null
+let voiceTimer = null
+let voiceRestartTimer = null
+
+function getRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!SpeechRecognition) return null
+  const r = new SpeechRecognition()
+  r.lang = 'zh-CN'
+  r.continuous = true
+  r.interimResults = true
+  r.maxAlternatives = 1
+  return r
+}
+
+function startVoice() {
+  const r = getRecognition()
+  if (!r) {
+    pushAssistantMessage('⚠️ 当前浏览器不支持语音输入，请使用 Chrome 或 Edge 浏览器。')
+    return
+  }
+  recognition = r
+  isVoiceRecording.value = true
+
+  recognition.onresult = (event) => {
+    let transcript = ''
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript
+    }
+    inputText.value = transcript
+    // 清除自动发送计时
+    if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null }
+  }
+
+  recognition.onerror = () => {
+    stopVoice()
+  }
+
+  recognition.onend = () => {
+    // 如果仍在录音状态（非手动停止），自动重启
+    if (isVoiceRecording.value) {
+      voiceRestartTimer = setTimeout(() => {
+        if (isVoiceRecording.value && recognition) {
+          try { recognition.start() } catch {}
+        }
+      }, 200)
+    }
+  }
+
+  try { recognition.start() } catch (e) { stopVoice() }
+}
+
+function stopVoice() {
+  if (voiceRestartTimer) { clearTimeout(voiceRestartTimer); voiceRestartTimer = null }
+  if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null }
+  isVoiceRecording.value = false
+  if (recognition) {
+    try {
+      recognition.onend = null
+      recognition.stop()
+    } catch {}
+    recognition = null
+  }
+}
+
+function toggleVoice() {
+  if (isVoiceRecording.value) {
+    stopVoice()
+  } else {
+    startVoice()
+  }
+}
+
+onBeforeUnmount(() => {
+  stopVoice()
+})
 </script>
 
 <style scoped>
@@ -674,27 +777,62 @@ function handleDocRefClick(e) {
 .kc-cta:hover { box-shadow: 0 4px 14px rgba(22,119,255,0.35); transform: translateY(-1px); }
 
 /* ===== 输入区 ===== */
-.kap-input { padding: 10px 14px 14px; border-top: 1px solid var(--border-primary); flex-shrink: 0; background: var(--bg-surface); }
+.kap-input { padding: 8px 14px 14px; border-top: 1px solid var(--border-primary); flex-shrink: 0; background: var(--bg-surface); }
 .kap-input-wrapper {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 2px;
   background: var(--bg-panel); border: 1px solid var(--border-primary);
-  border-radius: 22px; padding: 4px 4px 4px 14px; transition: border-color 0.2s;
+  border-radius: 24px; padding: 2px; transition: border-color 0.2s, box-shadow 0.2s;
 }
 .kap-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,119,255,0.08); }
 .kap-input-field {
   flex: 1; background: transparent; border: none; outline: none;
-  color: var(--text-primary); font-size: var(--font-sm); padding: 6px 0; font-family: inherit;
+  color: var(--text-primary); font-size: var(--font-sm); padding: 6px 4px; font-family: inherit;
+  min-width: 0;
 }
 .kap-input-field::placeholder { color: var(--text-muted); }
-.kap-send-btn {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #4096FF);
-  border: none; color: #fff; display: flex; align-items: center;
-  justify-content: center; cursor: pointer; transition: all 0.2s;
-  flex-shrink: 0; box-shadow: 0 2px 8px rgba(22,119,255,0.25);
+
+/* 语音按钮 */
+.kap-voice-btn {
+  position: relative; width: 32px; height: 32px; border-radius: 50%;
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-left: 2px;
 }
-.kap-send-btn:hover:not(:disabled) { box-shadow: 0 4px 14px rgba(22,119,255,0.4); transform: scale(1.06); }
-.kap-send-btn:disabled { opacity: 0.25; cursor: not-allowed; box-shadow: none; }
+.kap-voice-btn:hover { color: var(--accent); background: var(--accent-bg); }
+.kap-voice-btn.is-recording {
+  color: var(--danger); background: var(--danger-bg);
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+.kap-voice-btn .kv-icon { width: 17px; height: 17px; position: relative; z-index: 1; }
+.kap-voice-btn .kv-pulse {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid var(--danger); opacity: 0.6;
+  animation: pulse-ring 1.2s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes voice-pulse {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* 发送按钮 */
+.kap-send-btn {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); border: none; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  flex-shrink: 0; margin-right: 2px;
+}
+.kap-send-btn svg { width: 15px; height: 15px; }
+.kap-send-btn:hover:not(:disabled) {
+  background: #4096FF; transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(22,119,255,0.3);
+}
+.kap-send-btn:active:not(:disabled) { transform: scale(0.92); }
+.kap-send-btn:disabled { background: var(--border-primary); color: var(--text-muted); cursor: not-allowed; }
 
 /* ===== 移动端适配 ===== */
 @media (max-width: 768px) {
