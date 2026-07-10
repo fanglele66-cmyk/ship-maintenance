@@ -42,8 +42,26 @@
           </div>
 
           <!-- === 6 种消息卡片 === -->
-          <!-- 类型0：普通文本 -->
-          <div v-if="!msg.cardType" class="msg-content" v-html="getStreamContent(msg, idx)"></div>
+          <!-- 类型0：普通文本 / 气泡内嵌选项卡 -->
+          <div v-if="!msg.cardType" class="msg-content" :class="{ 'msg-content-with-options': msg.options && msg.options.length }">
+            <div class="msg-text" v-html="getStreamContent(msg, idx)"></div>
+            <div v-if="msg.options && msg.options.length" class="msg-options-card">
+              <div class="msg-options-title">选择一个最接近的原因</div>
+              <div
+                v-for="(opt, oi) in msg.options"
+                :key="oi"
+                class="msg-option-row"
+                :class="{ 'option-other': opt.isOther }"
+                @click.stop="handleInlineOptionClick(msg, opt)"
+              >
+                <span v-if="!opt.isOther" class="option-radio"></span>
+                <span v-else class="option-edit-icon">✎</span>
+                <span class="option-label">{{ opt.label }}</span>
+                <span v-if="opt.isOther" class="option-hint">手动输入</span>
+              </div>
+              <div class="msg-options-footnote">点选后自动记录；没有合适选项再手动输入</div>
+            </div>
+          </div>
 
           <!-- 类型1：诊断分析卡 🧠 -->
           <div v-else-if="msg.cardType === 'diagnosis'" class="msg-card diagnosis-card">
@@ -404,6 +422,10 @@ function getChipsByContext() {
   if (props.mode === 'event' && props.eventContext) {
     const ec = props.eventContext; const stage = eventStage[ec.id] || 'S1'
     const action = eventAssistantAction[ec.id]
+
+    // 正在展示内联选项（如误报原因），不重复显示猜你想问
+    if (action === 'false_alarm_options') return []
+
     if (stage === 'S1') {
       // 基于左侧实际解锁状态推荐下一步
       const tabs = eventSituationTabs[ec.id]
@@ -981,14 +1003,79 @@ function handleMarkFalseAlarm() {
   eventStore.addMessage(eid, { role: 'user', content: '标记为误报', ts: Date.now() })
   scrollToBottom()
   setTimeout(() => {
-    pushMsg(eid, { content: '请描述一下<b>实际工况或现场情况</b>，我会记录在事件报告中。例如：该告警触发时设备处于停机检修状态，并非实际故障。' })
-    // 标记进入误报追问状态，等待用户输入
-    eventAssistantAction[eid] = 'false_alarm_followup'
+    pushMsg(eid, {
+      content: '请选择<b>误报原因</b>，或选择"其他"自行描述：',
+      options: [
+        { label: '触发时设备处于停机/检修状态', action: 'false_alarm_done', text: '设备处于停机/检修状态，非实际运行故障' },
+        { label: '传感器数据采集异常', action: 'false_alarm_done', text: '传感器数据采集异常或信号干扰，非真实设备故障' },
+        { label: '告警规则阈值设置不当', action: 'false_alarm_done', text: '告警规则触发阈值偏紧，当前工况属正常范围' },
+        { label: '短暂工况波动已自行恢复', action: 'false_alarm_done', text: '短暂工况波动，已自行恢复正常' },
+        { label: '其他原因…', action: 'false_alarm_other', isOther: true }
+      ]
+    })
+    eventAssistantAction[eid] = 'false_alarm_options'
     refreshChips()
   }, 400)
 }
 
-// ============ 暂不处理 ============
+// ============ 手动登记处理反馈 ============
+function handleManualCloseForm() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '手动登记处理反馈', ts: Date.now() })
+  scrollToBottom()
+  setTimeout(() => {
+    pushMsg(eid, {
+      content: '请在输入框描述<b>实际异常情况与处理方式</b>，完成后自动记录并闭环。<br><br>示例："<b>检查发现传感器接头松动，已重新紧固并校准，当前读数正常。</b>"'
+    })
+    eventAssistantAction[eid] = 'manual_close_followup'
+    refreshChips()
+  }, 400)
+}
+
+// ============ 消息内联选项点击 ============
+function handleInlineOptionClick(msg, opt) {
+  const eid = props.eventContext?.id
+  if (!eid) return
+
+  if (opt.action === 'false_alarm_other') {
+    // 回退到自由文本输入
+    eventStore.addMessage(eid, { role: 'user', content: '其他原因', ts: Date.now() })
+    setTimeout(() => {
+      pushMsg(eid, { content: '请描述一下<b>实际工况或现场情况</b>，我会记录在事件报告中。' })
+      eventAssistantAction[eid] = 'false_alarm_followup'
+      refreshChips()
+    }, 300)
+    return
+  }
+
+  // 直接提交预设选项
+  const text = opt.text || opt.label
+  eventStore.addMessage(eid, { role: 'user', content: text, ts: Date.now() })
+  scrollToBottom()
+
+  if (opt.action === 'false_alarm_done') {
+    isTyping.value = true
+    setTimeout(() => {
+      isTyping.value = false
+      eventStore.addMessage(eid, { role: 'assistant', content: '已记录你的反馈：<b>"' + text + '"</b>。该事件已标记为<b>误报</b>并闭环。', ts: Date.now() })
+      scrollToBottom(); refreshChips()
+      eventAssistantAction[eid] = 'false_alarm_closed'
+      if (eventStage[eid]) eventStage[eid] = 'false_alarm'
+    }, 600)
+    return
+  }
+
+  if (opt.action === 'manual_close_done') {
+    isTyping.value = true
+    setTimeout(() => {
+      isTyping.value = false
+      eventStore.addMessage(eid, { role: 'assistant', content: '已记录处理反馈，事件已手动闭环。<br><br>左侧事件记录已更新。', ts: Date.now() })
+      scrollToBottom(); refreshChips()
+      eventAssistantAction[eid] = 'manual_close_done|' + encodeURIComponent(text)
+    }, 600)
+  }
+}
 function handleSnooze() {
   if (!props.eventContext) return
   const eid = props.eventContext.id
@@ -1016,29 +1103,6 @@ function handleConfirmClose() {
   setTimeout(() => {
     pushMsg(eid, { content: '已确认闭环，事件处理完成。' })
     eventStage[eid] = 'S5'
-    refreshChips()
-  }, 400)
-}
-
-// ============ 手动登记处理反馈 ============
-function handleManualCloseForm() {
-  if (!props.eventContext) return
-  const eid = props.eventContext.id
-  eventStore.addMessage(eid, { role: 'user', content: '手动登记处理反馈', ts: Date.now() })
-  scrollToBottom()
-  setTimeout(() => {
-    pushMsg(eid, {
-      cardType: null,
-      content: `📝 <b>请描述实际异常情况与处理方式</b>，完成后自动记录并闭环。<br><br>
-        <div style="padding:10px;background:var(--bg-hover);border-radius:6px;border:1px dashed var(--border-primary);color:var(--text-muted);font-size:var(--font-base);line-height:1.7">
-        <b>格式参考：</b><br>
-        实际异常：___<br>
-        处理方式：___<br>
-        备注：___
-        </div><br>
-        请直接在输入框描述，例如："<b>检查发现传感器接头松动，已重新紧固并校准，当前读数正常。</b>"`
-    })
-    eventAssistantAction[eid] = 'manual_close_followup'
     refreshChips()
   }, 400)
 }
@@ -1679,6 +1743,7 @@ function generateDeviceAnalysisHtml(d) {
 
 /* === 普通文本气泡 === */
 .msg-content { background: var(--bg-surface); border: 1px solid var(--border-primary); border-left: 2px solid var(--accent); border-radius: 4px var(--radius-md) var(--radius-md) 4px; padding: 10px 12px; color: var(--text-secondary); max-width: 100%; font-size: var(--font-base); line-height: 1.6; box-shadow: var(--shadow-sm); }
+.msg-content-with-options { border-left-color: var(--warning); display: flex; flex-direction: column; gap: 0; padding: 12px 12px 0; overflow: hidden; }
 .msg-user { display: flex; justify-content: flex-end; }
 .msg-user .msg-content { background: linear-gradient(135deg, var(--accent), #4096FF); border: none; border-radius: var(--radius-md) 4px var(--radius-md) var(--radius-md); color: #fff; }
 
@@ -1854,4 +1919,21 @@ function generateDeviceAnalysisHtml(d) {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+/* === 消息气泡内嵌选项卡（如误报原因） === */
+.msg-text { font-size: var(--font-base); line-height: 1.6; }
+.msg-content-with-options .msg-text { padding-bottom: 10px; }
+.msg-options-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0; }
+.msg-options-card { margin: 0 -12px; border-top: 1px solid var(--border-secondary); background: var(--bg-panel); }
+.msg-options-card .msg-options-title { padding: 9px 12px 6px; }
+.msg-option-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border-secondary); cursor: pointer; transition: background 0.15s; }
+.msg-option-row:last-of-type { border-bottom: 0; }
+.msg-option-row:hover { background: rgba(22,119,255,0.06); }
+.msg-option-row.option-other { background: var(--bg-surface); border-top: 1px dashed var(--border-primary); }
+.msg-option-row.option-other:hover { background: rgba(22,119,255,0.06); }
+.option-radio { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border-primary); flex-shrink: 0; transition: all 0.15s; }
+.msg-option-row:hover .option-radio { border-color: var(--warning); background: rgba(250,173,20,0.12); }
+.option-edit-icon { color: var(--text-muted); font-size: 13px; flex-shrink: 0; }
+.option-label { flex: 1; font-size: 13px; color: var(--text-primary); line-height: 1.4; }
+.option-hint { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.msg-options-footnote { padding: 7px 12px; font-size: 11px; color: var(--text-muted); text-align: center; background: var(--bg-surface); border-top: 1px solid var(--border-secondary); }
 </style>
