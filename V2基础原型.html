@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>船舶设备检修助手 V2.0 · 基础原型</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A1628;color:#E8F0FF;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;height:100vh;overflow:hidden}
+
+/* ===== 顶部导航条 ===== */
+.topbar{height:44px;background:#0F1F38;border-bottom:1px solid #1E3A5F;display:flex;align-items:center;padding:0 16px;gap:12px}
+.topbar .ship-name{font-size:14px;font-weight:600;color:#E8F0FF}
+.topbar .ship-status{font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(82,196,26,.15);color:#52C41A}
+.topbar .time{font-size:11px;color:#8BAAC0;margin-left:auto;font-family:Consolas,monospace}
+.topbar .net{font-size:10px;color:#52C41A;display:flex;align-items:center;gap:4px}
+.topbar .net::before{content:'';width:6px;height:6px;border-radius:50%;background:#52C41A}
+
+/* ===== 主容器 ===== */
+.main{display:flex;height:calc(100vh - 44px)}
+
+/* ===== 左侧导航栏(44px) ===== */
+.sidenav{width:56px;background:#0C1A2E;border-right:1px solid #1E3A5F;display:flex;flex-direction:column;align-items:center;padding-top:8px;gap:4px;flex-shrink:0}
+.nav-item{width:48px;padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:8px;cursor:pointer;transition:.2s;color:#5A7A92;font-size:9px}
+.nav-item:hover{background:rgba(24,144,255,.08);color:#8BAAC0}
+.nav-item.active{background:rgba(24,144,255,.15);color:#1890FF}
+.nav-item .icon{font-size:18px;line-height:1}
+
+/* ===== 内容区 ===== */
+.content{flex:1;display:flex;overflow:hidden;position:relative}
+
+/* ===== 右侧助手栏(280px) ===== */
+.assistant{width:300px;background:#0B1422;border-left:1px solid #1E3A5F;display:flex;flex-direction:column;flex-shrink:0}
+.ast-header{padding:10px 14px;border-bottom:1px solid #1E3A5F;display:flex;align-items:center;gap:8px}
+.ast-header .mode-tag{font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(24,144,255,.15);color:#1890FF}
+.ast-header .title{font-size:12px;font-weight:600}
+.ast-body{flex:1;overflow-y:auto;padding:12px}
+.ast-input{padding:10px 12px;border-top:1px solid #1E3A5F;display:flex;gap:8px;align-items:center}
+.ast-input input{flex:1;background:#0F1F38;border:1px solid #1E3A5F;border-radius:6px;padding:8px 12px;color:#E8F0FF;font-size:12px;outline:none}
+.ast-input input:focus{border-color:#1890FF}
+.ast-input .mic{width:32px;height:32px;border-radius:50%;background:rgba(24,144,255,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0}
+
+/* ===== 助手消息气泡 ===== */
+.msg{margin-bottom:12px}
+.msg.bot{display:flex;gap:8px}
+.msg.bot .avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#1890FF,#00BCD4);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.msg.bot .bubble{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;color:#C8D8E8;max-width:220px}
+.msg.bot .bubble strong{color:#E8F0FF}
+.msg.user{text-align:right}
+.msg.user .bubble{display:inline-block;background:rgba(24,144,255,.2);border:1px solid rgba(24,144,255,.3);border-radius:8px;padding:8px 12px;font-size:12px;max-width:200px;text-align:left}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:10px;padding:4px 8px;border-radius:12px;border:1px solid #1E3A5F;color:#8BAAC0;cursor:pointer;transition:.2s}
+.chip:hover{border-color:#1890FF;color:#1890FF}
+
+/* ===== 事件中心 - 事件列表 ===== */
+.event-panel{width:280px;background:#0B1A2E;border-right:1px solid #1E3A5F;display:flex;flex-direction:column;flex-shrink:0;transition:width .3s ease,opacity .3s ease;overflow:hidden}
+.event-panel.collapsed{width:0;opacity:0;border-right:none}
+.ep-header{padding:10px 14px;border-bottom:1px solid #1E3A5F}
+.ep-header .title{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ep-header .filters{display:flex;gap:6px}
+.ep-header .filter{font-size:9px;padding:3px 8px;border-radius:10px;border:1px solid #1E3A5F;color:#5A7A92;cursor:pointer}
+.ep-header .filter.active{background:rgba(24,144,255,.15);border-color:#1890FF;color:#1890FF}
+.ep-list{flex:1;overflow-y:auto}
+.ev-item{display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid #0F1F38;cursor:pointer;transition:.15s}
+.ev-item:hover{background:rgba(24,144,255,.05)}
+.ev-item.selected{background:rgba(24,144,255,.1);border-left:2px solid #1890FF}
+.ev-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.ev-dot.danger{background:#FF4D4F}
+.ev-dot.warning{background:#FAAD14}
+.ev-dot.info{background:#1890FF}
+.ev-info{flex:1;min-width:0}
+.ev-title{font-size:12px;font-weight:500;color:#E8F0FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-meta{font-size:10px;color:#5A7A92;margin-top:2px;display:flex;gap:8px}
+.ev-time{font-size:10px;color:#5A7A92;margin-top:4px}
+
+/* ===== 事件中心 - 产物抽屉 ===== */
+.product-drawer{flex:1;background:#0A1628;overflow-y:auto;display:none;flex-direction:column}
+.product-drawer.show{display:flex}
+.pd-header{padding:14px 20px;border-bottom:1px solid #1E3A5F;display:flex;align-items:center;gap:10px}
+.pd-header .back{width:28px;height:28px;border-radius:6px;background:rgba(24,144,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
+.pd-header .title{font-size:14px;font-weight:600}
+.pd-header .status{font-size:10px;padding:2px 8px;border-radius:3px;margin-left:auto}
+.pd-body{padding:16px 20px;flex:1}
+.pd-section{margin-bottom:20px}
+.pd-section .stitle{font-size:11px;font-weight:600;color:#5A7A92;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.pd-section .stitle::before{content:'';width:3px;height:12px;border-radius:2px;background:#1890FF}
+
+/* 快照数据卡片 */
+.snapshot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.snap-card{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;padding:12px}
+.snap-card .label{font-size:10px;color:#5A7A92;margin-bottom:4px}
+.snap-card .value{font-size:20px;font-weight:700;font-family:Consolas,monospace}
+.snap-card .value.red{color:#FF4D4F}
+.snap-card .value.yellow{color:#FAAD14}
+.snap-card .unit{font-size:11px;color:#8BAAC0;font-weight:400}
+
+/* 趋势图占位 */
+.trend-placeholder{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;height:180px;display:flex;align-items:center;justify-content:center;color:#5A7A92;font-size:12px}
+
+/* AI诊断卡片 */
+.ai-card{background:linear-gradient(135deg,rgba(24,144,255,.08),rgba(0,188,212,.08));border:1px solid rgba(24,144,255,.2);border-radius:8px;padding:14px}
+.ai-card .ai-label{font-size:10px;color:#1890FF;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.ai-card .ai-text{font-size:12px;color:#C8D8E8;line-height:1.6}
+
+/* ===== 态势感知 - 三层展示 ===== */
+.situation-panel{flex:1;background:#0A1628;overflow:hidden;position:relative}
+.situation-panel .layer{position:absolute;inset:0;transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .3s ease;overflow-y:auto;padding:16px 20px}
+.situation-panel .layer.hidden-left{transform:translateX(-100%);opacity:0;pointer-events:none}
+.situation-panel .layer.hidden-right{transform:translateX(100%);opacity:0;pointer-events:none}
+
+/* 层级指示器 */
+.layer-indicator{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;z-index:10}
+.layer-dot{width:6px;height:6px;border-radius:50%;background:#1E3A5F;transition:.2s}
+.layer-dot.active{background:#1890FF;width:18px;border-radius:3px}
+
+/* 第一层：船舶级 */
+.ship-overview{display:flex;gap:16px;margin-bottom:20px}
+.ship-card{background:#0F1F38;border:1px solid #1E3A5F;border-radius:10px;padding:16px;flex:1}
+.ship-card .sc-label{font-size:10px;color:#5A7A92;margin-bottom:6px}
+.ship-card .sc-value{font-size:18px;font-weight:700;font-family:Consolas,monospace}
+.ship-card .sc-sub{font-size:10px;color:#8BAAC0;margin-top:4px}
+
+.device-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.device-card{background:#0F1F38;border:1px solid #1E3A5F;border-radius:10px;padding:14px;cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+.device-card:hover{border-color:#1890FF;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.device-card .dc-name{font-size:13px;font-weight:600;margin-bottom:4px}
+.device-card .dc-system{font-size:10px;color:#5A7A92}
+.device-card .dc-status{position:absolute;top:10px;right:10px;font-size:9px;padding:2px 6px;border-radius:3px}
+.dc-status.normal{background:rgba(82,196,26,.15);color:#52C41A}
+.dc-status.warning{background:rgba(250,173,20,.15);color:#FAAD14}
+.dc-status.danger{background:rgba(255,77,79,.15);color:#FF4D4F}
+.dc-status.offline{background:rgba(90,122,146,.15);color:#5A7A92}
+.device-card .dc-metrics{display:flex;gap:12px;margin-top:10px}
+.dc-metric .dm-val{font-size:14px;font-weight:700;font-family:Consolas,monospace}
+.dc-metric .dm-label{font-size:9px;color:#5A7A92}
+
+/* 第二层：传感器网格 */
+.sensor-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.sensor-header .back-btn{width:28px;height:28px;border-radius:6px;background:rgba(24,144,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
+.sensor-header .title{font-size:14px;font-weight:600}
+.sensor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sensor-card{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;padding:12px;cursor:pointer;transition:.2s}
+.sensor-card:hover{border-color:#1890FF}
+.sensor-card.alarm{border-color:rgba(255,77,79,.4)}
+.sensor-card.warn{border-color:rgba(250,173,20,.4)}
+.sensor-card .sc-name{font-size:11px;color:#8BAAC0;margin-bottom:4px}
+.sensor-card .sc-value{font-size:18px;font-weight:700;font-family:Consolas,monospace}
+.sensor-card .sc-value.red{color:#FF4D4F}
+.sensor-card .sc-value.yellow{color:#FAAD14}
+.sensor-card .sc-threshold{font-size:9px;color:#5A7A92;margin-top:4px}
+.sensor-card .sc-bar{height:3px;background:#1E3A5F;border-radius:2px;margin-top:6px;overflow:hidden}
+.sensor-card .sc-bar-fill{height:100%;border-radius:2px;transition:.3s}
+
+/* 第三层：趋势图 */
+.trend-view{display:flex;flex-direction:column;height:100%}
+.trend-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.trend-header .back-btn{width:28px;height:28px;border-radius:6px;background:rgba(24,144,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
+.trend-header .title{font-size:14px;font-weight:600}
+.trend-chart{background:#0F1F38;border:1px solid #1E3A5F;border-radius:10px;flex:1;min-height:200px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.trend-chart svg{width:100%;height:100%}
+.trend-info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.trend-info-card{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;padding:10px}
+.tic-label{font-size:10px;color:#5A7A92}
+.tic-value{font-size:16px;font-weight:700;font-family:Consolas,monospace;margin-top:2px}
+
+/* ===== 知识库 ===== */
+.kb-panel{flex:1;background:#0A1628;overflow-y:auto;padding:16px 20px}
+.kb-categories{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.kb-cat{font-size:11px;padding:5px 12px;border-radius:16px;border:1px solid #1E3A5F;color:#8BAAC0;cursor:pointer;transition:.2s}
+.kb-cat:hover,.kb-cat.active{background:rgba(24,144,255,.15);border-color:#1890FF;color:#1890FF}
+.kb-list{display:flex;flex-direction:column;gap:8px}
+.kb-item{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;padding:12px 14px;cursor:pointer;transition:.2s}
+.kb-item:hover{border-color:#1890FF}
+.kb-item .ki-title{font-size:13px;font-weight:500;margin-bottom:4px}
+.kb-item .ki-meta{font-size:10px;color:#5A7A92;display:flex;gap:10px}
+
+/* ===== 操作卡片(助手内) ===== */
+.action-card{background:#0F1F38;border:1px solid #1E3A5F;border-radius:8px;padding:10px 12px;margin-top:8px}
+.action-card .ac-title{font-size:11px;font-weight:600;margin-bottom:6px}
+.action-card .ac-desc{font-size:10px;color:#8BAAC0;margin-bottom:8px;line-height:1.5}
+.action-card .ac-btns{display:flex;gap:6px}
+.ac-btn{font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid;transition:.2s}
+.ac-btn.primary{background:rgba(24,144,255,.15);border-color:rgba(24,144,255,.3);color:#1890FF}
+.ac-btn.primary:hover{background:rgba(24,144,255,.3)}
+.ac-btn.success{background:rgba(82,196,26,.15);border-color:rgba(82,196,26,.3);color:#52C41A}
+.ac-btn.danger{background:rgba(255,77,79,.15);border-color:rgba(255,77,79,.3);color:#FF4D4F}
+.ac-btn.ghost{background:transparent;border-color:#1E3A5F;color:#5A7A92}
+
+/* ===== 动画 ===== */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.fade-in{animation:fadeIn .3s ease}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#1E3A5F;border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航条 -->
+<div class="topbar">
+  <span class="ship-name">🚢 远洋6号</span>
+  <span class="ship-status">航行中</span>
+  <span class="net">在线</span>
+  <span class="time" id="clock">2026-07-02 19:15:00</span>
+</div>
+
+<div class="main">
+  <!-- 左侧导航(44px) -->
+  <div class="sidenav">
+    <div class="nav-item active" onclick="switchTab('event')">
+      <span class="icon">📌</span>
+      <span>事件</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('situation')">
+      <span class="icon">📡</span>
+      <span>态势</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('knowledge')">
+      <span class="icon">📖</span>
+      <span>知识</span>
+    </div>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="content">
+
+    <!-- ===== Tab1: 事件中心 ===== -->
+    <div id="tab-event" class="tab-page" style="display:flex;flex:1">
+      <!-- 事件列表 -->
+      <div class="event-panel" id="eventPanel">
+        <div class="ep-header">
+          <div class="title">📌 事件中心 <span style="font-size:10px;color:#5A7A92;font-weight:400;margin-left:auto">6 件</span></div>
+          <div class="filters">
+            <span class="filter active">全部</span>
+            <span class="filter">待处理</span>
+            <span class="filter">处理中</span>
+            <span class="filter">已解决</span>
+          </div>
+        </div>
+        <div class="ep-list">
+          <div class="ev-item selected" onclick="selectEvent(0)">
+            <div class="ev-dot danger"></div>
+            <div class="ev-info">
+              <div class="ev-title">主机冷却水温异常偏高</div>
+              <div class="ev-meta"><span>主机系统</span><span>·</span><span>优先级：紧急</span></div>
+              <div class="ev-time">2026-07-02 14:05</div>
+            </div>
+          </div>
+          <div class="ev-item" onclick="selectEvent(1)">
+            <div class="ev-dot warning"></div>
+            <div class="ev-info">
+              <div class="ev-title">2号辅机油压偏低预警</div>
+              <div class="ev-meta"><span>辅机系统</span><span>·</span><span>优先级：一般</span></div>
+              <div class="ev-time">2026-07-02 11:30</div>
+            </div>
+          </div>
+          <div class="ev-item" onclick="selectEvent(2)">
+            <div class="ev-dot danger"></div>
+            <div class="ev-info">
+              <div class="ev-title">舵机液压油温度超限</div>
+              <div class="ev-meta"><span>甲板机械</span><span>·</span><span>优先级：紧急</span></div>
+              <div class="ev-time">2026-07-02 09:15</div>
+            </div>
+          </div>
+          <div class="ev-item" onclick="selectEvent(3)">
+            <div class="ev-dot info"></div>
+            <div class="ev-info">
+              <div class="ev-title">3号泵计划维保到期提醒</div>
+              <div class="ev-meta"><span>泵系统</span><span>·</span><span>优先级：一般</span></div>
+              <div class="ev-time">2026-07-02 08:00</div>
+            </div>
+          </div>
+          <div class="ev-item" onclick="selectEvent(4)">
+            <div class="ev-dot warning"></div>
+            <div class="ev-info">
+              <div class="ev-title">空压机排气压力波动</div>
+              <div class="ev-meta"><span>辅机系统</span><span>·</span><span>优先级：重要</span></div>
+              <div class="ev-time">2026-07-01 22:40</div>
+            </div>
+          </div>
+          <div class="ev-item" onclick="selectEvent(5)">
+            <div class="ev-dot info"></div>
+            <div class="ev-info">
+              <div class="ev-title">锅炉水位传感器校准提醒</div>
+              <div class="ev-meta"><span>辅机系统</span><span>·</span><span>优先级：一般</span></div>
+              <div class="ev-time">2026-07-01 16:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 产物抽屉 -->
+      <div class="product-drawer show" id="productDrawer">
+        <div class="pd-header">
+          <div class="back" onclick="backToEventList()">←</div>
+          <span class="title">主机冷却水温异常偏高</span>
+          <span class="status" style="background:rgba(255,77,79,.15);color:#FF4D4F">待处理</span>
+        </div>
+        <div class="pd-body">
+          <!-- 快照数据 -->
+          <div class="pd-section">
+            <div class="stitle">事件快照 · 事发时数据</div>
+            <div class="snapshot-grid">
+              <div class="snap-card">
+                <div class="label">冷却水出口温度</div>
+                <div class="value red">92.4 <span class="unit">°C</span></div>
+              </div>
+              <div class="snap-card">
+                <div class="label">冷却水进口温度</div>
+                <div class="value yellow">48.7 <span class="unit">°C</span></div>
+              </div>
+              <div class="snap-card">
+                <div class="label">温差</div>
+                <div class="value red">43.7 <span class="unit">°C</span></div>
+              </div>
+              <div class="snap-card">
+                <div class="label">冷却水流量</div>
+                <div class="value">12.3 <span class="unit">m³/h</span></div>
+              </div>
+              <div class="snap-card">
+                <div class="label">阀门开度</div>
+                <div class="value yellow">65 <span class="unit">%</span></div>
+              </div>
+              <div class="snap-card">
+                <div class="label">环境温度</div>
+                <div class="value">34.2 <span class="unit">°C</span></div>
+              </div>
+            </div>
+          </div>
+          <!-- 趋势图 -->
+          <div class="pd-section">
+            <div class="stitle">温度趋势(事发前24h)</div>
+            <div class="trend-placeholder">
+              <svg viewBox="0 0 400 120" style="width:100%;height:100%">
+                <polyline points="0,90 40,88 80,85 120,82 160,78 200,70 240,60 280,45 320,30 360,20 400,15" fill="none" stroke="#FF4D4F" stroke-width="2" opacity=".8"/>
+                <line x1="0" y1="50" x2="400" y2="50" stroke="#FAAD14" stroke-width="1" stroke-dasharray="4" opacity=".5"/>
+                <text x="395" y="46" fill="#FAAD14" font-size="8" text-anchor="end">阈值 85°C</text>
+                <circle cx="360" cy="20" r="4" fill="#FF4D4F"/>
+                <text x="350" y="12" fill="#FF4D4F" font-size="8" text-anchor="end">92.4°C</text>
+              </svg>
+            </div>
+          </div>
+          <!-- AI诊断 -->
+          <div class="pd-section">
+            <div class="stitle">AI 诊断分析</div>
+            <div class="ai-card">
+              <div class="ai-label">🤖 AI 初步判断</div>
+              <div class="ai-text">
+                冷却水温差异常偏大（43.7°C，正常范围 15-25°C），结合流量正常、阀门开度65%，<strong style="color:#FF4D4F">高度怀疑冷却水系统存在堵塞或热交换器效率下降</strong>。建议优先检查：① 海水冷却管路是否堵塞 ② 淡水冷却侧水垢情况 ③ 温控阀工作状态。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 助手区(事件中心) -->
+      <div class="assistant" id="eventAssistant">
+        <div class="ast-header">
+          <span class="mode-tag" id="astModeTag">事件模式</span>
+          <span class="title">AI 助手</span>
+        </div>
+        <div class="ast-body" id="astBody">
+          <!-- 事件模式消息 -->
+          <div class="msg bot fade-in">
+            <div class="avatar">🤖</div>
+            <div class="bubble">
+              <strong>事件已关联：主机冷却水温异常偏高</strong><br><br>
+              快照数据显示冷却水出口温度 92.4°C，超阈值 85°C。AI 判断可能是冷却系统堵塞或热交换器效率下降。<br><br>
+              我可以帮你：
+              <div class="chip-row">
+                <span class="chip">🔍 查看可能原因</span>
+                <span class="chip">📋 开始排查</span>
+                <span class="chip">📝 创建工单</span>
+              </div>
+              <div class="action-card">
+                <div class="ac-title">推荐操作</div>
+                <div class="ac-desc">根据 AI 分析，建议先排查海水冷却管路是否堵塞。</div>
+                <div class="ac-btns">
+                  <span class="ac-btn primary">开始排查</span>
+                  <span class="ac-btn ghost">转派工单</span>
+                  <span class="ac-btn ghost">标记误报</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ast-input">
+          <input type="text" placeholder="输入问题或描述当前情况...">
+          <div class="mic">🎤</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Tab2: 态势感知 ===== -->
+    <div id="tab-situation" class="tab-page" style="display:none;flex:1">
+      <div class="situation-panel">
+        <!-- 层级指示器 -->
+        <div class="layer-indicator">
+          <div class="layer-dot active" id="dot0"></div>
+          <div class="layer-dot" id="dot1"></div>
+          <div class="layer-dot" id="dot2"></div>
+        </div>
+
+        <!-- 第一层：船舶+设备概览 -->
+        <div class="layer" id="layer0">
+          <div class="ship-overview">
+            <div class="ship-card">
+              <div class="sc-label">🚢 船舶状态</div>
+              <div class="sc-value" style="color:#52C41A">航行中</div>
+              <div class="sc-sub">航速 12.5kn · 航向 215° · 位置 23°N 118°E</div>
+            </div>
+            <div class="ship-card">
+              <div class="sc-label">💚 船舶健康分</div>
+              <div class="sc-value" style="color:#52C41A">82 <span style="font-size:12px;color:#8BAAC0;font-weight:400">/100 良好</span></div>
+              <div class="sc-sub">设备 10 台 · 正常 7 · 预警 2 · 异常 1</div>
+            </div>
+            <div class="ship-card">
+              <div class="sc-label">⏰ 下次维保</div>
+              <div class="sc-value">3 <span style="font-size:12px;color:#8BAAC0;font-weight:400">天后</span></div>
+              <div class="sc-sub">3号泵定期保养 · 2026-07-05</div>
+            </div>
+          </div>
+
+          <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:#8BAAC0">设备状态总览</div>
+          <div class="device-grid">
+            <div class="device-card" onclick="goLayer(1,'主机系统')">
+              <div class="dc-name">1号主机</div>
+              <div class="dc-system">主机系统</div>
+              <span class="dc-status danger">异常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val" style="color:#FF4D4F">92°C</div><div class="dm-label">冷却水温</div></div>
+                <div class="dc-metric"><div class="dm-val">450</div><div class="dm-label">转速rpm</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'辅机系统')">
+              <div class="dc-name">1号辅机</div>
+              <div class="dc-system">辅机系统</div>
+              <span class="dc-status normal">正常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val">78°C</div><div class="dm-label">水温</div></div>
+                <div class="dc-metric"><div class="dm-val">1800</div><div class="dm-label">转速rpm</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'辅机系统')">
+              <div class="dc-name">2号辅机</div>
+              <div class="dc-system">辅机系统</div>
+              <span class="dc-status warning">预警</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val" style="color:#FAAD14">2.1MPa</div><div class="dm-label">油压</div></div>
+                <div class="dc-metric"><div class="dm-val">1750</div><div class="dm-label">转速rpm</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'泵系统')">
+              <div class="dc-name">1号冷却水泵</div>
+              <div class="dc-system">泵系统</div>
+              <span class="dc-status normal">正常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val">12.5</div><div class="dm-label">流量m³/h</div></div>
+                <div class="dc-metric"><div class="dm-val">0.35</div><div class="dm-label">压力MPa</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'泵系统')">
+              <div class="dc-name">2号冷却水泵</div>
+              <div class="dc-system">泵系统</div>
+              <span class="dc-status normal">正常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val">11.8</div><div class="dm-label">流量m³/h</div></div>
+                <div class="dc-metric"><div class="dm-val">0.33</div><div class="dm-label">压力MPa</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'甲板机械')">
+              <div class="dc-name">舵机</div>
+              <div class="dc-system">甲板机械</div>
+              <span class="dc-status danger">异常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val" style="color:#FF4D4F">78°C</div><div class="dm-label">油温</div></div>
+                <div class="dc-metric"><div class="dm-val">15°</div><div class="dm-label">舵角</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'辅机系统')">
+              <div class="dc-name">空压机</div>
+              <div class="dc-system">辅机系统</div>
+              <span class="dc-status warning">预警</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val" style="color:#FAAD14">0.82</div><div class="dm-label">排气MPa</div></div>
+                <div class="dc-metric"><div class="dm-val">65°C</div><div class="dm-label">温度</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'辅机系统')">
+              <div class="dc-name">锅炉</div>
+              <div class="dc-system">辅机系统</div>
+              <span class="dc-status normal">正常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val">72%</div><div class="dm-label">水位</div></div>
+                <div class="dc-metric"><div class="dm-val">0.7</div><div class="dm-label">压力MPa</div></div>
+              </div>
+            </div>
+            <div class="device-card" onclick="goLayer(1,'导航系统')">
+              <div class="dc-name">雷达</div>
+              <div class="dc-system">导航系统</div>
+              <span class="dc-status normal">正常</span>
+              <div class="dc-metrics">
+                <div class="dc-metric"><div class="dm-val">12</div><div class="dm-label">量程nm</div></div>
+                <div class="dc-metric"><div class="dm-val">24</div><div class="dm-label">转速rpm</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第二层：传感器网格 -->
+        <div class="layer hidden-right" id="layer1">
+          <div class="sensor-header">
+            <div class="back-btn" onclick="goLayer(0)">←</div>
+            <span class="title" id="sensorTitle">主机系统 · 传感器列表</span>
+          </div>
+          <div class="sensor-grid">
+            <div class="sensor-card alarm" onclick="goLayer(2,'Exh.Gas Temp')">
+              <div class="sc-name">Exh.Gas Temp (排气温度)</div>
+              <div class="sc-value red">92.2°C</div>
+              <div class="sc-threshold">阈值: 85°C ↑ 超限</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:92%;background:#FF4D4F"></div></div>
+            </div>
+            <div class="sensor-card alarm" onclick="goLayer(2,'Cyl.3 Exh.Temp')">
+              <div class="sc-name">Cyl.3 Exh.Temp (3缸排气温度)</div>
+              <div class="sc-value red">385°C</div>
+              <div class="sc-threshold">阈值: 380°C ↑ 超限</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:96%;background:#FF4D4F"></div></div>
+            </div>
+            <div class="sensor-card warn" onclick="goLayer(2,'Cyl Cooling Water Out')">
+              <div class="sc-name">Cyl Cooling Water Out (缸套水出口)</div>
+              <div class="sc-value yellow">88.5°C</div>
+              <div class="sc-threshold">阈值: 85°C ↑ 预警</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:88%;background:#FAAD14"></div></div>
+            </div>
+            <div class="sensor-card" onclick="goLayer(2,'Cyl Cooling Water In')">
+              <div class="sc-name">Cyl Cooling Water In (缸套水进口)</div>
+              <div class="sc-value">48.7°C</div>
+              <div class="sc-threshold">阈值: 55°C · 正常</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:48%;background:#52C41A"></div></div>
+            </div>
+            <div class="sensor-card" onclick="goLayer(2,'Lube Oil Press')">
+              <div class="sc-name">Lube Oil Press (滑油压力)</div>
+              <div class="sc-value">0.38 MPa</div>
+              <div class="sc-threshold">范围: 0.3-0.5MPa · 正常</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:60%;background:#52C41A"></div></div>
+            </div>
+            <div class="sensor-card" onclick="goLayer(2,'Fuel Oil Temp')">
+              <div class="sc-name">Fuel Oil Temp (燃油温度)</div>
+              <div class="sc-value">62.3°C</div>
+              <div class="sc-threshold">范围: 50-80°C · 正常</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:55%;background:#52C41A"></div></div>
+            </div>
+            <div class="sensor-card" onclick="goLayer(2,'Scavenge Air Press')">
+              <div class="sc-name">Scavenge Air Press (扫气压力)</div>
+              <div class="sc-value">0.22 MPa</div>
+              <div class="sc-threshold">范围: 0.15-0.30MPa · 正常</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:65%;background:#52C41A"></div></div>
+            </div>
+            <div class="sensor-card" onclick="goLayer(2,'Engine Speed')">
+              <div class="sc-name">Engine Speed (主机转速)</div>
+              <div class="sc-value">450 rpm</div>
+              <div class="sc-threshold">额定: 500rpm · 正常</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:90%;background:#52C41A"></div></div>
+            </div>
+            <div class="sensor-card" onclick="goLayer(2,'Vibration')">
+              <div class="sc-name">Vibration (振动)</div>
+              <div class="sc-value">2.8 mm/s</div>
+              <div class="sc-threshold">阈值: 7.1mm/s · 正常</div>
+              <div class="sc-bar"><div class="sc-bar-fill" style="width:30%;background:#52C41A"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第三层：趋势图 -->
+        <div class="layer hidden-right" id="layer2">
+          <div class="trend-view">
+            <div class="trend-header">
+              <div class="back-btn" onclick="goLayer(1)">←</div>
+              <span class="title" id="trendTitle">Exh.Gas Temp · 趋势详情</span>
+            </div>
+            <div class="trend-chart">
+              <svg viewBox="0 0 500 200" style="width:100%;height:100%;padding:20px">
+                <!-- 网格线 -->
+                <line x1="50" y1="20" x2="50" y2="170" stroke="#1E3A5F" stroke-width="1"/>
+                <line x1="50" y1="170" x2="480" y2="170" stroke="#1E3A5F" stroke-width="1"/>
+                <line x1="50" y1="50" x2="480" y2="50" stroke="#1E3A5F" stroke-width="1" stroke-dasharray="4" opacity=".3"/>
+                <line x1="50" y1="100" x2="480" y2="100" stroke="#1E3A5F" stroke-width="1" stroke-dasharray="4" opacity=".3"/>
+                <!-- Y轴标签 -->
+                <text x="45" y="25" fill="#5A7A92" font-size="8" text-anchor="end">100°C</text>
+                <text x="45" y="55" fill="#5A7A92" font-size="8" text-anchor="end">85°C</text>
+                <text x="45" y="105" fill="#5A7A92" font-size="8" text-anchor="end">60°C</text>
+                <text x="45" y="175" fill="#5A7A92" font-size="8" text-anchor="end">30°C</text>
+                <!-- 阈值线 -->
+                <line x1="50" y1="50" x2="480" y2="50" stroke="#FAAD14" stroke-width="1.5" stroke-dasharray="6"/>
+                <text x="475" y="45" fill="#FAAD14" font-size="9" text-anchor="end">阈值 85°C</text>
+                <!-- 数据曲线 -->
+                <polyline points="60,140 100,138 140,135 180,130 220,125 260,118 300,100 340,80 380,60 420,40 460,30" fill="none" stroke="#FF4D4F" stroke-width="2.5"/>
+                <!-- 渐变填充 -->
+                <polygon points="60,140 100,138 140,135 180,130 220,125 260,118 300,100 340,80 380,60 420,40 460,30 460,170 60,170" fill="url(#redGrad)" opacity=".2"/>
+                <defs><linearGradient id="redGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FF4D4F"/><stop offset="100%" stop-color="#FF4D4F" stop-opacity="0"/></linearGradient></defs>
+                <!-- 突变点标注 -->
+                <circle cx="340" cy="80" r="5" fill="#FF4D4F" stroke="#0A1628" stroke-width="2"/>
+                <text x="335" y="72" fill="#FF4D4F" font-size="9" text-anchor="end">19:00 突变点</text>
+                <!-- 当前值 -->
+                <circle cx="460" cy="30" r="5" fill="#FF4D4F" stroke="#0A1628" stroke-width="2"/>
+                <text x="450" y="22" fill="#FF4D4F" font-size="10" text-anchor="end" font-weight="700">92.2°C</text>
+                <!-- X轴标签 -->
+                <text x="60" y="185" fill="#5A7A92" font-size="8">00:00</text>
+                <text x="180" y="185" fill="#5A7A92" font-size="8">06:00</text>
+                <text x="300" y="185" fill="#5A7A92" font-size="8">12:00</text>
+                <text x="420" y="185" fill="#5A7A92" font-size="8">18:00</text>
+              </svg>
+            </div>
+            <div class="trend-info">
+              <div class="trend-info-card">
+                <div class="tic-label">当前值</div>
+                <div class="tic-value" style="color:#FF4D4F">92.2°C</div>
+              </div>
+              <div class="trend-info-card">
+                <div class="tic-label">24h 最高</div>
+                <div class="tic-value" style="color:#FF4D4F">93.1°C</div>
+              </div>
+              <div class="trend-info-card">
+                <div class="tic-label">24h 最低</div>
+                <div class="tic-value">68.4°C</div>
+              </div>
+              <div class="trend-info-card">
+                <div class="tic-label">变化趋势</div>
+                <div class="tic-value" style="color:#FF4D4F">↑ 急升</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 助手区(态势感知) -->
+      <div class="assistant" id="situationAssistant">
+        <div class="ast-header">
+          <span class="mode-tag" style="background:rgba(0,188,212,.15);color:#00BCD4">辅助模式</span>
+          <span class="title">AI 助手</span>
+        </div>
+        <div class="ast-body" id="sitAstBody">
+          <div class="msg bot fade-in">
+            <div class="avatar">🤖</div>
+            <div class="bubble">
+              <strong>当前态势概览</strong><br><br>
+              船舶健康分 82，10 台设备中 7 台正常、2 台预警、1 台异常。<br><br>
+              ⚠️ 1号主机冷却水温超限，舵机油温异常，2号辅机油压偏低。<br><br>
+              <div style="font-size:10px;color:#5A7A92;margin-top:6px">💡 点击左侧设备，我会为你解读数据</div>
+            </div>
+          </div>
+        </div>
+        <div class="ast-input">
+          <input type="text" placeholder="问我任何数据问题...">
+          <div class="mic">🎤</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Tab3: 知识库 ===== -->
+    <div id="tab-knowledge" class="tab-page" style="display:none;flex:1">
+      <div class="kb-panel">
+        <div style="font-size:16px;font-weight:600;margin-bottom:16px">📖 知识库</div>
+        <div class="kb-categories">
+          <span class="kb-cat active">全部</span>
+          <span class="kb-cat">故障案例</span>
+          <span class="kb-cat">维修手册</span>
+          <span class="kb-cat">操作规范</span>
+          <span class="kb-cat">安全须知</span>
+          <span class="kb-cat">设备参数</span>
+        </div>
+        <div class="kb-list">
+          <div class="kb-item">
+            <div class="ki-title">主机冷却水温异常排查 SOP</div>
+            <div class="ki-meta"><span>操作规范</span><span>·</span><span>更新于 2026-06-15</span><span>·</span><span>12 步</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">2026-05 主机冷却水系统堵塞案例</div>
+            <div class="ki-meta"><span>故障案例</span><span>·</span><span>匹配事件：主机冷却水温异常偏高</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">辅机油压系统维护手册</div>
+            <div class="ki-meta"><span>维修手册</span><span>·</span><span>制造商：MAN B&W</span><span>·</span><span>V3.2</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">舵机液压油温度过高处理流程</div>
+            <div class="ki-meta"><span>操作规范</span><span>·</span><span>更新于 2026-04-20</span><span>·</span><span>8 步</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">空压机排气压力波动分析</div>
+            <div class="ki-meta"><span>故障案例</span><span>·</span><span>发生于 2026-03</span><span>·</span><span>已解决</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">机舱作业安全须知（2026版）</div>
+            <div class="ki-meta"><span>安全须知</span><span>·</span><span>强制阅读</span><span>·</span><span>年度更新</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">冷却水泵定期保养操作指南</div>
+            <div class="ki-meta"><span>操作规范</span><span>·</span><span>周期：每500小时</span><span>·</span><span>6 步</span></div>
+          </div>
+          <div class="kb-item">
+            <div class="ki-title">锅炉水位传感器校准规程</div>
+            <div class="ki-meta"><span>设备参数</span><span>·</span><span>精度：±0.5%</span><span>·</span><span>校准周期：季度</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// 时钟
+function updateClock(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  document.getElementById('clock').textContent=`2026-07-02 ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+setInterval(updateClock,1000);
+
+// Tab 切换
+function switchTab(tab){
+  document.querySelectorAll('.tab-page').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+tab).style.display='flex';
+  event.currentTarget.classList.add('active');
+
+  // 态势感知重置到第一层
+  if(tab==='situation') goLayer(0);
+}
+
+// 事件选择
+function selectEvent(idx){
+  document.querySelectorAll('.ev-item').forEach((e,i)=>{
+    e.classList.toggle('selected',i===idx);
+  });
+  // 展开产物抽屉
+  document.getElementById('productDrawer').classList.add('show');
+  // 更新助手消息
+  updateEventAssistant(idx);
+}
+
+// 返回事件列表
+function backToEventList(){
+  document.getElementById('productDrawer').classList.remove('show');
+}
+
+// 更新事件助手消息
+function updateEventAssistant(idx){
+  const msgs=[
+    {title:'主机冷却水温异常偏高',snap:'92.4°C',analysis:'冷却水温差异常偏大（43.7°C），高度怀疑冷却系统存在堵塞或热交换器效率下降。',chips:['🔍 查看可能原因','📋 开始排查','📝 创建工单'],actions:[{text:'开始排查',type:'primary'},{text:'转派工单',type:'ghost'},{text:'标记误报',type:'ghost'}]},
+    {title:'2号辅机油压偏低预警',snap:'2.1MPa（阈值2.5MPa）',analysis:'油压持续偏低，可能原因：油泵磨损、滤器堵塞或油路泄漏。建议检查油滤压差。',chips:['🔍 查看历史趋势','📋 排查步骤','📖 相关手册'],actions:[{text:'开始排查',type:'primary'},{text:'安排维保',type:'ghost'}]},
+    {title:'舵机液压油温度超限',snap:'78°C（阈值70°C）',analysis:'舵机油温超限，可能原因：冷却器效率下降、连续大舵角操作或油液老化。',chips:['🔍 查看原因','📋 处理流程'],actions:[{text:'查看处理流程',type:'primary'},{text:'转派工单',type:'ghost'}]},
+    {title:'3号泵计划维保到期提醒',snap:'维保日期：2026-07-05',analysis:'3号泵运行已接近500小时保养周期，建议安排定期保养。',chips:['📋 查看保养项目','📝 创建维保工单'],actions:[{text:'创建维保工单',type:'primary'},{text:'延后提醒',type:'ghost'}]},
+    {title:'空压机排气压力波动',snap:'0.82MPa（正常0.7±0.05）',analysis:'排气压力波动，可能原因：进气阀异常、压力传感器漂移或气路泄漏。',chips:['🔍 查看波动详情','📖 历史案例'],actions:[{text:'查看详情',type:'primary'},{text:'标记待观察',type:'ghost'}]},
+    {title:'锅炉水位传感器校准提醒',snap:'上次校准：2026-04-01',analysis:'季度校准到期，建议安排传感器校准以确保水位监测准确。',chips:['📋 校准步骤','📝 创建工单'],actions:[{text:'创建校准工单',type:'primary'},{text:'延后一周',type:'ghost'}]}
+  ];
+  const m=msgs[idx];
+  const body=document.getElementById('astBody');
+  body.innerHTML=`
+    <div class="msg bot fade-in">
+      <div class="avatar">🤖</div>
+      <div class="bubble">
+        <strong>事件已关联：${m.title}</strong><br><br>
+        快照数据：${m.snap}<br><br>
+        ${m.analysis}<br><br>
+        <div class="chip-row">${m.chips.map(c=>`<span class="chip">${c}</span>`).join('')}</div>
+        <div class="action-card">
+          <div class="ac-title">推荐操作</div>
+          <div class="ac-btns">${m.actions.map(a=>`<span class="ac-btn ${a.type}">${a.text}</span>`).join('')}</div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('astModeTag').textContent='事件模式';
+}
+
+// 态势感知层级切换
+let currentLayer=0;
+function goLayer(target,context){
+  if(target===currentLayer && context) {
+    // 同层点击更新助手
+    updateSituationAssistant(context);
+    return;
+  }
+
+  const layers=document.querySelectorAll('.situation-panel .layer');
+  const dots=document.querySelectorAll('.layer-dot');
+
+  layers.forEach((l,i)=>{
+    l.classList.remove('hidden-left','hidden-right');
+    if(i<target) l.classList.add('hidden-left');
+    else if(i>target) l.classList.add('hidden-right');
+  });
+
+  dots.forEach((d,i)=>{
+    d.classList.toggle('active',i===target);
+  });
+
+  currentLayer=target;
+
+  // 更新标题
+  if(target===1 && context) document.getElementById('sensorTitle').textContent=context+' · 传感器列表';
+  if(target===2 && context) document.getElementById('trendTitle').textContent=context+' · 趋势详情';
+
+  // 更新助手
+  if(target===0) updateSituationAssistant('概览');
+  else if(target===1 && context) updateSituationAssistant(context);
+  else if(target===2 && context) updateSituationAssistant(context+'-trend');
+}
+
+// 态势感知助手更新
+function updateSituationAssistant(context){
+  const body=document.getElementById('sitAstBody');
+  const responses={
+    '概览':{msg:'<strong>当前态势概览</strong><br><br>船舶健康分 82，10 台设备中 7 台正常、2 台预警、1 台异常。<br><br>⚠️ 重点关注：1号主机冷却水温超限（92.2°C），舵机油温异常（78°C）。<br><br><div style="font-size:10px;color:#5A7A92;margin-top:6px">💡 点击左侧设备卡片，我会为你解读数据</div>'},
+    '主机系统':{msg:'<strong>主机系统 · 已选中</strong><br><br>共 3 个传感器超限/预警：<br>• Exh.Gas Temp: 92.2°C ↑<br>• Cyl.3 Exh.Temp: 385°C ↑<br>• 缸套水出口: 88.5°C ↑<br><br>🔴 排气温度19:00后急剧上升，疑似燃烧工况异常。<br><br><div class="chip-row"><span class="chip">🔍 查看详细分析</span><span class="chip">📋 排查建议</span></div>'},
+    '辅机系统':{msg:'<strong>辅机系统 · 已选中</strong><br><br>2号辅机油压偏低（2.1MPa），空压机排气压力波动。其余设备参数正常。<br><br><div class="chip-row"><span class="chip">🔍 油压分析</span><span class="chip">📖 相关手册</span></div>'},
+    '泵系统':{msg:'<strong>泵系统 · 已选中</strong><br><br>两台冷却水泵运行正常，流量和压力均在标准范围内。3号泵维保到期提醒已推送至事件中心。<br><br><div style="font-size:10px;color:#5A7A92">💡 该设备暂无异常</div>'},
+    '甲板机械':{msg:'<strong>甲板机械 · 已选中</strong><br><br>⚠️ 舵机液压油温度 78°C，超过阈值 70°C。可能原因：冷却器效率下降或连续大舵角操作。<br><br><div class="chip-row"><span class="chip">🔍 温度趋势</span><span class="chip">📋 处理流程</span></div>'},
+    '导航系统':{msg:'<strong>导航系统 · 已选中</strong><br><br>雷达运行正常，量程12nm，转速24rpm。所有导航设备状态良好。<br><br><div style="font-size:10px;color:#5A7A92">💡 该设备暂无异常</div>'},
+    'Exh.Gas Temp':{msg:'<strong>Exh.Gas Temp · 排气温度</strong><br><br>当前值 92.2°C，超阈值 85°C。<br><br>📈 趋势分析：从19:00开始急剧上升，2小时内从78°C升至92°C。<br><br>🔴 可能原因：<br>① 燃油喷射系统异常<br>② 增压器效率下降<br>③ 排气阀泄漏<br><br><div class="chip-row"><span class="chip">📋 排查步骤</span><span class="chip">📖 相关案例</span><span class="chip">⚡ 生成事件快照</span></div>'},
+    'Exh.Gas Temp-trend':{msg:'<strong>排气温度趋势解读</strong><br><br>• 24h 内从 68°C 升至 92°C<br>• <span style="color:#FF4D4F">19:00 出现突变点</span>，升温速率加快<br>• 已超过阈值 85°C 达 1.5 小时<br><br>🔴 建议立即检查燃烧工况，必要时降速运行。<br><br><div class="chip-row"><span class="chip">⚡ 生成事件快照</span><span class="chip">📋 推荐操作</span></div>'},
+    'Cyl.3 Exh.Temp':{msg:'<strong>Cyl.3 Exh.Temp · 3缸排气温度</strong><br><br>当前值 385°C，超阈值 380°C。与 Exh.Gas Temp 趋势一致，疑似关联故障。<br><br><div class="chip-row"><span class="chip">🔍 对比分析</span><span class="chip">⚡ 生成事件快照</span></div>'},
+    'Cyl Cooling Water Out':{msg:'<strong>缸套水出口温度</strong><br><br>当前值 88.5°C，预警（阈值85°C）。与排气温度升高存在关联——冷却系统负荷增大。<br><br><div class="chip-row"><span class="chip">🔍 关联分析</span><span class="chip">📖 冷却系统手册</span></div>'}
+  };
+
+  const r=responses[context]||responses['概览'];
+  body.innerHTML=`<div class="msg bot fade-in"><div class="avatar">🤖</div><div class="bubble">${r.msg}</div></div>`;
+}
+
+// 态势感知触摸滑动
+(function(){
+  const panel=document.querySelector('.situation-panel');
+  let startX=0,startY=0,isDragging=false;
+  panel.addEventListener('touchstart',e=>{
+    startX=e.touches[0].clientX;
+    startY=e.touches[0].clientY;
+    isDragging=true;
+  });
+  panel.addEventListener('touchend',e=>{
+    if(!isDragging)return;
+    isDragging=false;
+    const dx=e.changedTouches[0].clientX-startX;
+    const dy=e.changedTouches[0].clientY-startY;
+    if(Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>50){
+      if(dx<0 && currentLayer<2) goLayer(currentLayer+1);
+      else if(dx>0 && currentLayer>0) goLayer(currentLayer-1);
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>事件中心改造概念方案 V2.0</title>
+<style>
+:root {
+  --bg: #0A1628; --bg2: #0F1F38; --bg3: #102236;
+  --bd: #1E3A5F; --accent: #1890FF; --suc: #52C41A;
+  --warn: #FAAD14; --danger: #FF4D4F; --off: #5A7A92;
+  --t1: #E8F0FF; --t2: #8BAAC0; --t3: #5A7A92;
+  --r: 12px; --f: Consolas,"Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t1);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+
+/* nav */
+.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 24px;z-index:100;gap:16px}
+.topbar .tag{background:var(--bg3);color:var(--accent);font-size:11px;padding:2px 10px;border-radius:4px;border:1px solid var(--accent)}
+.topbar .label{font-size:14px;font-weight:600;color:var(--t1)}
+.topbar .sub{font-size:12px;color:var(--t2);margin-left:auto}
+
+.section{padding:80px 0 60px;max-width:1200px;margin:0 auto;padding-left:40px;padding-right:40px}
+.sec-title{font-size:20px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.sec-desc{font-size:13px;color:var(--t2);margin-bottom:32px;line-height:1.7}
+.sec-alt{background:var(--bg2);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd)}
+
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:24px;margin-bottom:16px}
+.card .hdr{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;border:none;cursor:pointer}
+.btn-p{background:var(--accent);color:#fff}
+.btn-g{background:transparent;border:1px solid var(--bd);color:var(--t2)}
+
+.tag{font-size:9px;padding:1px 6px;border-radius:3px;font-weight:500;white-space:nowrap}
+.t-red{background:rgba(255,77,79,.15);color:var(--danger)}
+.t-org{background:rgba(250,173,20,.15);color:var(--warn)}
+.t-blu{background:rgba(24,144,255,.15);color:var(--accent)}
+.t-grn{background:rgba(82,196,26,.15);color:var(--suc)}
+.t-gry{background:rgba(90,122,146,.15);color:var(--off)}
+
+.chip{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--accent);margin:2px;cursor:pointer}
+
+/* ===== Interactive Demo ===== */
+.demo-wrap{background:var(--bg);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin:20px 0;position:relative;height:460px}
+
+/* Tabs bar */
+.tabs{display:flex;align-items:center;height:36px;background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 8px;gap:2px}
+.tab-item{padding:4px 14px;font-size:11px;border-radius:4px;cursor:pointer;color:var(--t2);transition:.15s}
+.tab-item.active{background:var(--accent);color:#fff}
+
+/* Default: two columns */
+.two-col{display:grid;grid-template-columns:220px 1fr;height:424px;transition:all .3s}
+.two-col .left{border-right:1px solid var(--bd);overflow-y:auto;background:var(--bg3)}
+.two-col .right{overflow:hidden;display:flex;flex-direction:column}
+
+/* Viewer drawer state */
+.with-drawer{display:flex;height:424px}
+.with-drawer .left-col{width:0;overflow:hidden;transition:width .35s ease}
+.with-drawer .viewer-col{flex:1;overflow-y:auto;background:var(--bg);border-right:1px solid var(--bd);padding:16px;animation:slideIn .35s ease}
+.with-drawer .right-col{width:300px;overflow:hidden;display:flex;flex-direction:column}
+
+@keyframes slideIn{0%{opacity:0;transform:translateX(-30px)}100%{opacity:1;transform:translateX(0)}}
+
+.col-hdr{padding:8px 12px;font-size:11px;font-weight:600;color:var(--t2);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:6px}
+
+/* Event items */
+.evt{padding:9px 12px;border-bottom:1px solid var(--bg);cursor:grab;font-size:11px;transition:.15s}
+.evt:hover{background:rgba(24,144,255,.05)}
+.evt.active{background:rgba(24,144,255,.1);border-left:3px solid var(--accent)}
+.evt .tt{color:var(--t1);font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evt .mt{color:var(--t3);font-size:10px;margin-top:2px}
+.evt-row{display:flex;gap:6px;align-items:flex-start}
+
+/* Drag handle */
+.drag-h{color:var(--t3);font-size:14px;cursor:grab;flex-shrink:0;margin-top:-1px;user-select:none;width:12px;text-align:center}
+
+/* Chat */
+.msg{margin:0 12px 8px;max-width:92%;font-size:11px;line-height:1.6}
+.msg-ai{padding:8px 10px;border-radius:8px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd)}
+.msg-user{padding:6px 10px;border-radius:8px;background:rgba(24,144,255,.1);color:var(--accent);border:1px solid rgba(24,144,255,.2);align-self:flex-end}
+.msg-card{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px;margin:0 12px 8px;font-size:11px}
+.msg-card .ct{font-size:12px;font-weight:500;color:var(--t1);margin-bottom:4px}
+.msg-card .cd{font-size:10px;color:var(--t3);margin-bottom:6px;line-height:1.5}
+.msg-act{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.ai-inp{margin:auto 12px 10px;display:flex;gap:6px}
+.ai-inp input{flex:1;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;color:var(--t1);font-size:11px;outline:none}
+.ai-inp input::placeholder{color:var(--t3)}
+.ai-inp .mic{background:transparent;border:1px solid var(--bd);border-radius:6px;width:32px;display:flex;align-items:center;justify-content:center;color:var(--t2);cursor:pointer;font-size:14px}
+.ai-inp button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 12px;font-size:11px;cursor:pointer;font-weight:500}
+
+/* viewer data */
+.d-card{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px}
+.d-lb{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sg .sv{font-size:18px;font-weight:600;font-family:var(--f)}
+
+/* Info boxes */
+.ibox{background:rgba(24,144,255,.05);border:1px solid var(--accent);border-radius:8px;padding:16px;margin:16px 0}
+.ibox .it{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px}
+
+/* flowchart */
+.flow{padding-left:28px;position:relative}
+.flow::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--bd)}
+.fi{position:relative;padding-bottom:24px;font-size:13px;line-height:1.6}
+.fi::before{content:'';position:absolute;left:-24px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--bg2);border:2px solid var(--accent)}
+.fi.done::before{border-color:var(--suc);background:var(--suc)}
+.fi.cur::before{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 4px rgba(24,144,255,.2)}
+.fi.wa::before{border-color:var(--warn);background:var(--warn)}
+.ft{font-size:10px;color:var(--t3);margin-bottom:2px}
+
+.arrow{display:flex;gap:12px;justify-content:center;margin:8px 0 16px}
+.step{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--t2)}
+.step .num{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500}
+.step .num.on{background:var(--accent);color:#fff}
+.step .num.off{background:var(--bg3);color:var(--t3);border:1px solid var(--bd)}
+.step .num.dn{background:var(--suc);color:#fff}
+
+.footer{padding:40px;text-align:center;color:var(--t3);font-size:12px;border-top:1px solid var(--bd)}
+
+/* tabs switch hint */
+.hint{background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--t2);display:flex;justify-content:space-between;align-items:center}
+
+@media(max-width:800px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .two-col{grid-template-columns:1fr}
+  .with-drawer{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="tag">概念方案 V2.0</span>
+  <span class="label">船舶设备检修助手 · 事件中心交互概念</span>
+  <span class="sub">2026-07-02 · pad 端</span>
+</div>
+
+<!-- ===== 1. 核心交互流程演示 ===== -->
+<div class="section" style="padding-top:92px">
+  <div class="sec-title">01 交互流程演示</div>
+  <div class="sec-desc">从默认状态到进入事件查看的完整流程。点击下方按钮体验不同阶段。</div>
+
+  <!-- Step control -->
+  <div class="hint" id="stepHint" style="margin-bottom:8px">
+    <span id="stepLabel">步骤 1/3：默认状态 - 事件列表 + 通用助手</span>
+    <div>
+      <span class="btn btn-g" style="padding:3px 10px;font-size:10px" id="prevBtn">← 上一步</span>
+      <span class="btn btn-p" style="padding:3px 10px;font-size:10px" id="nextBtn">下一步 →</span>
+    </div>
+  </div>
+
+  <div id="demoContainer" class="demo-wrap"></div>
+
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:8px;font-size:11px;color:var(--t2)">
+    <span id="stepDots"></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  const container = document.getElementById('demoContainer');
+  const stepLabel = document.getElementById('stepLabel');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const stepDots = document.getElementById('stepDots');
+
+  let step = 0; // 0=default, 1=clicked event, 2=drawer open
+
+  const events = [
+    {id:1,title:'主机缸套水温异常偏高',src:'主机系统',time:'14:05',color:'danger',tag:'紧急',cls:'t-red'},
+    {id:2,title:'3号冷却泵振动值超标',src:'泵系统',time:'13:42',color:'warn',tag:'警告',cls:'t-org'},
+    {id:3,title:'锅炉房定期巡检到期',src:'巡检任务',time:'13:30',color:'accent',tag:'待执行',cls:'t-blu'},
+    {id:4,title:'空压机#2工单已完成',src:'工单',time:'11:20',color:'suc',tag:'已解决',cls:'t-grn'},
+    {id:5,title:'舵机液压油更换提醒',src:'保养',time:'09:00',color:'off',tag:'计划中',cls:'t-gry'}
+  ];
+
+  const colors = {danger:'var(--danger)',warn:'var(--warn)',accent:'var(--accent)',suc:'var(--suc)',off:'var(--off)'};
+
+  const viewerContent = `
+<div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px">主机缸套水温异常偏高</div>
+<div style="font-size:10px;color:var(--t3);margin-bottom:10px">事件 #EVT-0042 · 主机系统 · 14:05</div>
+<div class="d-card">
+  <div class="d-lb">实时传感数据</div>
+  <div class="sg">
+    <div><div style="font-size:10px;color:var(--t3)">缸套水温</div><div class="sv" style="color:var(--danger)">92.4°C</div></div>
+    <div><div style="font-size:10px;color:var(--t3)">正常范围</div><div class="sv" style="color:var(--suc)">78-85°C</div></div>
+    <div><div style="font-size:10px;color:var(--t3)">冷却水流量</div><div class="sv" style="color:var(--danger)">偏低</div></div>
+    <div><div style="font-size:10px;color:var(--t3)">膨胀水箱液位</div><div class="sv" style="color:var(--suc)">正常</div></div>
+  </div>
+</div>
+<div class="d-card">
+  <div class="d-lb">AI 诊断</div>
+  <div style="font-size:11px;color:var(--t2);line-height:1.5">冷却水流量偏低导致缸套水温上升。原因推测：冷却水泵效率下降 / 管路堵塞 / 温控阀异常。关联事件：3号冷却泵（振动超标）。</div>
+</div>
+<div class="d-card">
+  <div class="d-lb">关系图谱</div>
+  <div style="font-size:11px;color:var(--t2)">
+    <span class="tag t-red">主机缸套水温</span>
+    <span style="color:var(--t3);margin:0 4px">→</span>
+    <span class="tag t-org">3号冷却泵</span>
+    <span style="color:var(--t3);margin:0 4px">→</span>
+    <span class="tag t-gry">温控阀</span>
+  </div>
+</div>
+`;
+
+  function renderEventList(activeId) {
+    return events.map(e => {
+      const dot = colors[e.color] || 'var(--t3)';
+      const act = e.id === activeId ? ' active' : '';
+      return `<div class="evt${act}" data-id="${e.id}" style="display:flex;gap:4px">
+        <span class="drag-h">☰</span>
+        <span style="width:5px;height:5px;background:${dot};border-radius:50%;flex-shrink:0;margin-top:4px"></span>
+        <div style="flex:1;min-width:0">
+          <div class="tt">${e.title}</div>
+          <div class="mt">${e.src} · ${e.time}</div>
+        </div>
+        <span class="tag ${e.cls}">${e.tag}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderChat(mode) {
+    if (mode === 'default') {
+      return `
+<div class="msg-ai">👋 下午好！当前有 <b style="color:var(--danger)">2 个待处理事件</b>，其中 1 个紧急。需要我帮你梳理一下优先级吗？</div>
+<div style="padding:4px 14px;font-size:9px;color:var(--t3)">试试问我：</div>
+<div style="padding:0 14px 8px">
+  <span class="chip">今天有什么紧急的</span>
+  <span class="chip">查看主机运行状态</span>
+  <span class="chip">帮我看一下工单</span>
+</div>`;
+    } else {
+      return `
+<div class="msg-ai">已切换到事件<b style="color:var(--danger)">「主机缸套水温异常」</b>。传感数据已加载，请查看中栏。建议优先检查 3 号冷却泵（关联振动告警）。<br><br>需要我做什么？</div>
+<div class="msg-card">
+  <div class="ct">建议操作</div>
+  <div class="cd">排查步骤：<br>1️⃣ 检查冷却水阀开度<br>2️⃣ 检查冷却泵运行参数<br>3️⃣ 检查管路有无堵塞</div>
+  <div class="msg-act">
+    <span class="chip" style="padding:4px 10px;color:#fff;background:var(--accent)">开始排查</span>
+    <span class="chip" style="padding:4px 10px">生成工单</span>
+    <span class="chip" style="padding:4px 10px">查看趋势图</span>
+    <span class="chip" style="padding:4px 10px">关联案例</span>
+  </div>
+</div>`;
+    }
+  }
+
+  function render() {
+    const steps = [
+      {label:'默认状态：事件列表 + 通用助手'},
+      {label:'点击事件 → 助手切换上下文 + 左栏待收起'},
+      {label:'左栏丝滑收起 + 产物抽屉展开'}
+    ];
+
+    let html = '';
+
+    if (step === 0) {
+      // Default: two columns
+      html += `<div class="two-col">
+        <div class="left">
+          <div class="col-hdr">
+            <span style="width:5px;height:5px;background:var(--danger);border-radius:50%"></span> 事件流
+            <span style="margin-left:auto;font-size:9px;font-weight:400;color:var(--danger)">2 待处理</span>
+          </div>
+          ${renderEventList(-1)}
+        </div>
+        <div class="right">
+          <div class="col-hdr"><span style="width:5px;height:5px;background:var(--accent);border-radius:50%"></span> AI 助手</div>
+          <div style="flex:1;overflow-y:auto;padding:8px 0;display:flex;flex-direction:column">
+            ${renderChat('default')}
+          </div>
+          <div class="ai-inp">
+            <input placeholder="描述你的问题..." />
+            <span class="mic">🎤</span>
+            <button>发送</button>
+          </div>
+        </div>
+      </div>`;
+    } else if (step === 1) {
+      // Event clicked, left still visible but assistant switched context
+      html += `<div class="two-col">
+        <div class="left">
+          <div class="col-hdr">
+            <span style="width:5px;height:5px;background:var(--danger);border-radius:50%"></span> 事件流
+            <span style="margin-left:auto;font-size:9px;font-weight:400;color:var(--t3)">点击事件 → 即将收起</span>
+          </div>
+          ${renderEventList(1)}
+        </div>
+        <div class="right">
+          <div class="col-hdr"><span style="width:5px;height:5px;background:var(--accent);border-radius:50%"></span> AI 助手 · 主机缸套水温</div>
+          <div style="flex:1;overflow-y:auto;padding:8px 0;display:flex;flex-direction:column">
+            ${renderChat('event')}
+          </div>
+          <div class="ai-inp">
+            <input placeholder="说点什么..." />
+            <span class="mic">🎤</span>
+            <button>发送</button>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      // Drawer open: viewer slides in, left collapses
+      html += `<div class="with-drawer">
+        <div class="left-col" style="width:0"></div>
+        <div class="viewer-col">
+          ${viewerContent}
+        </div>
+        <div class="right-col">
+          <div class="col-hdr"><span style="width:5px;height:5px;background:var(--accent);border-radius:50%"></span> AI 助手 · 主机缸套水温</div>
+          <div style="flex:1;overflow-y:auto;padding:8px 0;display:flex;flex-direction:column">
+            ${renderChat('event')}
+          </div>
+          <div class="ai-inp">
+            <input placeholder="说点什么..." />
+            <span class="mic">🎤</span>
+            <button>发送</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    container.innerHTML = html;
+    stepLabel.textContent = `步骤 ${step+1}/3：${steps[step].label}`;
+
+    // Dots
+    stepDots.innerHTML = steps.map((_,i) =>
+      `<span style="display:inline-block;width:20px;height:4px;border-radius:2px;${i===step?'background:var(--accent)':'background:var(--bd)'};margin:0 2px"></span>`
+    ).join('');
+  }
+
+  prevBtn.addEventListener('click', () => { if (step > 0) { step--; render(); }});
+  nextBtn.addEventListener('click', () => { if (step < 2) { step++; render(); }});
+
+  render();
+})();
+</script>
+
+<!-- ===== 2. 交互流程说明 ===== -->
+<div class="section sec-alt">
+  <div class="sec-title">02 完整操作链条</div>
+  <div class="sec-desc"></div>
+
+  <div class="flow">
+    <div class="fi cur">
+      <div class="ft">进入 App</div>
+      <div style="color:var(--t1)">看到<b>事件列表 + 通用助手</b>。事件列表可按优先级拖拽排序</div>
+    </div>
+    <div class="fi cur">
+      <div class="ft">点击某条事件</div>
+      <div style="color:var(--t1)">助手立即切换到该事件的上下文，给出分析建议。左栏<mark style="background:var(--bg3);color:var(--accent);padding:1px 4px;border-radius:2px">准备收起</mark></div>
+    </div>
+    <div class="fi cur">
+      <div class="ft">左栏收起 + 产物抽屉展开</div>
+      <div style="color:var(--t1)"><b style="color:var(--accent)">丝滑动画：</b>左栏事件列表向左滑出，产物查看器从左侧滑入（抽屉式），助手区右对齐。</div>
+    </div>
+    <div class="fi wa">
+      <div class="ft">在助手对话中操作</div>
+      <div style="color:var(--t1)">所有排查、工单、查询都在助手里完成。支持打字/语音输入。</div>
+    </div>
+    <div class="fi done">
+      <div class="ft">完成 / 返回列表</div>
+      <div style="color:var(--t1)">关闭抽屉→左栏重新滑入→回到默认状态。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3. 设计要点总结 ===== -->
+<div class="section">
+  <div class="sec-title">03 已确认的设计要点</div>
+  <div class="sec-desc"></div>
+
+  <div class="g3">
+    <div class="card">
+      <div class="hdr" style="color:var(--accent">01 默认双栏</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6">
+        进入 App 就是 <b style="color:var(--t1)">事件列表 + 通用助手</b>。<br>
+        列表可<b style="color:var(--t1)">拖拽排序</b>，用户自定义优先级。
+      </div>
+    </div>
+    <div class="card">
+      <div class="hdr" style="color:var(--accent">02 产物抽屉</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6">
+        点击事件→<b style="color:var(--t1)">左栏丝滑收起</b>→产物区以<b style="color:var(--t1)">抽屉</b>方式从左侧滑入。<br>
+        产物区<b style="color:var(--t3)">只读、不交互</b>。
+      </div>
+    </div>
+    <div class="card">
+      <div class="hdr" style="color:var(--accent">03 助手主驾驶</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6">
+        通用模式 = 问答、总览。<br>
+        事件模式 = 排查、操作、工单。<br>
+        支持 <b style="color:var(--t1)">语音输入</b>🎤。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 4. Tab 架构 ===== -->
+<div class="section sec-alt">
+  <div class="sec-title">04 Tab 导航规划</div>
+  <div class="sec-desc">原"首页"和"监控中心"融合为一个 Tab。</div>
+
+  <div class="g4">
+    <div class="card">
+      <div class="hdr" style="color:var(--accent">事件中心</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5">默认进入。双栏布局，所有事件交互入口。</div>
+    </div>
+    <div class="card">
+      <div class="hdr" style="color:var(--t2)">监控（融合）</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5">原首页仪表盘 + 设备监控合并。全局综览。</div>
+    </div>
+    <div class="card">
+      <div class="hdr" style="color:var(--t2)">知识库</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5">案例、手册、SOP。助手可检索引用。</div>
+    </div>
+    <div class="card">
+      <div class="hdr" style="color:var(--t2)">个人中心</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5">工单、历史、设置。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 5. 版本管理 ===== -->
+<div class="section">
+  <div class="sec-title">05 版本管理</div>
+  <div class="sec-desc"></div>
+  <div class="g2">
+    <div class="card" style="border-color:var(--off)">
+      <div class="hdr" style="color:var(--off)">V1.0（保留）</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.8">
+        <b style="color:var(--t1)">分支：</b> main<br>
+        <b style="color:var(--t1)">内容：</b> 首页仪表盘 + 监控 + 检修中心<br>
+        <b style="color:var(--t1)">在线：</b> <a href="https://fanglele66-cmyk.github.io/ship-maintenance/" style="color:var(--accent)" target="_blank">GitHub Pages</a>
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--accent)">
+      <div class="hdr" style="color:var(--accent)">V2.0（新建）</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.8">
+        <b style="color:var(--t1)">分支：</b> feat/event-center-v2<br>
+        <b style="color:var(--t1)">交互：</b> 默认双栏 + 产物抽屉 + 助手主驾驶<br>
+        <b style="color:var(--t1)">状态：</b> 概念方案讨论中
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:12px;font-size:11px;color:var(--t2);background:var(--bg3);border-radius:8px;padding:12px">
+    <code style="color:var(--accent);font-size:11px;background:var(--bg);padding:2px 6px;border-radius:3px">git checkout -b feat/event-center-v2 main</code>
+    <span style="margin-left:8px">→ 原 main 不受影响</span>
+  </div>
+</div>
+
+<div class="footer">
+  概念方案 V2.0 · 事件中心 · 基于 V1.0 独立设计<br>
+  <a href="https://fanglele66-cmyk.github.io/ship-maintenance/" style="color:var(--accent)" target="_blank">原版本 V1.0 →</a>
+</div>
+
+</body>
+</html>

@@ -1,464 +1,739 @@
 <template>
-  <div class="kb-page">
-    <!-- 顶部栏 -->
-    <div class="kb-header">
-      <div class="kb-header-left">
-        <span class="kb-logo">📚</span>
-        <span class="kb-title">知识库</span>
+  <div class="knowledge-view">
+    <!-- ===== 左侧：双维度侧边栏 ===== -->
+    <aside class="sidebar">
+      <!-- 设备类型 -->
+      <div class="sb-section">
+        <div class="sb-section-title">设备类型</div>
+        <button
+          v-for="dt in deviceTypes"
+          :key="dt.key"
+          class="sb-item"
+          :class="{ active: selectedDevice === dt.key }"
+          @click="selectDevice(dt.key)"
+        >
+          <span class="sb-item-label">{{ dt.key }}</span>
+          <span class="sb-item-count" :class="{ active: selectedDevice === dt.key }">{{ dt.count }}</span>
+        </button>
       </div>
-      <span class="kb-status-badge">
-        <span class="kb-status-dot"></span>
-        {{ selectedKbDevice }} · {{ kbFilteredDocs.length }} 篇
-      </span>
-    </div>
-
-    <!-- 搜索栏 -->
-    <div class="kb-search-bar">
-      <div class="kb-search-box">
-        <span class="kb-search-icon">🔍</span>
-        <input v-model="kbSearchQuery" type="text" placeholder="搜索文档标题、关键词..." />
+      <!-- 文档类型 -->
+      <div class="sb-section">
+        <div class="sb-section-title">文档类型</div>
+        <button
+          v-for="dt in docTypeKeys"
+          :key="dt"
+          class="sb-item"
+          :class="{ active: selectedDocType === dt }"
+          @click="selectedDocType = dt"
+        >
+          <span class="sb-item-label">{{ dt }}</span>
+          <span class="sb-item-count" :class="{ active: selectedDocType === dt }">{{ docTypeStats[dt] }}</span>
+        </button>
       </div>
-    </div>
+    </aside>
 
-    <!-- 主体：左侧分类 + 右侧文档列表 -->
-    <div class="kb-body">
-      <aside class="kb-sidebar">
-        <div class="kb-sidebar-section">
-          <div class="kb-sidebar-title">设备类型</div>
-          <div
-            v-for="d in kbDeviceTypes"
-            :key="d.name"
-            :class="['kb-sidebar-item', { active: selectedKbDevice === d.name }]"
-            @click="selectedKbDevice = d.name"
-          >
-            <span class="kb-sidebar-item-label">{{ d.name }}</span>
-            <span class="kb-sidebar-item-count">{{ d.count }}</span>
+    <!-- ===== 主内容区 ===== -->
+    <main class="main-content">
+      <!-- 文件库视图 -->
+      <template v-if="!selectedDoc">
+        <!-- 顶部栏 -->
+        <div class="top-bar">
+          <div class="top-bar-left">
+            <h2 class="page-title">
+              <svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="#1890ff" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+              知识库
+            </h2>
+            <div class="search-box">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input v-model="searchQuery" type="text" placeholder="搜索文档标题、关键词..." class="search-input" />
+            </div>
+          </div>
+          <div class="top-bar-right">
+            <span class="device-badge">
+              <span class="device-badge-dot"></span>
+              {{ selectedDevice }} . {{ filteredDocs.length }} 篇文档
+            </span>
           </div>
         </div>
-        <div class="kb-sidebar-section">
-          <div class="kb-sidebar-title">文档类型</div>
-          <div
-            v-for="t in kbDocTypes"
-            :key="t.name"
-            :class="['kb-sidebar-item', { active: selectedKbDocType === t.name }]"
-            @click="selectedKbDocType = t.name"
-          >
-            <span class="kb-sidebar-item-label">{{ t.name }}</span>
-            <span class="kb-sidebar-item-count">{{ t.count }}</span>
-          </div>
-        </div>
-      </aside>
 
-      <main class="kb-content">
-        <div class="kb-content-header">
-          <div class="kb-content-title">
-            {{ selectedKbDevice }} · <span class="count">{{ kbFilteredDocs.length }} 篇文档</span>
-          </div>
-        </div>
-        <div v-if="kbFilteredDocs.length" class="kb-doc-grid">
+        <!-- 文档卡片网格 -->
+        <div class="doc-grid">
           <div
-            v-for="doc in kbFilteredDocs"
+            v-for="doc in filteredDocs"
             :key="doc.id"
-            class="kb-doc-card"
-            @click="kbOpenDoc(doc)"
+            class="doc-card"
+            @click="openDoc(doc)"
           >
-            <span :class="['kb-doc-tag', doc.typeKey]">{{ doc.typeName }}</span>
-            <div class="kb-doc-title">{{ doc.title }}</div>
-            <div class="kb-doc-meta">
-              <span>更新 {{ doc.date }}</span>
-              <span v-if="doc.code" class="kb-doc-code">{{ doc.code }}</span>
+            <div class="doc-card-top">
+              <span class="doc-type-badge" :style="badgeStyle(doc.docType)">{{ doc.docType }}</span>
+            </div>
+            <div class="doc-card-title">{{ doc.title }}</div>
+            <div class="doc-card-bottom">
+              <span class="doc-card-date">更新 {{ doc.updatedAt }}</span>
+              <span class="doc-card-id">{{ doc.id }}</span>
+            </div>
+          </div>
+          <div v-if="filteredDocs.length === 0" class="empty-grid">
+            未找到匹配的文档
+          </div>
+        </div>
+      </template>
+
+      <!-- 文档详情页 -->
+      <template v-else>
+        <div class="detail-page">
+          <!-- 顶部导航栏 -->
+          <div class="detail-topbar">
+            <button class="back-btn" @click="goBackFromDoc">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              返回
+            </button>
+            <span class="detail-title">{{ selectedDoc.title }}</span>
+            <span class="detail-meta">编号: {{ selectedDoc.id }}&nbsp;&nbsp;版本: {{ selectedDoc.version }}</span>
+            <button class="download-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              下载PDF
+            </button>
+          </div>
+
+          <!-- 文档内容 -->
+          <div class="detail-content">
+            <div class="doc-content-card">
+              <div class="doc-content-body" v-html="renderContent"></div>
             </div>
           </div>
         </div>
-        <div v-else class="kb-empty">📂 没有符合条件的文档</div>
-      </main>
-    </div>
+      </template>
+    </main>
 
-    <!-- 文档详情预览 -->
-    <div v-if="kbPreviewDoc" class="kb-preview-overlay">
-      <div class="kb-preview-header">
-        <div class="kb-preview-header-left">
-          <button class="kb-back-btn" @click="kbPreviewDoc = null">← 返回</button>
-          <span class="kb-preview-title">{{ kbPreviewDoc.title }}</span>
-        </div>
-        <div class="kb-preview-info">
-          <span>编号: {{ kbPreviewDoc.code || 'DOC-AUTO' }}</span>
-          <span>版本: V3.2</span>
-        </div>
-        <button class="kb-preview-download">⬇ 下载PDF</button>
-      </div>
-      <div class="kb-preview-body">
-        <div class="kb-doc-paper">
-          <h2>{{ kbDocContent.title }}</h2>
-
-          <template v-for="(sec, si) in kbDocContent.sections" :key="si">
-            <p class="kb-section-num">{{ sec.num }} {{ sec.heading }}</p>
-            <p v-if="sec.text" class="kb-section-text" v-html="sec.text"></p>
-
-            <table v-if="sec.table" class="kb-doc-table">
-              <tr><th v-for="(th, thi) in sec.table.headers" :key="thi">{{ th }}</th></tr>
-              <tr v-for="(row, ri) in sec.table.rows" :key="ri">
-                <td v-for="(cell, ci) in row" :key="ci">{{ cell }}</td>
-              </tr>
-            </table>
-
-            <div v-if="sec.warning" :class="['kb-warning-box', sec.warning.type]">
-              <span class="wb-icon">{{ sec.warning.type === 'warn' ? '⚠️' : 'ℹ️' }}</span>
-              <span v-html="sec.warning.text"></span>
-            </div>
-          </template>
-
-          <div class="kb-related-box">
-            <h4>📚 关联文档</h4>
-            <a
-              v-for="r in kbDocContent.related"
-              :key="r"
-              class="kb-related-link"
-              @click="kbJumpRelated(r)"
-            >{{ r }}</a>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ===== AI 问答助手 ===== -->
+    <KnowledgeAIPanel
+      :search-query="searchQuery"
+      :selected-device="selectedDevice"
+      :selected-doc-type="selectedDocType"
+      :filtered-doc-count="filteredDocs.length"
+      :filtered-docs="filteredDocs"
+      @open-doc="handleOpenDocById"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { knowledgeDocs, kbDeviceTypes, kbDocTypes, kbDocContent } from '@/mock'
+import {
+  knowledgeDocs, DEVICE_TYPES, DOC_TYPE_STATS,
+  docTypeColors
+} from '@/mock/knowledge'
+import KnowledgeAIPanel from '@/components/KnowledgeAIPanel.vue'
 
-const kbSearchQuery = ref('')
-const selectedKbDevice = ref('主机')
-const selectedKbDocType = ref('全部类型')
-const kbPreviewDoc = ref(null)
+const deviceTypes = DEVICE_TYPES
+const docTypeKeys = Object.keys(DOC_TYPE_STATS)
+const docTypeStats = DOC_TYPE_STATS
 
-const kbFilteredDocs = computed(() => {
-  let list = knowledgeDocs.filter(d => d.device === selectedKbDevice.value)
-  if (selectedKbDocType.value !== '全部类型') {
-    list = list.filter(d => d.typeName === selectedKbDocType.value)
+const selectedDevice = ref('主机')
+const selectedDocType = ref('全部类型')
+const searchQuery = ref('')
+const selectedDoc = ref(null)
+
+const filteredDocs = computed(() => {
+  let list = [...knowledgeDocs]
+  if (selectedDevice.value !== '全部') {
+    list = list.filter(d => d.device === selectedDevice.value)
   }
-  if (kbSearchQuery.value) {
-    const q = kbSearchQuery.value.toLowerCase()
+  if (selectedDocType.value !== '全部类型') {
+    list = list.filter(d => d.docType === selectedDocType.value)
+  }
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
     list = list.filter(d =>
-      d.title.toLowerCase().includes(q) || (d.code && d.code.toLowerCase().includes(q))
+      d.title.toLowerCase().includes(q) ||
+      d.subcategory.toLowerCase().includes(q) ||
+      d.category.toLowerCase().includes(q)
     )
   }
-  list.sort((a, b) => b.date.localeCompare(a.date))
   return list
 })
 
-function kbOpenDoc(doc) {
-  kbPreviewDoc.value = doc
+function selectDevice(key) {
+  selectedDevice.value = key
 }
 
-function kbJumpRelated(name) {
-  // 模拟跳转
-  console.log('Jump to:', name)
+function openDoc(doc) {
+  selectedDoc.value = doc
 }
+
+function badgeStyle(type) {
+  const c = docTypeColors[type]
+  if (!c) return {}
+  return {
+    color: c.color,
+    background: c.bg,
+    border: `1px solid ${c.border}`
+  }
+}
+
+// 从 AI 面板的文档引用跳转
+function handleOpenDocById(docId) {
+  const doc = knowledgeDocs.find(d => d.id === docId)
+  if (doc) selectedDoc.value = doc
+}
+
+// 从文档详情返回列表
+function goBackFromDoc() {
+  selectedDoc.value = null
+}
+
+// 渲染文档内容 HTML
+const renderContent = computed(() => {
+  if (!selectedDoc.value) return ''
+  if (selectedDoc.value.chapterHTML) {
+    return selectedDoc.value.chapterHTML
+  }
+  return `
+    <h3>${selectedDoc.value.title}</h3>
+    <p><strong>设备类型：</strong>${selectedDoc.value.device}</p>
+    <p><strong>文档类型：</strong>${selectedDoc.value.docType}</p>
+    <p><strong>所属分类：</strong>${selectedDoc.value.category} / ${selectedDoc.value.subcategory}</p>
+    <p><strong>文档编号：</strong>${selectedDoc.value.id}</p>
+    <p><strong>版本：</strong>${selectedDoc.value.version}</p>
+    <p><strong>更新日期：</strong>${selectedDoc.value.updatedAt}</p>
+    <hr>
+    <p>本文档详细内容正在编制中，敬请期待。</p>
+  `
+})
 </script>
 
 <style scoped>
-.kb-page {
-  display: flex;
-  flex-direction: column;
+/* ===== 整体布局 ===== */
+.knowledge-view {
+  flex: 1;
   height: 100%;
+  display: flex;
   overflow: hidden;
-  background: #060d17;
+  background: var(--bg-surface);
 }
 
-/* ===== 顶部栏 ===== */
-.kb-header {
+/* ============ 左侧 Sidebar ============ */
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+.sb-section {
+  margin-bottom: 8px;
+}
+
+.sb-section-title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 8px 16px 6px;
+  letter-spacing: 0.5px;
+}
+
+.sb-item {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  background: #0A1628;
-  border-bottom: 1px solid #162940;
-  flex-shrink: 0;
-}
-.kb-header-left { display: flex; align-items: center; gap: 10px; }
-.kb-logo { font-size: 22px; }
-.kb-title { font-size: 17px; font-weight: 800; color: #E0ECF8; }
-.kb-status-badge {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: #8BAAC0;
-  background: rgba(82,196,26,0.08);
-  border: 1px solid rgba(82,196,26,0.2);
-  padding: 4px 12px; border-radius: 14px;
-}
-.kb-status-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #52C41A;
-  box-shadow: 0 0 6px rgba(82,196,26,0.6);
-}
-
-/* ===== 搜索栏 ===== */
-.kb-search-bar {
-  padding: 12px 20px;
-  background: #08121f;
-  border-bottom: 1px solid #162940;
-  flex-shrink: 0;
-}
-.kb-search-box {
-  display: flex; align-items: center; gap: 8px;
-  max-width: 500px;
-  background: #0D1B2E;
-  border: 1px solid #1E3A5F;
-  border-radius: 8px;
-  padding: 8px 14px;
-  transition: border-color 0.2s;
-}
-.kb-search-box:focus-within { border-color: #1890FF; }
-.kb-search-icon { font-size: 14px; opacity: 0.5; }
-.kb-search-box input {
-  flex: 1; background: none; border: none; outline: none;
-  color: #E0ECF8; font-size: 13px;
-}
-.kb-search-box input::placeholder { color: #5A7A92; }
-
-/* ===== 主体 ===== */
-.kb-body {
-  flex: 1; min-height: 0;
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  overflow: hidden;
-}
-
-/* ===== 左侧分类 ===== */
-.kb-sidebar {
-  border-right: 1px solid #162940;
-  background: #08121f;
-  overflow-y: auto;
-  padding: 8px 0 16px;
-}
-.kb-sidebar-section { margin-bottom: 6px; }
-.kb-sidebar-title {
-  padding: 12px 16px 6px;
-  font-size: 11px; font-weight: 700;
-  color: #5A7A92; letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.kb-sidebar-item {
-  display: flex; align-items: center; justify-content: space-between;
   padding: 8px 16px;
-  cursor: pointer; transition: all 0.12s;
-  border-left: 3px solid transparent;
-}
-.kb-sidebar-item:hover { background: #0D1B2E; }
-.kb-sidebar-item.active {
-  background: rgba(24,144,255,0.08);
-  border-left-color: #1890FF;
-}
-.kb-sidebar-item-label {
-  font-size: 13px; color: #8BAAC0;
-}
-.kb-sidebar-item.active .kb-sidebar-item-label {
-  color: #1890FF; font-weight: 700;
-}
-.kb-sidebar-item-count {
-  font-size: 10px; color: #5A7A92;
-  background: #0c1420;
-  padding: 1px 7px; border-radius: 8px;
-}
-.kb-sidebar-item.active .kb-sidebar-item-count {
-  background: rgba(24,144,255,0.15);
-  color: #1890FF;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  font-family: inherit;
 }
 
-/* ===== 右侧内容 ===== */
-.kb-content {
+.sb-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sb-item.active {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.sb-item-label { flex: 1; }
+
+.sb-item-count {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  min-width: 22px;
+  text-align: center;
+}
+
+.sb-item-count.active {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+/* ============ 主内容区 ============ */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* 顶部栏 */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.page-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.title-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 8px 14px;
+  width: 280px;
+}
+
+.search-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  font-family: inherit;
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.device-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--success);
+  padding: 5px 14px;
+  border-radius: 14px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-bg);
+  white-space: nowrap;
+}
+
+.device-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(0, 180, 42, 0.6);
+}
+
+/* ============ 文档卡片网格 ============ */
+.doc-grid {
+  flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
-}
-.kb-content-header {
-  margin-bottom: 14px;
-}
-.kb-content-title {
-  font-size: 15px; font-weight: 700; color: #E0ECF8;
-}
-.kb-content-title .count {
-  font-size: 12px; color: #5A7A92; font-weight: 400;
-}
-
-/* ===== 文档卡片网格 ===== */
-.kb-doc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+  align-content: start;
 }
-.kb-doc-card {
-  position: relative;
-  background: #0D1B2E;
-  border: 1px solid #162940;
-  border-radius: 8px;
-  padding: 16px 18px 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.kb-doc-card:hover {
-  border-color: #243B58;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-}
-.kb-doc-tag {
-  display: inline-block;
-  font-size: 10px; padding: 2px 8px;
-  border-radius: 3px; font-weight: 600;
-  margin-bottom: 8px;
-}
-.kb-doc-tag.manual { background: rgba(82,196,26,0.15); color: #52C41A; }
-.kb-doc-tag.procedure { background: rgba(24,144,255,0.15); color: #1890FF; }
-.kb-doc-tag.case { background: rgba(255,77,79,0.15); color: #FF4D4F; }
-.kb-doc-tag.notice { background: rgba(250,173,20,0.15); color: #FAAD14; }
 
-.kb-doc-title {
-  font-size: 13px; font-weight: 700; color: #E0ECF8;
-  line-height: 1.4; margin-bottom: 10px;
+.doc-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.doc-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.doc-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doc-type-badge {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.doc-card-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.kb-doc-meta {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 11px; color: #5A7A92;
-}
-.kb-doc-code {
-  font-family: 'Consolas', monospace;
-  background: #080f1a;
-  padding: 1px 6px; border-radius: 3px;
-}
 
-.kb-empty {
-  grid-column: 1/-1;
-  display: flex; align-items: center; justify-content: center;
-  padding: 60px 0;
-  color: #3A5A7A; font-size: 14px;
-}
-
-/* ===== 文档详情预览 ===== */
-.kb-preview-overlay {
-  position: fixed;
-  inset: 0;
-  background: #060d17;
-  z-index: 200;
-  display: flex;
-  flex-direction: column;
-}
-.kb-preview-header {
+.doc-card-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
-  background: #0A1628;
-  border-bottom: 1px solid #162940;
+  margin-top: auto;
+}
+
+.doc-card-date {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.doc-card-id {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-family: Consolas, monospace;
+}
+
+.empty-grid {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: var(--font-md);
+}
+
+/* ============ 文档详情页 ============ */
+.detail-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-topbar {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-panel);
+  gap: 16px;
   flex-shrink: 0;
 }
-.kb-preview-header-left {
-  display: flex; align-items: center; gap: 16px;
-}
-.kb-back-btn {
-  background: none; border: none;
-  color: #8BAAC0; cursor: pointer;
-  font-size: 13px; padding: 4px 8px;
-  border-radius: 4px; transition: all 0.12s;
-}
-.kb-back-btn:hover { color: #1890FF; background: rgba(24,144,255,0.08); }
-.kb-preview-title {
-  font-size: 15px; font-weight: 700; color: #E0ECF8;
-}
-.kb-preview-info {
-  display: flex; gap: 16px;
-  font-size: 12px; color: #5A7A92;
-}
-.kb-preview-download {
-  padding: 6px 16px; border-radius: 6px;
-  border: 1px solid #1890FF; background: rgba(24,144,255,0.08);
-  color: #1890FF; font-size: 12px; cursor: pointer;
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
   transition: all 0.15s;
+  font-family: inherit;
 }
-.kb-preview-download:hover { background: rgba(24,144,255,0.15); }
-
-.kb-preview-body {
-  flex: 1; overflow-y: auto;
-  padding: 32px;
-  display: flex; justify-content: center;
+.back-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
-/* ===== 文档纸张样式 ===== */
-.kb-doc-paper {
-  max-width: 780px;
-  width: 100%;
-  background: #0D1B2E;
-  border: 1px solid #162940;
+.detail-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-meta {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: var(--font-sm);
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.download-btn:hover {
+  background: var(--accent-bg);
+}
+
+/* 文档内容 */
+.detail-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: var(--bg-surface);
+}
+
+.doc-content-card {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  padding: 40px 48px;
-}
-.kb-doc-paper h2 {
-  font-size: 20px; font-weight: 800; color: #E0ECF8;
-  margin: 0 0 24px;
-  padding-bottom: 14px;
-  border-bottom: 2px solid #1E3A5F;
-}
-.kb-section-num {
-  font-size: 15px; font-weight: 700; color: #1890FF;
-  margin: 24px 0 8px;
-}
-.kb-section-text {
-  font-size: 13px; color: #8BAAC0;
-  line-height: 1.8; margin: 8px 0;
-}
-.kb-doc-table {
-  width: 100%; border-collapse: collapse;
-  font-size: 12px; margin: 12px 0;
-}
-.kb-doc-table th {
-  background: #0a1020; color: #5A7A92;
-  padding: 9px 14px; text-align: left;
-  font-weight: 600; border-bottom: 1px solid #1E3A5F;
-}
-.kb-doc-table td {
-  padding: 9px 14px;
-  border-bottom: 1px solid #111e34;
-  color: #B0C4D8;
+  padding: 28px 36px 48px;
+  max-width: 720px;
+  width: 100%;
+  min-height: 200px;
+  box-shadow: var(--shadow-sm);
 }
 
-.kb-warning-box {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 16px;
+.doc-content-body {
+  width: 100%;
+}
+
+/* ===== 文档内容 HTML 样式 ===== */
+.doc-content-body :deep(h3) {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.doc-content-body :deep(h4) {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--accent);
+  margin: 20px 0 8px 0;
+}
+
+.doc-content-body :deep(h5) {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--accent);
+  margin: 16px 0 6px 0;
+}
+
+.doc-content-body :deep(p) {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin: 6px 0;
+}
+
+.doc-content-body :deep(strong) {
+  color: var(--text-primary);
+}
+
+.doc-content-body :deep(ul),
+.doc-content-body :deep(ol) {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.doc-content-body :deep(li) {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin: 2px 0;
+}
+
+.doc-content-body :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: var(--font-sm);
+}
+
+.doc-content-body :deep(thead th) {
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: var(--font-sm);
+}
+
+.doc-content-body :deep(tbody td) {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.doc-content-body :deep(tbody tr:hover) {
+  background: var(--bg-hover);
+}
+
+/* 通知框 */
+.doc-content-body :deep(.notice-box) {
+  padding: 10px 14px;
   border-radius: 6px;
-  font-size: 12px; line-height: 1.6;
+  font-size: var(--font-sm);
+  line-height: 1.6;
+  margin: 12px 0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.doc-content-body :deep(.notice-box::before) {
+  flex-shrink: 0;
+  font-size: var(--font-md);
+}
+
+.doc-content-body :deep(.notice-box.info) {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-bg);
+  color: var(--text-secondary);
+}
+.doc-content-body :deep(.notice-box.info::before) {
+  content: '';
+}
+
+.doc-content-body :deep(.notice-box.warn) {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-bg);
+  color: var(--warning);
+}
+.doc-content-body :deep(.notice-box.warn::before) {
+  content: '';
+}
+
+.doc-content-body :deep(.notice-box.danger) {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-bg);
+  color: var(--danger);
+}
+.doc-content-body :deep(.notice-box.danger::before) {
+  content: '';
+}
+
+/* 关联文档 */
+.doc-content-body :deep(.related-docs) {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.doc-content-body :deep(.related-docs h4) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.doc-content-body :deep(.related-docs h4::before) {
+  content: '';
+  font-size: var(--font-md);
+}
+
+.doc-content-body :deep(.related-docs ul) {
+  list-style: none;
+  padding: 0;
+}
+
+.doc-content-body :deep(.related-docs li) {
+  padding: 4px 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--font-sm);
+}
+.doc-content-body :deep(.related-docs li:hover) {
+  text-decoration: underline;
+}
+
+.doc-content-body :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-primary);
   margin: 16px 0;
 }
-.kb-warning-box.info {
-  background: rgba(24,144,255,0.08);
-  border: 1px solid rgba(24,144,255,0.2);
-  color: #8BAAC0;
-}
-.kb-warning-box.warn {
-  background: rgba(250,173,20,0.08);
-  border: 1px solid rgba(250,173,20,0.2);
-  color: #FAAD14;
-}
-.wb-icon { font-size: 16px; flex-shrink: 0; }
 
-.kb-related-box {
-  margin-top: 32px;
-  padding: 18px 20px;
-  background: #08121f;
-  border: 1px solid #162940;
-  border-radius: 8px;
+/* 文档元信息头 */
+.doc-content-body :deep(.doc-meta-header) {
+  display: flex;
+  gap: 20px;
+  padding: 8px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  font-family: Consolas, monospace;
+  margin-bottom: 20px;
 }
-.kb-related-box h4 {
-  font-size: 14px; font-weight: 700; color: #E0ECF8;
-  margin: 0 0 12px;
-}
-.kb-related-link {
-  display: block;
-  font-size: 12px; color: #1890FF;
-  padding: 6px 0;
-  cursor: pointer;
-  transition: color 0.12s;
-}
-.kb-related-link:hover { color: #40A9FF; text-decoration: underline; }
 </style>
