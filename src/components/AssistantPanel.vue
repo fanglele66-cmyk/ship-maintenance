@@ -9,31 +9,20 @@
       title="拖拽调整宽度 · 双击重置"
     ></div>
     <!-- Header -->
-    <div class="assistant-header">
-      <span class="mode-tag" :class="modeClass">{{ modeLabel }}</span>
+    <div class="assistant-header" :class="{ 'event-assistant-header': props.mode === 'event' }">
+      <span v-if="props.mode !== 'event'" class="mode-tag" :class="modeClass">{{ modeLabel }}</span>
       <span class="assistant-title">
         <svg class="sparkle-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M8 1.5l.8 2.5a5.5 5.5 0 0 0 3.2 3.2l2.5.8-2.5.8a5.5 5.5 0 0 0-3.2 3.2L8 14.5l-.8-2.5a5.5 5.5 0 0 0-3.2-3.2L1.5 8l2.5-.8a5.5 5.5 0 0 0 3.2-3.2L8 1.5z"/>
         </svg>
-        AI 助手
+        {{ props.mode === 'event' ? '事件助手' : 'AI 助手' }}
       </span>
-      <span v-if="currentStageLabel" class="stage-pill">{{ currentStageLabel }}</span>
+      <span v-if="props.mode !== 'event' && currentStageLabel" class="stage-pill">{{ currentStageLabel }}</span>
     </div>
 
-    <!-- 事件上下文条 -->
-    <div v-if="props.mode === 'event' && props.eventContext" class="event-context-bar">
-      <div class="ecb-row">
-        <svg class="ecb-clip" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="1" width="8" height="2" rx="0.5"/><rect x="3" y="3" width="10" height="12" rx="1.5"/>
-          <line x1="6" y1="7" x2="10" y2="7"/><line x1="6" y1="10" x2="10" y2="10"/>
-        </svg>
-        <span class="ecb-name" :title="props.eventContext.title">{{ props.eventContext.title }}</span>
-      </div>
-      <div class="ecb-row ecb-meta">
-        <span class="ecb-tag" :class="props.eventContext.priority">{{ priorityLabels[props.eventContext.priority] }}</span>
-        <span class="ecb-tag" :class="props.eventContext.status">{{ statusLabels[props.eventContext.status] }}</span>
-        <span class="ecb-id">#{{ props.eventContext.id }}</span>
-      </div>
+    <div v-if="props.mode === 'event' && props.eventContext" class="event-context-bar compact-event-link">
+      <span class="ecb-link-label">已关联</span>
+      <span class="ecb-name" :title="props.eventContext.title">{{ props.eventContext.title }}</span>
     </div>
 
     <!-- Messages -->
@@ -151,17 +140,19 @@
         </div>
       </div>
 
-      <!-- 快捷回复 + CTA -->
-      <div v-if="recommendedQuestions.length > 0" class="recommended-section">
-        <div class="rec-label">{{ recLabel }}</div>
-        <div class="rec-chips">
-          <button v-for="(q, idx) in recommendedQuestions" :key="idx"
-            class="rec-chip"
-            :class="q.action !== 'send' ? 'rec-chip-cta' : ''"
-            :style="q.highlight ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-bg);font-weight:600' : ''"
-            @click="handleRecommendedClick(q)">
-            {{ q.text }}
-          </button>
+      <!-- 猜你想问 -->
+      <div v-if="recommendedQuestions.length > 0" class="msg msg-ai">
+        <div class="msg-bubble chips-bubble">
+          <div class="chips-hint">{{ recLabel }}</div>
+          <div class="rec-chips">
+            <button v-for="(q, idx) in recommendedQuestions" :key="idx"
+              class="rec-chip"
+              :class="q.action !== 'send' ? 'rec-chip-cta' : ''"
+              :style="q.highlight ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-bg);font-weight:600' : ''"
+              @click="handleRecommendedClick(q)">
+              {{ q.text }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -287,6 +278,7 @@ const eventUnread = inject('eventUnread', reactive({}))
 const eventStage = inject('eventStage', reactive({}))
 const eventAssistantAction = inject('eventAssistantAction', reactive({}))
 const eventAssistantCommand = inject('eventAssistantCommand', reactive({}))
+const eventSituationTabs = inject('eventSituationTabs', reactive({}))
 const totalUnread = inject('totalUnread', ref(0))
 // 本地状态
 const followupSent = reactive({})
@@ -389,7 +381,7 @@ watch(messages, (list) => {
 
 // ============ Chips ============
 const recommendedQuestions = ref([])
-const recLabel = computed(() => messages.value.length > 0 ? '快捷回复' : '试试问我')
+const recLabel = computed(() => messages.value.length > 0 ? '猜你想问' : '试试问我')
 
 function getChipsByContext() {
   if (props.mode === 'general') {
@@ -411,43 +403,40 @@ function getChipsByContext() {
   }
   if (props.mode === 'event' && props.eventContext) {
     const ec = props.eventContext; const stage = eventStage[ec.id] || 'S1'
-    const hasUserMsg = messages.value.some(m => m.role === 'user')
-    if (stage === 'S1' && !hasUserMsg) {
-      const chips = [
-        { text: '立即开始排查，生成方案', action: 'start_check', highlight: true }
-      ]
-      chips.push({ text: '暂不处理，稍晚些提醒我', action: 'snooze' })
-      chips.push({ text: '标记为误报', action: 'mark_false_alarm' })
-      return chips
-    }
-    if (stage === 'S1' && hasUserMsg) {
-      return [{ text: '这种原因多久能恢复？', action: 'send' }, { text: '还有其他可能原因吗？', action: 'send' }, { text: '开始排查，为我生成方案', action: 'start_check' }]
-    }
-    if (stage === 'S2') {
-      const action = eventAssistantAction[ec.id]
-      if (action === 'check_activate_first' || action?.startsWith('check_normal_') || action?.startsWith('repair_not_fixed_')) {
+    const action = eventAssistantAction[ec.id]
+    if (stage === 'S1') {
+      // 基于左侧实际解锁状态推荐下一步
+      const tabs = eventSituationTabs[ec.id]
+      const unlocked = tabs?.unlocked || { summary: true }
+      const hasData = unlocked.data
+      const hasWorkload = unlocked.workload
+      
+      if (!hasData) {
         return [
-          { text: '一切正常，继续排查', action: 'chip_check_normal', highlight: true },
-          { text: '登记异常反馈', action: 'chip_open_feedback' }
+          { text: '查看数据与趋势图', action: 'open_data', highlight: true },
+          { text: '分析相关工况', action: 'open_workload' }
         ]
       }
+      if (!hasWorkload) {
+        return [
+          { text: '分析相关工况', action: 'open_workload', highlight: true },
+          { text: '进入排查处置', action: 'start_check' }
+        ]
+      }
+      // 事件情况模块已看全
+      return [
+        { text: '进入排查处置', action: 'start_check', highlight: true },
+        { text: '标记为误报', action: 'mark_false_alarm' }
+      ]
+    }
+    if (stage === 'S2') {
       return []
     }
     if (stage === 'S4') {
       const action = eventAssistantAction[ec.id]
-      // 维修没解决 → 左侧已跳到下一项排查，chip 切到排查态
-      if (action?.startsWith('repair_not_fixed_')) {
-        return [
-          { text: '一切正常，继续排查', action: 'chip_check_normal', highlight: true },
-          { text: '登记异常反馈', action: 'chip_open_feedback' }
-        ]
-      }
-      // 活跃维修态（异常刚发现 → 维修卡展开中）
-      if (action === 'warning' || action?.startsWith('check_abnormal_')) {
-        return [
-          { text: '修好了，事件已解决', action: 'chip_repair_solved', highlight: true },
-          { text: '维修了，但事件仍异常', action: 'chip_repair_not_fixed' }
-        ]
+      // 排查/维修过程不再用右侧猜你想问抢焦点，左侧卡片内完成确认、反馈与验收。
+      if (action?.startsWith('repair_not_fixed_') || action === 'warning' || action?.startsWith('check_abnormal_')) {
+        return []
       }
       if (action === 'repair_solved') {
         return [
@@ -554,9 +543,15 @@ function initEventSession(eventId) {
   initCheckItems(eventId)
   const sess = eventStore.getSessionMessages(eventId)
   if (sess.length === 0) {
-    incUnread(eventId); incUnread(eventId)
-    pushMsg(eventId, { content: `已关联「${props.eventContext?.title || ''}」，正在分析…`, cardType: null })
-    setTimeout(() => pushDiagnosisCard(eventId, props.eventContext), 400)
+    incUnread(eventId)
+    const ev = props.eventContext
+    const sensor = ev?.snapshot?.sensors?.[0]
+    const deviceText = ev?.system || '相关设备'
+    pushMsg(eventId, {
+      content: `${deviceText}检测到事件：<b>${ev?.title || ''}</b>。${sensor ? `当前关键指标 <b>${sensor.name}</b> ${sensor.value}${sensor.unit}。` : ''}左侧<b>事件情况</b>已整理完毕。`,
+      cardType: null
+    })
+    eventAssistantAction[eventId] = 'open_summary'
   }
   refreshChips()
 }
@@ -693,14 +688,14 @@ const CHECK_NORMAL_MSGS = {
   0: `✅ <b>液压系统故障排查</b> —— 油箱外观、管路接头、密封件各检查点均无异常，外观及液位数值一致。<br><br>已自动进入 <b>吸口堵塞排查</b>（4步 · 15个关键点），重点检查吸口滤网、负压值、沉积物和回油过滤器状态。请继续按左侧方案执行。`,
   1: `✅ <b>吸口堵塞排查</b> —— 滤网通畅、负压正常、油液品质无异常表现，成功排除了堵塞类因素。<br><br>接下来排查 <b>压力传感器故障</b>（4步 · 15个关键点），核心确认传感器校验、供电回路与信号干扰情况。结合 AI 分析，根因可能出在采集环节而非机械本体。`,
   2: `✅ <b>压力传感器故障排查</b> —— 读数校验通过、供电电压稳定 24V±3%、信号无噪声干扰，传感器及回路均无异常。<br><br>进入最后一环 <b>系统管线泄漏排查</b>（5步 · 19个关键点），沿管路走向逐段检查接头焊缝、执行机构密封和油箱附件。排查进入收官阶段。`,
-  3: `✅ <b>系统管线泄漏排查</b> —— 各接头焊缝、执行机构密封均无泄漏痕迹，管线状态良好。<br><br>四项排查已全部完成，左侧已生成事件记录报告。请通过下方快捷回复完成闭环。`
+  3: `✅ <b>系统管线泄漏排查</b> —— 各接头焊缝、执行机构密封均无泄漏痕迹，管线状态良好。<br><br>四项排查已全部完成。`
 }
 
 const REPAIR_NOT_FIXED_MSGS = {
   0: `⚠️ <b>液压系统</b> 维修后问题仍未消除。建议结合维修记录升级处理策略，必要时联系岸基技术支持。<br><br>已自动进入下一排查项 <b>吸口堵塞排查</b>（4步 · 15个关键点），请继续按左侧方案逐项排查其它可能原因。`,
   1: `⚠️ <b>吸口堵塞</b> 维修未解决。滤网已清洁、油液已更换，但症状依旧——原因很可能不在管路侧。<br><br>已进入 <b>压力传感器故障排查</b>（4步 · 15个关键点），重点校验传感器本体的准确性和信号回路。`,
   2: `⚠️ <b>压力传感器</b> 换新后问题仍复现，已彻底排除传感器本体故障。<br><br>已进入最后一环 <b>系统管线泄漏排查</b>（5步 · 19个关键点），沿管路逐段排查接头焊缝与密封件状态。`,
-  3: `⚠️ <b>系统管线</b> 维修后仍未根除。四项排查均已尝试维修但问题依旧。<br><br>建议升级处置：联系岸基技术支持或安排坞修检查。左侧已生成事件记录，请通过下方快捷回复完成手动闭环。`
+  3: `⚠️ <b>系统管线</b> 维修后仍未根除。四项排查均已尝试维修但问题依旧。<br><br>建议升级处置：联系岸基技术支持或安排坞修检查。`
 }
 watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
   if (!action || !props.eventContext) return
@@ -737,9 +732,8 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
       const title = titles[idx] || ('T' + (idx + 1))
       pushMsg(eid, {
         cardType: null,
-        content: `⚠️ <b>${title}</b> 排查发现异常 👈 左侧已生成专项维修方案，包含注意事项、维修步骤、备件清单与验收标准。<br><br>请按步骤执行维修操作，完成后反馈结果。`
+        content: `<b>${title}</b> 的排查反馈显示存在异常。左侧已打开对应<b>维修项</b>，里面包含注意事项、维修步骤、备件清单与验收标准。<br><br>请按左侧执行，完成后在这里反馈“修好了”或“仍异常”。`
       })
-      pushWarningCard(eid)
       refreshChips()
     }, 400)
   }
@@ -766,14 +760,13 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
     }, 400)
   }
 
-  // 全部完成 → 推送报告卡片
+  // 兼容旧动作：异常后进入维修
   if (action === 'repair') {
     setTimeout(() => {
       pushMsg(eid, {
         cardType: null,
-        content: `排查已全部完成 👈 发现若干异常项，已自动进入维修阶段。<br><br>左侧产物区已生成维修方案，包含备件清单和验收标准。请按步骤执行维修操作。`
+        content: `排查反馈已收到，左侧已切到对应维修项。请按维修步骤处理，完成后反馈结果。`
       })
-      pushWarningCard(eid)
       refreshChips()
     }, 500)
   }
@@ -784,7 +777,7 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
       pushReportCard(eid, ev)
       pushMsg(eid, {
         cardType: null,
-        content: `✅ 事件已关闭。处理总结见左侧产物区「维修报告」卡片。<br><br>后续仍需关注：${ev?.title || ''}的长期运行趋势，建议安排定期巡检。`
+        content: `事件已关闭。后续关注：${ev?.title || ''}的长期运行趋势，建议安排定期巡检。`
       })
       refreshChips()
     }, 500)
@@ -795,7 +788,7 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
     setTimeout(() => {
       pushMsg(eid, {
         cardType: null,
-        content: `✅ 维修已完成！左侧产物区已生成事件记录报告，包含故障根因、维修内容、关键验收及遗留建议。`
+        content: `维修已完成，事件记录已更新。`
       })
       // 确保不被后续 watch 覆盖
       eventAssistantAction[eid] = 'repair_solved'
@@ -808,7 +801,7 @@ watch(() => eventAssistantAction[props.eventContext?.id], (action) => {
     setTimeout(() => {
       pushMsg(eid, {
         cardType: null,
-        content: `⚠️ 全部排查已完成。左侧已生成事件记录报告，请通过下方快捷回复完成闭环。`
+        content: `全部排查已完成。`
       })
       refreshChips()
     }, 400)
@@ -884,6 +877,8 @@ function toggleGuideStep(stepIdx) {
 
 // ============ Chips 点击 ============
 function handleRecommendedClick(q) {
+  if (q.action === 'view_ai') { handleViewAi(); return }
+  if (q.action === 'open_data' || q.action === 'open_trend' || q.action === 'open_workload') { handleOpenEventModule(q.action); return }
   if (q.action === 'start_check') { startIterativeCheck(); return }
   if (q.action === 'start_check_item') { startCheckItem(); return }
   if (q.action === 'check_fault') { handleCheckResult('fault_found'); return }
@@ -927,12 +922,56 @@ function handleChipAction(chipAction) {
     if (!feedbackGuideTs[eid] || now - feedbackGuideTs[eid] > 2000) {
       feedbackGuideTs[eid] = now
       pushMsg(eid, {
-        content: '左侧排查卡已展开，<b>请按步骤逐项反馈</b>，也可以直接告诉我，我帮您填写。' +
-          '<div style="margin-top:4px;padding:4px 8px;background:var(--bg-hover);border-radius:4px;font-size:12px;color:var(--text-muted);">例如：油箱外壁焊缝处有明显渗漏油渍。</div>'
+        content: '左侧当前<b>排查项</b>已经定位到反馈区。请按步骤选择现场结果，提交后我会继续判断下一步。' +
+          '<div style="margin-top:4px;padding:4px 8px;background:var(--bg-hover);border-radius:4px;font-size:12px;color:var(--text-muted);">也可以直接输入：油箱外壁焊缝处有明显渗漏油渍。</div>'
       })
       scrollToBottom()
     }
   }
+}
+
+const EVENT_MODULE_TEXT = {
+  open_data: {
+    user: '查看数据与趋势图',
+    left: '数据概览',
+    reply: '左侧已打开<b>数据概览</b>——上方为各监控项当前值，点击可切换下方趋势图。'
+  },
+  open_workload: {
+    user: '分析相关工况',
+    left: '工况分析',
+    reply: '左侧已切换到<b>工况分析</b>，含候选故障匹配和可能影响。'
+  }
+}
+
+function handleOpenEventModule(action) {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  const config = EVENT_MODULE_TEXT[action]
+  if (!config) return
+  eventStore.addMessage(eid, { role: 'user', content: config.user, ts: Date.now() })
+  eventAssistantAction[eid] = action
+  // 同步更新 eventSituationTabs，不依赖 ProductDrawer 的 watch 时序
+  const tabKey = action === 'open_data' ? 'data' : action === 'open_workload' ? 'workload' : null
+  if (tabKey) {
+    if (!eventSituationTabs[eid]) eventSituationTabs[eid] = reactive({ unlocked: { summary: true }, active: 'summary' })
+    eventSituationTabs[eid].unlocked = { ...eventSituationTabs[eid].unlocked, [tabKey]: true }
+    eventSituationTabs[eid].active = tabKey
+  }
+  pushMsg(eid, { content: config.reply })
+  refreshChips()
+  scrollToBottom()
+}
+
+function handleViewAi() {
+  if (!props.eventContext) return
+  const eid = props.eventContext.id
+  eventStore.addMessage(eid, { role: 'user', content: '查看事件概况', ts: Date.now() })
+  eventAssistantAction[eid] = 'open_summary'
+  pushMsg(eid, {
+    content: '左侧现在是<b>事件概况</b>：基础信息、AI 初步结论和处置建议在同一块里。你可以继续看数据概览或直接进入排查。'
+  })
+  refreshChips()
+  scrollToBottom()
 }
 
 // ============ 标记为误报 ============
@@ -975,7 +1014,7 @@ function handleConfirmClose() {
   eventStore.addMessage(eid, { role: 'user', content: '确认闭环，无需补充', ts: Date.now() })
   scrollToBottom()
   setTimeout(() => {
-    pushMsg(eid, { content: '✅ 已确认闭环。事件处理完成，左侧产物区已生成完整事件记录。' })
+    pushMsg(eid, { content: '已确认闭环，事件处理完成。' })
     eventStage[eid] = 'S5'
     refreshChips()
   }, 400)
@@ -1009,18 +1048,16 @@ function startIterativeCheck() {
   if (!props.eventContext) return
   const eid = props.eventContext.id
   const ev = props.eventContext
-  eventStore.addMessage(eid, { role: 'user', content: '立即开始排查，生成方案', ts: Date.now() })
+  eventStore.addMessage(eid, { role: 'user', content: '进入排查处置', ts: Date.now() })
   eventStage[eid] = 'S2'
   scrollToBottom()
   setTimeout(() => {
     pushMsg(eid, {
       cardType: null,
-      content: `📋 排查方案已生成。根据 AI 分析，症状最可能指向<b>液压系统</b> —— 涉及油箱、管路接头、密封件及吸入口状态（6 步 · 21 个关键点），建议优先从该项入手。<br><br>执行顺序：液压系统 → 吸口堵塞排查 → 压力传感器 → 系统管线泄漏，逐项推进直至定位根因。左侧卡片已展开，按步骤反馈即可。有什么问题随时问我。`
+      content: `已进入排查。接下来先看左侧当前排查项的注意事项，确认后在左侧继续推进步骤和反馈，我会在提交结果后再提示下一步。`
     })
-    // 激活第一个排查项卡片
     const p = eventStore.events.find(e => e.id === eid)
     if (p?.snapshot) {
-      // 通过 eventAssistantAction 通知 ProductDrawer 激活第一项
       eventAssistantAction[eid] = 'check_activate_first'
     }
     refreshChips()
@@ -1198,7 +1235,7 @@ function sendMessage() {
     isTyping.value = true
     setTimeout(() => {
       isTyping.value = false
-      const response = '✅ 已记录你的反馈：<b>"' + text + '"</b>。该事件已标记为<b>误报</b>并闭环。'
+      const response = '已记录你的反馈：<b>"' + text + '"</b>。该事件已标记为<b>误报</b>并闭环。'
       eventStore.addMessage(sessionKey, { role: 'assistant', content: response, ts: Date.now() })
       scrollToBottom(); refreshChips()
       // 触发产物区：事件记录卡片展开
@@ -1216,7 +1253,7 @@ function sendMessage() {
     setTimeout(() => {
       isTyping.value = false
       const feedbackText = text
-      const response = '✅ 已记录处理反馈，事件已手动闭环。<br><br>左侧产物区事件记录已更新。'
+      const response = '已记录处理反馈，事件已手动闭环。<br><br>左侧事件记录已更新。'
       eventStore.addMessage(sessionKey, { role: 'assistant', content: response, ts: Date.now() })
       scrollToBottom(); refreshChips()
       // 把反馈内容传给产物区
@@ -1237,7 +1274,7 @@ function sendMessage() {
         isTyping.value = false
         eventStore.addMessage(sessionKey, {
           role: 'assistant',
-          content: `已识别到排查反馈：<b>${parsed.label}</b>。<br><br>我已先帮你填到左侧当前排查步骤里，请确认后点击左侧「提交排查结果」。`,
+          content: `已识别到排查反馈：<b>${parsed.label}</b>。<br><br>我已先帮你填到左侧当前排查步骤里，请确认后点击左侧「提交排查反馈」。`,
           ts: Date.now()
         })
         scrollToBottom(); refreshChips()
@@ -1392,9 +1429,9 @@ function generateEventResponse(t, ev) {
   // 排查/步骤
   if (/排查|步骤|怎么做/.test(t)) {
     if (overSensors.length > 0) {
-      return `建议从<b>${overSensors[0].name}</b>入手排查：<br>1. 检查相关管路外观和渗漏<br>2. 测量进出口温度差<br>3. 拆检关键滤器<br>4. 记录原始数据<br><br>点击「立即开始排查」按钮，我会在产物区生成完整 SOP 文档。`
+      return `建议从<b>${overSensors[0].name}</b>入手排查：<br>1. 检查相关管路外观和渗漏<br>2. 测量进出口温度差<br>3. 拆检关键滤器<br>4. 记录原始数据<br><br>点击「进入排查下一步」，左侧会新增当前排查项表单。`
     }
-    return '已为您准备好标准排查方案。点击「立即开始排查」按钮，方案会在产物区展开。'
+    return '已为您准备好标准排查方案。点击「进入排查下一步」，左侧会新增当前排查项表单。'
   }
 
   // 误报
@@ -1608,6 +1645,7 @@ function generateDeviceAnalysisHtml(d) {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
   background: linear-gradient(180deg, var(--bg-surface), #FBFCFD);
 }
+.assistant-header.event-assistant-header { background: var(--bg-surface); }
 .mode-tag { font-size: var(--font-xs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 500; }
 .gen-mode,.event-mode { background: var(--accent-bg); color: var(--accent); }
 .aux-mode { background: rgba(0,188,212,0.10); color: #0096A0; }
@@ -1618,21 +1656,15 @@ function generateDeviceAnalysisHtml(d) {
 
 /* === 事件上下文条 === */
 .event-context-bar {
-  padding: 12px 14px; background: linear-gradient(135deg, #F5F9FF, #EEF4FC);
-  border-bottom: 1px solid var(--border-primary); border-left: 3px solid var(--accent); flex-shrink: 0;
+  padding: 8px 14px;
+  background: #F5F9FF;
+  border-bottom: 1px solid var(--border-primary);
+  border-left: 3px solid var(--accent);
+  flex-shrink: 0;
 }
-.ecb-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.ecb-clip { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
-.ecb-name { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.ecb-meta { margin-top: 6px; }
-.ecb-tag { font-size: var(--font-xs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 500; }
-.ecb-tag.critical { background: var(--danger-bg); color: var(--danger); }
-.ecb-tag.important { background: var(--warning-bg); color: var(--warning); }
-.ecb-tag.normal { background: var(--accent-bg); color: var(--accent); }
-.ecb-tag.pending { background: var(--warning-bg); color: var(--warning); }
-.ecb-tag.processing { background: var(--accent-bg); color: var(--accent); }
-.ecb-tag.resolved { background: var(--success-bg); color: var(--success); }
-.ecb-id { margin-left: auto; font-size: var(--font-xs); color: var(--text-muted); font-family: Consolas, monospace; }
+.compact-event-link { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ecb-link-label { flex-shrink: 0; color: var(--accent); font-size: var(--font-xs); font-weight: 600; }
+.ecb-name { font-size: var(--font-sm); font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 
 /* === Messages === */
 .messages-area { flex: 1; overflow-y: auto; padding: 10px 0; display: flex; flex-direction: column; }
@@ -1745,10 +1777,25 @@ function generateDeviceAnalysisHtml(d) {
 .rb-conclusion { font-size: var(--font-sm); line-height: 1.6; color: var(--text-secondary); border-top: 1px solid var(--border-secondary); padding-top: 8px; }
 
 /* === 快捷回复 === */
-.recommended-section { margin: 8px 8px 12px; }
-.rec-label { font-size: var(--font-xs); color: var(--text-muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.msg-bubble {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-sm);
+}
+.chips-bubble {
+  border: 1px dashed var(--border-secondary);
+  background: var(--bg-panel);
+}
+.chips-hint {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
 .rec-chips { display: flex; gap: 5px; flex-wrap: wrap; }
-.rec-chip { font-size: var(--font-sm); padding: 5px 10px; border-radius: var(--radius-lg); border: 1px solid var(--border-primary); background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; white-space: nowrap; min-height: 32px; }
+.rec-chip { font-size: var(--font-sm); padding: 5px 10px; border-radius: var(--radius-lg); border: 1px solid var(--border-primary); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; white-space: nowrap; min-height: 32px; }
 .rec-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(22,119,255,0.07); }
 .rec-chip-cta { background: linear-gradient(135deg, var(--accent), #4096FF) !important; color: #fff !important; border: none !important; font-weight: 600; box-shadow: 0 2px 8px rgba(22,119,255,0.25); }
 .rec-chip-cta:hover { background: linear-gradient(135deg, #4096FF, var(--accent)) !important; color: #fff !important; box-shadow: 0 4px 14px rgba(22,119,255,0.4); transform: translateY(-2px); }

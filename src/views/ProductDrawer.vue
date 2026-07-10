@@ -1,212 +1,241 @@
 <template>
   <div class="product-drawer" v-if="event">
-    <!-- Header: 返回 + 4 段阶段进度条 -->
-    <div class="drawer-header">
-      <button class="back-btn" @click="handleBack">← 返回列表</button>
-      <div class="stage-progress">
-        <div
-          v-for="(s, idx) in displayStages"
-          :key="s.key"
-          class="sp-item"
-          :class="{
-            done: idx < currentDisplayIdx,
-            active: idx === currentDisplayIdx,
-            pending: idx > currentDisplayIdx
-          }"
-        >
-          <span class="sp-dot">{{ idx < currentDisplayIdx ? '✓' : (idx + 1) }}</span>
-          <span class="sp-label">{{ s.label }}</span>
-          <span v-if="idx < displayStages.length - 1" class="sp-line"></span>
-        </div>
-      </div>
+    <!-- 图片全屏遮罩 -->
+    <div v-if="lightboxUrl" class="lightbox-overlay" @click="lightboxUrl = null">
+      <img :src="lightboxUrl" class="lightbox-img" alt="放大查看" />
     </div>
+    <button class="back-float" @click="handleBack" title="返回事件列表">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+    </button>
 
     <div class="drawer-body">
-      <!-- ========== 产物卡片列表 ========== -->
-      <!-- 4 份产物：AI 初步分析 / 排查方案 / 维修方案 / 维修报告 -->
-      <!-- 阶段推进：上一份产物收成 ▶ 摘要，新产物展开 + 流式 -->
+      <!-- 任务卡片轨道：产物随流程向右叠加 -->
+      <div class="task-card-rail" v-if="stageTabs.length > 0">
+        <button
+          v-for="(tab, ti) in stageTabs"
+          :key="tab.key"
+          class="task-card-chip"
+          :class="[
+            { active: activeTab === tab.key },
+            'task-' + (tab.type || 'normal'),
+            taskStatusClass(tab)
+          ]"
+          :style="{ '--stack-i': ti }"
+          @click="activeTab = tab.key"
+        >
+          <span class="task-card-index">{{ String(ti + 1).padStart(2, '0') }}</span>
+          <span class="task-card-main">
+            <span class="task-card-kicker">{{ taskKicker(tab) }}</span>
+            <span class="task-card-title">{{ tab.label }}</span>
+          </span>
+          <span class="task-card-state">{{ taskStatusText(tab) }}</span>
+        </button>
+      </div>
 
-      <!-- 🧠 AI 初步分析 -->
-      <section
-        v-if="visibleSections.ai"
-        class="prod-card"
-        :class="{
-          'card-current': currentSection === 'ai',
-          'card-collapsed': !aiExpanded
-        }"
-      >
-        <header class="prod-head" @click="aiExpanded = !aiExpanded">
-          <span class="prod-icon">🧠</span>
-          <div class="prod-titles">
-            <div class="prod-title">
-              AI 初步分析
-              <span v-if="currentSection === 'ai' && streaming.section === 'ai'" class="prod-gen">生成中</span>
-            </div>
-            <div class="prod-sub">基于事件快照 / 趋势 / 历史案例的智能诊断</div>
-          </div>
-          <span class="prod-toggle">{{ aiExpanded ? '▼' : '▶' }}</span>
-        </header>
+      <!-- ==== 事件情况 ==== -->
+      <section v-if="activeTab === 'situation'" class="prod-body-wrap">
+        <div class="situation-tabs">
+          <button
+            v-for="tab in visibleSituationTabs"
+            :key="tab.key"
+            class="situation-tab"
+            :class="{ active: activeSituationTab === tab.key }"
+            @click="activeSituationTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
 
-        <div v-show="aiExpanded" class="prod-body">
-          <!-- ① 结论与建议（主要 · 默认展开） -->
-          <div class="block">
-            <div class="sub-head" @click="aiSubs.conclusion = !aiSubs.conclusion">
-              <div class="block-title">结论与建议</div>
-              <span class="sub-toggle">{{ aiSubs.conclusion ? '▼' : '▶' }}</span>
-            </div>
-            <div v-show="aiSubs.conclusion">
-              <div class="verdict">
-                <div class="verdict-row"><span class="verdict-label">判定结论</span></div>
-                <div class="verdict-text">{{ product.ai.verdict }}</div>
+        <div v-if="activeSituationTab === 'summary'" class="situation-panel">
+          <div class="overview-summary-grid">
+            <section class="overview-section event-info-section">
+              <div class="section-heading">事件信息</div>
+              <div class="event-info-list">
+                <div v-for="(row, ri) in product.ai.eventInfo" :key="ri" class="event-info-row">
+                  <span class="event-info-label">{{ row.label }}</span>
+                  <span class="event-info-value">{{ row.value }}</span>
+                </div>
               </div>
-              <div class="data-line"><span class="data-label">数据：</span>{{ product.ai.dataLine }}</div>
-              <div class="advice-line"><span class="advice-label">建议：</span>{{ product.ai.advice }}</div>
-            </div>
-          </div>
+              <p class="event-info-narrative">{{ product.ai.eventNarrative }}</p>
+            </section>
 
-          <!-- ② 数据分析（主要 · 默认展开）—— 传感器卡片 + 趋势图 -->
-          <div class="block">
-            <div class="sub-head" @click="aiSubs.data = !aiSubs.data">
-              <div class="block-title">数据分析</div>
-              <span class="sub-toggle">{{ aiSubs.data ? '▼' : '▶' }}</span>
-            </div>
-            <div v-show="aiSubs.data">
-              <!-- 传感器卡片横向排列 -->
-              <div class="sensor-cards-row">
-                <div
-                  v-for="(s, i) in event.snapshot?.sensors || []"
-                  :key="i"
-                  class="sensor-card-h"
-                  :class="{
-                    'sc-selected': selectedSensorIndex === i,
-                    'sc-over': s.status === 'over',
-                    'sc-warning': s.status === 'warning'
-                  }"
-                  @click="selectedSensorIndex = i"
-                >
-                  <div class="sc-header">
-                    <span class="sc-name">{{ s.name }}</span>
-                    <span v-if="s.tag" class="sc-tag">{{ s.tag }}</span>
-                    <span v-if="selectedSensorIndex === i" class="sc-dot"></span>
+            <section class="overview-section conclusion-section">
+              <div class="section-heading">初步判断与结论建议</div>
+              <div class="conclusion-stack">
+                <div class="conclusion-block">
+                  <div class="conclusion-top-row">
+                    <div class="conclusion-main">
+                      <span class="conclusion-label">初判结论</span>
+                      <strong class="conclusion-value">{{ product.ai.initialConclusion }}</strong>
+                    </div>
+                    <div class="confidence-ring-wrap">
+                      <div
+                        class="confidence-ring confidence-ring-sm"
+                        :style="{ '--confidence-deg': (product.ai.confidence * 3.6) + 'deg' }"
+                      >
+                        <div class="confidence-ring-inner">
+                          <strong class="confidence-value">{{ product.ai.confidence }}%</strong>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="sc-meta">{{ s.sampleCount }}个采样点{{ s.trendHours ? '·' + s.trendHours : '' }}</div>
-                  <div class="sc-history">{{ s.historyDesc }}</div>
-                  <div class="sc-status" :class="'st-' + s.status">{{ s.statusDesc }}</div>
+                </div>
+                <div class="suggestion-block">
+                  <span class="conclusion-label">建议</span>
+                  <p>{{ product.ai.recommendation }}</p>
                 </div>
               </div>
-              <!-- 趋势图（跟随选中传感器） -->
-              <div class="trend-chart-area">
-                <div class="trend-chart-header">
-                  <span class="tch-title">📈 {{ selectedSensor?.name || '—' }}</span>
-                  <span class="tch-hint">点击上方卡片切换趋势图</span>
-                </div>
-                <div v-if="!trendLoaded" class="trend-skeleton-lg">
-                  <div class="trend-skel-pulse"></div>
-                  <span class="trend-skel-text">正在加载趋势数据…</span>
-                </div>
-                <svg v-else-if="currentTrendPoints" class="trend-svg-lg" viewBox="0 0 800 220" preserveAspectRatio="xMidYMid meet">
-                  <!-- 网格线 -->
-                  <line v-for="y in 5" :key="'g'+y" :x1="60" :y1="20 + (y-1)*36" :x2="780" :y2="20 + (y-1)*36" stroke="var(--border-secondary)" stroke-width="0.5" />
-                  <!-- 数据折线 -->
-                  <polyline :points="currentTrendPoints" fill="none" :stroke="trendColor" stroke-width="2.5" />
-                  <!-- 面积填充 -->
-                  <polygon :points="trendAreaPoints" :fill="trendColor" opacity="0.08" />
-                </svg>
+            </section>
+          </div>
+        </div>
+
+        <div v-if="activeSituationTab === 'data'" class="situation-panel">
+          <div class="block-title">数据概览</div>
+          <div class="sensor-cards-row">
+            <div
+              v-for="(s, i) in event.snapshot?.sensors || []"
+              :key="i"
+              class="sensor-card-h"
+              :class="{
+                'sc-selected': selectedSensorIndex === i,
+                'sc-alert': s.status === 'over' || s.status === 'warning'
+              }"
+              @click="selectedSensorIndex = i"
+            >
+              <div class="sc-header">
+                <span class="sc-name">{{ s.name }}</span>
+                <span v-if="s.tag" class="sc-tag">{{ s.tag }}</span>
+                <span v-if="selectedSensorIndex === i" class="sc-dot"></span>
+              </div>
+              <div class="sc-desc">{{ s.historyDesc }}</div>
+            </div>
+          </div>
+          <div class="trend-chart-area" style="margin-top:16px">
+            <div class="trend-chart-header">
+              <span class="tch-title">{{ selectedSensor?.name || '—' }}</span>
+              <span class="tch-hint">点击上方监控块切换趋势</span>
+            </div>
+            <div v-if="!trendLoaded" class="trend-skeleton-lg">
+              <div class="trend-skel-pulse"></div>
+              <span class="trend-skel-text">正在加载趋势数据…</span>
+            </div>
+            <svg v-else-if="currentTrendPoints" class="trend-svg-lg" viewBox="0 0 800 220" preserveAspectRatio="xMidYMid meet">
+              <line v-for="y in 5" :key="'g'+y" :x1="60" :y1="20 + (y-1)*36" :x2="780" :y2="20 + (y-1)*36" stroke="var(--border-secondary)" stroke-width="0.5" />
+              <polyline :points="currentTrendPoints" fill="none" :stroke="trendColor" stroke-width="2.5" />
+              <polygon :points="trendAreaPoints" :fill="trendColor" opacity="0.08" />
+            </svg>
+          </div>
+        </div>
+
+        <div v-if="activeSituationTab === 'workload'" class="situation-panel">
+          <div class="block compact-evidence">
+            <div class="block-title">工况分析</div>
+            <div class="mechanism">
+              <div class="mech-label">当前判断：</div>
+              <div class="mech-text">{{ product.ai.mechanism }}</div>
+            </div>
+            <div class="fault-match">
+              <div class="fm-row fm-head"><span class="fm-name">候选故障</span><span class="fm-match">匹配度</span></div>
+              <div v-for="(f, i) in product.ai.faultMatch" :key="i" class="fm-row">
+                <span class="fm-name">{{ f.name }}</span>
+                <span class="fm-bar">
+                  <span class="fm-bar-fill" :style="{ width: f.match + '%', background: f.color }"></span>
+                  <span class="fm-bar-text">{{ f.match }}%</span>
+                </span>
               </div>
             </div>
           </div>
-
-          <!-- ③ 工程机理分析（次要 · 默认收起） -->
-          <div class="block">
-            <div class="sub-head" @click="aiSubs.mechanism = !aiSubs.mechanism">
-              <div class="block-title">工程机理分析</div>
-              <span class="sub-toggle">{{ aiSubs.mechanism ? '▼' : '▶' }}</span>
+          <div class="reason-table">
+            <div class="rt-row rt-head"><span class="rt-col rt-fault">候选故障</span><span class="rt-col rt-cause">可能原因</span><span class="rt-col rt-effect">影响</span></div>
+            <div v-for="(r, i) in product.ai.reasons" :key="i" class="rt-row">
+              <span class="rt-col rt-fault"><span class="rt-prob" :class="r.prob">{{ r.probLabel }}</span>{{ r.fault }}</span>
+              <span class="rt-col rt-cause">{{ r.cause }}</span>
+              <span class="rt-col rt-effect">{{ r.effect }}</span>
             </div>
-            <div v-show="aiSubs.mechanism">
-              <div class="mechanism">
-                <div class="mech-label">本次诊断：</div>
-                <div class="mech-text">{{ product.ai.mechanism }}</div>
-              </div>
-              <div class="fault-match">
-                <div class="fm-row fm-head"><span class="fm-name">候选故障</span><span class="fm-match">匹配度</span></div>
-                <div v-for="(f, i) in product.ai.faultMatch" :key="i" class="fm-row">
-                  <span class="fm-name">{{ f.name }}</span>
-                  <span class="fm-bar">
-                    <span class="fm-bar-fill" :style="{ width: f.match + '%', background: f.color }"></span>
-                    <span class="fm-bar-text">{{ f.match }}%</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ④ 可能的原因与后果（次要 · 默认收起） -->
-          <div class="block">
-            <div class="sub-head" @click="aiSubs.reasons = !aiSubs.reasons">
-              <div class="block-title">可能的原因与后果</div>
-              <span class="sub-toggle">{{ aiSubs.reasons ? '▼' : '▶' }}</span>
-            </div>
-            <div v-show="aiSubs.reasons">
-              <div class="reason-table">
-                <div class="rt-row rt-head"><span class="rt-col rt-fault">候选故障</span><span class="rt-col rt-cause">可能原因</span><span class="rt-col rt-effect">直接后果</span></div>
-                <div v-for="(r, i) in product.ai.reasons" :key="i" class="rt-row">
-                  <span class="rt-col rt-fault"><span class="rt-prob" :class="r.prob">{{ r.probLabel }}</span>{{ r.fault }}</span>
-                  <span class="rt-col rt-cause">{{ r.cause }}</span>
-                  <span class="rt-col rt-effect">{{ r.effect }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 流式进行中提示 -->
-          <div v-if="currentSection === 'ai' && streaming.section === 'ai'" class="stream-tip">
-            <span class="cursor-blink">▍</span> AI 正在生成分析…
           </div>
         </div>
       </section>
 
-      <!-- ============================================= -->
-      <!-- 🔍 排查-维修 顺序配对（T1→R1→T2→R2→T3→R3→T4→R4） -->
-      <!-- ============================================= -->
+      <!-- ==== 排查项 ==== -->
       <template v-for="(item, idx) in (product.check?.checkItems || [])" :key="'pair-' + idx">
-        <!-- 排查项卡片 -->
         <section
-          v-if="isCheckVisible(idx)"
+          v-if="activeTab === 'check-' + idx && isCheckVisible(idx)"
           :id="'check-card-' + idx"
-          class="prod-card"
-          :class="{ 'card-collapsed': !checkCardsExpanded[idx] }"
+          class="prod-body-wrap"
         >
-          <header class="prod-head" @click="checkCardsExpanded[idx] = !checkCardsExpanded[idx]">
-            <span class="prod-icon">🔍</span>
-            <div class="prod-titles">
-              <div class="prod-title">排查项 · {{ cleanTitle(item.title) }}</div>
-              <div class="prod-sub">{{ item.target || ('针对' + cleanTitle(item.title) + '的标准排查流程') }}</div>
-            </div>
-            <span class="prod-status" :class="checkItemStatusClass(item)">{{ checkItemStatusText(item) }}</span>
-            <span class="prod-toggle">{{ checkCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
-          </header>
-          <div v-show="checkCardsExpanded[idx] !== false" class="prod-body">
-            <div class="ci-warning"><span class="ci-warning-label">注意事项：</span><span>{{ item.warning }}</span></div>
-            <div class="ci-steps-label">排查步骤与反馈：</div>
-            <div v-for="(step, si) in item.steps" :key="si" class="ci-step">
-              <div class="ci-step-num">{{ si + 1 }}. {{ step.title }}</div>
-              <ul class="ci-step-details">
-                <li v-for="(d, di) in step.details" :key="di" class="ci-detail-row" :class="{ 'ci-detail-with-feedback': item.status === 'active' && getDetailFeedbackItem(item, si, di) }">
-                  <span class="ci-detail-text">{{ d }}</span>
-                  <span v-if="item.status === 'active' && getDetailFeedbackItem(item, si, di)" class="ci-detail-feedback">
-                    <label v-for="(opt, oi) in getDetailFeedbackItem(item, si, di).options" :key="oi" class="ci-inline-opt">
-                      <input type="radio" :name="'check-' + idx + '-' + si + '-' + di" v-model="getDetailFeedbackItem(item, si, di).selected" :value="oi" />
-                      <span>{{ opt }}</span>
-                    </label>
-                  </span>
-                </li>
+          <div class="detail-sub-tabs">
+            <button
+              v-for="tab in checkSubTabs(item, idx)"
+              :key="tab.key"
+              class="detail-sub-tab"
+              :class="{ active: activeCheckSubTab[idx] === tab.key }"
+              @click="activeCheckSubTab[idx] = tab.key"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <div v-if="activeCheckSubTab[idx] === 'warning'" class="detail-sub-panel">
+            <div class="ci-warning check-warning-focus"><span class="ci-warning-label">注意事项</span>
+              <ul class="ci-warning-list">
+                <li v-for="(line, li) in item.warning.split('\n')" :key="li">{{ line }}</li>
               </ul>
-              <div class="ci-step-diagram">[可能有示意图]</div>
+              <div v-if="item.status === 'active'" class="ci-warning-confirm">
+                <button class="ci-confirm-btn" @click.stop="confirmCheckWarning(idx)">确认，开始推进</button>
+              </div>
             </div>
+          </div>
+
+          <div v-if="activeCheckSubTab[idx] === 'steps'" class="detail-sub-panel check-step-focus-panel">
+            <!-- 圆点进度 -->
+            <div class="check-step-dots-bar">
+              <div class="check-step-dots">
+                <span
+                  v-for="(step, si) in item.steps"
+                  :key="si"
+                  class="check-step-dot"
+                  :class="{ active: activeCheckStep(idx) === si, done: activeCheckStep(idx) > si }"
+                ></span>
+              </div>
+            </div>
+
+            <!-- 当前步骤标题 -->
+            <div class="check-step-title">步骤{{ activeCheckStep(idx) + 1 }}：{{ compactStepTitle(currentCheckStep(item, idx).title) }}</div>
+
+            <!-- 检查项 + 反馈（同一行：左侧描述，右侧选项） -->
+            <ul class="ci-step-details check-step-list">
+              <li v-for="(d, di) in currentCheckStep(item, idx).details" :key="di" class="ci-detail-row" :class="{ 'ci-detail-with-feedback': item.status === 'active' && getDetailFeedbackItem(item, activeCheckStep(idx), di) }">
+                <span class="ci-detail-text">{{ d }}</span>
+                <span v-if="item.status === 'active' && getDetailFeedbackItem(item, activeCheckStep(idx), di)" class="ci-detail-feedback">
+                  <label v-for="(opt, oi) in getDetailFeedbackItem(item, activeCheckStep(idx), di).options" :key="oi" class="ci-inline-opt">
+                    <input type="radio" :name="'check-' + idx + '-' + activeCheckStep(idx) + '-' + di" v-model="getDetailFeedbackItem(item, activeCheckStep(idx), di).selected" :value="oi" />
+                    <span>{{ opt }}</span>
+                  </label>
+                </span>
+              </li>
+            </ul>
+            <div v-if="idx === 0 && activeCheckStep(idx) === 0" class="ci-step-diagram">
+              <img src="/check-sample.jpg" alt="现场参考图" @click.stop="openLightbox('/check-sample.jpg')" />
+            </div>
+            <div v-if="idx === 1 && activeCheckStep(idx) === 0" class="ci-step-diagram">
+              <img src="/check-sample-2.jpg" alt="现场参考图" @click.stop="openLightbox('/check-sample-2.jpg')" />
+            </div>
+
+            <!-- 备注 -->
             <div v-if="item.status === 'active'" :id="'check-feedback-' + idx" class="ci-inline-note">
-              <div class="ci-inline-note-label">现场备注</div>
-              <textarea v-model="item.feedbackNotes" class="ci-inline-textarea" placeholder="边查边记录现场现象、读数、照片编号等，可为空"></textarea>
+              <div class="ci-inline-note-label">当前步骤备注</div>
+              <textarea v-model="item.feedbackNotes" class="ci-inline-textarea" placeholder="记录读数、现场现象、照片编号等，可为空"></textarea>
             </div>
+
+            <!-- 底部按钮 -->
+            <div v-if="item.status === 'active'" class="ci-actions check-step-actions">
+              <button class="ci-action-btn ci-action-secondary" :disabled="activeCheckStep(idx) === 0" @click.stop="prevCheckStep(idx)">上一步</button>
+              <button v-if="activeCheckStep(idx) < item.steps.length - 1" class="ci-action-btn ci-action-feedback" @click.stop="nextCheckStep(idx)">下一步</button>
+              <button v-else class="ci-action-btn ci-action-feedback" @click.stop="submitInlineFeedback(idx)">提交排查反馈</button>
+            </div>
+          </div>
+
+          <div v-if="activeCheckSubTab[idx] === 'summary'" class="detail-sub-panel">
             <div v-if="item.feedback && item.feedback.length" class="ci-feedback-summary">
               <div class="ci-summary-label">登记反馈摘要</div>
               <div v-for="(f, fi) in item.feedback" :key="fi" class="ci-feedback-row">
@@ -215,76 +244,126 @@
               </div>
               <div v-if="item.notes" class="ci-notes">备注：{{ item.notes }}</div>
             </div>
-            <!-- 操作按钮：仅 active 时显示 -->
-            <div v-if="item.status === 'active'" class="ci-actions">
-              <button class="ci-action-btn ci-action-feedback" @click.stop="submitInlineFeedback(idx)">提交排查结果</button>
-            </div>
+            <div v-else class="empty-sub-panel">暂无反馈记录</div>
           </div>
         </section>
 
-        <!-- 维修项卡片（反馈异常后才展示） -->
+        <!-- 维修项 -->
         <section
-          v-if="item.repair && item.status === 'done-abnormal'"
+          v-if="activeTab === 'repair-' + idx && item.repair && item.status === 'done-abnormal'"
           :id="'repair-card-' + idx"
-          class="prod-card repair-card-section"
+          class="prod-body-wrap"
         >
-          <header class="prod-head" @click="repairCardsExpanded[idx] = !repairCardsExpanded[idx]">
-            <span class="prod-icon">🔧</span>
-            <div class="prod-titles">
-              <div class="prod-title">维修项 · {{ cleanTitle(item.title) }}</div>
-              <div class="prod-sub">注意事项 / 维修步骤 / 备件清单 / 验收标准</div>
+          <div class="detail-sub-tabs">
+            <button
+              v-for="tab in repairSubTabs"
+              :key="tab.key"
+              class="detail-sub-tab"
+              :class="{ active: activeRepairSubTab[idx] === tab.key }"
+              @click="activeRepairSubTab[idx] = tab.key"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <div v-if="activeRepairSubTab[idx] === 'safety'" class="detail-sub-panel repair-flow-panel">
+            <div class="ci-warning repair-warning-panel">
+              <span class="ci-warning-label">注意事项</span>
+              <ul class="ci-warning-list repair-warning-list">
+                <li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li>
+              </ul>
             </div>
-            <span class="prod-status" :class="repairItemStatusClass(item)">{{ repairItemStatusText(item) }}</span>
-            <span class="prod-toggle">{{ repairCardsExpanded[idx] !== false ? '▼' : '▶' }}</span>
-          </header>
-          <div v-show="repairCardsExpanded[idx] !== false" class="prod-body">
-            <div class="block">
-              <div class="block-title">注意事项</div>
-              <ul class="repair-list"><li v-for="(w, wi) in item.repair.safety" :key="wi">{{ w }}</li></ul>
+
+            <div class="repair-parts-panel">
+              <div class="repair-section-head">
+                <div>
+                  <div class="block-title">备件清单</div>
+                  <p class="repair-section-desc">维修开始前核对库存、型号和替代件适配性，避免拆开后等待物料。</p>
+                </div>
+                <span class="repair-count">{{ item.repair.parts.length }} 项</span>
+              </div>
+              <div class="repair-parts-table-wrap">
+                <table class="repair-parts-table">
+                  <thead>
+                    <tr>
+                      <th>备件/工具</th>
+                      <th>规格</th>
+                      <th>数量</th>
+                      <th>用途</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(part, pi) in item.repair.parts" :key="pi">
+                      <td>{{ repairPartCell(part, 'name') }}</td>
+                      <td>{{ repairPartCell(part, 'spec') }}</td>
+                      <td>{{ repairPartCell(part, 'qty') }}</td>
+                      <td>{{ repairPartCell(part, 'usage') }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div class="block">
-              <div class="block-title">维修步骤</div>
-              <ol class="repair-steps"><li v-for="(s, si) in item.repair.steps" :key="si">{{ s }}</li></ol>
+
+            <div v-if="item.repaired === undefined" class="repair-actions repair-actions-right">
+              <button class="ra-btn ra-primary" @click="confirmRepairPrep(idx)">确认，开始推进</button>
             </div>
-            <div class="block">
-              <div class="block-title">备件清单</div>
-              <div class="repair-parts">{{ item.repair.parts.join(' / ') }}</div>
+          </div>
+
+          <div v-if="activeRepairSubTab[idx] === 'steps'" class="detail-sub-panel repair-flow-panel">
+            <div class="repair-step-list">
+              <div v-for="(s, si) in item.repair.steps" :key="si" class="repair-step-card">
+                <div class="repair-step-index">{{ si + 1 }}</div>
+                <div class="repair-step-main">
+                  <div class="repair-step-title">{{ repairStepTitle(s) }}</div>
+                  <ul class="repair-step-details">
+                    <li v-for="(d, di) in repairStepDetails(s)" :key="di">{{ d }}</li>
+                  </ul>
+                </div>
+              </div>
             </div>
-            <div class="block accept-inline">
+            <div v-if="item.repaired === undefined" class="repair-actions repair-actions-right">
+              <button class="ra-btn ra-primary" @click="finishRepairWork(idx)">处理完成，推进验收</button>
+            </div>
+          </div>
+
+          <div v-if="activeRepairSubTab[idx] === 'acceptance'" class="detail-sub-panel repair-flow-panel">
+            <div class="block accept-inline repair-accept-panel">
               <div class="block-title">验收标准</div>
-              <div class="repair-accept-text">{{ item.repair.acceptance }}</div>
+              <div class="repair-accept-grid">
+                <div v-for="(row, ai) in repairAcceptanceRows(item.repair.acceptance)" :key="ai" class="repair-accept-row">
+                  <div class="accept-name">{{ row.name }}</div>
+                  <div class="accept-req">{{ row.req }}</div>
+                  <div class="accept-method">{{ row.method }}</div>
+                </div>
+              </div>
             </div>
             <div v-if="item.repaired === undefined" class="repair-actions">
-              <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">解决了，验收通过</button>
-              <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">没解决，继续排查</button>
+              <button class="ra-btn ra-resolved" @click="markItemRepaired(idx)">事件已解决，验收通过</button>
+              <button class="ra-btn ra-continue" @click="markItemNotFixed(idx)">事件仍异常，继续排查</button>
             </div>
           </div>
         </section>
       </template>
 
-
-      <!-- 全部排查完成 → 事件小结 -->
-      <template v-if="allChecksDone && !hasActiveRepair">
-        <div class="pair-divider"></div>
-      </template>
-
-      <!-- ✅ 事件记录 -->
+      <!-- ==== 事件记录 ==== -->
       <section
-        v-if="showReportCard || currentStage === 'S5'"
+        v-if="activeTab === 'report' && (showReportCard || currentStage === 'S5')"
         id="event-record-card"
-        class="prod-card"
-        :class="{ 'card-collapsed': !reportExpanded }"
+        class="prod-body-wrap"
       >
-        <header class="prod-head" @click="reportExpanded = !reportExpanded">
-          <span class="prod-icon">✅</span>
-          <div class="prod-titles">
-            <div class="prod-title">事件记录</div>
-            <div class="prod-sub">本事件处理过程 · 共耗时 {{ product.report.elapsed }}</div>
-          </div>
-          <span class="prod-toggle">{{ reportExpanded ? '▼' : '▶' }}</span>
-        </header>
+        <div class="detail-sub-tabs">
+          <button
+            v-for="tab in reportSubTabs"
+            :key="tab.key"
+            class="detail-sub-tab"
+            :class="{ active: activeReportSubTab === tab.key }"
+            @click="activeReportSubTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
 
-        <div v-show="reportExpanded" class="prod-body">
+        <div v-if="activeReportSubTab === 'summary'" class="detail-sub-panel">
           <div class="report-summary">
             <div class="report-banner" :class="{ 'banner-needs-manual': needsManualClose, 'banner-false-alarm': isFalseAlarm }">
               <div class="report-banner-icon">{{ needsManualClose ? '!' : isFalseAlarm ? 'ℹ' : '✓' }}</div>
@@ -326,25 +405,31 @@
                 <span class="rk-text">{{ product.report.followup }}</span>
               </div>
             </div>
-            <div v-if="manualFeedback" class="report-key" style="margin-top:10px">
-              <div class="rk-row">
-                <span class="rk-label">手动反馈</span>
-                <span class="rk-text">{{ manualFeedback }}</span>
-              </div>
-            </div>
-            <div v-if="event.timeline && event.timeline.length" class="report-timeline">
-              <div class="rtl-title">📋 处理时间线</div>
-              <div class="timeline-list">
-                <div v-for="(t, i) in event.timeline" :key="i" class="tl-row">
-                  <div class="tl-time-col">{{ formatTime(t.time) }}</div>
-                  <div class="tl-dot-col"><span class="tl-dot-report" :class="{ first: i === 0, last: i === event.timeline.length - 1 }"></span></div>
-                  <div class="tl-action-col">{{ t.action }}</div>
-                </div>
-              </div>
-            </div>
-            <div class="report-footer">本报告由系统自动生成 · 维修完成后写入 · 仅供运维归档</div>
           </div>
-          <!-- 按钮已移至右侧助手对话 -->
+        </div>
+
+        <div v-if="activeReportSubTab === 'timeline'" class="detail-sub-panel">
+          <div v-if="event.timeline && event.timeline.length" class="report-timeline">
+            <div class="rtl-title">📋 处理时间线</div>
+            <div class="timeline-list">
+              <div v-for="(t, i) in event.timeline" :key="i" class="tl-row">
+                <div class="tl-time-col">{{ formatTime(t.time) }}</div>
+                <div class="tl-dot-col"><span class="tl-dot-report" :class="{ first: i === 0, last: i === event.timeline.length - 1 }"></span></div>
+                <div class="tl-action-col">{{ t.action }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-sub-panel">暂无处理时间线</div>
+        </div>
+
+        <div v-if="activeReportSubTab === 'feedback'" class="detail-sub-panel">
+          <div v-if="manualFeedback" class="report-key">
+            <div class="rk-row">
+              <span class="rk-label">手动反馈</span>
+              <span class="rk-text">{{ manualFeedback }}</span>
+            </div>
+          </div>
+          <div v-else class="empty-sub-panel">暂无手动反馈</div>
         </div>
       </section>
 
@@ -364,39 +449,101 @@ const props = defineProps({
 
 const emit = defineEmits(['back'])
 
-// ============ 阶段定义（外显 3 段：AI分析 / 处理中 / 已完成）============
-// 内部仍是 4 个折叠产物：AI分析 → 排查方案 → 维修方案 → 事件小结
-const displayStages = [
-  { key: 'ai', label: 'AI分析' },
-  { key: 'mid', label: '处理中' },
-  { key: 'done', label: '已完成' }
-]
-
-const currentDisplayIdx = computed(() => {
-  if (currentStage.value === 'S1') return 0
-  if (currentStage.value === 'S2' || currentStage.value === 'S4') return 1
-  return 2
-})
-
-// 阶段 → 主产物（4 个折叠面板的内部映射）
-const sectionMap = {
-  S1: 'ai',
-  S2: 'check',
-  S4: 'repair',
-  S5: 'report'
-}
-
 const eventStage = inject('eventStage', reactive({}))
 const eventAssistantAction = inject('eventAssistantAction', reactive({}))
 const eventAssistantCommand = inject('eventAssistantCommand', reactive({}))
+const eventSituationTabs = inject('eventSituationTabs', reactive({}))
 
 const currentStage = computed(() => eventStage[props.event?.id] || 'S1')
-const currentSection = computed(() => sectionMap[currentStage.value])
+const activeTab = ref('situation')
+const activeSituationTab = ref('summary')
+const situationTabs = [
+  { key: 'summary', label: '事件概况' },
+  { key: 'data', label: '数据概览' },
+  { key: 'workload', label: '工况分析' }
+]
+const situationTabOrder = ['summary', 'data', 'workload']
+const unlockedSituationTabs = reactive({ summary: true, data: false, workload: false })
+const visibleSituationTabs = computed(() => situationTabs.filter(tab => unlockedSituationTabs[tab.key]))
 
-// 各产物可见性（AI 分析 + 排查-维修对 + 事件小结）
-const visibleSections = computed(() => ({
-  ai: currentDisplayIdx.value >= 0
-}))
+// 大卡内部子 tab 状态
+const activeCheckSubTab = reactive({})
+const activeRepairSubTab = reactive({})
+const activeReportSubTab = ref('summary')
+const lightboxUrl = ref(null)
+function openLightbox(url) { lightboxUrl.value = url }
+const repairSubTabs = [
+  { key: 'safety', label: '注意事项与备件' },
+  { key: 'steps', label: '维修步骤' },
+  { key: 'acceptance', label: '验收标准' }
+]
+const reportSubTabs = [
+  { key: 'summary', label: '处理摘要' },
+  { key: 'timeline', label: '处理时间线' },
+  { key: 'feedback', label: '手动反馈' }
+]
+function checkSubTabs(item, idx) {
+  const tabs = [
+    { key: 'warning', label: '注意事项' },
+    { key: 'steps', label: '排查步骤' }
+  ]
+  if (item.feedback && item.feedback.length) {
+    tabs.push({ key: 'summary', label: '反馈摘要' })
+  }
+  if (!activeCheckSubTab[idx]) activeCheckSubTab[idx] = 'warning'
+  return tabs
+}
+
+const stageTabs = computed(() => {
+  const tabs = [{ key: 'situation', label: '事件情况', type: 'situation' }]
+  const items = product.value?.check?.checkItems || []
+  for (let idx = 0; idx < items.length; idx++) {
+    if (!isCheckVisible(idx)) continue
+    tabs.push({ key: 'check-' + idx, label: shortCheckTitle(items[idx].title), type: 'check', idx })
+    const item = items[idx]
+    if (item.repair && item.status === 'done-abnormal') {
+      tabs.push({ key: 'repair-' + idx, label: shortRepairTitle(item.title), type: 'repair', idx })
+    }
+  }
+  if (showReportCard.value || currentStage.value === 'S5') {
+    tabs.push({ key: 'report', label: '事件记录', type: 'report' })
+  }
+  return tabs
+})
+
+function taskKicker(tab) {
+  const map = { situation: '事件底稿', check: '排查任务', repair: '维修任务', report: '闭环归档' }
+  return map[tab.type] || '任务'
+}
+
+function taskStatusClass(tab) {
+  if (tab.type === 'situation') return 'status-done'
+  if (tab.type === 'report') return currentStage.value === 'S5' ? 'status-done' : 'status-active'
+  const item = product.value?.check?.checkItems?.[tab.idx]
+  if (!item) return ''
+  if (tab.type === 'check') return 'status-' + checkItemStatusClass(item)
+  if (tab.type === 'repair') return item.repaired === true ? 'status-done' : item.repaired === false ? 'status-abnormal' : 'status-active'
+  return ''
+}
+
+function taskStatusText(tab) {
+  if (tab.type === 'situation') return '已生成'
+  if (tab.type === 'report') return currentStage.value === 'S5' ? '已归档' : '待确认'
+  const item = product.value?.check?.checkItems?.[tab.idx]
+  if (!item) return ''
+  if (tab.type === 'check') {
+    if (item.status === 'done-normal') return '正常'
+    if (item.status === 'done-abnormal') return '已反馈'
+    if (item.status === 'active') return '进行中'
+    return '待开始'
+  }
+  if (tab.type === 'repair') {
+    if (item.repaired === true) return '已解决'
+    if (item.repaired === false) return '未解决'
+    return '待维修'
+  }
+  return ''
+}
 
 // ============ 折叠状态 ============
 const aiExpanded = ref(true)
@@ -405,6 +552,23 @@ const showReportCard = ref(false)
 const needsManualClose = ref(false)
 const isFalseAlarm = ref(false)
 const manualFeedback = ref('')
+
+function syncSituationTabs() {
+  if (!props.event) return
+  const eid = props.event.id
+  if (!eventSituationTabs[eid]) eventSituationTabs[eid] = reactive({ unlocked: {}, active: 'summary' })
+  eventSituationTabs[eid].unlocked = { ...unlockedSituationTabs }
+  eventSituationTabs[eid].active = activeSituationTab.value
+}
+
+function unlockSituationTab(tabKey) {
+  if (!situationTabOrder.includes(tabKey)) return
+  unlockedSituationTabs[tabKey] = true
+  activeTab.value = 'situation'
+  activeSituationTab.value = tabKey
+  syncSituationTabs()
+  pulseInto('situation', 700)
+}
 
 function scrollIntoCard(id, delay = 50) {
   setTimeout(() => {
@@ -417,10 +581,32 @@ function scrollIntoCard(id, delay = 50) {
 const repairCardsExpanded = reactive({})
 // 排查卡片展开状态
 const checkCardsExpanded = reactive({})
+const activeCheckStepMap = reactive({})
 
-// 标题清理：去掉"排查"后缀
+// 标题清理：去掉"排查/维修"后缀，取简短名
 function cleanTitle(title) {
-  return (title || '').replace(/排查$/, '')
+  const t = (title || '').replace(/[排维]修$/, '').replace(/排查$/, '')
+  return t
+}
+function shortCheckTitle(title) {
+  const t = cleanTitle(title)
+  const map = {
+    '液压系统故障': '液压系统',
+    '系统或油柜吸口堵塞': '系统或油柜吸口',
+    '压力传感器故障': '压力传感器',
+    '系统管线泄漏': '管线泄漏',
+  }
+  return '排查' + (map[t] || t)
+}
+function shortRepairTitle(title) {
+  const t = cleanTitle(title)
+  const map = {
+    '液压系统故障': '液压系统',
+    '系统或油柜吸口堵塞': '系统或油柜吸口',
+    '压力传感器故障': '压力传感器',
+    '系统管线泄漏': '管线泄漏',
+  }
+  return '维修' + (map[t] || t)
 }
 
 // ============ 排查-维修 顺序配对逻辑 ============
@@ -493,9 +679,6 @@ const allChecksNormal = computed(() => {
   const items = product.value?.check?.checkItems || []
   return items.length > 0 && items.every(i => i.status === 'done-normal')
 })
-
-// 是否全部排查已走完（S5阶段展示事件小结）
-const shouldShowReport = computed(() => currentStage.value === 'S5')
 
 // ============ 排查项卡片交互（产物区操作按钮）============
 const feedbackModal = reactive({
@@ -572,10 +755,90 @@ function isFeedbackOptionAbnormal(feedbackItem) {
   return Number(feedbackItem?.selected || 0) !== 0
 }
 
+function activeCheckStep(idx) {
+  return Number(activeCheckStepMap[idx] || 0)
+}
+function setActiveCheckStep(idx, stepIdx) {
+  const item = product.value?.check?.checkItems?.[idx]
+  const max = Math.max(0, (item?.steps?.length || 1) - 1)
+  activeCheckStepMap[idx] = Math.min(Math.max(Number(stepIdx) || 0, 0), max)
+}
+function currentCheckStep(item, idx) {
+  return item?.steps?.[activeCheckStep(idx)] || { title: '', details: [] }
+}
+function nextCheckStep(idx) { setActiveCheckStep(idx, activeCheckStep(idx) + 1) }
+function prevCheckStep(idx) { setActiveCheckStep(idx, activeCheckStep(idx) - 1) }
+function compactStepTitle(title) {
+  const map = {
+    '检查液压油箱外观及液位': '排查液压油箱',
+    '记录油位和油温数据': '排查油位和油温',
+    '检查管路接头及软管段': '排查管路接头和软管',
+    '使用检漏剂定位微漏点': '检测定位微漏点',
+    '检查吸油口滤网状态': '排查吸油口滤网',
+    '测量吸口负压值': '测量吸口负压',
+    '检查油箱底部沉积物': '排查底部沉积物',
+    '传感器校验': '校验传感器',
+    '电磁干扰排查': '排查电磁干扰',
+    '分段检查高压管路': '分段排查高压管路',
+    '执行机构密封检查': '排查执行机构密封',
+    '记录并拍照': '记录拍照取证'
+  }
+  return map[title] || title
+}
+
+function confirmCheckWarning(idx) {
+  const item = product.value?.check?.checkItems?.[idx]
+  if (!item) return
+  ensureFeedbackDraft(item, idx)
+  activeCheckStepMap[idx] = 0
+  activeCheckSubTab[idx] = 'steps'
+  scrollIntoCard('check-card-' + idx, 80)
+}
+
+function confirmRepairPrep(idx) {
+  const item = product.value?.check?.checkItems?.[idx]
+  if (!item?.repair) return
+  activeRepairSubTab[idx] = 'steps'
+  scrollIntoCard('repair-card-' + idx, 80)
+}
+
+function finishRepairWork(idx) {
+  const item = product.value?.check?.checkItems?.[idx]
+  if (!item?.repair) return
+  activeRepairSubTab[idx] = 'acceptance'
+  scrollIntoCard('repair-card-' + idx, 80)
+}
+
+function repairPartCell(part, key) {
+  if (part && typeof part === 'object') return part[key] || '-'
+  if (key === 'name') return String(part || '-')
+  if (key === 'qty') {
+    const text = String(part || '')
+    const match = text.match(/×\s*([^/]+)/)
+    return match ? match[1] : '-'
+  }
+  return '-'
+}
+
+function repairStepTitle(step) {
+  return typeof step === 'object' ? step.title : step
+}
+function repairStepDetails(step) {
+  return Array.isArray(step?.details) ? step.details : []
+}
+function repairStepResult(step) {
+  return typeof step === 'object' ? step.result : ''
+}
+function repairAcceptanceRows(acceptance) {
+  if (Array.isArray(acceptance)) return acceptance
+  return [{ name: '综合验收', req: acceptance || '关键参数恢复正常范围', method: '现场复测并持续观察' }]
+}
+
 function openFeedbackModal(idx) {
   const item = product.value?.check?.checkItems?.[idx]
   if (!item) return
   ensureFeedbackDraft(item, idx)
+  activeCheckSubTab[idx] = 'steps'
   checkCardsExpanded[idx] = true
   scrollIntoCard('check-feedback-' + idx)
 }
@@ -627,6 +890,7 @@ function submitInlineFeedback(idx) {
   if (hasAbnormal) {
     checkCardsExpanded[idx] = false
     repairCardsExpanded[idx] = true
+    activeTab.value = 'repair-' + idx
     scrollIntoCard('repair-card-' + idx)
     if (props.event) {
       eventStage[props.event.id] = 'S4'
@@ -635,15 +899,22 @@ function submitInlineFeedback(idx) {
     return
   }
 
-  // 正常项：折叠当前排查卡片，激活下一项
+  // 正常项：折叠当前排查卡片，找下一个可用的排查项
   checkCardsExpanded[idx] = false
-  if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
-    items[idx + 1].status = 'active'
-    ensureFeedbackDraft(items[idx + 1], idx + 1)
-    checkCardsExpanded[idx + 1] = true
-    scrollIntoCard('check-card-' + (idx + 1))
-    // 通知助手
-    eventAssistantAction[props.event.id] = 'check_normal_' + idx + '|' + (idx + 1)
+  let nxt = idx + 1
+  while (nxt < items.length && (items[nxt].status === 'done-normal' || items[nxt].status === 'done-abnormal')) {
+    nxt++
+  }
+  if (nxt < items.length) {
+    if (items[nxt].status === 'pending') {
+      items[nxt].status = 'active'
+      ensureFeedbackDraft(items[nxt], nxt)
+    }
+    activeCheckSubTab[nxt] = 'warning'
+    checkCardsExpanded[nxt] = true
+    activeTab.value = 'check-' + nxt
+    scrollIntoCard('check-card-' + nxt)
+    eventAssistantAction[props.event.id] = 'check_normal_' + idx + '|' + nxt
   }
 
   // 全部完成检查
@@ -656,11 +927,25 @@ function checkAllDone() {
   if (!items) return
   const done = items.filter(i => i.status === 'done-normal' || i.status === 'done-abnormal').length
   if (done === items.length) {
-    const hasActive = items.some(i => i.status === 'done-abnormal' && i.repaired === undefined)
-    if (hasActive) {
-      eventStage[props.event.id] = 'S4'
+    showReportCard.value = true
+    reportExpanded.value = true
+    activeTab.value = 'report'
+    // 根据异常状态判断走哪种闭环
+    const hasAbnormal = items.some(i => i.status === 'done-abnormal')
+    const hasUnresolved = items.some(i => i.status === 'done-abnormal' && i.repaired === false)
+    const hasResolved = items.some(i => i.status === 'done-abnormal' && i.repaired === true)
+    if (hasUnresolved) {
+      needsManualClose.value = true
+      if (props.event) eventStage[props.event.id] = 'S5'
+      scrollIntoCard('event-record-card')
+    } else if (!hasAbnormal) {
+      // 全部正常
+      needsManualClose.value = false
+      if (props.event) eventStage[props.event.id] = 'S5'
+    } else {
+      // 有异常但都解决了
+      if (props.event) eventStage[props.event.id] = 'S5'
     }
-    // 全部正常/全部已解决/全部未解决 → 由 allChecksNormal / allRepairsExhausted watch 处理
   }
 }
 
@@ -673,6 +958,8 @@ function markItemRepaired(idx) {
   // 激活事件记录卡并展开
   showReportCard.value = true
   reportExpanded.value = true
+  activeTab.value = 'report'
+  if (props.event) eventStage[props.event.id] = 'S5'
   scrollIntoCard('event-record-card')
   // 通知助手：维修已解决
   eventAssistantAction[props.event.id] = 'repair_solved'
@@ -684,14 +971,24 @@ function markItemNotFixed(idx) {
   if (!items || !items[idx]) return
   items[idx].repaired = false
   repairCardsExpanded[idx] = false
-  // 激活下一个排查项
-  if (idx + 1 < items.length && items[idx + 1].status === 'pending') {
-    items[idx + 1].status = 'active'
-    ensureFeedbackDraft(items[idx + 1], idx + 1)
-    checkCardsExpanded[idx + 1] = true
-    scrollIntoCard('check-card-' + (idx + 1))
-    // 通知助手
-    eventAssistantAction[props.event.id] = 'repair_not_fixed_' + idx + '|' + (idx + 1)
+  // 找下一个需要处理的排查项（跳过已完成的）
+  let nxt = idx + 1
+  while (nxt < items.length && (items[nxt].status === 'done-normal' || items[nxt].status === 'done-abnormal')) {
+    nxt++
+  }
+  if (nxt < items.length) {
+    if (items[nxt].status === 'pending') {
+      items[nxt].status = 'active'
+      ensureFeedbackDraft(items[nxt], nxt)
+    }
+    activeCheckSubTab[nxt] = 'warning'
+    checkCardsExpanded[nxt] = true
+    activeTab.value = 'check-' + nxt
+    scrollIntoCard('check-card-' + nxt)
+    eventAssistantAction[props.event.id] = 'repair_not_fixed_' + idx + '|' + nxt
+  } else {
+    // 没有更多排查项了，直接完结
+    checkAllDone()
   }
 }
 
@@ -778,7 +1075,7 @@ const product = computed(() => {
   if (p) return p
   // 完整空 fallback：每个字段都是数组，避免 v-for 报 undefined is not iterable
   return {
-    ai: { verdict: '', dataSnapshot: '', dataLine: '', advice: '', metrics: [], faultMatch: [], reasons: [] },
+    ai: { verdict: '', dataSnapshot: '', dataLine: '', advice: '', eventInfo: [], eventNarrative: '', initialConclusion: '', confidence: 0, recommendation: '', keyFindings: [], metrics: [], faultMatch: [], reasons: [] },
     check: { warnings: [], steps: [{ title: '', subs: [] }], checklist: [] },
     repair: { recap: '', safetyWarnings: [], flows: [{ name: '', steps: [] }], acceptance: [] },
     report: { banner: '', rows: [], conclusions: [] }
@@ -852,10 +1149,29 @@ function buildProduct(ev) {
 
   // ========== 🧠 AI 初步分析 ==========
   const relatedNames = (ev.snapshot?.sensors || []).slice(1, 3).map(s => s.name).join('、') || '辅助参数'
+  const triggerValue = firstSensor.value && firstSensor.unit ? `${firstSensor.value}${firstSensor.unit}` : '已达到规则阈值'
+  const triggerCondition = ev.aiAnalysis?.triggerCondition || `${firstSensor.name}超过设定观察阈值，触发系统预监控规则`
+  const eventNarrative = `本次事件由${sys}在${formatTime(ev.createdAt)}触发，触发条件为${triggerCondition}；触发时${firstSensor.name}为${triggerValue}，系统同步记录${relatedNames}变化，用于判断是否存在供给不足、控制偏差或传感器异常趋势。`
+  const recommendation = `建议持续监控${firstSensor.name}与${relatedNames}变化；在下一航次或合适窗口检查相关泵组、控制阀、滤器及传感器回路，若趋势继续偏离则进入现场排查。`
   const ai = {
     verdict: `${firstSensor.name}当前为 ${firstSensor.value}${firstSensor.unit}，系统结合多项传感器实际数据与短时趋势判定本次事件需要处置。`,
     dataLine: `本次事件发生时，${firstSensor.name}为 ${firstSensor.value}${firstSensor.unit}，近 12 分钟未见回落；同时关联的${relatedNames}也出现同步偏离，需联合评估整体运行状态。`,
     advice: `建议立即按"诊断-隔离-排查-维修-验收"流程处置，优先排查与${firstSensor.name}直接耦合的回路与执行机构，避免故障扩散。`,
+    eventInfo: [
+      { label: '时间', value: formatTime(ev.createdAt) },
+      { label: '设备系统', value: sys },
+      { label: '触发来源', value: ev.source || '系统监测规则' },
+      { label: '触发条件', value: triggerCondition }
+    ],
+    eventNarrative,
+    initialConclusion: ev.aiAnalysis?.conclusion || 'suspected（疑似异常）',
+    confidence: ev.aiAnalysis?.confidence || 60,
+    recommendation,
+    keyFindings: [
+      `${firstSensor.name}已超过当前工况下的安全观察区间，短时未出现自然回落。`,
+      `${relatedNames}与主参数同向偏离，说明不是单点采样噪声，更像系统性波动。`,
+      `建议先保护设备运行边界，再按任务卡逐项排查，避免一次性展开过多信息。`
+    ],
     metrics: (ev.snapshot?.sensors || []).slice(0, 4).map((s, idx) => ({
       name: s.name,
       trend: s.status === 'over' ? 'up' : (idx === 1 ? 'down' : 'flat'),
@@ -937,47 +1253,125 @@ function buildProduct(ev) {
     checkItems: [
       {
         title: '液压系统故障排查',
-        warning: '检查前确认设备已停机，系统已泄压至零，操作面板挂"禁止启动"标识',
+        warning: '拆卸油箱盖板前确认液压系统已泄压至零，操作面板挂"禁止启动"标识\n高压液压油泄漏非常危险，检查时佩戴防油手套和护目镜\n泵柱塞磨损初期可能不表现明显压力下降，仅反映为执行器行程异常\n记录所有原始数据后再行拆装，参照液压系统原理图排查',
         steps: [
-          { title: '检查液压油箱外观及液位计', details: ['目视检查油箱外壁焊缝处有无渗漏油渍', '检查油箱底部放油堵有无湿润痕迹', '对比液位计读数与远程监控值是否一致', '检查液位计上下连通阀是否处于全开位置'] },
-          { title: '记录当前油位和油温初始数据', details: ['拍照记录液位计当前读数', '记录液压油温度（正常范围40~70℃）', '读取系统压力表稳态值（正常16~21MPa）', '记录电机运行电流'] },
-          { title: '目视检查管路各接头及软管段', details: ['重点检查高压管路法兰接头有无油渍', '检查软管段有无鼓包/老化/龟裂/渗油', '检查管路支架/卡箍处有无摩擦磨损痕迹', '检查弯头、三通等应力集中部位有无湿润'] },
-          { title: '使用荧光检漏剂定位微漏点', details: ['在油液中按规定比例加入紫外荧光示踪剂', '系统循环运行15min使示踪剂充分扩散', '在疑似渗漏区域用UV灯照射观察荧光痕迹', '标记所有发现的微漏点位置并拍照记录'] }
+          { title: '检查液压油箱外观及液位', details: ['目视检查油箱外壁焊缝处有无渗漏油渍', '对比液位计读数与远程监控值是否一致'] },
+          { title: '记录油位和油温数据', details: ['拍照记录液位计当前读数及液压油温度', '读取系统压力表稳态值（正常16~21MPa）'] },
+          { title: '检查管路接头及软管段', details: ['重点检查高压法兰接头和软管段有无渗油/鼓包/老化', '检查管路支架、弯头等应力集中部位有无湿润'] },
+          { title: '使用检漏剂定位微漏点', details: ['在油液中加入紫外荧光示踪剂循环15min', '用UV灯照射疑似区域标记泄漏点并拍照'] }
         ],
         status: 'pending', feedback: null,
-        repair: { safety: ['确认锚机已停机系统已泄压至零', '佩戴防油手套和护目镜'], steps: ['关闭相关阀门系统泄压', '更换法兰密封垫片NBR Shore A 70±5', '力矩紧固50±2Nm分3次对角', '试压确认无渗漏', '恢复运行持续监控24h'], parts: ['法兰密封垫片×2', 'O型密封圈×4', '力矩扳手5-80Nm'], acceptance: '法兰接头无渗漏，压力稳定在16~21MPa' }
+        repair: {
+          safety: [
+            '确认锚机已停机，液压系统已泄压至零，控制面板挂“禁止启动”标识',
+            '拆卸法兰前用接油盘和吸油棉做好围挡，防止液压油进入舱底水系统',
+            '更换密封件时不得用尖锐工具刮伤法兰密封面，旧垫片需完整留存便于复核',
+            '复装前核对垫片材质、硬度和尺寸，禁止用非耐油橡胶临时代替'
+          ],
+          steps: [
+            { title: '隔离并泄压', details: ['关闭锚机液压站供油阀和回油阀，确认压力表回零', '释放蓄能器残压并悬挂锁定牌，记录泄压完成时间'], result: '压力表读数 0MPa，现场无残余喷溅风险' },
+            { title: '拆检渗漏法兰', details: ['按对角顺序松开法兰螺栓，拆下旧 NBR 垫片和 O 型圈', '检查法兰密封面是否有划痕、压痕或杂质嵌入'], result: '密封面清洁无毛刺，旧件已拍照归档' },
+            { title: '更换密封件并复装', details: ['安装 NBR Shore A 70±5 法兰垫片，O 型圈薄涂液压油后入槽', '螺栓按 30Nm、45Nm、50±2Nm 三轮对角紧固'], result: '力矩记录完整，法兰贴合均匀无偏压' },
+            { title: '试压与复位', details: ['低压循环 5 分钟排气，再升至 16MPa 保压 10 分钟', '清理现场油污，恢复阀位并更新维修记录'], result: '试压期间无渗漏，锚机低速动作平稳' }
+          ],
+          parts: [
+            { name: '法兰密封垫片', spec: 'NBR Shore A 70±5', qty: '2 片', usage: '替换渗漏法兰主密封' },
+            { name: 'O 型密封圈', spec: '耐油丁腈橡胶 / 匹配法兰槽', qty: '4 个', usage: '更换老化副密封' },
+            { name: '力矩扳手', spec: '5-80Nm，校验有效期内', qty: '1 把', usage: '三轮对角紧固复核' },
+            { name: '吸油棉与接油盘', spec: '舱内防污染套件', qty: '1 套', usage: '拆装期间油液收集' }
+          ],
+          acceptance: [
+            { name: '静态保压', req: '16MPa 保压 10min 无压降', method: '现场压力表读数复核' },
+            { name: '法兰渗漏', req: '密封面及螺栓孔无油迹', method: '白布擦拭 + 目视检查' },
+            { name: '动作验证', req: '锚机低速/中速动作平稳', method: '空载动作 3 次并记录' },
+            { name: '趋势观察', req: '24h 油位变化 <2%', method: '系统趋势图持续跟踪' }
+          ]
+        }
       },
       {
         title: '系统或油柜吸口堵塞排查',
-        warning: '需停机泄压后操作',
+        warning: '油柜吸口堵塞通常伴随进机压力波动，拆检前关闭相关阀门并锁定\n拆检吸口滤器时注意油温，高温可能导致烫伤\n取样时注意容器清洁，避免二次污染油液\n检查燃油日用柜放残，确认无积水或杂质',
         steps: [
-          { title: '检查吸油口滤网状态', details: ['拆检吸口滤器有无堵塞/异物附着', '记录滤网表面杂质类型和沉积量', '评估滤网通流面积减少百分比', '检查滤网骨架有无变形/破损'] },
-          { title: '测量吸口负压值', details: ['在额定流量下读取吸入侧真空表数值', '对比历史正常负压基准判断有无异常阻力', '在不同转速工况下记录负压变化趋势', '若负压超过-0.08MPa需立即清洗滤器'] },
-          { title: '检查油箱底部沉积物', details: ['打开放油旋塞取样底部油液', '观察有无金属屑/水分/絮状物', '用磁铁检查铁磁性颗粒含量', '评估是否需要彻底清洗油箱内部'] }
+          { title: '检查吸油口滤网状态', details: ['拆检吸口滤器有无堵塞/异物附着，记录杂质类型', '评估滤网通流面积减少百分比'] },
+          { title: '测量吸口负压值', details: ['在额定流量下读取吸入侧真空表数值', '对比历史正常负压基准判断有无异常阻力'] },
+          { title: '检查油箱底部沉积物', details: ['打开放油旋塞取样底部油液，观察有无金属屑/水分', '用磁铁检查铁磁性颗粒含量，评估是否需彻底清洗'] }
         ],
         status: 'pending', feedback: null,
-        repair: { safety: ['停机泄压后操作', '佩戴防护手套'], steps: ['清洗吸口滤网', '清除油箱底部沉积物', '更换回油过滤器滤芯', '补油至正常液位60~70%'], parts: ['回油过滤器滤芯×1', '液压油×20L'], acceptance: '滤器压差≤0.03MPa，吸口负压正常，油位≥60%' }
+        repair: {
+          safety: ['停机泄压后操作，关闭吸入口前后阀并悬挂锁定牌', '拆检滤器前确认油温低于 45°C，佩戴防油手套', '滤芯和沉积物需单独封样，便于判断污染来源'],
+          steps: [
+            { title: '拆检吸口滤网', details: ['拆下吸口滤网并拍照记录堵塞面积', '使用清洁液反向冲洗并检查滤网破损'], result: '滤网通流面积恢复至 90% 以上' },
+            { title: '清理油箱沉积物', details: ['打开放残点排出底部含水油样', '用无纤维布清理底部金属屑和胶质沉积'], result: '底部油样无明显水分和大颗粒杂质' },
+            { title: '更换回油滤芯并补油', details: ['安装新回油滤芯并记录型号批次', '经 60 目过滤漏斗补油至液位 60-70%'], result: '滤器压差回落至 0.03MPa 以下' }
+          ],
+          parts: [
+            { name: '回油过滤器滤芯', spec: '10μm / 匹配液压站型号', qty: '1 支', usage: '替换污染滤芯' },
+            { name: 'ISO VG 46 液压油', spec: '同批次或兼容牌号', qty: '20L', usage: '清理后补油' },
+            { name: '取样瓶', spec: '洁净透明瓶', qty: '2 个', usage: '留存底部油样' }
+          ],
+          acceptance: [
+            { name: '滤器压差', req: '≤0.03MPa', method: '压差计读数' },
+            { name: '吸口负压', req: '恢复历史正常区间', method: '额定流量下真空表读数' },
+            { name: '油位', req: '液位 60-70%', method: '液位计和远程值双重确认' }
+          ]
+        }
       },
       {
         title: '压力传感器故障排查',
-        warning: '注意防止电磁干扰影响测量精度',
+        warning: '断开传感器前确保发动机处于安全状态\n燃油轨压变送器（4-20mA信号）断开不会影响控制系统功能\n如确认传感器故障，更换后需校验零点\n注意防止电磁干扰影响测量精度',
         steps: [
-          { title: '传感器校验', details: ['使用标准传感器对核心监控传感器进行参照校验', '记录校验前后读数偏差', '检查传感器供电回路是否稳定（24V±5%）', '排查信号回路有无接地或短路'] },
-          { title: '电磁干扰排查', details: ['检查传感器电缆屏蔽层接地是否良好', '排查附近有无大功率设备启动干扰', '使用示波器观察信号是否存在高频噪声', '检查传感器安装支架有无振动松动'] }
+          { title: '传感器校验', details: ['使用标准传感器对核心监控传感器进行参照校验', '检查传感器供电回路是否稳定（24V±5%）'] },
+          { title: '电磁干扰排查', details: ['检查传感器电缆屏蔽层接地是否良好', '使用示波器观察信号是否存在高频噪声'] }
         ],
         status: 'pending', feedback: null,
-        repair: { safety: ['确认供电已断开', '防静电损坏传感器'], steps: ['更换故障传感器', '重新校准零量和量程', '检查屏蔽接地', '通电测试读数一致性'], parts: ['压力传感器×1', '屏蔽电缆×5m'], acceptance: '读数偏差≤2%，无噪声干扰' }
+        repair: {
+          safety: ['确认传感器回路已断电，拆线前拍照记录端子序号', '佩戴防静电腕带，避免损坏新传感器敏感元件', '更换后必须做零点和量程校验，不能只看通电有数值'],
+          steps: [
+            { title: '拆除旧传感器', details: ['记录旧传感器铭牌、量程和接线端子位置', '拆除前测量供电电压，确认回路已隔离'], result: '旧件封存，端子编号清晰' },
+            { title: '安装并接线', details: ['安装同量程压力传感器，螺纹处按规范缠绕密封带', '屏蔽层单端接地，避免形成接地环流'], result: '供电 24V±5%，接线无松动' },
+            { title: '校准与对比', details: ['用标准压力源校验零点、50%、满量程三点', '与机械压力表和系统历史曲线进行一致性对比'], result: '读数偏差 ≤2%，曲线无尖峰噪声' }
+          ],
+          parts: [
+            { name: '压力传感器', spec: '4-20mA / 同量程替换', qty: '1 只', usage: '替换故障测点' },
+            { name: '屏蔽电缆', spec: '船用屏蔽线', qty: '5m', usage: '修复老化或破损线段' },
+            { name: '标准压力源', spec: '校验有效期内', qty: '1 台', usage: '零点与量程校准' }
+          ],
+          acceptance: [
+            { name: '读数偏差', req: '≤2%', method: '标准压力源三点校验' },
+            { name: '信号噪声', req: '无高频尖峰和跳变', method: '趋势图观察 15min' },
+            { name: '接地屏蔽', req: '屏蔽层单端可靠接地', method: '万用表导通检查' }
+          ]
+        }
       },
       {
         title: '系统管线泄漏排查',
-        warning: '分段检查时注意系统压力，确认各段隔离阀状态',
+        warning: '高压液压油泄漏非常危险，检查时佩戴安全设备\n分段检查时注意系统压力，确认各段隔离阀状态\n泄漏通常伴随进机压力或共轨压力下降趋势\n管路伴热系统工作正常与否影响油温，检查时一并确认',
         steps: [
-          { title: '分段检查高压管路', details: ['沿管路走向逐段目视检查接头、焊缝有无油渍', '重点检查弯头、三通等应力集中部位', '检查管路固定支架处有无磨损渗漏', '检查法兰密封垫片处有无湿润痕迹'] },
-          { title: '执行机构密封检查', details: ['检查液压缸活塞杆处有无外泄漏', '检查液压马达轴封处有无渗油', '观察执行机构动作是否平稳无爬行', '测量执行机构端盖温度判断内部泄漏'] },
-          { title: '记录并拍照', details: ['对每个可疑泄漏点拍照标记坐标位置', '在管路图上标注所有泄漏点位置', '按严重程度分级（严重/中等/轻微）', '整理泄漏点清单供维修参考'] }
+          { title: '分段检查高压管路', details: ['沿管路走向逐段目视检查接头、焊缝有无油渍', '重点检查弯头、三通等应力集中部位和法兰密封垫片'] },
+          { title: '执行机构密封检查', details: ['检查液压缸活塞杆和液压马达轴封处有无渗油', '观察执行机构动作是否平稳无爬行'] },
+          { title: '记录并拍照', details: ['对每个可疑泄漏点拍照标记坐标，在管路图上标注', '按严重程度分级（严重/中等/轻微），整理清单供维修参考'] }
         ],
         status: 'pending', feedback: null,
-        repair: { safety: ['确认系统泄压至零', '准备接油及消防设备'], steps: ['更换渗漏部位密封件', '力矩紧固分3次对角', '恢复运行试压检漏', '24h跟踪验证'], parts: ['法兰密封垫片×2', 'O型密封圈×4', '力矩扳手'], acceptance: '无可见渗漏，24h油位变化<2%' }
+        repair: {
+          safety: ['确认系统泄压至零，泄漏段前后阀已关闭并挂牌', '准备接油盘、吸油棉和灭火器，防止油液污染和火险', '处理弯头、三通等应力集中部位时避免强行撬动管线'],
+          steps: [
+            { title: '定位并隔离泄漏段', details: ['根据排查照片和管路图确认泄漏坐标', '关闭泄漏段前后隔离阀并排放残油'], result: '泄漏段已隔离，残油收集完成' },
+            { title: '更换密封件', details: ['拆下渗漏部位垫片和 O 型圈，清洁密封面', '按规格更换新件并检查法兰平面度'], result: '密封面无划伤，新件型号匹配' },
+            { title: '复装试压检漏', details: ['螺栓分三轮对角紧固并记录最终力矩', '恢复运行后用白布擦拭观察是否渗油'], result: '试压无可见渗漏，动作无异常振动' },
+            { title: '24h 跟踪验证', details: ['记录维修后 2h、8h、24h 油位变化', '对比压力趋势和执行机构动作稳定性'], result: '24h 油位变化 <2%，压力曲线稳定' }
+          ],
+          parts: [
+            { name: '法兰密封垫片', spec: 'NBR / 匹配管径', qty: '2 片', usage: '替换渗漏密封' },
+            { name: 'O 型密封圈', spec: '耐油丁腈橡胶', qty: '4 个', usage: '替换副密封' },
+            { name: '力矩扳手', spec: '5-80Nm', qty: '1 把', usage: '复装力矩控制' },
+            { name: '白布与检漏剂', spec: '现场检漏套件', qty: '1 套', usage: '试压后复核' }
+          ],
+          acceptance: [
+            { name: '可见渗漏', req: '无油迹、无湿润', method: '白布擦拭与目视检查' },
+            { name: '压力稳定', req: '16-21MPa 区间内稳定', method: '在线趋势观察' },
+            { name: '油位变化', req: '24h 变化 <2%', method: '液位计定时记录' }
+          ]
+        }
       }
     ],
   }
@@ -1061,6 +1455,27 @@ function buildProduct(ev) {
   return { ai, check, repair, report }
 }
 
+// 切换大 tab 时，保证子 tab 有默认值
+watch(activeTab, (tab) => {
+  if (!tab) return
+  const checkMatch = tab.match(/^check-(\d+)$/)
+  if (checkMatch) {
+    const idx = Number(checkMatch[1])
+    if (!activeCheckSubTab[idx]) activeCheckSubTab[idx] = 'warning'
+    return
+  }
+  const repairMatch = tab.match(/^repair-(\d+)$/)
+  if (repairMatch) {
+    const idx = Number(repairMatch[1])
+    if (!activeRepairSubTab[idx]) activeRepairSubTab[idx] = 'safety'
+  }
+})
+
+// 小 tab 切换同步给右侧助手
+watch(activeSituationTab, () => {
+  syncSituationTabs()
+})
+
 // ============ 阶段 / 事件切换：折叠所有 → 展开当前 → 脉冲 ============
 watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
   const [eid, stage] = newVal
@@ -1072,29 +1487,50 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
 
   // 切事件：重置状态
   if (isEventChanged) {
+    activeTab.value = 'situation'
+    activeSituationTab.value = 'summary'
+    Object.keys(unlockedSituationTabs).forEach(k => { unlockedSituationTabs[k] = k === 'summary' })
     aiExpanded.value = true
     reportExpanded.value = false
     needsManualClose.value = false
     isFalseAlarm.value = false
     manualFeedback.value = ''
     showReportCard.value = false
-    aiSubs.conclusion = true
-    aiSubs.data = true
-    aiSubs.mechanism = false
-    aiSubs.reasons = false
     selectedSensorIndex.value = 0
     trendLoaded.value = false
+    activeReportSubTab.value = 'summary'
+    Object.keys(activeCheckSubTab).forEach(k => delete activeCheckSubTab[k])
+    Object.keys(activeRepairSubTab).forEach(k => delete activeRepairSubTab[k])
     setTimeout(() => { trendLoaded.value = true }, 600)
     // 重置排查和维修卡片
     Object.keys(checkCardsExpanded).forEach(k => delete checkCardsExpanded[k])
     Object.keys(repairCardsExpanded).forEach(k => delete repairCardsExpanded[k])
+    syncSituationTabs()
   }
 
   // 阶段变化
   if (isStageChanged) {
-    if (stage !== 'S1') aiExpanded.value = false
-    if (stage === 'S5') reportExpanded.value = true
-    pulseInto(sectionMap[stage], 900)
+    if (stage === 'S2') {
+      const items = product.value?.check?.checkItems
+      // Find the first visible/active check item
+      let targetIdx = 0
+      for (let i = 0; i < (items?.length || 0); i++) {
+        if (isCheckVisible(i)) { targetIdx = i; break }
+      }
+      activeTab.value = 'check-' + targetIdx
+    }
+    if (stage === 'S4') {
+      const items = product.value?.check?.checkItems
+      let targetIdx = 0
+      for (let i = 0; i < (items?.length || 0); i++) {
+        if (items[i].status === 'done-abnormal' && items[i].repaired === undefined) { targetIdx = i; break }
+      }
+      activeTab.value = 'repair-' + targetIdx
+    }
+    if (stage === 'S5') {
+      activeTab.value = 'report'
+      reportExpanded.value = true
+    }
   }
 
   // 初始化 S2：激活第一项排查
@@ -1103,6 +1539,7 @@ watch(() => [props.event?.id, currentStage.value], (newVal, oldVal) => {
     if (items && items.length > 0 && items[0].status === 'pending') {
       items[0].status = 'active'
       ensureFeedbackDraft(items[0], 0)
+      activeCheckSubTab[0] = 'warning'
       checkCardsExpanded[0] = true
     }
   }
@@ -1114,9 +1551,10 @@ watch(allChecksNormal, (normal) => {
     showReportCard.value = true
     reportExpanded.value = true
     needsManualClose.value = true
+    activeTab.value = 'report'
     scrollIntoCard('event-record-card')
     if (props.event) {
-      eventStage[props.event.id] = 'S4'
+      eventStage[props.event.id] = 'S5'
       eventAssistantAction[props.event.id] = 'needs_manual_close'
     }
   }
@@ -1130,9 +1568,10 @@ watch(allRepairsExhausted, (exhausted) => {
     showReportCard.value = true
     reportExpanded.value = true
     needsManualClose.value = true
+    activeTab.value = 'report'
     scrollIntoCard('event-record-card')
     if (props.event) {
-      eventStage[props.event.id] = 'S4'
+      eventStage[props.event.id] = 'S5'
       eventAssistantAction[props.event.id] = 'needs_manual_close'
     }
   }
@@ -1140,8 +1579,8 @@ watch(allRepairsExhausted, (exhausted) => {
 
 // ============ 助手卡片联动：渐进展开子模块 ============
 const cardToSection = {
-  diagnosis: 'ai',
-  snapshot: 'ai',
+  diagnosis: 'situation',
+  snapshot: 'situation',
   guide: 'check',
   warning: 'check',
   report: 'report'
@@ -1150,15 +1589,41 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
   if (!action || !props.event) return
   stopStream()
 
+  if (action === 'open_summary') {
+    unlockSituationTab('summary')
+    return
+  }
+
+  if (action === 'open_data') {
+    unlockSituationTab('data')
+    return
+  }
+
+  if (action === 'open_trend') {
+    unlockSituationTab('data')
+    return
+  }
+
+  if (action === 'open_workload') {
+    unlockSituationTab('workload')
+    return
+  }
+
+  if (action === 'view_ai') {
+    unlockSituationTab('summary')
+    return
+  }
+
   // 激活第一个排查项
   if (action === 'check_activate_first') {
+    activeTab.value = 'check-0'
     const items = product.value?.check?.checkItems
     if (items && items.length > 0 && items[0].status === 'pending') {
       items[0].status = 'active'
       ensureFeedbackDraft(items[0], 0)
+      activeCheckSubTab[0] = 'warning'
       checkCardsExpanded[0] = true
     }
-    pulseInto('check', 700)
     return
   }
 
@@ -1169,6 +1634,7 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
     reportExpanded.value = true
     needsManualClose.value = false
     isFalseAlarm.value = true
+    activeTab.value = 'report'
     scrollIntoCard('event-record-card')
     if (props.event) eventStage[props.event.id] = 'S5'
     return
@@ -1185,9 +1651,24 @@ watch(() => eventAssistantAction[props.event?.id], (action) => {
   const section = cardToSection[action]
   if (!section) return
 
-  aiExpanded.value = (section === 'ai')
+  if (section === 'check') {
+    const items = product.value?.check?.checkItems || []
+    let targetIdx = 0
+    for (let i = 0; i < items.length; i++) {
+      if (isCheckVisible(i)) { targetIdx = i; break }
+    }
+    activeTab.value = 'check-' + targetIdx
+  } else if (section === 'repair') {
+    const items = product.value?.check?.checkItems || []
+    let targetIdx = 0
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].status === 'done-abnormal') { targetIdx = i; break }
+    }
+    activeTab.value = 'repair-' + targetIdx
+  } else {
+    activeTab.value = section
+  }
   reportExpanded.value = (section === 'report')
-  pulseInto(section, 700)
 })
 
 function applyNaturalLanguageCheckFeedback(key, rawText = '') {
@@ -1209,7 +1690,7 @@ function applyNaturalLanguageCheckFeedback(key, rawText = '') {
   const target = draft.find(f => rule.names.some(name => f.name.includes(name)))
   if (!target) return false
   target.selected = Math.min(rule.option, target.options.length - 1)
-  item.feedbackNotes = rawText ? `右侧助手识别：${rawText}` : item.feedbackNotes
+  item.feedbackNotes = rawText || item.feedbackNotes
   checkCardsExpanded[activeIdx] = true
   scrollIntoCard('check-card-' + activeIdx)
   return true
@@ -1229,12 +1710,22 @@ watch(() => eventAssistantCommand[props.event?.id], (command) => {
 
   if (action === 'chip_check_normal') {
     const activeIdx = items.findIndex(i => i.status === 'active')
-    if (activeIdx >= 0) markNormal(activeIdx)
+    if (activeIdx >= 0) { markNormal(activeIdx); return }
+    // 没有 active 排查项了，检查是否全部完成
+    checkAllDone()
     return
   }
   if (action === 'chip_open_feedback') {
     const activeIdx = items.findIndex(i => i.status === 'active')
-    if (activeIdx >= 0) openFeedbackModal(activeIdx)
+    if (activeIdx < 0) return
+    // 切到当前排查项
+    activeTab.value = 'check-' + activeIdx
+    activeCheckSubTab[activeIdx] = 'steps'
+    // 展开"现场备注"和"提交反馈"区域
+    setTimeout(() => {
+      const el = document.getElementById('check-feedback-' + activeIdx)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 60)
     return
   }
   if (action === 'chip_repair_solved') {
@@ -1260,6 +1751,7 @@ function formatTime(t) {
 
 <style scoped>
 .product-drawer {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1267,100 +1759,146 @@ function formatTime(t) {
   border-left: 1px solid var(--border-primary);
 }
 
-/* ============ Header ============ */
-.drawer-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-primary);
-  flex-shrink: 0;
-}
-.back-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary, var(--text-secondary));
-  cursor: pointer;
-  font-size: var(--font-base);
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-.back-btn:hover { background: var(--bg-hover); }
-
-/* ============ 阶段进度条 ============ */
-.stage-progress {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex: 1;
-  justify-content: center;
-}
-.sp-item {
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-.sp-dot {
+/* 返回悬浮按钮 */
+.back-float {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  font-size: var(--font-sm);
-  font-weight: 600;
-  background: var(--border-primary);
-  color: var(--text-muted);
-  border: 2px solid var(--border-primary);
-  transition: all 0.3s;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s;
 }
-.sp-item.done .sp-dot {
-  background: var(--success);
-  color: #fff;
-  border-color: var(--success);
-}
-.sp-item.active .sp-dot {
-  background: var(--accent);
-  color: #fff;
+.back-float:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.15);
+  color: var(--accent);
+  background: var(--accent-bg);
 }
-.sp-label {
-  margin: 0 6px;
-  font-size: var(--font-sm);
-  color: var(--text-muted);
+
+/* 任务卡片轨道 */
+.task-card-rail {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 54px 8px 14px 42px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.55), var(--bg-panel));
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
-.sp-item.done .sp-label { color: var(--success); }
-.sp-item.active .sp-label { color: var(--accent); font-weight: 600; }
-.sp-line {
-  width: 50px;
-  height: 2px;
-  background: var(--border-primary);
-  margin: 0 2px;
+.task-card-rail:hover { scrollbar-color: var(--border-primary) transparent; }
+.task-card-rail::-webkit-scrollbar { height: 4px; }
+.task-card-rail::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+.task-card-rail:hover::-webkit-scrollbar-thumb { background: var(--border-primary); }
+.task-card-chip {
+  --chip-accent: var(--accent);
+  position: relative;
+  flex: 0 0 172px;
+  min-height: 74px;
+  margin-left: -18px;
+  padding: 12px 12px 10px 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  gap: 8px 10px;
+  border: 1px solid rgba(22, 119, 255, 0.12);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,248,250,0.94));
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(25, 42, 70, 0.07);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  z-index: calc(1 + var(--stack-i));
+  text-align: left;
 }
-.sp-item.done .sp-line { background: var(--success); }
-.sp-cursor {
+.task-card-chip:first-child { margin-left: 0; }
+.task-card-chip::before {
+  content: '';
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-  animation: cursorPulse 1s infinite;
+  inset: 0 auto 0 0;
+  width: 5px;
+  border-radius: 16px 0 0 16px;
+  background: var(--chip-accent);
+  opacity: 0.72;
 }
-@keyframes cursorPulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.2); }
+.task-card-chip:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--chip-accent) 38%, var(--border-primary));
+  box-shadow: 0 14px 30px rgba(25, 42, 70, 0.12);
+}
+.task-card-chip.active {
+  flex-basis: 208px;
+  transform: translateY(-8px);
+  border-color: color-mix(in srgb, var(--chip-accent) 58%, var(--border-primary));
+  box-shadow: 0 18px 36px rgba(22, 119, 255, 0.18);
+}
+.task-check { --chip-accent: #1677ff; }
+.task-repair { --chip-accent: #ff7d00; }
+.task-report { --chip-accent: #00b42a; }
+.task-card-index {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--chip-accent) 11%, #fff);
+  color: var(--chip-accent);
+  font-size: 0.78rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.task-card-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.task-card-kicker {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+.task-card-title {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.28;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-card-state {
+  grid-column: 2;
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--chip-accent) 10%, #fff);
+  color: var(--chip-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.status-abnormal { --chip-accent: var(--danger); }
+.status-active { --chip-accent: var(--accent); }
+.status-done { --chip-accent: var(--success); }
+.status-pending { --chip-accent: #8a95a6; }
+
+.prod-body-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 18px 22px;
 }
 
 /* ============ Drawer Body ============ */
 .drawer-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 16px 24px;
+  padding: 0 10px 24px;
 }
 
 /* ============ 产物卡片 ============ */
@@ -1372,6 +1910,233 @@ function formatTime(t) {
   overflow: hidden;
   transition: all 0.3s;
 }
+.stage-panel { max-width: 100%; }
+.situation-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-secondary);
+  border-radius: 20px;
+  overflow-x: auto;
+}
+.situation-tab {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.situation-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.5); }
+.situation-tab.active {
+  background: var(--bg-surface);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.situation-panel {
+  min-height: 120px;
+  font-size: 0.92rem;
+}
+.situation-tabs {
+  margin-left: 2px;
+}
+
+
+/* 大卡内部子 tab */
+.detail-sub-tabs {
+  display: inline-flex;
+  gap: 3px;
+  padding: 2px;
+  margin-bottom: 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-secondary);
+  border-radius: 16px;
+  overflow-x: auto;
+}
+.detail-sub-tab {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.detail-sub-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.5); }
+.detail-sub-tab.active {
+  background: var(--bg-surface);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.detail-sub-panel { min-height: 120px; }
+.empty-sub-panel {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  background: var(--bg-panel);
+  border: 1px dashed var(--border-secondary);
+  border-radius: 6px;
+}
+
+.overview-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+.overview-section {
+  min-height: auto;
+  padding: 14px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.82);
+  box-shadow: 0 8px 22px rgba(25, 42, 70, 0.06);
+}
+.section-heading {
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: 760;
+}
+.event-info-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--border-secondary);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+.event-info-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-secondary);
+  border-right: 1px solid var(--border-secondary);
+}
+.event-info-row:nth-child(2n) { border-right: 0; }
+.event-info-row:nth-last-child(-n + 2) { border-bottom: 0; }
+.event-info-label {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+.event-info-value {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  font-weight: 620;
+}
+.event-info-narrative {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.75;
+}
+.conclusion-stack {
+  display: grid;
+  gap: 10px;
+}
+.conclusion-block {
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-secondary);
+}
+.conclusion-top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+.conclusion-main .conclusion-label { margin-bottom: 4px; }
+.confidence-ring-wrap { flex-shrink: 0; }
+.confidence-ring-sm { width: 68px; height: 68px; }
+.confidence-ring-sm .confidence-ring-inner { width: 48px; height: 48px; }
+.conclusion-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.conclusion-value {
+  color: var(--text-primary);
+  font-size: 1.03rem;
+  line-height: 1.45;
+  font-weight: 760;
+}
+.confidence-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+}
+.confidence-ring {
+  margin: 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--accent) var(--confidence-deg), var(--bg-panel) 0deg);
+  box-shadow: inset 0 0 0 1px var(--border-secondary), 0 6px 14px rgba(22,119,255,0.10);
+}
+.confidence-ring-inner {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-secondary);
+}
+.confidence-value {
+  color: var(--accent);
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.suggestion-block {
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-secondary);
+}
+.suggestion-block p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+@media (max-width: 900px) {
+  .event-info-list { grid-template-columns: 1fr; }
+  .event-info-row,
+  .event-info-row:nth-child(2n) { border-right: 0; }
+  .event-info-row:nth-last-child(-n + 2) { border-bottom: 1px solid var(--border-secondary); }
+  .event-info-row:last-child { border-bottom: 0; }
+  .conclusion-top-row { grid-template-columns: 1fr; }
+  .confidence-ring-wrap { justify-self: center; }
+}
+
 .prod-card.card-current {
   border-color: var(--accent);
   border-left-width: 3px;
@@ -2010,8 +2775,6 @@ function formatTime(t) {
   border-width: 2px;
   box-shadow: 0 0 0 3px rgba(22,119,255,0.12);
 }
-.sc-over { border-left: 3px solid var(--danger); }
-.sc-warning { border-left: 3px solid var(--warning); }
 .sc-header {
   display: flex;
   align-items: center;
@@ -2044,26 +2807,25 @@ function formatTime(t) {
   0%,100% { opacity: 0.6; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.2); }
 }
-.sc-meta {
-  font-size: var(--font-xs);
-  color: var(--text-muted);
-  margin-bottom: 6px;
-  line-height: 1.4;
-}
-.sc-history {
-  font-size: var(--font-xs);
+.sc-desc {
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   line-height: 1.5;
-  margin-bottom: 6px;
 }
-.sc-status {
+.sc-flag {
   font-size: var(--font-xs);
+  padding: 1px 6px;
+  border-radius: 3px;
   font-weight: 600;
+  flex-shrink: 0;
   line-height: 1.4;
 }
-.sc-status.st-over { color: var(--danger); }
-.sc-status.st-warning { color: var(--warning); }
-.sc-status.st-normal { color: var(--success); }
+.sc-flag-over { background: var(--danger-bg); color: var(--danger); }
+.sc-flag-warn { background: var(--warning-bg, rgba(255,125,0,0.08)); color: var(--warning); }
+
+.sensor-card-h.sc-alert {
+  border-left: 3px solid var(--danger);
+}
 
 /* === 大尺寸趋势图 === */
 .trend-chart-area {
@@ -2141,36 +2903,91 @@ function formatTime(t) {
 .ci-title { font-size: var(--font-base); font-weight: 600; color: var(--text-primary); }
 .ci-toggle { font-size: var(--font-xs); color: var(--text-muted); }
 .ci-body { padding: 14px; border-top: 1px solid var(--border-primary); }
-.ci-warning { font-size: var(--font-sm); padding: 8px 10px; background: rgba(250,173,20,0.08); border-left: 3px solid var(--warning); border-radius: 0 4px 4px 0; margin-bottom: 12px; }
-.ci-warning-label { font-weight: 700; color: var(--warning); }
+.ci-warning { font-size: var(--font-sm); padding: 10px 12px; background: rgba(250,173,20,0.08); border-left: 3px solid var(--warning); border-radius: 0 4px 4px 0; margin-bottom: 12px; }
+.ci-warning-label { font-weight: 700; color: var(--warning); display: block; margin-bottom: 6px; font-size: var(--font-base); }
+.ci-warning-list { margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.7; }
+.ci-warning-list li { margin-bottom: 4px; }
+.ci-warning-list li::marker { color: var(--warning); }
+.check-warning-focus {
+  padding-bottom: 14px;
+}
+.ci-warning-confirm {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(250,173,20,0.28);
+}
+.ci-confirm-btn {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--warning);
+  border-radius: 18px;
+  background: rgba(250,173,20,0.12);
+  color: var(--warning);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+.ci-confirm-btn:hover {
+  background: var(--warning);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(255,125,0,0.18);
+}
+.repair-warning-panel {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 120px;
+  padding: 14px 16px;
+  border-radius: 0 10px 10px 0;
+}
+.repair-warning-list {
+  font-size: var(--font-sm);
+  line-height: 1.75;
+}
 .ci-steps-label { font-size: var(--font-sm); font-weight: 700; color: var(--warning); margin-bottom: 8px; }
-.ci-step { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-secondary); }
-.ci-step:last-child { border-bottom: none; }
-.ci-step-num { font-size: var(--font-sm); font-weight: 700; color: var(--text-primary); margin-bottom: 5px; line-height: 1.5; }
-.ci-step-details { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.62; }
-.ci-detail-row { margin-bottom: 5px; }
-.ci-detail-with-feedback {
+.check-step-focus-panel { display: grid; gap: 10px; }
+.check-step-dots-bar { display: flex; justify-content: center; padding: 2px 0 6px; }
+.check-step-dots { display: flex; gap: 8px; align-items: center; }
+.check-step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-primary); transition: all 0.2s; flex-shrink: 0; }
+.check-step-dot.active { width: 12px; height: 12px; background: var(--accent); box-shadow: 0 0 0 4px rgba(22,119,255,0.16); }
+.check-step-dot.done { background: var(--accent); opacity: 0.5; }
+.check-step-title { font-size: 15px; font-weight: 760; color: var(--text-primary); line-height: 1.35; }
+
+.check-step-list { display: grid; gap: 2px; }
+.ci-step-details { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+.ci-step-details li { margin-bottom: 6px; }
+.ci-detail-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.ci-detail-with-feedback { padding-right: 4px; }
+.ci-detail-text { flex: 1 1 auto; min-width: 0; }
+.ci-detail-feedback { display: inline-flex; flex: 0 0 auto; flex-wrap: wrap; gap: 5px; align-items: center; }
+.ci-step-diagram {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
-  padding: 2px 0;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
 }
-.ci-detail-text { min-width: 0; flex: 1 1 auto; line-height: 1.62; }
-.ci-detail-feedback {
-  display: inline-flex;
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  gap: 4px;
-  align-items: center;
-  white-space: nowrap;
+.ci-step-diagram img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
-.ci-step-diagram { font-size: var(--font-xs); color: var(--text-muted); margin-top: 6px; font-style: italic; }
-.ci-actions { display: flex; gap: 12px; justify-content: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-primary); }
-.ci-action-btn { font-size: var(--font-base); padding: 10px 28px; border-radius: 20px; border: 2px solid var(--accent); cursor: pointer; font-weight: 600; transition: all 0.2s; background: var(--bg-surface); }
-.ci-action-ok { color: var(--success); border-color: var(--success); }
-.ci-action-ok:hover { background: var(--success-bg); }
-.ci-action-feedback { color: var(--accent); }
+.ci-actions { display: flex; gap: 12px; justify-content: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-primary); }
+.check-step-actions { justify-content: flex-end; margin-top: 8px; }
+.ci-action-btn { font-size: 14px; padding: 9px 26px; border-radius: 20px; border: 2px solid; cursor: pointer; font-weight: 600; transition: all 0.2s; background: var(--bg-surface); }
+.ci-action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--border-primary); color: var(--text-muted); }
+.ci-action-secondary { color: var(--text-secondary); border-color: var(--border-primary); }
+.ci-action-secondary:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-hover); }
+.ci-action-feedback { color: var(--accent); border-color: var(--accent); }
 .ci-action-feedback:hover { background: var(--accent-bg); }
 .ci-summary { padding: 10px 14px; border-top: 1px solid var(--border-primary); background: var(--bg-hover); }
 .ci-summary-label { font-size: var(--font-xs); color: var(--text-muted); font-weight: 600; }
@@ -2185,12 +3002,12 @@ function formatTime(t) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border: 1px solid var(--border-primary);
   border-radius: 999px;
   background: var(--bg-surface);
   color: var(--text-secondary);
-  font-size: var(--font-xs);
+  font-size: 12px;
   line-height: 1.25;
   white-space: nowrap;
   cursor: pointer;
@@ -2211,25 +3028,10 @@ function formatTime(t) {
   pointer-events: none;
 }
 @media (max-width: 1180px) {
-  .ci-detail-with-feedback {
-    gap: 6px;
-  }
-  .ci-inline-opt {
-    min-height: 22px;
-    padding: 2px 5px;
-    gap: 2px;
-    font-size: 11px;
-  }
+  .check-step-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 860px) {
-  .ci-detail-with-feedback {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-  .ci-detail-feedback {
-    width: 100%;
-    flex-wrap: wrap;
-  }
+  .check-step-grid { grid-template-columns: 1fr; }
 }
 .ci-inline-note {
   margin-top: 12px;
@@ -2313,11 +3115,60 @@ function formatTime(t) {
 /* === 排查项维修卡片（独立于排查方案）=== */
 .repair-card-inline { border-left: 4px solid var(--accent); box-shadow: 0 2px 8px rgba(22,119,255,0.1); }
 .repair-card-section { border-left: 4px solid var(--accent); box-shadow: 0 2px 8px rgba(22,119,255,0.1); }
-.repair-list { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
-.repair-list li { margin-bottom: 2px; }
-.repair-steps { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.6; }
-.repair-steps li { margin-bottom: 4px; }
-.repair-parts { font-size: var(--font-sm); color: var(--text-secondary); padding: 6px 10px; background: var(--bg-hover); border-radius: 4px; }
-.repair-accept-text { font-size: var(--font-base); color: var(--success); font-weight: 600; padding: 8px 10px; background: var(--success-bg); border-radius: 4px; border-left: 3px solid var(--success); }
-.accept-inline .block-title { color: var(--success) !important; border-left-color: var(--success) !important; }
+.repair-flow-panel { display: grid; gap: 14px; }
+.repair-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.repair-section-desc { margin: 4px 0 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.6; }
+.repair-count { flex-shrink: 0; padding: 4px 9px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); font-size: 12px; font-weight: 700; }
+.repair-parts-panel { padding: 14px; border: 1px solid var(--border-secondary); border-radius: 12px; background: var(--bg-surface); box-shadow: 0 4px 14px rgba(25,42,70,0.04); }
+.repair-parts-table-wrap { margin-top: 10px; overflow-x: auto; border: 1px solid var(--border-secondary); border-radius: 10px; }
+.repair-parts-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 12.5px; }
+.repair-parts-table th { text-align: left; padding: 9px 10px; color: var(--text-muted); font-weight: 700; background: var(--bg-panel); border-bottom: 1px solid var(--border-secondary); }
+.repair-parts-table td { padding: 10px; color: var(--text-secondary); border-bottom: 1px solid var(--border-secondary); line-height: 1.55; }
+.repair-parts-table tr:last-child td { border-bottom: 0; }
+.repair-parts-table td:first-child { color: var(--text-primary); font-weight: 650; }
+.repair-step-list { display: grid; gap: 10px; }
+.repair-step-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--border-secondary); border-radius: 12px; background: var(--bg-surface); }
+.repair-step-index { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--accent-bg); color: var(--accent); font-weight: 800; font-size: 13px; }
+.repair-step-title { color: var(--text-primary); font-weight: 700; font-size: 13.5px; margin-bottom: 6px; }
+.repair-step-details { margin: 0; padding-left: 16px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.65; }
+.repair-step-details li { margin-bottom: 2px; }
+.repair-step-result { margin-top: 8px; padding: 7px 9px; border-radius: 8px; background: var(--success-bg); color: var(--success); font-size: 12.5px; font-weight: 650; }
+.repair-accept-panel { border-left: 0; }
+.repair-accept-grid { display: grid; gap: 10px; }
+.repair-accept-row { display: grid; grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(160px, 1fr); gap: 10px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--success) 20%, var(--border-secondary)); border-radius: 10px; background: var(--success-bg); align-items: center; }
+.accept-name { color: var(--text-primary); font-weight: 700; font-size: 13px; }
+.accept-req { color: var(--success); font-weight: 700; font-size: 12.5px; }
+.accept-method { color: var(--text-secondary); font-size: 12.5px; line-height: 1.5; }
+.repair-actions-right { justify-content: flex-end; }
+.ra-primary { color: var(--accent); border-color: var(--accent); background: var(--bg-surface); }
+.ra-primary:hover { background: var(--accent-bg); transform: translateY(-1px); }
+@media (max-width: 900px) { .repair-accept-row { grid-template-columns: 1fr; } }
+
+/* 示例图放大遮罩 */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: fadeIn .2s;
+}
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 示例图 hover 提示 */
+.ci-step-diagram img { cursor: zoom-in; }
+.ci-step-diagram img:hover { opacity: 0.85; }
 </style>

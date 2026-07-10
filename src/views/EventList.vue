@@ -1,6 +1,6 @@
 <template>
   <div class="event-list" ref="listRef">
-    <!-- Header: search box + advanced filter button -->
+    <!-- Header: search/filter only -->
     <div class="el-header">
       <div class="el-row">
         <div class="el-search">
@@ -128,8 +128,37 @@
       </div>
     </div>
 
-    <!-- Event cards -->
+    <!-- Event inbox -->
     <div class="el-items" ref="itemsRef">
+      <button
+        v-if="priorityEvent"
+        class="priority-card"
+        :class="priorityTone(priorityEvent)"
+        @click="handleEventClick(priorityEvent)"
+      >
+        <div class="priority-card-top">
+          <span class="priority-card-kicker">优先处理</span>
+          <span
+            v-if="unreadById(priorityEvent.id) > 0"
+            class="unread-badge priority-unread"
+          >
+            {{ unreadById(priorityEvent.id) > 99 ? '99+' : unreadById(priorityEvent.id) }}
+          </span>
+        </div>
+        <span class="priority-card-title" v-html="highlightMatch(priorityEvent.title)"></span>
+        <span class="priority-card-desc" v-html="highlightMatch(eventPreview(priorityEvent))"></span>
+        <span class="priority-card-meta">
+          <span>{{ priorityEvent.system || '未分组设备' }}</span>
+          <span>{{ statusLabels[priorityEvent.status] }}</span>
+          <span class="priority-card-time">{{ formatMessageTime(latestEventTime(priorityEvent)) }}</span>
+        </span>
+      </button>
+
+      <div class="inbox-section-head">
+        <span>事件 inbox</span>
+        <span>{{ displayEvents.length }} 件</span>
+      </div>
+
       <div
         v-for="(event, idx) in displayEvents"
         :key="event.id"
@@ -138,32 +167,40 @@
           selected: eventStore.selectedEventId === event.id,
           'drag-over-top': dragState.overId === event.id && dragState.overPos === 'top',
           'drag-over-bottom': dragState.overId === event.id && dragState.overPos === 'bottom',
-          dragging: dragState.activeId === event.id
+          dragging: dragState.activeId === event.id,
+          swiping: swipeState.activeId === event.id,
+          'pin-ready': swipeState.activeId === event.id && swipeState.ready
         }"
+        :style="swipeCardStyle(event.id)"
         :data-id="event.id"
         @pointerdown="onPointerDown($event, event, idx)"
         @click="handleEventClick(event)"
       >
+        <span class="pin-action" aria-hidden="true">置顶</span>
         <span class="drag-handle" title="长按或拖拽排序">⠿</span>
-        <span class="priority-dot" :class="event.priority"></span>
-        <div class="card-body">
-          <div class="card-title text-overflow" v-html="highlightMatch(event.title)"></div>
-          <div class="card-meta">
-            <span class="meta-system">{{ event.system }}</span>
-            <span class="meta-time">{{ formatTime(event.createdAt) }}</span>
+        <span class="priority-rail" :class="priorityTone(event)"></span>
+        <div class="event-main">
+          <div class="card-topline">
+            <div class="card-title text-overflow" v-html="highlightMatch(event.title)"></div>
+            <span class="card-time">{{ formatMessageTime(latestEventTime(event)) }}</span>
+          </div>
+          <div class="card-preview text-overflow" v-html="highlightMatch(eventPreview(event))"></div>
+          <div class="card-meta-row">
+            <span class="system-tag">{{ event.system || '未分组设备' }}</span>
+            <span class="status-chip" :class="'st-' + event.status">{{ statusLabels[event.status] }}</span>
           </div>
         </div>
-        <span class="tag" :class="event.priority">
-          {{ priorityLabels[event.priority] }}
-        </span>
-        <span
-          v-if="unreadById(event.id) > 0"
-          class="unread-badge"
-          :class="{ 'unread-badge-pulse': recentlyBumped[event.id] }"
-          :title="`${unreadById(event.id)} 条未读消息`"
-        >
-          {{ unreadById(event.id) > 99 ? '99+' : unreadById(event.id) }}
-        </span>
+        <div class="event-tail">
+          <span
+            v-if="unreadById(event.id) > 0"
+            class="unread-badge"
+            :class="{ 'unread-badge-pulse': recentlyBumped[event.id] }"
+            :title="`${unreadById(event.id)} 条未读消息`"
+          >
+            {{ unreadById(event.id) > 99 ? '99+' : unreadById(event.id) }}
+          </span>
+          <span class="open-indicator">›</span>
+        </div>
       </div>
 
       <div v-if="displayEvents.length === 0" class="empty-state">
@@ -176,7 +213,6 @@
 <script setup>
   import { ref, computed, onUnmounted, watch, reactive, inject } from 'vue'
   import { useEventStore } from '@/stores/eventStore'
-  import { eventPriorityLabels } from '@/mock/events'
 
   const eventStore = useEventStore()
   const listRef = ref(null)
@@ -184,7 +220,10 @@
   const searchInputRef = ref(null)
   const advPanelRef = ref(null)
 
-  const priorityLabels = eventPriorityLabels
+  const priorityLabels = {
+    critical: '紧急',
+    normal: '一般'
+  }
 
   // ---- Inject unread counter from AssistantPanel ----
   const eventUnread = inject('eventUnread', reactive({}))
@@ -218,13 +257,13 @@ const searchKeyword = ref('')
 // ---- Advanced filter state (in-memory only, not persisted) ----
 const advOpen = ref(false)
 const localAdv = reactive({
-  priorities: [],  // critical | important | normal
+  priorities: [],  // critical | normal (important is shown as normal on home)
   statuses: [],    // pending | processing | resolved
   systems: []      // dynamic, from events
 })
 
 // Available options
-const priorityOptions = ['critical', 'important', 'normal']
+const priorityOptions = ['critical', 'normal']
 const statusOptions = ['pending', 'processing', 'resolved']
 
 // Dynamic systems list — derived from current events, sorted by frequency desc
@@ -300,22 +339,71 @@ const dragState = reactive({
   overId: null,
   overPos: 'bottom',
   startY: 0,
+  startX: 0,
   longPressTimer: null,
   moved: false,
   pointerId: null,
   workingList: null
 })
 
+const swipeState = reactive({
+  activeId: null,
+  offsetX: 0,
+  ready: false,
+  locked: false
+})
+
 const LONG_PRESS_MS = 220
 const MOVE_THRESHOLD = 6
+const SWIPE_START_THRESHOLD = 12
+const SWIPE_PIN_THRESHOLD = 96
+const SWIPE_MAX_OFFSET = 128
 
 // localStorage key for user-customized order (per filter)
 const ORDER_STORAGE_KEY = 'ship-event-list-order-v1'
 
 // ---- Helpers ----
-function formatTime(time) {
+function formatMessageTime(time) {
+  if (!time) return ''
   const d = new Date(time)
-  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (isNaN(d.getTime())) return ''
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const diffDays = Math.round((today - target) / 86400000)
+
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const md = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const ymd = `${d.getFullYear()}-${md}`
+
+  if (diffDays === 0) return hm
+  if (diffDays === 1) return '昨天'
+  if (now.getFullYear() === d.getFullYear()) return `${md} ${hm}`
+  return `${ymd} ${hm}`
+}
+
+function priorityTone(event) {
+  if (event.status === 'resolved') return 'resolved'
+  return event.priority === 'critical' ? 'critical' : 'normal'
+}
+
+function latestEventTime(event) {
+  const lastTimeline = event.timeline?.[event.timeline.length - 1]?.time
+  return lastTimeline || event.createdAt
+}
+
+function eventPreview(event) {
+  const messages = eventStore.getSessionMessages(event.id)
+  const lastMessage = messages?.[messages.length - 1]
+  if (lastMessage?.content) {
+    return stripHtml(lastMessage.content)
+  }
+  const lastTimeline = event.timeline?.[event.timeline.length - 1]?.action
+  return lastTimeline || event.aiAnalysis?.summary || '暂无最新进度'
+}
+
+function stripHtml(text) {
+  return String(text).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
 }
 
 // ---- Fuzzy search ----
@@ -376,6 +464,22 @@ function savePersistedOrder(filterKey, orderedIds) {
   }
 }
 
+function pinEventToTop(eventId) {
+  const base = [...eventStore.events]
+  const idx = base.findIndex(e => e.id === eventId)
+  if (idx <= 0) return
+  const [target] = base.splice(idx, 1)
+  base.unshift(target)
+  const orderedIds = base.map(e => e.id)
+  savePersistedOrder('all', orderedIds)
+  eventStore.reorderEvents(orderedIds)
+}
+
+function swipeCardStyle(eventId) {
+  if (swipeState.activeId !== eventId) return null
+  return { transform: `translateX(${swipeState.offsetX}px)` }
+}
+
 const displayEvents = computed(() => {
   // While dragging, render the in-memory working list verbatim
   if (dragState.active && dragState.workingList) {
@@ -383,9 +487,7 @@ const displayEvents = computed(() => {
       .filter(e => passesAdvanced(e))
   }
 
-  // 1. Reorder the underlying events by persisted order (only the current
-  //    store-level filter is the legacy "全部/待处理/处理中/已解决" tab;
-  //    since we removed that tab, treat this as 'all' for ordering purposes.)
+  // 1. Reorder the underlying events by persisted order.
   const orderKey = 'all'
   const persistedOrder = loadPersistedOrder(orderKey)
   let base = [...eventStore.events]
@@ -396,16 +498,29 @@ const displayEvents = computed(() => {
     ordered.push(...map.values())
     base = ordered
   }
-  // 2. Apply fuzzy search
   let result = base.filter(e => matchesSearch(e, searchKeyword.value))
-  // 3. Apply advanced filters (in-memory; not persisted)
   result = result.filter(e => passesAdvanced(e))
   return result
 })
 
+const priorityEvent = computed(() => {
+  const candidates = displayEvents.value.filter(e => e.status !== 'resolved')
+  return candidates
+    .slice()
+    .sort((a, b) => {
+      const pa = a.priority === 'critical' ? 0 : 1
+      const pb = b.priority === 'critical' ? 0 : 1
+      if (pa !== pb) return pa - pb
+      const ua = unreadById(a.id)
+      const ub = unreadById(b.id)
+      if (ua !== ub) return ub - ua
+      return new Date(latestEventTime(b)).getTime() - new Date(latestEventTime(a)).getTime()
+    })[0] || null
+})
+
 // Advanced-filter predicate (in-memory, not stored)
 function passesAdvanced(event) {
-  if (localAdv.priorities.length && !localAdv.priorities.includes(event.priority)) return false
+  if (localAdv.priorities.length && !localAdv.priorities.includes(priorityTone(event))) return false
   if (localAdv.statuses.length && !localAdv.statuses.includes(event.status)) return false
   if (localAdv.systems.length && !localAdv.systems.includes(event.system)) return false
   return true
@@ -436,7 +551,7 @@ watch(() => eventStore.events.map(e => `${e.id}:${e.status}`).join('|'), () => {
 
 // ---- Click ----
 function handleEventClick(event) {
-  if (dragState.moved) return
+  if (dragState.moved || swipeState.locked) return
   eventStore.selectEvent(event.id)
 }
 
@@ -454,9 +569,14 @@ function onPointerDown(e, event, idx) {
   if (e.target.closest('input, button')) return
   dragState.pointerId = e.pointerId
   dragState.startY = e.clientY
+  dragState.startX = e.clientX
   dragState.moved = false
   dragState.activeId = event.id
   dragState.workingList = displayEvents.value.slice()
+  swipeState.activeId = null
+  swipeState.offsetX = 0
+  swipeState.ready = false
+  swipeState.locked = false
 
   clearLongPressTimer()
   dragState.longPressTimer = setTimeout(() => {
@@ -482,7 +602,28 @@ function beginDrag(event, pointerId) {
 
 function onPointerMove(e) {
   if (dragState.pointerId !== null && e.pointerId !== dragState.pointerId) return
+  const dx = e.clientX - dragState.startX
   const dy = e.clientY - dragState.startY
+
+  if (!dragState.active && dx > SWIPE_START_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.4) {
+    clearLongPressTimer()
+    swipeState.activeId = dragState.activeId
+    swipeState.offsetX = Math.min(dx, SWIPE_MAX_OFFSET)
+    swipeState.ready = dx >= SWIPE_PIN_THRESHOLD
+    swipeState.locked = true
+    dragState.moved = true
+    e.preventDefault()
+    return
+  }
+
+  if (swipeState.activeId) {
+    swipeState.offsetX = Math.max(0, Math.min(dx, SWIPE_MAX_OFFSET))
+    swipeState.ready = dx >= SWIPE_PIN_THRESHOLD
+    dragState.moved = true
+    e.preventDefault()
+    return
+  }
+
   if (!dragState.active) {
     if (Math.abs(dy) < MOVE_THRESHOLD) return
     beginDrag({ id: dragState.activeId }, e.pointerId)
@@ -515,17 +656,59 @@ function updateDropTarget(clientY) {
 
 function onPointerUp(e) {
   if (dragState.pointerId !== null && e.pointerId !== dragState.pointerId) return
+
+  if (swipeState.activeId) {
+    finishSwipe()
+    return
+  }
   finishDrag(true)
 }
 
 function onPointerCancel() {
+  if (swipeState.activeId) {
+    finishSwipe()
+    return
+  }
   finishDrag(false)
 }
 
 function onDragKeyDown(e) {
   if (e.key === 'Escape' && dragState.active) {
+    if (swipeState.activeId) {
+      finishSwipe()
+      return
+    }
     finishDrag(false)
   }
+}
+
+function finishSwipe() {
+  const eventId = swipeState.activeId
+
+  if (swipeState.ready && eventId) {
+    pinEventToTop(eventId)
+  }
+
+  swipeState.offsetX = 0
+  swipeState.activeId = null
+  swipeState.ready = false
+  swipeState.locked = false
+
+  // Clean up drag-like listeners
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerup', onPointerUp)
+  window.removeEventListener('pointercancel', onPointerCancel)
+  window.removeEventListener('keydown', onDragKeyDown)
+  clearLongPressTimer()
+  document.body.style.userSelect = ''
+
+  dragState.active = false
+  dragState.activeId = null
+  dragState.overId = null
+  dragState.overPos = 'bottom'
+  dragState.pointerId = null
+  dragState.workingList = null
+  setTimeout(() => { dragState.moved = false }, 50)
 }
 
 function finishDrag(commit) {
@@ -577,20 +760,19 @@ onUnmounted(() => {
 
 <style scoped>
 .event-list {
-  width: var(--event-list-width);
-  min-width: var(--event-list-width);
+  width: 100%;
+  min-width: 0;
   height: 100%;
-  background: var(--bg-surface);
+  background: var(--bg-app);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-primary);
   transition: width 0.3s ease, min-width 0.3s ease, opacity 0.3s ease;
-  overflow: visible;
+  overflow: hidden;
   touch-action: pan-y;
 }
 
 .el-header {
-  padding: 12px 14px 10px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
   display: flex;
@@ -724,8 +906,7 @@ onUnmounted(() => {
   font-weight: 500;
 }
 .chip.pri-critical { background: var(--danger-bg); color: var(--danger); border-color: rgba(245,63,63,0.25); }
-.chip.pri-important { background: var(--warning-bg); color: var(--warning); border-color: rgba(255,125,0,0.25); }
-.chip.pri-normal { background: var(--accent-bg); color: var(--accent); border-color: rgba(22,119,255,0.25); }
+.chip.pri-normal { background: var(--bg-hover); color: var(--text-secondary); border-color: var(--border-primary); }
 .chip.st-pending { background: var(--offline-bg); color: var(--offline); border-color: rgba(134,144,156,0.25); }
 .chip.st-processing { background: var(--accent-bg); color: var(--accent); border-color: rgba(22,119,255,0.25); }
 .chip.st-resolved { background: var(--success-bg); color: var(--success); border-color: rgba(0,180,42,0.25); }
@@ -810,8 +991,7 @@ onUnmounted(() => {
 }
 .opt-pill:hover { color: var(--text-primary); border-color: var(--text-secondary); }
 .opt-pill.on.pri-critical { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
-.opt-pill.on.pri-important { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
-.opt-pill.on.pri-normal { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.opt-pill.on.pri-normal { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-secondary); }
 .opt-pill.on.st-pending { background: var(--offline-bg); color: var(--offline); border-color: var(--offline); }
 .opt-pill.on.st-processing { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
 .opt-pill.on.st-resolved { background: var(--success-bg); color: var(--success); border-color: var(--success); }
@@ -847,29 +1027,113 @@ onUnmounted(() => {
 .el-items {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 16px 22px 22px;
+}
+
+.priority-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border-primary);
+  border-left: 4px solid #8A95A6;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.priority-card.critical { border-left-color: var(--danger); }
+.priority-card.normal { border-left-color: var(--accent); }
+.priority-card:hover { border-color: rgba(22,119,255,0.35); box-shadow: var(--shadow-md); }
+.priority-card-top {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.priority-card-kicker {
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+.priority-card-title {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.priority-card-desc {
+  grid-column: 1 / 3;
+  color: var(--text-secondary);
+  font-size: var(--font-base);
+  line-height: 1.55;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.priority-card-meta {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+.priority-card-meta > span:not(.priority-card-time) {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-secondary);
+}
+.priority-card-time {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  line-height: 1;
+}
+.priority-unread { box-shadow: none; }
+
+.inbox-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2px 8px;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  font-weight: 600;
 }
 
 .event-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border-secondary);
+  display: grid;
+  grid-template-columns: 18px 4px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 13px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 10px;
+  background: var(--bg-surface);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
   user-select: none;
   position: relative;
-  touch-action: pan-y;
-  min-height: 50px;
+  overflow: hidden;
+  touch-action: pan-x pan-y;
+  min-height: 84px;
 }
 .event-card:hover {
-  background: var(--bg-hover);
+  border-color: rgba(22,119,255,0.28);
+  box-shadow: var(--shadow-sm);
 }
 .event-card.selected {
   background: var(--bg-selected);
-  border-left: 3px solid var(--accent);
-  padding-left: 11px;
+  border-color: rgba(22,119,255,0.35);
 }
 .event-card.dragging {
   opacity: 0.5;
@@ -883,28 +1147,40 @@ onUnmounted(() => {
   box-shadow: inset 0 -2px 0 0 var(--accent);
 }
 
-/* Priority tag in card */
-.tag {
-  font-size: var(--font-xs);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-  margin-top: 1px;
-  align-self: flex-start;
-  font-weight: 500;
+/* Swipe-to-pin */
+.pin-action {
+  position: absolute;
+  inset: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 22px;
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--font-md);
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 10px;
+  transition: opacity 0.12s;
 }
-.tag.critical { background: var(--danger-bg); color: var(--danger); }
-.tag.important { background: var(--warning-bg); color: var(--warning); }
-.tag.normal { background: var(--accent-bg); color: var(--accent); }
+.event-card.swiping .pin-action { opacity: 0.55; }
+.event-card.pin-ready .pin-action { opacity: 1; }
+.event-card.swiping,
+.event-card.pin-ready {
+  transition: transform 0.05s linear;
+}
+.event-card:not(.swiping):not(.pin-ready) {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
 
 .drag-handle {
   color: var(--text-muted);
   font-size: 15px;
   cursor: grab;
-  flex-shrink: 0;
-  width: 14px;
+  width: 18px;
   text-align: center;
-  margin-top: 1px;
   user-select: none;
   opacity: 0;
   transition: opacity 0.15s;
@@ -913,36 +1189,95 @@ onUnmounted(() => {
 .event-card.dragging .drag-handle { opacity: 1; }
 .event-card:active .drag-handle { cursor: grabbing; }
 
-.priority-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 5px;
+.priority-rail {
+  width: 4px;
+  height: 52px;
+  border-radius: 4px;
+  justify-self: center;
 }
-.priority-dot.critical { background: var(--danger); }
-.priority-dot.important { background: var(--warning); }
-.priority-dot.normal { background: var(--accent); }
+.priority-rail.critical { background: var(--danger); }
+.priority-rail.normal { background: var(--accent); }
+.priority-rail.resolved { background: var(--text-muted); }
 
-.card-body {
-  flex: 1;
+.event-main {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-topline {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .card-title {
-  font-size: var(--font-base);
-  font-weight: 500;
+  min-width: 0;
+  flex: 1;
+  font-size: var(--font-md);
+  font-weight: 650;
   color: var(--text-primary);
-  line-height: 1.4;
-  padding-right: 30px;
+  line-height: 1.35;
 }
 
-.card-meta {
-  display: flex;
-  gap: 10px;
-  margin-top: 3px;
+.card-preview {
+  min-width: 0;
+  color: var(--text-secondary);
   font-size: var(--font-sm);
+  line-height: 1.45;
+}
+
+.card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.system-tag,
+.status-chip {
+  max-width: 160px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: var(--font-xs);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.system-tag {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-secondary);
+}
+.status-chip.st-pending { background: var(--offline-bg); color: var(--offline); }
+.status-chip.st-processing { background: var(--accent-bg); color: var(--accent); }
+.status-chip.st-resolved { background: var(--success-bg); color: var(--success); }
+
+.event-tail {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 40px;
+}
+
+.card-time {
+  flex-shrink: 0;
   color: var(--text-muted);
+  font-size: var(--font-sm);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.open-indicator {
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
 }
 
 :deep(.search-hl) {
@@ -954,9 +1289,6 @@ onUnmounted(() => {
 
 /* Unread badge */
 .unread-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -979,6 +1311,50 @@ onUnmounted(() => {
   0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(245,63,63,0.6); }
   40%  { transform: scale(1.35); box-shadow: 0 0 0 6px rgba(245,63,63,0); }
   100% { transform: scale(1); }
+}
+
+@media (max-width: 760px) {
+  .el-header {
+    padding: 14px 14px 10px;
+  }
+  .el-items {
+    padding: 10px 14px 14px;
+  }
+  .priority-card {
+    padding: 14px;
+    border-radius: 9px;
+  }
+  .priority-card-title {
+    font-size: 17px;
+  }
+  .event-card {
+    grid-template-columns: 4px minmax(0, 1fr) auto;
+    row-gap: 8px;
+    column-gap: 10px;
+  }
+  .drag-handle {
+    display: none;
+  }
+  .priority-rail {
+    grid-column: 1;
+    height: auto;
+    align-self: stretch;
+  }
+  .event-main {
+    grid-column: 2;
+  }
+  .event-tail {
+    grid-column: 3;
+  }
+  .card-topline {
+    align-items: flex-start;
+  }
+  .card-meta-row {
+    flex-wrap: wrap;
+  }
+  .status-chip {
+    display: none;
+  }
 }
 
 .empty-state {

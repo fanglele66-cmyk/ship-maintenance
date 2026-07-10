@@ -1,6 +1,6 @@
 <template>
   <div class="event-center">
-    <!-- Left: Event List -->
+    <!-- Home: Event List -->
     <div class="event-list-wrapper" :class="{ collapsed: eventStore.isDrawerOpen }">
       <EventList />
     </div>
@@ -19,19 +19,15 @@
       </transition>
     </div>
 
-    <!-- Right: 首页 general 模式 → 专用空态；事件模式 → AssistantPanel -->
-    <template v-if="eventStore.isDrawerOpen && eventStore.selectedEvent">
-      <AssistantPanel
-        mode="event"
-        :event-context="eventStore.selectedEvent"
-        :fill-remaining="true"
-        class="panel-compact"
-        @chip-click="handleChipAction"
-      />
-    </template>
-    <div v-else class="home-assistant-slot">
-      <HomeAssistant />
-    </div>
+    <!-- Right: event detail assistant only -->
+    <AssistantPanel
+      v-if="eventStore.isDrawerOpen && eventStore.selectedEvent"
+      mode="event"
+      :event-context="eventStore.selectedEvent"
+      :fill-remaining="true"
+      class="panel-compact"
+      @chip-click="handleChipAction"
+    />
   </div>
 </template>
 
@@ -41,7 +37,6 @@ import { useEventStore } from '@/stores/eventStore'
 import EventList from './EventList.vue'
 import ProductDrawer from './ProductDrawer.vue'
 import AssistantPanel from '@/components/AssistantPanel.vue'
-import HomeAssistant from './HomeAssistant.vue'
 
 const eventStore = useEventStore()
 
@@ -50,6 +45,7 @@ const eventUnread = eventStore.eventUnread
 const eventStage = reactive({})
 const eventAssistantAction = reactive({})
 const eventAssistantCommand = reactive({})
+const eventSituationTabs = reactive({}) // { [eventId]: { unlocked: {summary,data,workload}, active: string } }
 const totalUnread = computed(() => Object.values(eventUnread).reduce((a, b) => a + b, 0))
 
 provide('eventUnread', eventUnread)
@@ -57,6 +53,7 @@ provide('totalUnread', totalUnread)
 provide('eventStage', eventStage)
 provide('eventAssistantAction', eventAssistantAction)
 provide('eventAssistantCommand', eventAssistantCommand)
+provide('eventSituationTabs', eventSituationTabs)
 
 // 初始化未读计数：有 AI 分析的事件 = 2 条未读
 eventStore.events.forEach(ev => {
@@ -64,8 +61,6 @@ eventStore.events.forEach(ev => {
     eventStore.eventUnread[ev.id] = 2
   }
 })
-
-const assistantMode = computed(() => eventStore.selectedEvent ? 'event' : 'general')
 
 function handleChipAction(action) {
   const sessionKey = eventStore.selectedEvent?.id || 'general'
@@ -106,13 +101,12 @@ function handleChipAction(action) {
 <style scoped>
 .event-center { flex: 1; display: flex; height: 100%; overflow: hidden; }
 .event-list-wrapper {
-  width: var(--event-list-width);
-  min-width: var(--event-list-width);
+  flex: 1 1 0;
+  min-width: 0;
   transition: all 0.3s ease;
   overflow: hidden;
-  flex-shrink: 0;
 }
-.event-list-wrapper.collapsed { width: 0; min-width: 0; opacity: 0; border-right: none; }
+.event-list-wrapper.collapsed { flex: 0 0 0; width: 0; min-width: 0; opacity: 0; border-right: none; }
 
 /* 中间产物区：有内容时 flex:1 占空间，无内容时收缩到 0（助手区 fill 填充剩余） */
 .drawer-wrapper {
@@ -154,13 +148,5 @@ function handleChipAction(action) {
     min-width: 300px !important;
     max-width: none !important;
   }
-}
-
-/* 首页助手区：fill 剩余空间 */
-.home-assistant-slot {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
 }
 </style>
