@@ -543,16 +543,25 @@ const renderContent = computed(() => {
   padding: 20px;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  background: var(--bg-surface);
 }
 
 .doc-content-card {
+  flex: 0 0 auto;
+  align-self: flex-start;
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
   border-radius: 8px;
-  padding: 28px 36px;
+  padding: 28px 36px 48px;
   max-width: 720px;
   width: 100%;
+  min-height: 200px;
   box-shadow: var(--shadow-sm);
+}
+
+.doc-content-body {
+  width: 100%;
 }
 
 /* ===== 文档内容 HTML 样式 ===== */
