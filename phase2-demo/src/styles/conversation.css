@@ -1,0 +1,86 @@
+/* Shared structured inquiry: business-agnostic fields within the existing message surface. */
+.p2-inquiry { border:1px solid #e3e6ea; border-radius:8px; padding:12px; font-size:13px; line-height:1.6; background:#fff; }
+.p2-inquiry .p2-inquiry-text { margin:0 0 8px; color:#1a1c1f; }
+.p2-inquiry .p2-inquiry-hint { margin:6px 0 12px; font-size:12px; color:#777e8b; }
+.p2-inquiry fieldset { margin:0; padding:0; border:0; min-width:0; display:grid; gap:12px; }
+.p2-inquiry-field { display:grid; gap:5px; min-width:0; }
+.p2-inquiry-field label { font-size:13px; color:#50596a; }
+.p2-inquiry-field input:not([type=checkbox]),.p2-inquiry-field textarea,.p2-inquiry-field select { width:100%; min-width:0; box-sizing:border-box; border:1px solid #dde2e9; border-radius:6px; background:#fff; padding:8px; font:inherit; color:#1a1c1f; }
+.p2-inquiry-field textarea { resize:vertical; }
+.p2-inquiry-field input[type=checkbox] { justify-self:start; width:16px; height:16px; accent-color:#a88b5b; }
+.p2-inquiry-field.is-boolean { grid-template-columns:16px minmax(0,1fr); align-items:start; column-gap:8px; }
+.p2-inquiry-field.is-boolean label { grid-column:2; grid-row:1; }
+.p2-inquiry-field.is-boolean input { grid-column:1; grid-row:1; margin:3px 0 0; }
+.p2-inquiry-field.is-boolean .p2-inquiry-error { grid-column:1 / -1; }
+.p2-inquiry-field input:focus-visible,.p2-inquiry-field textarea:focus-visible,.p2-inquiry-field select:focus-visible { outline:2px solid #cbb58e; outline-offset:1px; }
+.p2-inquiry-required,.p2-inquiry .p2-inquiry-error { color:#b23b36; font-size:12px; }
+.p2-inquiry button { background:#1a1c1f; color:white; border:0; border-radius:6px; padding:10px 12px; font:inherit; cursor:pointer; }
+.p2-inquiry fieldset:disabled { opacity:.55; }
+.p2-inquiry-receipt { margin:0; }
+.p2-inquiry-receipt>div { padding:8px 0; border-bottom:1px solid #eef0f3; }
+.p2-inquiry-receipt dt { font-size:12px; color:#777e8b; }
+.p2-inquiry-receipt dd { margin:3px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.p2-inquiry .p2-inquiry-status { margin:10px 0 0; color:#397f68; font-size:12px; }
+/* Figma conversation surface: continuous reading, light user bubbles, rounded composer. */
+.app-container.app-container .p2-restored-assistant { border-left: 0; border-radius: 16px; overflow: hidden; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head { padding: 16px; min-height: 68px; border: 0; }
+.app-container.app-container .p2-restored-assistant .p2-ai-mark,
+.app-container.app-container .p2-restored-assistant .p2-avatar { display: none; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head strong { font-size: 18px; line-height: 28px; font-weight: 400; color: #1a1c1f; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head small { font-size: 12px; color: #9195a2; }
+.app-container.app-container .p2-restored-assistant .p2-messages { padding: 0 16px 16px; }
+.app-container.app-container .p2-restored-assistant .p2-message { margin: 0 0 20px; padding: 0; border: 0; gap: 0; }
+.app-container.app-container .p2-restored-assistant .p2-message[data-demo="true"]+.p2-message { border: 0; padding-top: 0; }
+.app-container.app-container .p2-restored-assistant .assistant .p2-bubble { max-width: 100%; width: 100%; font-size: 16px; line-height: 28px; color: #1a1c1f; }
+.app-container.app-container .p2-restored-assistant .p2-message.user .p2-bubble { background: #f3f7ff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 16px; line-height: 24px; color: #1a1c1f; }
+.app-container.app-container .p2-restored-assistant .p2-scene-details>summary h3 { font-size: 16px; line-height: 28px; font-weight: 500; }
+.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph { margin: 12px 0; }
+.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,
+.app-container.app-container .p2-restored-assistant .p2-dialog-question { color: #1a1c1f; font-size: 16px; line-height: 28px; }
+.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph b { color: #6c7183; font-size: 14px; line-height: 22px; font-weight: 400; }
+.app-container.app-container .p2-restored-assistant .p2-demo-label { background: transparent; padding: 0; border-radius: 0; font-weight: 400; color: #9195a2; font-size: 12px; }
+.app-container.app-container .p2-restored-assistant .p2-demo-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+.app-container.app-container .p2-restored-assistant .p2-demo-actions button { min-height: 40px; background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; color: #6c7183; font-size: 14px; }
+.app-container.app-container .p2-restored-assistant .p2-feedback-record { background: #f5f7fa; border-color: #e5e6e7; border-radius: 8px; }
+.app-container.app-container .p2-restored-assistant .p2-compose { padding: 0 16px 16px; border: 0; }
+.app-container.app-container .p2-restored-assistant .p2-compose-shell,
+.app-container.app-container .kap-input-wrapper { display: flex; flex-direction: column; justify-content: space-between; min-height: 100px; padding: 12px; border: 1px solid #e8ebf1; border-radius: 16px; background: #fff; box-shadow: 0 8px 16px -12px #00000029; }
+.app-container.app-container .p2-restored-assistant .p2-compose-shell:focus-within,
+.app-container.app-container .kap-input-wrapper:focus-within { border-color: #cbb58e; box-shadow: 0 0 0 2px #b7935a14; }
+.app-container.app-container .p2-restored-assistant .p2-compose textarea { border: 0; background: transparent; border-radius: 0; padding: 0; font-size: 14px; line-height: 24px; box-shadow: none; }
+.app-container.app-container .p2-restored-assistant .p2-compose-foot { margin-top: 8px; }
+.app-container.app-container .p2-restored-assistant .p2-compose-foot button,
+.app-container.app-container .kap-send-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; min-height: 36px; padding: 4px; border-radius: 50%; background: #1d2129; color: #fff; border: 0; }
+.app-container.app-container .p2-restored-assistant .p2-compose-foot button:disabled,
+.app-container.app-container .kap-send-btn:disabled { background: #1d2129; opacity: .45; cursor: not-allowed; }
+.app-container.app-container .p2-compose-foot button img,
+.app-container.app-container .kap-send-btn img { display: block; }
+.app-container.app-container .kap-sparkle { display: none; }
+.app-container.app-container .kap-header { border-bottom: 0; padding: 16px; }
+.app-container.app-container .kap-title { font-size: 18px; line-height: 28px; font-weight: 400; color: #1a1c1f; }
+.app-container.app-container .km { font-size: 16px; line-height: 28px; }
+.app-container.app-container .km-user-bubble { background: #f3f7ff; border: 0; border-radius: 8px; color: #1a1c1f; }
+.app-container.app-container .kap-voice-btn { left: 12px; right: auto; bottom: 12px; }
+.app-container.app-container .kap-send-btn { right: 12px; bottom: 12px; }
+@media (max-width:1200px) {
+  .app-container.app-container .p2-restored-assistant .assistant .p2-bubble,
+  .app-container.app-container .p2-restored-assistant .user .p2-bubble,
+  .app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,
+  .app-container.app-container .p2-restored-assistant .p2-dialog-question { font-size: 15px; line-height: 26px; }
+}
+
+/* Daily deliveries are compact summaries, distinct from ordinary dialogue. */
+.app-container.app-container .p2-restored-assistant .p2-message.is-daily-push .p2-bubble { padding: 16px; border: 1px solid #e8ebf1; border-radius: 8px; background: linear-gradient(180deg,#faf8f4 0,#fff 76px); }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-push-date { display: block; margin: 0 0 6px; text-align: left; color: #9195a2; font-size: 12px; line-height: 20px; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-demo-label { color: #947448; font-size: 12px; margin-bottom: 4px; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary { display: block; list-style: none; cursor: pointer; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary::before { display: none; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary::-webkit-details-marker { display: none; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary h3 { font-size: 17px; font-weight: 600; line-height: 26px; margin: 0 0 8px; }
+.app-container.app-container .p2-restored-assistant .p2-push-preview { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 24px; color: #6c7183; margin: 0; }
+.app-container.app-container .p2-restored-assistant .p2-push-toggle { display: block; margin-top: 12px; color: #947448; font-size: 13px; line-height: 20px; }
+.app-container.app-container .p2-restored-assistant .p2-push-toggle::after { content: '展开回顾 ↓'; }
+.app-container.app-container .p2-restored-assistant .p2-scene-details[open] .p2-push-toggle::after { content: '收起回顾 ↑'; }
+.app-container.app-container .p2-restored-assistant .p2-scene-details[open] .p2-push-preview { display: none; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details[open]>summary { padding-bottom: 12px; border-bottom: 1px solid #ebeef5; }
+.app-container.app-container .p2-restored-assistant .is-daily-push summary:focus-visible { outline: 2px solid #b7935a; outline-offset: 4px; border-radius: 4px; }

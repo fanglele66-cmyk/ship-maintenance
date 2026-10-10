@@ -36,6 +36,26 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const observationTargets = reactive({ maintenance:2, drift:1, fault:1 })
   const situationVersions = reactive({})
   const dataViews = reactive({})
+  const attentionFeedback = reactive({})
+  function attentionAction(id) {
+    if (isTaskHandled(id)) {
+      const result = getObservationResult(id)
+      if (result.type === 'reinspect') return { phase:'处理后观察', linked:true, text:'进入关联事件，核实反复现象并补充复查结果' }
+      if (result.type === 'extend') return { phase:'处理后观察', linked:true, text:'补充缺失或不可比的运行记录，在关联事件中记录；按建议延长观察' }
+      return { phase:result.type === 'archive' ? '已结束' : '处理后观察', text:result.type === 'archive' ? '无需操作，可回看结束依据' : '系统继续跟踪处理效果；有新现场现象可补充' }
+    }
+    if (id === 'drift' && todoCreated.drift) return { phase:'检查处置中', linked:true, text:'检查在关联事件中进行，请进入事件完成当前阶段' }
+    if (id === 'drift' && monitorStep.drift && !attentionFeedback[id]) return { phase:'待现场核实', required:true, text:'核对稳定负荷下的现场排温读数、运行工况与现场现象' }
+    const ended = id === 'cyl2-ended' || (id === 'stable' && monitorStep.stable >= 2)
+    return { phase:ended ? '已结束' : '系统跟踪中', text:ended ? '无需操作，可回看过程与结束依据' : attentionFeedback[id] ? '现场核实已提交，系统接续分析；本次反馈不等于确认无故障' : '暂不需要人员操作，系统继续比较可比工况下的变化' }
+  }
+  function submitAttentionFeedback(id, evidence) {
+    if (!attentionAction(id).required || !evidence.conditions?.trim() || !evidence.phenomenon?.trim() || !evidence.confirmed || evidence.reading === '' || !Number.isFinite(Number(evidence.reading)) || Number(evidence.reading) < 0) return false
+    attentionFeedback[id] = { ...evidence, at:new Date().toLocaleString('zh-CN') }
+    addLog(id,'user',`现场核实已提交：排温 ${evidence.reading}°C；工况：${evidence.conditions}；现场现象：${evidence.phenomenon}`)
+    addLog(id,'assistant','本次现场核实信息已完整提交，撤下该项待处理要求，系统接续分析。记录不自动确立或排除故障，也不创建事件；后续新增要求将另行提醒。')
+    return true
+  }
   const sensors=useSensorStore()
   watch(()=>[progress.fault,progress.drift,progress.maintenance,monitorStep.stable,monitorStep.drift,observationRecords.fault.at(-1),observationRecords.drift.at(-1),observationRecords.maintenance.at(-1)],()=>{
     const outlet=sensors.allSensors.find(s=>s.id==='s-007'),exhaust=sensors.allSensors.find(s=>s.id==='s-005')
@@ -337,6 +357,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     Object.keys(logs).forEach(id => { logs[id].splice(0) })
     Object.keys(openedStages).forEach(key=>delete openedStages[key])
     Object.keys(recordDrafts).forEach(key=>delete recordDrafts[key])
+    Object.keys(attentionFeedback).forEach(key=>delete attentionFeedback[key])
     Object.keys(situationVersions).forEach(key=>delete situationVersions[key])
     ;[taskResults,taskNotes,taskAttachments,workAcceptance,workAcceptanceNotes].forEach(data=>Object.keys(data).forEach(key=>delete data[key]))
     ;['maintenance','drift','fault'].forEach(id=>{observationReady[id]=false;observationRounds[id]=1;observationRecords[id].splice(0);observationHistory[id].splice(0);observationTargets[id]=observationConfig[id].days})
@@ -344,5 +365,6 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
 
   selectAttention('maintenance')
-  return { observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodoId, selectedTodo, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
+  // Action completion is explicit and independent from chat and event progress.
+  return { attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodoId, selectedTodo, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
 })

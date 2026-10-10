@@ -1,7 +1,7 @@
 <template>
   <div v-if="todo && stage" class="p2-detail p2-pad-detail">
     <header class="p2-detail-head">
-      <button class="p2-back" @click="store.closeTodo()">← 返回待办中心</button>
+      <BackButton label="返回待办中心" @click="store.closeTodo()" />
       <div><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
       <button v-if="store.isTaskHandled(todo.id)&&stage.kind!=='handled'" type="button" class="p2-link-button" @click="store.selectTodo(todo.id)">查看处理结果</button>
       <span class="p2-badge" :class="store.isTaskHandled(todo.id)?'blue':'red'">{{ store.isTaskHandled(todo.id)?'已处理':'未处理' }}</span>
@@ -78,6 +78,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import Phase2DataOverview from '@/components/Phase2DataOverview.vue'
+import BackButton from '@/components/BackButton.vue'
 import { overviewReports, causeContent } from '@/mock/phase2Content'
 const router=useRouter(),store=usePhase2DemoStore(),todo=computed(()=>store.selectedTodo),stage=computed(()=>store.currentStage)
 const subtab=computed({get:()=>store.detailTab,set:value=>store.detailTab=value})

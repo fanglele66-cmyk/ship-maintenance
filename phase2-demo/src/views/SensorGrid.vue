@@ -46,8 +46,8 @@
           @keydown.space.prevent="$emit('selectSensor', sensor)"
         >
           <div class="sc-body">
-            <div class="sc-name-en">{{ sensor.nameEn }}</div>
             <div class="sc-name-cn">{{ sensor.nameCn }}</div>
+            <div class="sc-name-en" :title="sensor.nameEn">{{ sensor.nameEn }}</div>
             <div class="sc-value-row">
               <span class="sc-value">
                 {{ sensor.precision != null ? Number(sensor.value).toFixed(sensor.precision) : sensor.value }}

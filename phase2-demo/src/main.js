@@ -6,6 +6,9 @@ import App from './App.vue'
 import router from './router'
 import './styles/global.css'
 import './styles/phase2.css'
+import './styles/workbench.css'
+import './styles/hierarchy.css'
+import './styles/conversation.css'
 
 const app = createApp(App)
 app.use(createPinia())

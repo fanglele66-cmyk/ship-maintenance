@@ -1,0 +1,252 @@
+/* Ship operations workbench: landscape Pad, 1080p and 2K.
+   One explicit layer for the current prototype; existing routes and business flows stay intact. */
+:root {
+  --wb-navy: #1c1a19;
+  --wb-accent: #b7935a;
+  --wb-selected: #faf5eb;
+  --wb-background: #f4f3f1;
+  --wb-text: #1d2129;
+  --wb-secondary: #6c7183;
+  --wb-muted: #9195a2;
+  --wb-line: #e3e6ea;
+  --wb-body: 14px;
+  --wb-label: 12px;
+  --wb-title: 22px;
+  --wb-space: 20px;
+}
+@media (min-width: 1600px) {
+  :root { --wb-body: 15px; --wb-label: 13px; --wb-title: 24px; --wb-space: 24px; }
+}
+@media (min-width: 2300px) {
+  :root { --wb-body: 16px; --wb-label: 14px; --wb-title: 26px; --wb-space: 28px; }
+}
+.app-container.app-container { color: var(--wb-text); font-variant-numeric: tabular-nums; }
+.app-container.app-container .app-nav { background: var(--wb-navy); }
+.app-container.app-container .nav-label { font-size: 12px; }
+.app-container.app-container .app-header { border-bottom: 1px solid var(--wb-line); }
+.app-container.app-container .header-section-title { font-size: 16px; }
+.app-container.app-container :where(button, a, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid var(--wb-accent); outline-offset: 3px;
+}
+.app-container.app-container .p2-primary, .app-container.app-container .p2-secondary {
+  min-height: 40px; padding: 9px 16px; border-radius: 8px; font-size: var(--wb-body);
+  border-color: var(--wb-accent); transition: background-color .15s, border-color .15s;
+}
+.app-container.app-container .p2-primary { background: var(--wb-accent); }
+.app-container.app-container .p2-secondary { color: var(--wb-accent); }
+.app-container.app-container .p2-panel { padding: var(--wb-space); border-color: var(--wb-line); border-radius: 8px; box-shadow: none; }
+.app-container.app-container .p2-section-title { font-size: 16px; color: var(--wb-text); margin-bottom: 14px; }
+.app-container.app-container .p2-badge, .app-container.app-container .p2-attention-status, .app-container.app-container .p2-state-tag {
+  font-size: var(--wb-label); line-height: 1.5; padding: 4px 9px; border-radius: 5px;
+}
+.app-container.app-container .p2-eyebrow { font-size: var(--wb-label); color: var(--wb-muted); }
+.app-container.app-container .p2-device-page { padding: var(--wb-space); background: var(--wb-background); }
+.app-container.app-container .p2-device-head { margin-bottom: 12px; }
+.app-container.app-container .p2-device-head h2 { font-size: var(--wb-title); font-weight: 650; }
+.app-container.app-container .p2-device-status { font-size: var(--wb-label); gap: 16px; }
+.app-container.app-container .p2-device-page .p2-tab-row, .app-container.app-container .p2-subtabs { gap: 22px; }
+.app-container.app-container .p2-device-page .p2-tab-row button, .app-container.app-container .p2-pad-body .p2-subtabs button {
+  font-size: var(--wb-body); padding: 12px 2px;
+}
+.app-container.app-container .p2-tab-row span { font-size: var(--wb-label); color: var(--wb-secondary); }
+.app-container.app-container .p2-overview-layout { display: grid; gap: 16px; padding: 16px 0; align-items: start; }
+.app-container.app-container .p2-device-page .p2-overview-analysis p {
+  font-size: var(--wb-body); line-height: 1.75; color: var(--wb-secondary); grid-template-columns: 72px minmax(0,1fr);
+}
+.app-container.app-container .p2-device-page .p2-analysis-tag { font-size: var(--wb-label); border-radius: 4px; }
+.app-container.app-container .p2-running-details { margin-top: 18px; }
+.app-container.app-container .p2-running-details summary { padding: 5px 0; font-size: var(--wb-body); }
+.app-container.app-container .p2-running-details summary small { font-size: var(--wb-label); color: var(--wb-muted); }
+.app-container.app-container .p2-device-page .p2-technical-report,
+.app-container.app-container .p2-device-page .p2-unified-report { max-width: 1120px; }
+.app-container.app-container .p2-device-page .p2-technical-report p,
+.app-container.app-container .p2-device-page .p2-running-details p,
+.app-container.app-container .p2-device-page .p2-unified-report p { font-size: var(--wb-body); line-height: 1.8; color: var(--wb-secondary); }
+.app-container.app-container .p2-device-page .p2-technical-report h4,
+.app-container.app-container .p2-device-page .p2-running-details h4 { font-size: 16px; color: var(--wb-text); }
+.app-container.app-container .p2-device-page .p2-overview-item { padding: 14px 0; gap: 16px; }
+.app-container.app-container .p2-device-page .p2-overview-item-main b { font-size: var(--wb-body); color: var(--wb-text); }
+.app-container.app-container .p2-device-page .p2-overview-item-main small { font-size: var(--wb-label); line-height: 1.65; color: var(--wb-secondary); }
+.app-container.app-container .p2-device-page .p2-attention-card { padding: 18px; min-height: 150px; }
+.app-container.app-container .p2-attention-card, .app-container.app-container .p2-todo-card { box-shadow: none; border-radius: 8px; }
+.app-container.app-container .p2-attention-card:hover, .app-container.app-container .p2-todo-card:hover { transform: none; box-shadow: none; border-color: #caac79; }
+.app-container.app-container .p2-attention-card>strong, .app-container.app-container .p2-todo-card>strong { font-size: 16px; }
+.app-container.app-container .p2-attention-card>p, .app-container.app-container .p2-todo-card>p { font-size: var(--wb-body); line-height: 1.65; }
+.app-container.app-container .p2-card-foot, .app-container.app-container .p2-card-state { font-size: var(--wb-label); color: var(--wb-muted); }
+.app-container.app-container .p2-attention-category-tabs button { font-size: var(--wb-body); }
+.app-container.app-container .p2-device-page .p2-history-record { padding: 18px 0; }
+.app-container.app-container .p2-device-page .p2-history-record h3 { font-size: 16px; }
+.app-container.app-container .p2-device-page .p2-history-record p { font-size: var(--wb-body); }
+.app-container.app-container .p2-device-page .p2-history-record time,
+.app-container.app-container .p2-device-page .p2-report-arrangement dl>div { font-size: var(--wb-label); }
+.app-container.app-container .p2-todo-list { padding: var(--wb-space); }
+.app-container.app-container .p2-todo-list-head { padding-bottom: 16px; border-bottom: 1px solid var(--wb-line); }
+.app-container.app-container .p2-todo-list-head h2 { font-size: var(--wb-title); }
+.app-container.app-container .p2-todo-tools input, .app-container.app-container .p2-todo-tools select { height: 40px; font-size: var(--wb-body); border-radius: 6px; }
+.app-container.app-container .p2-todo-tools .p2-secondary { border-color: var(--wb-line); color: var(--wb-secondary); background: transparent; }
+.app-container.app-container .p2-todo-grid { grid-template-columns: repeat(auto-fill,minmax(300px,380px)); gap: 16px; }
+.app-container.app-container .p2-todo-card { padding: 20px; min-height: 188px; }
+.app-container.app-container .p2-pad-detail { padding: var(--wb-space); }
+.app-container.app-container .p2-pad-detail .p2-detail-head { height: auto; min-height: 68px; padding-bottom: 16px; }
+.app-container.app-container .p2-pad-detail .p2-detail-head h2 { font-size: var(--wb-title); line-height: 1.4; }
+.app-container.app-container .p2-back { font-size: var(--wb-label); min-height: 36px; padding: 8px 12px; }
+.app-container.app-container .p2-pad-detail .p2-stage-rail { gap: 12px; padding-bottom: 14px; min-height: 86px; }
+.app-container.app-container .p2-pad-detail .p2-stage-card { padding: 12px 14px; gap: 2px 10px; min-height: 72px; border-radius: 6px; }
+.app-container.app-container .p2-pad-detail .p2-stage-card strong { font-size: var(--wb-body); }
+.app-container.app-container .p2-pad-detail .p2-stage-card small { font-size: var(--wb-label); color: var(--wb-secondary); }
+.app-container.app-container .p2-stage-card.locked { opacity: 1; background: #f3f5f8; border-color: #e3e9f0; }
+.app-container.app-container .p2-stage-card.locked strong { color: #66778c; }
+.app-container.app-container .p2-stage-card.locked small { color: #7c899a; }
+.app-container.app-container .p2-stage-card.active { border-color: var(--wb-accent); box-shadow: inset 0 2px 0 var(--wb-accent); }
+.app-container.app-container .p2-pad-overview>.p2-overview-meta { padding: 16px 20px; }
+.app-container.app-container .p2-overview-meta dl>div { font-size: var(--wb-body); }
+.app-container.app-container .p2-overview-meta dt { color: var(--wb-muted); }
+.app-container.app-container .p2-pad-overview>.p2-overview-analysis { padding: var(--wb-space); gap: 20px; }
+.app-container.app-container .p2-report-block h3 { font-size: 16px; margin-bottom: 10px; }
+.app-container.app-container .p2-report-block>p, .app-container.app-container .p2-next-advice { font-size: var(--wb-body); line-height: 1.75; max-width: 80ch; }
+.app-container.app-container .p2-cause-table, .app-container.app-container .p2-stage-purpose,
+.app-container.app-container .p2-current-task>p, .app-container.app-container .p2-pad-list-row,
+.app-container.app-container .p2-check-options, .app-container.app-container .p2-step-note { font-size: var(--wb-body); line-height: 1.75; }
+.app-container.app-container .p2-check-options label { min-height: 40px; padding: 6px 12px; border: 1px solid var(--wb-line); border-radius: 6px; background: #fff; }
+.app-container.app-container .p2-check-options label:has(input:checked) { border-color: var(--wb-accent); background: var(--wb-selected); color: var(--wb-accent); }
+.app-container.app-container .p2-step-note textarea { min-height: 88px; background: #fbfcfe; }
+.app-container.app-container .p2-pad-footer { min-height: 60px; height: auto; padding-top: 14px; }
+/* Keep the same assistant surface in situation and task screens. */
+.app-container.app-container .p2-todo-center>.p2-restored-assistant {
+  width: clamp(320px,23vw,480px); min-width: 320px; max-width: 480px; flex: none;
+}
+.app-container.app-container .p2-restored-assistant .p2-assistant-head { min-height: 76px; padding: 16px 20px; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head strong { font-size: 16px; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head small { font-size: var(--wb-label); }
+.app-container.app-container .p2-restored-assistant .p2-messages { padding: 20px 16px; background: #fff; }
+.app-container.app-container .p2-restored-assistant .p2-bubble { font-size: var(--wb-body); line-height: 1.75; }
+.app-container.app-container .p2-restored-assistant .assistant .p2-bubble { border: 0; border-radius: 0; padding: 0; box-shadow: none; }
+.app-container.app-container .p2-bubble h3 { font-size: 16px; color: var(--wb-text); }
+.app-container.app-container .p2-dialog-paragraph b { font-size: var(--wb-label); color: var(--wb-secondary); }
+.app-container.app-container .p2-dialog-paragraph p { color: var(--wb-text); }
+.app-container.app-container .p2-restored-assistant .p2-bubble small { font-size: 12px; color: var(--wb-muted); }
+.app-container.app-container .p2-demo-label, .app-container.app-container .p2-demo-actions button { font-size: var(--wb-label); }
+.app-container.app-container .p2-demo-actions button { min-height: 36px; border-radius: 5px; }
+.app-container.app-container .p2-compose { padding: 14px 16px; }
+.app-container.app-container .p2-restored-assistant .p2-compose textarea { font-size: var(--wb-body); padding: 12px; }
+.app-container.app-container .p2-restored-assistant .p2-compose-foot button { min-height: 36px; font-size: var(--wb-body); padding: 8px 16px; }
+/* Sensor names and numeric evidence use separate, consistent levels. */
+.app-container.app-container .sensor-card { border-radius: 8px; box-shadow: none; }
+.app-container.app-container .sc-name-cn { font-size: var(--wb-body); font-weight: 600; color: var(--wb-text); }
+.app-container.app-container .sc-name-en { font-size: var(--wb-label); color: var(--wb-muted); font-weight: 400; margin-top: 4px; }
+.app-container.app-container .sc-value { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 26px; font-weight: 650; }
+.app-container.app-container .sc-unit, .app-container.app-container .sc-action { font-size: var(--wb-label); }
+.app-container.app-container .sensor-card:hover { transform: none; box-shadow: none; }
+/* Quiet document cards; consistent spacing without oversized empty rows. */
+.app-container.app-container .inspection-home .report-list { grid-auto-rows: auto; grid-template-columns: repeat(auto-fill,minmax(350px,1fr)); gap: 16px; }
+.app-container.app-container .inspection-home .report-card { height: auto; min-height: 166px; padding: 20px; box-shadow: none; gap: 12px; }
+.app-container.app-container .inspection-home .report-card:hover { transform: none; box-shadow: none; }
+.app-container.app-container .inspection-home .rc-title { font-size: 16px; line-height: 1.6; }
+.app-container.app-container .inspection-home .rc-summary, .app-container.app-container .inspection-home .rc-status { font-size: var(--wb-body); }
+.app-container.app-container .inspection-home .rc-foot { margin-top: auto; }
+.app-container.app-container .knowledge-view .doc-grid { grid-template-columns: repeat(auto-fill,minmax(310px,1fr)); gap: 16px; }
+.app-container.app-container .knowledge-view .doc-card { min-height: 174px; padding: 20px; border-radius: 8px; box-shadow: none; }
+.app-container.app-container .knowledge-view .doc-card:hover { box-shadow: none; border-color: #caac79; }
+.app-container.app-container .knowledge-view .doc-card-title { font-size: 16px; line-height: 1.55; }
+.app-container.app-container .knowledge-view .doc-card-description { font-size: var(--wb-body); color: var(--wb-secondary); }
+.app-container.app-container .knowledge-view .doc-card-date, .app-container.app-container .knowledge-view .doc-card-id { font-size: var(--wb-label); color: var(--wb-muted); }
+@media (min-width: 1600px) {
+  .app-container.app-container .p2-overview-layout { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; }
+  .app-container.app-container .p2-overview-layout>.p2-panel { height: fit-content; }
+  .app-container.app-container .sg-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .app-container.app-container .p2-pad-overview { max-width: 1280px; width: 100%; }
+  .app-container.app-container .p2-pad-body>.p2-panel { max-width: 1280px; width: 100%; }
+}
+@media (max-width: 1200px) and (min-width: 900px) {
+  :root { --wb-space: 16px; }
+  .app-container.app-container .p2-device-page .p2-tab-row { gap: 14px; }
+  .app-container.app-container .p2-device-page .p2-tab-row button { font-size: 13px; }
+  .app-container.app-container .p2-device-page .p2-device-status { gap: 10px; }
+  .app-container.app-container .p2-pad-detail .p2-stage-card { padding: 10px 8px; gap: 2px 6px; }
+  .app-container.app-container .p2-pad-detail .p2-detail-head h2 { font-size: 18px; }
+  .app-container.app-container .p2-pad-overview>.p2-overview-analysis { gap: 14px; padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-container.app-container *, .app-container.app-container *::before, .app-container.app-container *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Visual language from Figma “10.08 视觉更新”.
+   Adopt the palette and component treatments; retain the prototype's routes and layout. */
+.app-container.app-container {
+  --bg-app: var(--wb-background);
+  --bg-panel: #f6f6f4;
+  --bg-hover: #f6f6f4;
+  --bg-selected: var(--wb-selected);
+  --bg-chat: #fff;
+  --accent: var(--wb-accent);
+  --accent-hover: #9b773e;
+  --accent-bg: var(--wb-selected);
+  --border-focus: var(--wb-accent);
+  --text-primary: var(--wb-text);
+  --text-secondary: var(--wb-secondary);
+  --text-muted: var(--wb-muted);
+  --el-color-primary: #b7935a;
+  --el-color-primary-light-3: #caac79;
+  --el-color-primary-light-5: #dfcba9;
+  --el-color-primary-light-7: #eee3d1;
+  --el-color-primary-light-9: #faf5eb;
+  --el-color-primary-dark-2: #9b773e;
+  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+  background: var(--wb-background);
+}
+.app-container.app-container .app-nav { background: #1c1a19; }
+.app-container.app-container .nav-icon, .app-container.app-container .nav-label { color: #c5c2bd; }
+.app-container.app-container .nav-item:hover { background: #302d29; }
+.app-container.app-container .nav-item.active { background: linear-gradient(110deg,#625e57,#302d29); }
+.app-container.app-container .nav-item.active .nav-icon { color: #e6c48b; }
+.app-container.app-container .nav-item.active .nav-label { color: #f4f4f4; }
+.app-container.app-container .nav-badge { box-shadow: 0 0 0 2px #1c1a19; }
+.app-container.app-container .app-header { background: #fff; }
+.app-container.app-container .p2-primary {
+  background: #1a1c1f; border-color: #1a1c1f; color: #fff;
+  box-shadow: inset 0 0 12px #ffffff12;
+}
+.app-container.app-container .p2-primary:hover { background: #302d29; border-color: #302d29; }
+.app-container.app-container .p2-primary:disabled { background: #b5b8c1; border-color: #b5b8c1; color: #fff; cursor: not-allowed; }
+.app-container.app-container .p2-secondary { background: #fff; color: #846336; border-color: #d8c4a2; }
+.app-container.app-container .p2-secondary:hover { background: var(--wb-selected); }
+.app-container.app-container .p2-todo-list, .app-container.app-container .p2-pad-detail { background: var(--wb-background); }
+.app-container.app-container .p2-todo-card, .app-container.app-container .p2-attention-card { background: #fff; border-color: var(--wb-line); }
+.app-container.app-container .p2-todo-card.priority { background: linear-gradient(180deg,#fff8ef,#fff 38%); }
+.app-container.app-container .p2-attention-card.active { border-color: var(--wb-accent); box-shadow: none; }
+.app-container.app-container .p2-tab-row button.active,
+.app-container.app-container .p2-subtabs button.active,
+.app-container.app-container .p2-attention-category-tabs button.active,
+.app-container.app-container .p2-observation-tabs button.active { color: #846336; border-color: var(--wb-accent); }
+.app-container.app-container .p2-stage-card.active { background: var(--wb-selected); }
+.app-container.app-container .p2-stage-card.active>span,
+.app-container.app-container .p2-stage-card.active strong,
+.app-container.app-container .p2-stage-card.active small { color: #846336; }
+.app-container.app-container .p2-check-options input, .app-container.app-container .p2-pad-list-row input { accent-color: var(--wb-accent); }
+.app-container.app-container .p2-result-row button.active,
+.app-container.app-container .p2-check-stepper .active { background: var(--wb-selected); color: #846336; border-color: var(--wb-accent); }
+.app-container.app-container .p2-check-stepper .active>span { background: var(--wb-accent); }
+.app-container.app-container .p2-link-button, .app-container.app-container .p2-pad-result { color: #846336; }
+.app-container.app-container .p2-restored-assistant { background: #fff; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head { background: #fff; border-color: var(--wb-line); }
+.app-container.app-container .p2-demo-actions button { background: #f6f6f4; border-color: var(--wb-line); color: var(--wb-text); }
+.app-container.app-container .p2-demo-actions button:hover { border-color: var(--wb-accent); background: var(--wb-selected); }
+.app-container.app-container .p2-restored-assistant .p2-compose-foot button { background: #1a1c1f; color: #fff; }
+.app-container.app-container .p2-restored-assistant .user .p2-bubble { background: var(--wb-selected); border-color: #eee3d1; color: var(--wb-text); }
+.app-container.app-container .knowledge-view .device-filter-tag.active,
+.app-container.app-container .knowledge-view .doc-type-filter-tag.active { color: #fce9a1; background: #292624; border-color: #292624; }
+.app-container.app-container .knowledge-view .device-filter-tag:hover,
+.app-container.app-container .knowledge-view .doc-type-filter-tag:hover { color: #846336; background: var(--wb-selected); border-color: #d8c4a2; }
+.app-container.app-container .knowledge-view .doc-card { background: linear-gradient(180deg,#f5f7fa,#fff 55%); border-color: #ebeef5; }
+.app-container.app-container .knowledge-view .doc-card:hover { border-color: #caac79; }
+.app-container.app-container .el-pagination.is-background .el-pager li.is-active { background: #292624; color: #fce9a1; }
+
+.app-container.app-container .p2-card-foot span:last-child { color: #846336; }
+.app-container.app-container .p2-ai-mark, .app-container.app-container .p2-avatar { background: #292624; color: #e6c48b; }
+.app-container.app-container .p2-restored-assistant .p2-message.user .p2-bubble { background: var(--wb-selected); border-color: #eee3d1; }
+.app-container.app-container .p2-restored-assistant .p2-compose-foot button:disabled { background: #b5b8c1; cursor: not-allowed; }
+.app-container.app-container .p2-demo-label:not(.is-change) { background: #f6f6f4; color: var(--wb-secondary); }
+.app-container.app-container .kf-float { background: #292624; box-shadow: 0 4px 16px #1c1a1920; }
+.app-container.app-container .kf-float:hover { box-shadow: 0 6px 20px #1c1a1930; transform: none; }
+.app-container.app-container .kap-send-btn { background: #1a1c1f; }
+.app-container.app-container .kap-sparkle { color: #b7935a; }

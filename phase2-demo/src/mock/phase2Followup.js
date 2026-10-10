@@ -26,6 +26,24 @@ export function maintenanceFollowup(store, planned = false) {
 }
 
 export function attentionFollowup(store, id) {
+  const report = attentionFollowupContent(store, id)
+  if (id === 'maintenance') return report
+  const action = store.attentionAction(id), feedback = store.attentionFeedback[id]
+  report.recommendation = action.text
+  if (id === 'drift' && !store.todoCreated[id]) {
+    report.arrangement = report.arrangement.map(item => item.label === '当前安排' ? {...item,text:action.text} : item)
+    if (feedback) {
+      report.conclusion = '排温变化仍需持续分析；现场核实记录已完整提交，不等于确认或排除具体故障。'
+    }
+  }
+  if (id === 'drift' && feedback) {
+    const entry=point('现场核实 · 已提交',feedback.at,'轮机员',`排温 ${feedback.reading}°C；${feedback.conditions}；${feedback.phenomenon}`,'本次核实要求已完成，系统接续分析，不自动创建事件。',!store.todoCreated[id])
+    const eventIndex=report.timeline.findIndex(item=>item.label==='人员决定 · 建立检查待办')
+    report.timeline.splice(eventIndex<0?report.timeline.length:eventIndex,0,entry)
+  }
+  return report
+}
+function attentionFollowupContent(store, id) {
   if (id === 'maintenance') return maintenanceFollowup(store)
   if (id === 'vibration-trend') return {
     conclusion:'机体X向振动小幅变化后持平，Y向没有同步抬升，尚无需要人工响应的新证据，继续由 AI 跟踪。',

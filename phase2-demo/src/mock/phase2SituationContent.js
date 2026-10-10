@@ -18,12 +18,12 @@ export function operationAssessment(store) {
   const fault = latestValues(store, 'fault', [79.1, 86.5]), drift = latestValues(store, 'drift', [3, 425]), bearing = latestValues(store, 'maintenance', [2.2, 64])
   const driftDelta = store.monitorStep.drift ? 10 : 8, driftTemp = store.monitorStep.drift ? 432 : 428
   const coolingConclusion = faultDone ? followUp(store, 'fault') : '冷却水温升高与流量下降同时出现，冷却能力不足已由待办跟进。'
-  const driftConclusion = driftDone ? followUp(store, 'drift') : store.todoCreated.drift && store.progress.drift >= 2 ? '3#缸异常已由现场证据确立，正在排查原因。' : store.todoCreated.drift ? '3#缸检查待办已建立，异常真实性仍待现场确认。' : store.monitorStep.drift ? '3#缸偏差扩大，需人工核实读数与现场现象。' : '3#缸相对排温偏高，现由 AI 持续跟踪。'
+  const driftConclusion = driftDone ? followUp(store, 'drift') : store.todoCreated.drift && store.progress.drift >= 2 ? '3#缸异常已由现场证据确立，正在排查原因。' : store.todoCreated.drift ? '3#缸检查待办已建立，异常真实性仍待现场确认。' : store.attentionFeedback?.drift ? '3#缸现场核实已提交，系统继续分析，尚未确认或排除故障。' : store.monitorStep.drift ? '3#缸偏差扩大，需人工核实读数与现场现象。' : '3#缸相对排温偏高，现由 AI 持续跟踪。'
   const bearingConclusion = bearingDone ? followUp(store, 'maintenance') : store.progress.maintenance >= 2 ? '轴承检查已发现偏磨，提前保养依据已补齐。' : store.todoCreated.maintenance ? '轴承提前检查已获同意，是否保养仍取决于现场证据。' : '轴承振动缓升与周期临近共同支持提前检查建议。'
   const conclusion = `1号主机处于航行工况。${coolingConclusion}${driftConclusion}${bearingConclusion}`
   const next = []
   if (!faultDone) next.push('优先跟进冷却系统待办，由轮机员结合运行规程安排现场检查。')
-  if (!driftDone) next.push(store.todoCreated.drift && store.progress.drift >= 2 ? '3#缸按关联待办核实喷油与气阀证据。' : store.todoCreated.drift || store.monitorStep.drift ? '3#缸先核对现场仪表、异响是否可复现，再判断异常是否成立。' : '3#缸继续比较相近工况样本。')
+  if (!driftDone) next.push(store.todoCreated.drift && store.progress.drift >= 2 ? '3#缸按关联待办核实喷油与气阀证据。' : !store.todoCreated.drift && store.attentionFeedback?.drift ? '3#缸本次核实要求已完成，接续系统跟踪。' : store.todoCreated.drift || store.monitorStep.drift ? '3#缸先核对现场仪表、异响是否可复现，再判断异常是否成立。' : '3#缸继续比较相近工况样本。')
   if (!bearingDone) next.push(store.progress.maintenance >= 2 ? '轴承按已确认检查结果安排提前保养。' : '轴承结合靠港条件先检查，再决定是否提前保养。')
   const handled = ['fault', 'drift', 'maintenance'].filter(id => store.isTaskHandled(id))
   if (handled.some(id => store.getObservationResult(id).type === 'reinspect')) next.push('处理后反复的事项优先请求现场复查。')

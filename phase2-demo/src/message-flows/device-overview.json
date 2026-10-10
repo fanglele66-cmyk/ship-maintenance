@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "scene": "device.situation",
+  "messages": [
+    {
+      "id": "device-daily-review",
+      "type": "dailyBrief",
+      "source": "dailyReview",
+      "expanded": false
+    },
+    {
+      "id": "device-drift-notice",
+      "type": "notice",
+      "source": "driftNotice",
+      "expanded": false
+    },
+    {
+      "id": "device-plan-links",
+      "type": "report",
+      "source": "planLinks",
+      "expanded": true
+    }
+  ]
+}

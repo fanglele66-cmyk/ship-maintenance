@@ -3,6 +3,7 @@
     <div class="p2-attention-detail-head"><button class="p2-link-button" type="button" @click="$emit('back')">← 返回关注事项</button><span class="p2-attention-status" :class="result.type==='archive'?'ended':result.type==='reinspect'?'human':'ai'">{{ result.type==='archive'?'观察已结束':result.type==='reinspect'?'需人工复查':'AI 效果观察' }}</span></div>
     <h3 class="p2-attention-detail-title">{{ title }}</h3>
     <p class="p2-report-meta">来源事件 {{ store.caseMaterials[scenario]?.sourceId }} · <button class="p2-link-button" type="button" @click="openEvent">回看人工处理记录 →</button></p>
+    <AttentionAction :scenario="scenario" />
     <nav class="p2-observation-tabs" aria-label="效果观察内容"><button v-for="tab in ['今日观测','观察时间线']" :key="tab" type="button" :class="{active:activeTab===tab}" @click="activeTab=tab">{{ tab }}</button></nav>
     <Phase2Observation v-if="activeTab==='今日观测'" :scenario="scenario" />
     <section v-else class="p2-observation-timeline">
@@ -19,6 +20,7 @@ import { useRouter } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { observationConfig } from '@/mock/phase2Observation'
 import Phase2Observation from '@/components/Phase2Observation.vue'
+import AttentionAction from '@/components/AttentionAction.vue'
 const props=defineProps({scenario:String})
 defineEmits(['back'])
 const store=usePhase2DemoStore(),router=useRouter(),activeTab=ref('今日观测')

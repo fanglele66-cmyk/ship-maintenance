@@ -51,6 +51,10 @@
               v-for="doc in paginatedDocs"
               :key="doc.id"
               class="doc-card"
+              role="button"
+              tabindex="0"
+              @keydown.enter="openDoc(doc)"
+              @keydown.space.prevent="openDoc(doc)"
               @click="openDoc(doc)"
             >
             <div class="doc-card-title">{{ doc.title }}</div>

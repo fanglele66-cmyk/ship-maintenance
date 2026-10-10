@@ -25,17 +25,16 @@
     </button>
     <div ref="situationBodyRef" class="situation-body">
       <div class="situation-content">
+        <AttentionDossier v-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
         <!-- Layer 1: Ship Overview -->
-        <div class="layer" :class="layerClass(1)">
+        <div v-show="!attentionId" class="layer" :class="layerClass(1)">
           <ShipOverview @select-device="handleDeviceClick" />
         </div>
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
-        <div class="layer" :class="layerClass(2)">
+        <div v-show="!attentionId" class="layer" :class="layerClass(2)">
           <div class="layer-header">
-            <button class="back-btn" type="button" title="返回船舶态势" aria-label="返回船舶态势" @click="goToLayer(1)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-            </button>
+            <BackButton label="返回船舶态势" @click="goToLayer(1)" />
             <span class="layer-subtitle">船舶态势</span>
           </div>
           <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-sensor="handleSensorClick">
@@ -80,7 +79,7 @@
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant :mode="currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <Phase2Assistant ref="assistantRef" :dossier="Boolean(attentionId)" :mode="attentionId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition>
     </div>
@@ -96,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, provide, nextTick, onActivated, onMounted, onUnmounted } from 'vue'
+import { ref, computed, reactive, provide, nextTick, watch, onActivated, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -105,7 +104,9 @@ import ShipOverview from './ShipOverview.vue'
 import SensorGrid from './SensorGrid.vue'
 import SensorTrend from './SensorTrend.vue'
 import DeviceSituation from './DeviceSituation.vue'
+import AttentionDossier from '@/components/AttentionDossier.vue'
 import Phase2Assistant from '@/components/Phase2Assistant.vue'
+import BackButton from '@/components/BackButton.vue'
 import { useSensorStore } from '@/stores/sensorStore'
 import { useSituationStore } from '@/stores/situationStore'
 import { useDeviceStore } from '@/stores/deviceStore'
@@ -118,6 +119,7 @@ const deviceStore = useDeviceStore()
 const demoStore = usePhase2DemoStore()
 const router = useRouter()
 const route = useRoute()
+const attentionId = computed(() => route.params.section === 'attention' ? String(route.params.attentionId || '') : '')
 const { createAbnormalEvent } = useAbnormalReport()
 const {
   currentLayer,
@@ -149,6 +151,12 @@ const situationBodyRef = ref(null)
 const isResizingAssistant = ref(false)
 const isAssistantCollapsed = ref(false)
 const compactAssistantOpen = ref(false)
+const assistantRef=ref(null)
+async function focusDossierInquiry(){
+  if(isAssistantCollapsed.value) compactAssistantOpen.value=true
+  await nextTick()
+  assistantRef.value?.focusInquiry()
+}
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1366)
 const windowHeight = ref(typeof window !== 'undefined' ? window.innerHeight : 1024)
 const isCompactAssistant = computed(() => windowWidth.value <= 900 && windowHeight.value >= windowWidth.value)
@@ -175,21 +183,21 @@ provide('situationContext', situationContext)
 const STORAGE_KEY = 'situation-assistant-width'
 const MIN_W = 280
 const MAX_W = 750
-const DEFAULT_W = 330
+const defaultAssistantWidth = computed(() => Math.round(Math.min(480, Math.max(320, windowWidth.value * 0.23))))
 const LEFT_MIN_W = 470
 const COLLAPSE_GAP = 16
 
 const customWidth = ref(null)
 
 const assistantWidthStyle = computed(() => {
-  const w = customWidth.value || DEFAULT_W
+  const w = customWidth.value || defaultAssistantWidth.value
   return { width: w + 'px', minWidth: w + 'px', maxWidth: w + 'px', flex: 'none' }
 })
 
 function updateAssistantVisibility() {
   const bodyWidth = situationBodyRef.value?.clientWidth || 0
   if (!bodyWidth) return
-  const assistantWidth = customWidth.value || DEFAULT_W
+  const assistantWidth = customWidth.value || defaultAssistantWidth.value
   isAssistantCollapsed.value = bodyWidth < LEFT_MIN_W + assistantWidth + COLLAPSE_GAP
 }
 
@@ -290,7 +298,7 @@ function startResize(e) {
   const handle = e.currentTarget
   const pointerId = e.pointerId
   const startX = e.clientX
-  const startW = customWidth.value || DEFAULT_W
+  const startW = customWidth.value || defaultAssistantWidth.value
   isResizingAssistant.value = true
   handle?.setPointerCapture?.(pointerId)
 
@@ -370,6 +378,22 @@ function handleDeviceClick(device) {
 }
 
 const deviceSituationRef = ref(null)
+watch(attentionId, async id => {
+  demoStore.regularMaintenanceInFocus=false
+  if (!id) { demoStore.clearObservationFocus(); demoStore.attentionInFocus=false; return }
+  if (demoStore.isTaskHandled(id)) demoStore.selectObservation(id)
+  else if (demoStore.attention.some(item=>item.id===id)) {
+    demoStore.clearObservationFocus()
+    demoStore.selectAttention(id)
+    demoStore.attentionInFocus=true
+  } else { demoStore.clearObservationFocus(); demoStore.attentionInFocus=false }
+}, {immediate:true,flush:'post'})
+async function returnToAttention() {
+  await router.push('/situation')
+  if (currentLayer.value !== 2 || selectedDeviceId.value !== 'main-engine-1') openDemoDevice()
+  await nextTick()
+  deviceSituationRef.value?.showAttentionList()
+}
 onActivated(async () => { const id=route.query.observation; if(id && demoStore.isTaskHandled(id)){openDemoDevice();await nextTick();deviceSituationRef.value?.openObservation(id)} })
 async function openDemoItem(id) {
   if (currentLayer.value === 1) {

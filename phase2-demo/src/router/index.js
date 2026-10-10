@@ -9,7 +9,7 @@ const routes = [
     meta: { title: '待办中心', icon: '📌' }
   },
   {
-    path: '/situation',
+    path: '/situation/:section(attention)?/:attentionId?',
     name: 'Situation',
     component: () => import('@/views/SituationView.vue'),
     meta: { title: '态势监测', icon: '📡' }

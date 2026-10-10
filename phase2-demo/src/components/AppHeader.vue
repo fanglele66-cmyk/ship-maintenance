@@ -2,11 +2,7 @@
   <header class="app-header">
     <div class="header-left">
       <template v-if="detailTitle">
-        <button class="header-back" type="button" :title="`返回${sectionTitle}`" @click="closeDetail">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-        </button>
+        <BackButton :label="`返回${sectionTitle}`" @click="closeDetail" />
         <span class="header-section-title header-section-title-muted">{{ sectionTitle }}</span>
         <span class="header-chevron" aria-hidden="true">›</span>
         <strong :key="detailTitle" class="header-page-title">{{ detailTitle }}</strong>
@@ -33,6 +29,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import BackButton from './BackButton.vue'
 import { shipInfo, statusLabels } from '@/mock/devices'
 import { knowledgeDocs } from '@/mock/knowledge'
 import { useEventStore } from '@/stores/eventStore'

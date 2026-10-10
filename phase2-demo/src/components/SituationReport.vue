@@ -1,11 +1,12 @@
 <template>
   <div class="p2-situation-report">
-    <div class="p2-attention-detail-head">
-      <button type="button" class="p2-link-button" @click="$emit('back')">← {{ backLabel }}</button>
-      <span class="p2-attention-status" :class="tone">{{ status }}</span>
-    </div>
-    <h3 class="p2-attention-detail-title">{{ title }}</h3>
-    <p v-if="meta" class="p2-report-meta">{{ meta }}</p>
+    <header class="p2-report-heading">
+      <BackButton :label="backLabel" @click="$emit('back')" />
+      <div class="p2-report-heading-content">
+        <div class="p2-report-title-row"><h3 class="p2-attention-detail-title">{{ title }}</h3><span class="p2-attention-status" :class="tone">{{ status }}</span></div>
+        <p v-if="meta" class="p2-report-meta">{{ meta }}</p>
+      </div>
+    </header>
     <article class="p2-technical-report p2-unified-report">
       <section class="p2-report-lead">
         <h4>当前结论</h4>
@@ -28,6 +29,7 @@
 </template>
 <script setup>
 import SituationTimeline from './SituationTimeline.vue'
+import BackButton from './BackButton.vue'
 defineProps({ title:String, status:String, tone:String, meta:String, conclusion:String, recommendation:String, backLabel:{type:String,default:'返回列表'}, sections:{type:Array,default:()=>[]}, timeline:{type:Array,default:()=>[]}, timelineFirst:Boolean, timelineExpanded:Boolean, arrangement:{type:Array,default:()=>[]} })
 defineEmits(['back'])
 </script>

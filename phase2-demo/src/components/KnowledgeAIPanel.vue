@@ -46,6 +46,7 @@
           <span class="kap-title">AI 助手</span>
         </div>
         <div class="kap-header-right">
+          <ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="selectConversation" @new-conversation="newConversation" />
           <button class="kap-close-btn" @click="closePanel" title="关闭">✕</button>
         </div>
       </div>
@@ -102,9 +103,7 @@
             placeholder="输入追问..." @keyup.enter="sendMessage"
           />
           <button class="kap-send-btn" :disabled="!inputText.trim()" @click="sendMessage" title="发送">
-            <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M1 9l15-6-6 15-3-6-6-3z"/>
-            </svg>
+            <img :src="sendIcon" alt="" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -114,6 +113,9 @@
 </template>
 
 <script setup>
+import sendIcon from '@/assets/figma/send.svg'
+import ConversationHistory from './messages/ConversationHistory.vue'
+import { useAgentConversations, demoConversations } from '@/composables/useAgentConversations'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { knowledgeDocs } from '@/mock/knowledge'
 
@@ -274,19 +276,21 @@ const contextBarText = computed(() => {
 
 // ============ 消息系统 ============
 const msgsRef = ref(null)
-const inputText = ref('')
 const isTyping = ref(false)
-const messages = ref([])
+const sessions=useAgentConversations(computed(()=>'knowledge'),id=>demoConversations(id).map(item=>({...item,messages:item.messages.map(message=>({role:message.role,content:message.text,ts:item.updatedAt}))})))
+const inputText=sessions.draft
+const messages=computed({get:()=>sessions.active.value.messages,set:value=>{sessions.active.value.messages=value}})
+function selectConversation(id){sessions.select(id);scrollToBottom()}
+function newConversation(){sessions.newConversation();scrollToBottom()}
 let initialResponseTimer = null
 
 function scrollToBottom() {
   nextTick(() => { if (msgsRef.value) msgsRef.value.scrollTop = msgsRef.value.scrollHeight })
 }
 
-function streamMessage(idx, fullText) {
+function streamMessage(msg, fullText) {
   const parts = fullText.split(/(<[^>]+>|\s+)/g).filter(Boolean)
   let pos = 0
-  const msg = messages.value[idx]
   if (!msg) return
   msg.streamed = ''
   const timer = setInterval(() => {
@@ -302,28 +306,28 @@ function streamMessage(idx, fullText) {
   }, 16)
 }
 
-function pushAssistantMessage(content, delay = 400) {
+function pushAssistantMessage(content, delay = 400, session = sessions.active.value) {
   const message = { role: 'assistant', content: '', raw: content, ts: Date.now() }
-  messages.value.push(message)
-  setTimeout(() => {
-    const idx = messages.value.indexOf(message)
-    if (idx >= 0) streamMessage(idx, content)
-  }, delay)
+  session.messages.push(message)
+  sessions.touch(session)
+  setTimeout(() => streamMessage(message, content), delay)
 }
 
 function pushUserMessage(text) {
   messages.value.push({ role: 'user', content: text, ts: Date.now() })
+  sessions.touch()
 }
 
 function generateInitialResponse() {
+  const session=sessions.active.value
   if (initialResponseTimer) clearTimeout(initialResponseTimer)
   isTyping.value = true
   initialResponseTimer = setTimeout(() => {
     initialResponseTimer = null
     isTyping.value = false
-    if (props.searchQuery) pushAssistantMessage(generateSearchSummary())
-    else if (hasFilter.value) pushAssistantMessage(generateFilterSummary())
-    else pushAssistantMessage(generateWelcome())
+    if (props.searchQuery) pushAssistantMessage(generateSearchSummary(),400,session)
+    else if (hasFilter.value) pushAssistantMessage(generateFilterSummary(),400,session)
+    else pushAssistantMessage(generateWelcome(),400,session)
     scrollToBottom()
   }, 600)
 }
@@ -462,13 +466,14 @@ function generateFollowUp(text) {
 function sendMessage() {
   const text = inputText.value.trim()
   if (!text) return
+  const session=sessions.active.value
   pushUserMessage(text)
   inputText.value = ''
   isTyping.value = true
   scrollToBottom()
   setTimeout(() => {
     isTyping.value = false
-    pushAssistantMessage(generateFollowUp(text))
+    pushAssistantMessage(generateFollowUp(text),400,session)
     scrollToBottom()
   }, 800)
 }
@@ -514,21 +519,9 @@ watch(() => props.searchQuery, (val) => {
   }
 })
 
-// 监听设备类型/文档类型筛选变化 → 同步更新助手对话
-watch([() => props.selectedDevice, () => props.selectedSystem, () => props.selectedDocType], ([dev, system, type], [oldDev, oldSystem, oldType]) => {
-  // 首次挂载时不触发
-  if (oldDev === undefined && oldSystem === undefined && oldType === undefined) return
-
-  if (isOpen.value) {
-    // 面板打开时：清空对话，重新生成首条消息，对齐当前筛选信息
-    messages.value = []
-    nextTick(() => generateInitialResponse())
-  } else {
-    // 面板关闭时：显示未读红点提示
-    showUnreadDot.value = true
-    if (unreadTimer) clearTimeout(unreadTimer)
-    unreadTimer = setTimeout(() => { showUnreadDot.value = false }, 3 * 60 * 1000)
-  }
+// Filtering updates retrieval context, never creates or clears agent conversations.
+watch([() => props.selectedDevice, () => props.selectedSystem, () => props.selectedDocType], () => {
+  if (!isOpen.value) showUnreadDot.value = true
 })
 
 function getMsgContent(m) {
