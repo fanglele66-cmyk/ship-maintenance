@@ -7,7 +7,7 @@
         <p v-if="meta" class="p2-report-meta">{{ meta }}</p>
       </div>
     </header>
-    <nav v-if="tabbed" class="maintenance-dossier-tabs" role="tablist" aria-label="维保详情内容">
+    <nav v-if="tabbed" class="maintenance-dossier-tabs" role="tablist" :aria-label="title + '详情内容'">
       <button v-for="tab in detailTabs" :key="tab.id" type="button" role="tab" :aria-selected="detailTab === tab.id" :class="{active:detailTab === tab.id}" @click="detailTab=tab.id">{{ tab.label }}</button>
     </nav>
     <article :key="detailTab" class="p2-technical-report p2-unified-report" :class="{'maintenance-dossier-body':tabbed}" :role="tabbed ? 'tabpanel' : undefined">
@@ -42,9 +42,8 @@
 import { ref, watch } from 'vue'
 import SituationTimeline from './SituationTimeline.vue'
 import BackButton from './BackButton.vue'
-const props = defineProps({ tabbed:Boolean, title:String, status:String, tone:String, meta:String, conclusion:String, recommendation:String, backLabel:{type:String,default:'返回列表'}, sections:{type:Array,default:()=>[]}, timeline:{type:Array,default:()=>[]}, timelineFirst:Boolean, timelineExpanded:Boolean, arrangement:{type:Array,default:()=>[]} })
+const props = defineProps({ tabbed:Boolean, detailTabs:{type:Array,default:()=>[{id:'overview',label:'事项概览'},{id:'evidence',label:'变化证据'},{id:'history',label:'跟踪记录'}]}, title:String, status:String, tone:String, meta:String, conclusion:String, recommendation:String, backLabel:{type:String,default:'返回列表'}, sections:{type:Array,default:()=>[]}, timeline:{type:Array,default:()=>[]}, timelineFirst:Boolean, timelineExpanded:Boolean, arrangement:{type:Array,default:()=>[]} })
 const detailTab=ref('overview')
-const detailTabs=[{id:'overview',label:'计划概览'},{id:'evidence',label:'分析依据'},{id:'history',label:'跟踪记录'}]
 watch(()=>props.title,()=>{detailTab.value='overview'})
 defineEmits(['back'])
 </script>

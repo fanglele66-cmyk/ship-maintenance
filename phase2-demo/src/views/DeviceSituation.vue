@@ -47,9 +47,7 @@
           <div v-else class="p2-empty p2-attention-empty"><strong>{{ attentionCategory === 'human' ? '当前没有需要你处理的关注事项' : attentionCategory === 'ended' ? '当前没有已结束的事项' : attentionCategory === 'post' ? '当前没有处理后观察的事项' : '当前没有系统跟踪中的关注事项' }}</strong><p v-if="attentionCategory==='human'">没有待处理要求，不代表设备全部正常。</p><div v-if="attentionCategory==='human'"><button class="p2-link-button" @click="attentionCategory='ai'">系统跟踪中 {{ attentionBuckets.ai.length }} 项 →</button> · <button class="p2-link-button" @click="attentionCategory='post'">处理后观察 {{ attentionBuckets.post.length }} 项 →</button></div></div>
       </template>
       <template v-else-if="activeTab === 'maintenance'">
-        <SituationReport v-if="maintenanceDetailId" tabbed :title="maintenanceDetailId === 'planned' ? regularPlan.title : selectedItem.title" :status="maintenanceDetailId === 'planned' ? '常规计划' : stateText('maintenance')" :tone="maintenanceDetailId === 'planned' ? 'ai' : store.todoCreated.maintenance ? 'transferred' : 'human'" :meta="regularPlan.device + ' · 周期计划 ' + regularPlan.currentHours.toLocaleString() + ' / ' + regularPlan.dueHours.toLocaleString() + ' h'" :conclusion="maintenanceConclusion" :recommendation="maintenanceRecommendation" :sections="maintenanceDetailId === 'planned' ? regularPlanReport : maintenanceReport" :timeline="maintenanceAssessmentData.timeline" :arrangement="maintenanceAssessmentData.arrangement" timeline-first timeline-expanded back-label="返回维保计划" @back="maintenanceDetailId = null">
-          <template #actions><button v-if="maintenanceDetailId !== 'planned' && store.isTaskHandled('maintenance')" type="button" class="p2-link-button" @click="openObservation('maintenance')">查看态势效果观察 →</button><button v-if="maintenanceDetailId !== 'planned' && store.todoCreated.maintenance" type="button" class="p2-link-button" @click="openTodo('maintenance')">查看关联待办 · {{ store.cases.maintenance.stages[store.progress.maintenance].label }} →</button><button v-else-if="maintenanceDetailId === 'planned'" type="button" class="p2-link-button" @click="maintenanceDetailId='maintenance';store.regularMaintenanceInFocus=false;store.attentionInFocus=true;store.selectAttention('maintenance')">查看本部件提前维保建议 →</button></template>
-        </SituationReport>
+        <MaintenanceDossier v-if="maintenanceDetailId" :model="maintenanceDetail" @back="maintenanceDetailId = null" @action="handleMaintenanceAction" />
         <template v-else>
           <div class="p2-attention-category-tabs p2-maintenance-subtabs" role="tablist" aria-label="维保信息分类"><button type="button" role="tab" :aria-selected="maintenanceCategory==='early'" :class="{active:maintenanceCategory==='early'}" @click="maintenanceCategory='early'">提前维保建议<span>{{ shownItems.length }}</span></button><button type="button" role="tab" :aria-selected="maintenanceCategory==='planned'" :class="{active:maintenanceCategory==='planned'}" @click="maintenanceCategory='planned'">常规维保计划<span>{{ maintenancePlans.length }}</span></button></div>
           <div class="p2-list-intro"><strong>{{ maintenanceCategory === 'early' ? '提前维保建议' : '常规维保计划' }}</strong></div>
@@ -82,7 +80,8 @@ import { maintenancePlans } from '@/mock/phase2Scenarios'
 import SituationReport from '@/components/SituationReport.vue'
 import { deviceHistory, historyCategories } from '@/mock/phase2History'
 import { operationAssessment } from '@/mock/phase2SituationContent'
-import { maintenanceFollowup } from '@/mock/phase2Followup'
+import MaintenanceDossier from '@/components/MaintenanceDossier.vue'
+import { maintenanceDossier, maintenanceStatus } from '@/mock/maintenanceDossier'
 const props = defineProps({ deviceName: { type: String, default: '主机' }, deviceId: { type: String, default: 'main-engine-1' } })
 defineEmits(['select-sensor'])
 const router = useRouter()
@@ -171,11 +170,17 @@ const overviewItems=computed(()=>[
   {id:'vibration-trend',title:'主机机体 · X向振动',text:'近三轮采集值2.7→2.8→2.8 mm/s，未形成持续上升，继续系统跟踪。',tag:'系统跟踪中',tone:'blue'},
   {id:'maintenance',title:'1#缸连杆轴承 · 振动趋势',text:store.isTaskHandled('maintenance')?observationSummary('maintenance'):'近7日振动2.1→3.0 mm/s；距周期检修约140 h，靠港窗口约48 h后。',tag:store.isTaskHandled('maintenance')?observationTag('maintenance'):store.todoCreated.maintenance?'待办未处理':'建议提前检查',tone:store.isTaskHandled('maintenance')?observationTone('maintenance'):store.todoCreated.maintenance?'blue':'amber'}
 ])
-const maintenanceAssessmentData = computed(() => maintenanceFollowup(store, maintenanceDetailId.value === 'planned'))
-const maintenanceConclusion = computed(() => maintenanceAssessmentData.value.conclusion)
-const maintenanceRecommendation = computed(() => maintenanceAssessmentData.value.recommendation)
-const regularPlanReport = computed(() => maintenanceFollowup(store, true).sections)
-const maintenanceReport = computed(() => maintenanceFollowup(store).sections)
+const maintenanceDetail = computed(() => maintenanceDossier(store, maintenanceDetailId.value === 'planned'))
+function handleMaintenanceAction(action) {
+  if (action === 'observation') openObservation('maintenance')
+  else if (action === 'todo') openTodo('maintenance')
+  else if (action === 'early') {
+    maintenanceDetailId.value='maintenance'
+    store.regularMaintenanceInFocus=false
+    store.attentionInFocus=true
+    store.selectAttention('maintenance')
+  }
+}
 function attentionStatusClass(id) { const action=store.attentionAction(id); return action.phase==='已结束'?'ended':action.required||action.linked?'human':'ai' }
 function attentionStatus(id) { return store.attentionAction(id).phase }
 function selectCard(id) { openAttentionDetail(id) }
@@ -199,5 +204,5 @@ async function openHistoryRecord(record) {
 }
 watch(maintenanceCategory, () => { if (activeTab.value === 'maintenance' && !maintenanceDetailId.value) { store.attentionInFocus = false; store.regularMaintenanceInFocus = false } })
 function openTodo(id) { store.selectTodo(id); router.push('/event') }
-function stateText(id) { if (id === 'maintenance' && store.isTaskHandled(id)) return '已处理 · '+(store.getObservationResult(id).type==='archive'?'观察已结束':'态势观察中'); if (id === 'maintenance' && store.todoCreated.maintenance) return store.cases.maintenance.stages[store.progress.maintenance].label === '完整闭环' ? '已闭环' : '已关联待办 · ' + store.cases.maintenance.stages[store.progress.maintenance].label; if(store.todoCreated[id]&&store.progress[id]===store.cases[id].stages.length-1)return '已闭环'; if (id === 'stable') return store.monitorStep.stable === 2 ? '已收束 · 未建待办' : '系统监测中'; if (id === 'drift') return store.todoCreated.drift ? '已形成待办' : store.monitorStep.drift ? '异动加剧' : '系统监测中'; return store.todoCreated.maintenance ? '已形成待办' : '待确认建议' }
+function stateText(id) { if (id === 'maintenance') return maintenanceStatus(store); if(store.todoCreated[id]&&store.progress[id]===store.cases[id].stages.length-1)return '已闭环'; if (id === 'stable') return store.monitorStep.stable === 2 ? '已收束 · 未建待办' : '系统监测中'; if (id === 'drift') return store.todoCreated.drift ? '已形成待办' : store.monitorStep.drift ? '异动加剧' : '系统监测中'; return store.todoCreated.maintenance ? '已形成待办' : '待确认建议' }
 </script>
