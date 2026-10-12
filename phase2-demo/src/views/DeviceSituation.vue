@@ -1,10 +1,10 @@
 <template>
   <div class="p2-device-page">
-    <div class="p2-device-head">
+    <div v-if="!maintenanceDetailId" class="p2-device-head">
       <div><span class="p2-eyebrow">设备态势</span><h2>{{ deviceName }}</h2></div>
       <div v-if="isMainEngine" class="p2-device-status"><span><i></i>航行中</span><span>关注事项 <b>{{ attentionCount }}</b></span><span>未处理待办 <b>{{ activeTodoCount }}</b></span></div>
     </div>
-    <div class="p2-tab-row" role="tablist" aria-label="设备层内容">
+    <div v-if="!maintenanceDetailId" class="p2-tab-row" role="tablist" aria-label="设备层内容">
       <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id">{{ tab.label }}<span v-if="tab.id === 'attention' && attentionCount">{{ attentionCount }}</span><span v-if="tab.id === 'maintenance' && maintenanceCount">{{ maintenanceCount }}</span><span v-if="tab.id === 'todo' && activeTodoCount">{{ activeTodoCount }}</span></button>
     </div>
     <div ref="deviceScroll" class="p2-device-scroll">
@@ -47,7 +47,7 @@
           <div v-else class="p2-empty p2-attention-empty"><strong>{{ attentionCategory === 'human' ? '当前没有需要你处理的关注事项' : attentionCategory === 'ended' ? '当前没有已结束的事项' : attentionCategory === 'post' ? '当前没有处理后观察的事项' : '当前没有系统跟踪中的关注事项' }}</strong><p v-if="attentionCategory==='human'">没有待处理要求，不代表设备全部正常。</p><div v-if="attentionCategory==='human'"><button class="p2-link-button" @click="attentionCategory='ai'">系统跟踪中 {{ attentionBuckets.ai.length }} 项 →</button> · <button class="p2-link-button" @click="attentionCategory='post'">处理后观察 {{ attentionBuckets.post.length }} 项 →</button></div></div>
       </template>
       <template v-else-if="activeTab === 'maintenance'">
-        <SituationReport v-if="maintenanceDetailId" :title="maintenanceDetailId === 'planned' ? regularPlan.title : selectedItem.title" :status="maintenanceDetailId === 'planned' ? '常规计划' : stateText('maintenance')" :tone="maintenanceDetailId === 'planned' ? 'ai' : store.todoCreated.maintenance ? 'transferred' : 'human'" :meta="regularPlan.device + ' · 周期计划 ' + regularPlan.currentHours.toLocaleString() + ' / ' + regularPlan.dueHours.toLocaleString() + ' h'" :conclusion="maintenanceConclusion" :recommendation="maintenanceRecommendation" :sections="maintenanceDetailId === 'planned' ? regularPlanReport : maintenanceReport" :timeline="maintenanceAssessmentData.timeline" :arrangement="maintenanceAssessmentData.arrangement" timeline-first timeline-expanded back-label="返回维保计划" @back="maintenanceDetailId = null">
+        <SituationReport v-if="maintenanceDetailId" tabbed :title="maintenanceDetailId === 'planned' ? regularPlan.title : selectedItem.title" :status="maintenanceDetailId === 'planned' ? '常规计划' : stateText('maintenance')" :tone="maintenanceDetailId === 'planned' ? 'ai' : store.todoCreated.maintenance ? 'transferred' : 'human'" :meta="regularPlan.device + ' · 周期计划 ' + regularPlan.currentHours.toLocaleString() + ' / ' + regularPlan.dueHours.toLocaleString() + ' h'" :conclusion="maintenanceConclusion" :recommendation="maintenanceRecommendation" :sections="maintenanceDetailId === 'planned' ? regularPlanReport : maintenanceReport" :timeline="maintenanceAssessmentData.timeline" :arrangement="maintenanceAssessmentData.arrangement" timeline-first timeline-expanded back-label="返回维保计划" @back="maintenanceDetailId = null">
           <template #actions><button v-if="maintenanceDetailId !== 'planned' && store.isTaskHandled('maintenance')" type="button" class="p2-link-button" @click="openObservation('maintenance')">查看态势效果观察 →</button><button v-if="maintenanceDetailId !== 'planned' && store.todoCreated.maintenance" type="button" class="p2-link-button" @click="openTodo('maintenance')">查看关联待办 · {{ store.cases.maintenance.stages[store.progress.maintenance].label }} →</button><button v-else-if="maintenanceDetailId === 'planned'" type="button" class="p2-link-button" @click="maintenanceDetailId='maintenance';store.regularMaintenanceInFocus=false;store.attentionInFocus=true;store.selectAttention('maintenance')">查看本部件提前维保建议 →</button></template>
         </SituationReport>
         <template v-else>
