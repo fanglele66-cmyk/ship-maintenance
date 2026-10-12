@@ -4,9 +4,9 @@
     <div v-for="(paragraph,i) in message.paragraphs" :key="i" class="p2-dialog-paragraph"><b>{{ paragraph.label }}</b><p>{{ paragraph.text }}</p></div>
     <p v-if="message.question" class="p2-dialog-question">{{ message.question }}</p>
   </details>
-  <div v-if="message.actions?.length" class="p2-demo-actions"><button v-for="action in message.actions" :key="action.id" type="button" @click="$emit('action',action.id)">{{ action.label }} →</button></div>
+  <div v-if="message.actions?.length" class="p2-demo-actions"><button v-for="action in message.actions" :key="action.id" :disabled="disabledActions.includes(action.id)" type="button" @click="$emit('action',action.id)">{{ action.label }} →</button></div>
 </template>
 <script setup>
-defineProps({message:{type:Object,required:true},daily:Boolean,expanded:Boolean})
+defineProps({message:{type:Object,required:true},daily:Boolean,expanded:Boolean,disabledActions:{type:Array,default:()=>[]}})
 defineEmits(['action'])
 </script>

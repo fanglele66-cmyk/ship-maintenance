@@ -4,7 +4,7 @@
   "messages": [
     {
       "id": "device-daily-review",
-      "type": "dailyBrief",
+      "type": "taskReceipt",
       "source": "dailyReview",
       "expanded": false
     },
@@ -13,12 +13,6 @@
       "type": "notice",
       "source": "driftNotice",
       "expanded": false
-    },
-    {
-      "id": "device-plan-links",
-      "type": "report",
-      "source": "planLinks",
-      "expanded": true
     }
   ]
 }

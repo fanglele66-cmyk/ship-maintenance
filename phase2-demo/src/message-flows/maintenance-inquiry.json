@@ -1,0 +1,11 @@
+{
+  "type": "inquiry",
+  "role": "assistant",
+  "text": "补充现场与安排信息",
+  "hint": "提交后同步保留在左侧人员记录中，不自动创建事件或确认换件。",
+  "status": "pending",
+  "fields": [
+    {"key":"information","type":"textarea","label":"现场、工况或安排信息","required":true,"placeholder":"例如核对时间、测点状态、靠港及备件安排"}
+  ],
+  "submitLabel": "保存补充记录"
+}

@@ -26,13 +26,14 @@
     <div ref="situationBodyRef" class="situation-body">
       <div class="situation-content">
         <AttentionDossier v-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
+        <MaintenanceAdviceDetail v-else-if="maintenanceId" standalone :planned="maintenanceId==='planned'" @back="returnToMaintenance" @show-advice="router.push('/situation/maintenance/maintenance')" @show-arrangements="router.push('/situation/maintenance/planned')" @open-event="openMaintenanceEvent" @open-observation="router.push('/situation/attention/maintenance')" />
         <!-- Layer 1: Ship Overview -->
-        <div v-show="!attentionId" class="layer" :class="layerClass(1)">
+        <div v-show="!attentionId && !maintenanceId" class="layer" :class="layerClass(1)">
           <ShipOverview @select-device="handleDeviceClick" />
         </div>
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
-        <div v-show="!attentionId" class="layer" :class="layerClass(2)">
+        <div v-show="!attentionId && !maintenanceId" class="layer" :class="layerClass(2)">
           <div class="layer-header">
             <BackButton label="返回船舶态势" @click="goToLayer(1)" />
             <span class="layer-subtitle">船舶态势</span>
@@ -79,7 +80,7 @@
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant ref="assistantRef" :dossier="Boolean(attentionId)" :mode="attentionId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <Phase2Assistant ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition>
     </div>
@@ -104,6 +105,7 @@ import ShipOverview from './ShipOverview.vue'
 import SensorGrid from './SensorGrid.vue'
 import SensorTrend from './SensorTrend.vue'
 import DeviceSituation from './DeviceSituation.vue'
+import MaintenanceAdviceDetail from '@/components/MaintenanceAdviceDetail.vue'
 import AttentionDossier from '@/components/AttentionDossier.vue'
 import Phase2Assistant from '@/components/Phase2Assistant.vue'
 import BackButton from '@/components/BackButton.vue'
@@ -120,6 +122,7 @@ const demoStore = usePhase2DemoStore()
 const router = useRouter()
 const route = useRoute()
 const attentionId = computed(() => route.params.section === 'attention' ? String(route.params.attentionId || '') : '')
+const maintenanceId=computed(()=>route.params.section==='maintenance'?String(route.params.attentionId || ''):'')
 const { createAbnormalEvent } = useAbnormalReport()
 const {
   currentLayer,
@@ -378,7 +381,8 @@ function handleDeviceClick(device) {
 }
 
 const deviceSituationRef = ref(null)
-watch(attentionId, async id => {
+watch([attentionId,maintenanceId], async ([id, maintenance]) => {
+  if(maintenance) { demoStore.clearObservationFocus();demoStore.selectAttention('maintenance');demoStore.attentionInFocus=true;demoStore.regularMaintenanceInFocus=maintenance==='planned';return }
   demoStore.regularMaintenanceInFocus=false
   if (!id) { demoStore.clearObservationFocus(); demoStore.attentionInFocus=false; return }
   if (demoStore.isTaskHandled(id)) demoStore.selectObservation(id)
@@ -388,12 +392,20 @@ watch(attentionId, async id => {
     demoStore.attentionInFocus=true
   } else { demoStore.clearObservationFocus(); demoStore.attentionInFocus=false }
 }, {immediate:true,flush:'post'})
+onMounted(()=>{if(maintenanceId.value){demoStore.selectAttention('maintenance');demoStore.attentionInFocus=true;demoStore.regularMaintenanceInFocus=maintenanceId.value==='planned'}})
 async function returnToAttention() {
   await router.push('/situation')
   if (currentLayer.value !== 2 || selectedDeviceId.value !== 'main-engine-1') openDemoDevice()
   await nextTick()
   deviceSituationRef.value?.showAttentionList()
 }
+async function returnToMaintenance() {
+  await router.push('/situation')
+  if(currentLayer.value!==2 || selectedDeviceId.value!=='main-engine-1')openDemoDevice()
+  await nextTick()
+  deviceSituationRef.value?.showMaintenanceList()
+}
+function openMaintenanceEvent(){demoStore.selectTodo('maintenance');router.push('/event')}
 onActivated(async () => { const id=route.query.observation; if(id && demoStore.isTaskHandled(id)){openDemoDevice();await nextTick();deviceSituationRef.value?.openObservation(id)} })
 async function openDemoItem(id) {
   if (currentLayer.value === 1) {

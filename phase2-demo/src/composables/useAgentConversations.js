@@ -28,7 +28,7 @@ export function useAgentConversations(agentId, seeds = () => []) {
   return { agent, active, draft, conversations, select, newConversation, touch }
 }
 export function demoConversations(agentId) {
-  const subject = agentId === 'knowledge' ? '知识资料' : agentId.includes('device') ? '主机设备' : agentId.includes('ship') ? '船舶运行' : '当前事项'
+  const subject = agentId === 'knowledge' ? '知识资料' : agentId.includes('maintenance-advice') ? '轴承维保建议' : agentId.includes('maintenance-arrangements') ? '已有维保安排' : agentId.includes('device') ? '主机设备' : agentId.includes('ship') ? '船舶运行' : '当前事项'
   return [
     createConversation(`${subject}近期情况`, [
       {role:'user',text:`帮我回顾一下${subject}的近期情况。`,at:'昨天 08:00'},

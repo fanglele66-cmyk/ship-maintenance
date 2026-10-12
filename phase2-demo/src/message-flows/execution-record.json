@@ -1,0 +1,72 @@
+{
+  "type": "inquiry",
+  "role": "assistant",
+  "purpose": "execution-record",
+  "text": "实际执行记录待确认",
+  "hint": "左侧与此处共用同一份草稿。请核对实际措施、时间和验收；确认仅记录现场执行，不修改船管工单。",
+  "status": "pending",
+  "submitLabel": "确认执行记录",
+  "fields": [
+    {
+      "key": "equipment",
+      "label": "实际执行设备与部位",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "measures",
+      "label": "实际措施",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "key": "executedAt",
+      "label": "实际执行时间",
+      "type": "datetime-local",
+      "required": true
+    },
+    {
+      "key": "acceptance",
+      "label": "验收与复测结果",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "key": "completion",
+      "label": "本轮执行状态",
+      "type": "select",
+      "required": true,
+      "options": [
+        {
+          "value": "completed",
+          "label": "执行及验收已完成"
+        },
+        {
+          "value": "partial",
+          "label": "尚未完成，保留进展"
+        }
+      ]
+    },
+    {
+      "key": "comparable",
+      "label": "处理后可比监测数据",
+      "type": "select",
+      "required": true,
+      "options": [
+        {
+          "value": "available",
+          "label": "已有可比数据（演示）"
+        },
+        {
+          "value": "missing",
+          "label": "数据缺失或工况不可比"
+        }
+      ]
+    },
+    {
+      "key": "supplement",
+      "label": "对话中的现场补充（原文）",
+      "type": "textarea"
+    }
+  ]
+}

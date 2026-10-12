@@ -15,12 +15,12 @@ function storeFixture() {
 test('configuration preserves order, IDs and explicit expansion; source state is not mutated',()=>{
   const store=storeFixture(), sources=deviceMessageSources(store)
   const before=JSON.stringify(sources), messages=resolveMessageFlow(config,sources)
-  assert.deepEqual(messages.map(x=>x.type),['dailyBrief','notice','report'])
-  assert.deepEqual(messages.map(x=>x.expanded),[false,false,true])
-  assert.equal(messages[0].paragraphs.length,3)
+  assert.deepEqual(messages.map(x=>x.type),['taskReceipt','notice'])
+  assert.deepEqual(messages.map(x=>x.expanded),[false,false])
+  assert.equal(messages[0].runId,'main-engine-health-20261012-0800')
   assert.equal(JSON.stringify(sources),before)
   const reversed=resolveMessageFlow({...config,messages:[...config.messages].reverse()},sources)
-  assert.equal(reversed[0].id,'device-plan-links')
+  assert.equal(reversed[0].id,'device-drift-notice')
 })
 test('state changes select evidence, linked task and handled observation actions',()=>{
   const store=storeFixture()

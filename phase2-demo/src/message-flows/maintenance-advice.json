@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "scene": "maintenance.advice",
+  "messages": [
+    {"id": "maintenance-introduction", "type": "report", "source": "introduction", "expanded": true}
+  ]
+}

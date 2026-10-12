@@ -84,3 +84,24 @@
 .app-container.app-container .p2-restored-assistant .p2-scene-details[open] .p2-push-preview { display: none; }
 .app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details[open]>summary { padding-bottom: 12px; border-bottom: 1px solid #ebeef5; }
 .app-container.app-container .p2-restored-assistant .is-daily-push summary:focus-visible { outline: 2px solid #b7935a; outline-offset: 4px; border-radius: 4px; }
+.app-container .p2-restored-assistant .p2-task-receipt { border:1px solid #e8ebf1; border-radius:10px; padding:16px; background:linear-gradient(180deg,#faf8f4 0,#fff 76px); font-size:14px; line-height:1.65; }
+.app-container .p2-restored-assistant .p2-task-receipt-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.app-container .p2-restored-assistant .p2-task-receipt h3 { margin:0; font-size:16px; color:#1a1c1f; }
+.p2-task-receipt-status { flex-shrink:0; font-size:12px; padding:2px 7px; border-radius:4px; color:#24745e; background:#eef7f2; }
+.p2-task-receipt-status[data-status="partial"] { color:#8b6427; background:#fff5e5; }
+.p2-task-receipt-status[data-status="failed"] { color:#ad3f3f; background:#fff0f0; }
+.app-container .p2-restored-assistant .p2-task-receipt-time { margin:6px 0 14px; font-size:12px; color:#737b88; }
+.p2-task-receipt-facts { margin:0; padding-bottom:12px; border-bottom:1px solid #edf0f3; }
+.p2-task-receipt-facts div { display:grid; grid-template-columns:60px minmax(0,1fr); gap:10px; margin:5px 0; }
+.p2-task-receipt-facts dt { color:#737b88; font-size:12px; }
+.p2-task-receipt-facts dd { margin:0; overflow-wrap:anywhere; }
+.p2-task-receipt section { margin-top:14px; }
+.app-container .p2-restored-assistant .p2-task-receipt h4 { margin:0 0 4px; font-size:12px; font-weight:500; color:#737b88; }
+.app-container .p2-restored-assistant .p2-task-receipt section p { margin:0; }
+.p2-task-receipt-next { border-left:2px solid #a38e68; padding-left:10px; }
+.app-container .p2-restored-assistant .p2-task-receipt-limit { margin:14px 0 0; color:#737b88; font-size:12px; line-height:1.6; }
+.p2-task-receipt footer { margin-top:14px; }
+.p2-task-receipt footer button { border:1px solid #e2e5ea; padding:7px 10px; border-radius:5px; background:#fff; cursor:pointer; }
+.p2-task-receipt footer button:focus-visible { outline:2px solid #a38e68; outline-offset:2px; }
+
+.app-container.app-container .p2-restored-assistant .p2-demo-actions button:disabled { opacity:.45; cursor:not-allowed; }

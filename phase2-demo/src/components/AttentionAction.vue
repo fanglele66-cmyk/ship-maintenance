@@ -6,6 +6,7 @@
       <p>检查与补证在关联事件中进行，这里不重复填写检查表。</p>
       <button class="p2-primary" type="button" @click="openEvent">进入关联事件 · {{ store.cases[scenario].stages[store.progress[scenario]].label }} →</button>
     </template>
+    <button v-else-if="action.decisionRequired && inConversation" class="p2-primary" type="button" @click="$emit('request-inquiry')">在对话中确认安排</button>
     <button v-else-if="action.required && inConversation" class="p2-primary" type="button" @click="$emit('request-inquiry')">在对话中核实 →</button>
     <button v-else-if="action.required && compact && !formOpen" class="p2-primary" type="button" @click="formOpen=true">填写现场核实</button>
     <form v-if="!inConversation && action.required && !action.linked && (!compact || formOpen)" @submit.prevent="submit">

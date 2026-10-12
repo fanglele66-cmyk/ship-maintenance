@@ -2,9 +2,11 @@
   <aside class="p2-assistant p2-restored-assistant">
     <div class="p2-assistant-head"><span class="p2-ai-mark">✦</span><div><strong>检修助手</strong><small>{{ contextLabel }}</small></div><ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="sessions.select" @new-conversation="sessions.newConversation" /></div>
     <div ref="scrollRef" class="p2-messages" aria-live="polite">
-      <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" @action="runDemoAction" @confirm-record="store.confirmQuickRecord(key)" @submit-inquiry="submitInquiry" @update-inquiry="updateInquiry">
+      <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" :disabled-actions="maintenanceDisabledActions" @action="runDemoAction" @confirm-record="store.confirmQuickRecord(key)" @submit-inquiry="submitInquiry" @update-inquiry="updateInquiry">
         <template #actions>
-          <div v-if="mode==='attention' && index===lastAttentionSceneIndex" class="p2-demo-actions"><button v-if="!store.regularMaintenanceInFocus && !store.attentionAction(key).required && ['maintenance','drift'].includes(key) && !store.todoCreated[key] && (key==='maintenance'||store.monitorStep.drift>=1)" type="button" @click="store.sendAttention('确认建立待办')">确认建立检查待办 →</button><button v-if="store.todoCreated[key]" type="button" @click="openLinkedTodo">查看关联待办 →</button></div>
+          <div v-if="props.dossier && message.noteCandidate" class="p2-demo-actions"><button v-if="!message.noteCandidate.registered" type="button" @click="registerMessageNote(message)">将这条补充登记为留言</button><small v-else>这条补充已登记到跟踪记录</small></div>
+          <div v-if="!props.maintenanceDetail && mode==='attention' && index===lastAttentionSceneIndex" class="p2-demo-actions"><button v-if="!props.dossier && !store.regularMaintenanceInFocus && !store.attentionAction(key).required && ['maintenance','drift'].includes(key) && !store.todoCreated[key] && (key==='maintenance'||store.monitorStep.drift>=1)" type="button" @click="store.sendAttention('确认建立待办')">确认建立检查待办 →</button><button v-if="store.todoCreated[key]" type="button" @click="openLinkedTodo">查看关联待办 →</button></div>
+          <div v-if="props.dossier && message.r02Check" class="p2-demo-actions r02-decision"><small v-if="store.dossierReviews[key]?.decision==='deferred'">已保留暂不安排的决定与原因</small><template v-else><button type="button" @click="confirmScriptCheck">{{store.todoCreated[key]?'进入关联检查事件':'确认开展检查'}}</button><button v-if="!store.todoCreated[key]" type="button" @click="requestDeferral">暂不安排，补充原因</button></template></div>
         </template>
       </MessageRenderer>
     </div>
@@ -26,23 +28,58 @@ import { deviceMessageSources, deviceConversationRecords } from '@/message-flows
 import { attentionFollowup, maintenanceFollowup, followupConversation } from '@/mock/phase2Followup'
 import { shipOverviewConversation } from '@/mock/phase2ShipConversation'
 import { attentionDossier } from '@/mock/attentionDossier'
+import { r02InitialMessage, r02Reply } from '@/mock/r02Stories'
+import { useEventWorkOrderStore } from '@/stores/eventWorkOrderStore'
+import { useMaintenanceAdviceStore } from '@/stores/maintenanceAdviceStore'
+import { appendMessages } from '@/message-flows/appendMessages'
+import { maintenanceMessageFlow, maintenanceReply } from '@/message-flows/maintenanceSources'
+import maintenanceInquiry from '@/message-flows/maintenance-inquiry.json'
 import { attentionInquiry } from '@/message-flows/attentionInquiry'
 import { validateInquiry } from '@/message-flows/inquiryFields'
-const props=defineProps({mode:{type:String,required:true},dossier:Boolean}),emit=defineEmits(['open-device','open-todo','open-item']),store=usePhase2DemoStore(),scrollRef=ref(null)
+const props=defineProps({mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean}),emit=defineEmits(['open-device','open-todo','open-item']),store=usePhase2DemoStore(),scrollRef=ref(null)
 const router = useRouter()
-const mode=computed(()=>props.dossier ? (store.situationObservationId?'observation':'attention') : props.mode==='attention'&&store.situationObservationId?'observation':props.mode==='attention'&&!store.attentionInFocus?'device':props.mode)
+const mode=computed(()=>props.maintenanceDetail ? 'attention' : props.dossier ? (store.situationObservationId?'observation':'attention') : props.mode==='attention'&&store.situationObservationId?'observation':props.mode==='attention'&&!store.attentionInFocus?'device':props.mode)
 const key=computed(()=>mode.value==='observation'?store.situationObservationId:mode.value==='attention'?store.selectedAttentionId:mode.value==='todo'?store.selectedTodoId:mode.value)
-const agentId=computed(()=>mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
+const advice=useMaintenanceAdviceStore(),workOrders=useEventWorkOrderStore()
+const agentId=computed(()=>props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:1'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
 const sessions=useAgentConversations(agentId,demoConversations)
 const draft=sessions.draft
 const inquiryDrafts=reactive({}),inquiryErrors=reactive({})
 const currentInquiry=computed(()=>props.dossier && mode.value==='attention' ? attentionInquiry(store,key.value,inquiryDrafts) : null)
 function updateInquiry(payload){
+  if(mode.value==='todo' && displayedMessages.value.some(message=>message.id===payload.messageId&&message.purpose==='execution-record')){store.updateExecutionRecord(key.value,payload.messageId,payload.values);return}
+  if(props.maintenanceDetail){const message=advice.chatMessages.find(item=>item.id===payload.messageId && item.conversationId===sessions.active.value.id);if(message?.status==='pending')message.values={...payload.values};return}
+
+  const other=displayedMessages.value.find(message=>message.id===payload.messageId && ['r02-note','r02-defer'].includes(message.purpose))
+  if(other && other.status==='pending'){other.values={...payload.values};return}
   if(currentInquiry.value?.id!==payload.messageId || currentInquiry.value.status!=='pending')return
   inquiryDrafts[payload.messageId]={...payload.values}
   delete inquiryErrors[payload.messageId]
 }
 function submitInquiry(payload){
+  if(mode.value==='todo' && displayedMessages.value.some(message=>message.id===payload.messageId&&message.purpose==='execution-record')){store.confirmExecutionRecord(key.value,payload.messageId,payload.values);sessions.touch();return}
+  if(props.maintenanceDetail){
+    const message=advice.chatMessages.find(item=>item.id===payload.messageId && item.conversationId===sessions.active.value.id)
+    if(!message || message.status!=='pending' || Object.keys(validateInquiry(message,payload.values)).length)return
+    const ok=message.purpose==='maintenance-defer'?advice.decide('defer',payload.values.information):advice.supplement(payload.values.information)
+    if(!ok)return
+    message.status='submitted';message.values={...payload.values};message.submittedAt=advice.records.at(-1).at;message.receiptText='已同步保存到建议的人员操作与记录中。'
+    sessions.touch();return
+  }
+
+  const other=displayedMessages.value.find(message=>message.id===payload.messageId && ['r02-note','r02-defer'].includes(message.purpose))
+  if(other){
+    if(other.status!=='pending' || Object.keys(validateInquiry(other,payload.values)).length)return
+    const session=sessions.active.value,records=store.logs[key.value]||[],start=records.length
+    if(other.purpose==='r02-defer'){
+      if(!store.deferR02Check(key.value,payload.values.reason))return
+    }else if(!store.registerDossierNote(key.value,`发生时间：${payload.values.time}；工况与位置：${payload.values.context}；现象：${payload.values.phenomenon}`))return
+    other.status='submitted';other.values={...payload.values};other.submittedAt=store.dossierNotes[key.value].at(-1).at
+    other.receiptText=other.purpose==='r02-defer'?'已保留暂不安排的决定与原因，不代表设备正常或事项结束。':'作为新的人员补充留存，历史结束状态保持不变。'
+    const added=records.slice(start);added.forEach(message=>{message.conversationId=session.id})
+    if(session.id!==sessions.agent.value.primaryId)session.messages.push(...added)
+    sessions.touch(session);return
+  }
   const request=currentInquiry.value
   if(!request || request.id!==payload.messageId || request.status!=='pending')return
   if(Object.keys(validateInquiry(request,payload.values)).length)return
@@ -57,9 +94,9 @@ function submitInquiry(payload){
 async function focusInquiry(){
   sessions.select(sessions.agent.value.primaryId)
   await nextTick()
-  const element=scrollRef.value?.querySelector('.p2-inquiry')
+  const element=scrollRef.value?.querySelector('.r02-decision') || scrollRef.value?.querySelector('.p2-inquiry')
   element?.scrollIntoView({block:'nearest',behavior:'smooth'})
-  element?.querySelector('input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')?.focus({preventScroll:true})
+  element?.querySelector('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')?.focus({preventScroll:true})
 }
 defineExpose({focusInquiry})
 const messages=computed(()=>(store.logs[key.value]||[]).filter(message=>!message.conversationId || message.conversationId===sessions.agent.value.primaryId))
@@ -74,7 +111,7 @@ const attentionConversation=computed(()=>{
 function openLinkedTodo(){store.selectTodo(key.value);router.push('/event')}
 const shipConversation = computed(() => [shipOverviewConversation(store), ...messages.value.filter(message => message.role === 'user' || message.shipFollowup)])
 const deviceConversation = computed(() => [
-  ...resolveMessageFlow(deviceFlow, deviceMessageSources(store)),
+  ...resolveMessageFlow(deviceFlow, deviceMessageSources(store)).filter(message=>!message.hidden),
   ...deviceConversationRecords(messages.value)
 ])
 const observationConversation=computed(()=>{
@@ -86,23 +123,43 @@ const observationConversation=computed(()=>{
 const dossierMessages=computed(()=>{
   const dossier=attentionDossier(store,key.value)
   if(!dossier)return []
-  const replies=messages.value.filter((message,i)=>(message.text && !(message.role==='user' && /^(查看|进入)/.test(message.text))) || (message.kind==='scene' && messages.value[i-1]?.role==='user' && !/^(查看|进入)/.test(messages.value[i-1]?.text||''))).map(message=>message.kind==='scene'?{...message,title:'当前依据与安排',paragraphs:[{label:'当前判断',text:dossier.conclusion},{label:'比较参考',text:dossier.charts.map(chart=>chart.reference).join('；')},{label:'当前安排',text:dossier.action.text}],question:'以上为原型基于现有档案的演示回复，不代表新一次检测或新的异常事实。'}:message)
-  return [{role:'assistant',kind:'scene',title:'当前关注档案',paragraphs:[{label:'本次重点',text:dossier.action.text}],question:'变化依据、比较口径或现场反馈有什么需要进一步解释的？详细证据和历史过程可在左侧切换查看。'},...(currentInquiry.value?[{...currentInquiry.value,submitError:inquiryErrors[currentInquiry.value.id]}]:[]),...replies ]
+  const records=messages.value.filter(message=>!/^现场核实已提交：|^本次核实已提交/.test(message.text||''))
+  const replies=records.filter((message,i)=>(message.text && !(message.role==='user' && /^(查看|进入)/.test(message.text))) || (message.type==='inquiry' || message.kind==='scene' && records[i-1]?.role==='user' && !/^(查看|进入)/.test(records[i-1]?.text||''))).map(message=>message.kind==='scene'?{...message,title:'当前依据与安排',paragraphs:[{label:'当前判断',text:dossier.conclusion},{label:'比较参考',text:dossier.charts.map(chart=>chart.reference).join('；')},{label:'当前安排',text:dossier.action.text}],question:'以上依据当前档案回答；新增现场信息将保留到跟踪记录。'}:message)
+  const summary=r02InitialMessage(store,key.value) || {role:'assistant',kind:'scene',title:'当前关注档案',paragraphs:[{label:'本次重点',text:dossier.action.text}],question:'详细证据和历史过程可在左侧页签中查看。'}
+  return [summary,...(currentInquiry.value?[{...currentInquiry.value,submitError:inquiryErrors[currentInquiry.value.id]}]:[]),...replies ]
 })
-const automaticMessages=computed(()=>props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='observation'?observationConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?messages.value.filter(message=>!message.observationContext&&!message.title?.startsWith('效果观察')&&!message.text?.startsWith('本轮效果观察已自动结束')):messages.value)
+const maintenanceMessages=computed(()=>[...maintenanceMessageFlow(store,advice,store.regularMaintenanceInFocus,workOrders.state('maintenance')),...advice.chatMessages.filter(message=>message.conversationId===sessions.agent.value.primaryId)])
+const automaticMessages=computed(()=>props.maintenanceDetail?maintenanceMessages.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='observation'?observationConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?messages.value.filter(message=>!message.observationContext&&!message.title?.startsWith('效果观察')&&!message.text?.startsWith('本轮效果观察已自动结束')):messages.value)
 watch(automaticMessages, value=>{
   const primary=sessions.agent.value.conversations.find(item=>item.id===sessions.agent.value.primaryId)
-  primary.messages=value
+  if(props.maintenanceDetail)appendMessages(primary.messages,value)
+  else primary.messages=value
 }, {immediate:true,deep:true})
+const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
+ ...(store.todoCreated.maintenance || store.isTaskHandled('maintenance')?['maintenance:check']:[]),
+ ...(!advice.sufficient || advice.decision==='execute' || store.isTaskHandled('maintenance')?['maintenance:execute']:[]),
+ ...(!advice.sufficient || advice.decision==='defer' || store.isTaskHandled('maintenance')?['maintenance:defer']:[])
+]:[])
 const displayedMessages=computed(()=>sessions.active.value.messages)
 watch(()=>sessions.active.value.id,async()=>{await nextTick();scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight})})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
 const contextLabel=computed(()=>mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
-const placeholder=computed(()=>mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
+const placeholder=computed(()=>props.maintenanceDetail?'询问检查依据，或补充现场与安排信息…':props.dossier?'询问当前判断、变化证据或后续安排…':mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
 function send(){
   const text=draft.value.trim();if(!text)return
+  if(props.maintenanceDetail){askMaintenance(text);draft.value='';return}
   const session=sessions.active.value,records=store.logs[key.value]||[],start=records.length
-  if(mode.value==='observation')store.sendObservation(text);else if(mode.value==='attention')store.sendAttention(text);else if(mode.value==='todo')store.sendTodo(text);else store.sendSituation(text,mode.value)
+  if(props.dossier){
+    const existing=[...displayedMessages.value].reverse().find(message=>message.noteCandidate && !message.noteCandidate.registered)
+    if(existing && /^(请)?(把|将)(这|刚才|上一).*(记录|登记|记下)/.test(text)){
+      registerMessageNote(existing);draft.value='';return
+    }
+    const dossier=attentionDossier(store,key.value)
+    if(!store.sendR02Message(key.value,text))store.askDossierQuestion(key.value,text,'当前档案判断：'+dossier.conclusion+' 后续观察：'+dossier.tracking.focus+' 新增现场信息可登记到跟踪记录，供后续研判参考。')
+  }else if(mode.value==='device' && (store.deviceDataTopic || /压力|泵组|机体|X向|Y向|振动/.test(text)) && !/维保|1#|3#|4#/.test(text)){
+    const topic=/压力|泵组/.test(text)?'stable':/机体|X向|Y向|振动/.test(text)?'vibration-trend':store.deviceDataTopic
+    store.deviceDataTopic=topic;store.sendR02Message('device',text,topic)
+  }else if(mode.value==='observation')store.sendObservation(text);else if(mode.value==='attention')store.sendAttention(text);else if(mode.value==='todo')store.sendTodo(text);else store.sendSituation(text,mode.value)
   const added=records.slice(start)
   added.forEach(message=>{message.conversationId=session.id})
   if(session.id!==sessions.agent.value.primaryId)session.messages.push(...added)
@@ -110,9 +167,55 @@ function send(){
   sessions.touch(session);draft.value=''
 }
 
+function registerMessageNote(message){
+  const candidate=message.noteCandidate
+  if(!candidate || candidate.registered)return
+  const session=sessions.active.value,records=store.logs[key.value]||[],start=records.length
+  if(!store.registerDossierNote(key.value,candidate.text))return
+  candidate.registered=true
+  const added=records.slice(start)
+  added.forEach(record=>{record.conversationId=session.id})
+  if(session.id!==sessions.agent.value.primaryId)session.messages.push(...added)
+  sessions.touch(session)
+}
+function confirmScriptCheck(){
+  if(store.todoCreated[key.value]){openLinkedTodo();return}
+  store.confirmR02Check(key.value)
+}
+function requestDeferral(){
+  const session=sessions.active.value,records=store.logs[key.value],id='r02-defer:'+key.value
+  if(displayedMessages.value.some(item=>item.id===id))return
+  const request={id,type:'inquiry',purpose:'r02-defer',role:'assistant',status:'pending',text:'请补充暂不安排检查的原因。原事实保留，不等于设备正常或问题结束。',fields:[{key:'reason',label:'暂不安排的原因',type:'textarea',required:true}],values:{},submitLabel:'确认暂不安排',conversationId:session.id}
+  records.push(request)
+  if(session.id!==sessions.agent.value.primaryId)session.messages.push(request)
+}
 let monitorTimer=null
 function clearMonitorTimer(){if(monitorTimer){clearTimeout(monitorTimer);monitorTimer=null}}
+function askMaintenance(text){
+ const id=sessions.active.value.id,at=new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})
+ const userOrder=advice.nextOrder(),replyOrder=advice.nextOrder()
+ const added=[{id:`maintenance-chat-${userOrder}`,order:userOrder,role:'user',text,at,conversationId:id},{id:`maintenance-chat-${replyOrder}`,order:replyOrder,...maintenanceReply(store,text,workOrders.state('maintenance')),at,conversationId:id}]
+ advice.chatMessages.push(...added)
+ if(id!==sessions.agent.value.primaryId)sessions.active.value.messages.push(...added)
+ sessions.touch()
+}
 function runDemoAction(id){
+ if(props.maintenanceDetail && id.startsWith('maintenance:')){
+  if(id.startsWith('maintenance:ask:')){const topic=id.split(':').at(-1);askMaintenance({basis:'为什么建议提前检查？',evidence:'需要补齐哪些检查证据？',arrangement:'已有安排是否冲突？'}[topic]);return}
+  if(id==='maintenance:event'){store.selectTodo('maintenance');router.push('/event');return}
+  if(id==='maintenance:observation'){router.push('/situation/attention/maintenance');return}
+  if(id==='maintenance:advice'){router.push('/situation/maintenance/maintenance');return}
+  sessions.select(sessions.agent.value.primaryId)
+  if(id==='maintenance:check' || id==='maintenance:execute'){advice.decide(id.split(':')[1]);return}
+  if(['maintenance:supplement','maintenance:defer'].includes(id)){
+   const purpose=id==='maintenance:defer'?'maintenance-defer':'maintenance-supplement'
+   const existing=advice.chatMessages.find(message=>message.purpose===purpose&&message.status==='pending'&&message.conversationId===sessions.active.value.id)
+   if(!existing)advice.chatMessages.push({...maintenanceInquiry,order:advice.nextOrder(),id:`${purpose}-${advice.chatMessages.length}`,purpose,conversationId:sessions.active.value.id,values:{},...(purpose==='maintenance-defer'?{text:'暂不采纳，记录原因',hint:'必须填写原因。建议和原事件保留，不代表设备恢复正常。',submitLabel:'保存决定'}:{})})
+   nextTick(()=>scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight,behavior:'smooth'}));return
+  }
+  return
+ }
+
   if(id==='device')emit('open-device')
   else if(id==='todo')emit('open-todo')
   else if(id.startsWith('ask:'))store.sendSituation(id.slice(4),mode.value)
@@ -123,8 +226,8 @@ watch([mode,key],()=>{
   if(mode.value==='attention')store.selectAttention(key.value)
   else if(['device','sensor'].includes(mode.value))store.enterSituation(mode.value)
 },{immediate:true})
-watch([mode,key,()=>store.monitorStep.stable,()=>store.monitorStep.drift,()=>store.todoCreated.drift],()=>{clearMonitorTimer();if(mode.value!=='attention')return;const id=key.value;if(id==='stable'&&store.monitorStep.stable<2)monitorTimer=setTimeout(()=>store.nextMonitor('stable'),4800);if(id==='drift'&&store.monitorStep.drift<1&&!store.todoCreated.drift)monitorTimer=setTimeout(()=>store.nextMonitor('drift'),4800)},{immediate:true})
-watch(()=>[key.value,displayedMessages.value.length],async()=>{await nextTick();scrollRef.value?.scrollTo({top:mode.value==='ship'&&displayedMessages.value.length===1?0:scrollRef.value.scrollHeight,behavior:'smooth'})},{immediate:true})
+watch([mode,key,()=>store.monitorStep.stable,()=>store.monitorStep.drift,()=>store.todoCreated.drift],()=>{clearMonitorTimer();if(mode.value!=='attention')return;const id=key.value;if(id==='drift'&&store.monitorStep.drift<1&&!store.todoCreated.drift)monitorTimer=setTimeout(()=>store.nextMonitor('drift'),4800)},{immediate:true})
+watch(()=>[key.value,displayedMessages.value.length],async()=>{await nextTick();scrollRef.value?.scrollTo({top:(mode.value==='ship'||props.maintenanceDetail)&&displayedMessages.value.length===1?0:scrollRef.value.scrollHeight,behavior:'smooth'})},{immediate:true})
 watch(()=>store.currentStage?.id,async id=>{if(mode.value!=='todo'||!id||store.activeStage[key.value]>=store.progress[key.value])return;await nextTick();const container=scrollRef.value,element=container?.querySelector('[data-stage-id="'+id+'"]');if(element)container.scrollTo({top:element.getBoundingClientRect().top-container.getBoundingClientRect().top+container.scrollTop-12,behavior:'smooth'})})
 watch(() => [store.progress.fault, store.progress.drift, store.progress.maintenance, store.monitorStep.stable, store.todoCreated.maintenance, store.todoCreated.drift], () => { if (mode.value === 'device') store.enterSituation('device') })
 onUnmounted(clearMonitorTimer)

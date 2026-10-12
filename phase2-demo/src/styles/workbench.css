@@ -154,8 +154,8 @@
   .app-container.app-container .p2-overview-layout { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; }
   .app-container.app-container .p2-overview-layout>.p2-panel { height: fit-content; }
   .app-container.app-container .sg-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
-  .app-container.app-container .p2-pad-overview { max-width: 1280px; width: 100%; }
-  .app-container.app-container .p2-pad-body>.p2-panel { max-width: 1280px; width: 100%; }
+  .app-container.app-container .p2-pad-overview { max-width: none; width: 100%; min-width: 0; box-sizing: border-box; }
+  .app-container.app-container .p2-pad-body>.p2-panel { max-width: none; width: 100%; min-width: 0; box-sizing: border-box; }
 }
 @media (max-width: 1200px) and (min-width: 900px) {
   :root { --wb-space: 16px; }

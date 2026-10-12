@@ -254,7 +254,7 @@
 .app-container.app-container .p2-pad-detail .p2-pad-list-row { background: transparent; border: 0; border-bottom: 1px solid #ebeef5; border-radius: 0; padding: 14px 0; }
 .app-container.app-container .p2-pad-detail .p2-data-overview { padding: 16px 0; }
 .app-container.app-container .p2-pad-detail .p2-trend-panel { border: 0; border-top: 1px solid #ebeef5; border-radius: 0; padding: 16px 0 0; }
-.app-container.app-container .p2-pad-detail .p2-pad-footer { background: #fff; border-top: 1px solid #ebeef5; }
+.app-container.app-container .p2-pad-detail .p2-pad-footer { background: #fff; border-top: 1px solid #ebeef5; max-width: none; width: 100%; box-sizing: border-box; }
 .app-container.app-container .knowledge-view .detail-body,
 .app-container.app-container .inspection-view .detail-page { background: #fff; }
 .app-container.app-container .knowledge-view .doc-content-card,

@@ -1,5 +1,6 @@
 import { assertInquiry } from './inquiryFields.js'
-export const messageTypes = ['text', 'dailyBrief', 'notice', 'report', 'feedbackRecord', 'inquiry']
+import { assertTaskReceipt } from './taskReceipt.js'
+export const messageTypes = ['text', 'dailyBrief', 'notice', 'report', 'feedbackRecord', 'inquiry', 'taskReceipt']
 
 // Explicit source lookup only: configuration never executes code or modifies the store.
 export function resolveMessageFlow(config, sources) {
@@ -14,6 +15,7 @@ export function resolveMessageFlow(config, sources) {
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw new Error(`Missing message source: ${entry.source || entry.id}`)
     const message = { ...source, id: entry.id, type: entry.type, ...(entry.expanded === undefined ? {} : { expanded: entry.expanded }) }
     if (entry.type === 'inquiry') assertInquiry(message)
+    if (entry.type === 'taskReceipt') assertTaskReceipt(message)
     return message
   })
 }

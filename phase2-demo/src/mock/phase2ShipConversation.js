@@ -15,8 +15,8 @@ function currentMatters(store) {
     : store.todoCreated.drift
       ? `3#缸已关联检查待办，${store.progress.drift < 2 ? '正在核实异动是否真实' : '异常已确立，按任务链排查与处置'}。`
       : store.monitorStep.drift
-        ? '3#缸同工况排温相对差由8°C扩大至10°C，当前432°C；建议人工核对读数和现场现象，尚未建立待办。'
-        : '3#缸排温相对差约8°C，当前428°C，暂由 AI 持续比较同工况变化。'
+        ? '3#缸反复偏差在新增可比片段中扩大；需要核实现场读数和现象，尚未建立事件。'
+        : '3#缸相对偏差反复出现，暂由系统比较。'
   const bearing = store.isTaskHandled('maintenance')
     ? `轴承人工保养已完成，${store.getObservationResult('maintenance').title}；持续效果在设备态势跟踪。`
     : store.todoCreated.maintenance
@@ -41,7 +41,7 @@ export function shipOverviewConversation(store) {
     role: 'assistant', kind: 'scene', title: '船舶运行概况', demoLabel: '全船运行回顾', at: '当前运行窗口',
     paragraphs: [
       { label: '运行情况', text: `${shipInfo.name}当前航行中，航速${shipInfo.speed} kn、航向${shipInfo.heading}°，主机转速450 rpm。接入${shipInfo.onlineDevices}/${shipInfo.totalDevices}台设备，当前重点展示主机、舵机、空压机和锅炉。` },
-      { label: '主机监测回顾', text: matters.cooling + matters.cylinder },
+      { label: '主机监测回顾', text: matters.cooling + matters.cylinder + '4#缸反复偏差由系统跟踪，2#缸原偏差收敛后已结束；压力与机体振动为普通数据，不计入关注。' },
       { label: '其他设备监测回顾', text: otherDevices() },
       { label: '建议与处理安排', text: `${pending ? `当前有${pending}项未处理待办，优先跟进已明确需要人工处理的事项。` : '当前已建待办的人工处理均已完成，持续效果由设备态势验证。'}${matters.bearing}` }
     ],

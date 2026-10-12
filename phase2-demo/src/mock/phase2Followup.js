@@ -1,3 +1,4 @@
+import { r02Report, r02Reports } from './r02Stories.js'
 import { maintenanceAssessment } from './phase2SituationContent'
 
 const point = (label, at, actor, text, assessment, current = false) => ({ label, at, actor, text, assessment, done: !current, current })
@@ -27,24 +28,36 @@ export function maintenanceFollowup(store, planned = false) {
 
 export function attentionFollowup(store, id) {
   const report = attentionFollowupContent(store, id)
+  if(id==='drift' && store.todoCreated[id])report.timeline=[...r02Reports.drift.timeline.map(record=>({...record})),...report.timeline.filter(record=>!['首次发现','分析更新 · 新证据'].includes(record.label))]
   if (id === 'maintenance') return report
   const action = store.attentionAction(id), feedback = store.attentionFeedback[id]
   report.recommendation = action.text
   if (id === 'drift' && !store.todoCreated[id]) {
+    report.sections = report.sections.map(section=>section.title==='人工补证要回答什么'?{...section,paragraphs:['在右侧询问组件中补充现场排温、运行工况与现场现象，并确认已核对现场仪表。此项核实不需要先创建检查事件。','完整提交后仅完成本次核实要求；普通留言不自动满足要求。需要开展进一步检查或维护时，再经人员明确确认关联事件。']}:section)
     report.arrangement = report.arrangement.map(item => item.label === '当前安排' ? {...item,text:action.text} : item)
     if (feedback) {
-      report.conclusion = '排温变化仍需持续分析；现场核实记录已完整提交，不等于确认或排除具体故障。'
+      report.conclusion = '现场核实记录已完整提交，后续分析尚未更新；不等于确认或排除具体故障。'
     }
   }
   if (id === 'drift' && feedback) {
     const entry=point('现场核实 · 已提交',feedback.at,'轮机员',`排温 ${feedback.reading}°C；${feedback.conditions}；${feedback.phenomenon}`,'本次核实要求已完成，系统接续分析，不自动创建事件。',!store.todoCreated[id])
     const eventIndex=report.timeline.findIndex(item=>item.label==='人员决定 · 建立检查待办')
     report.timeline.splice(eventIndex<0?report.timeline.length:eventIndex,0,entry)
+    if(store.dossierReviews?.[id]){
+      const review=store.dossierReviews[id]
+      if(!store.todoCreated[id])report.conclusion=review.text
+      const reviews=(review.history||[review]).map(entry=>point('研判更新',entry.at,'AI 健康研判',entry.text,'结合现场反馈更新判断；原事实与反馈保留。'))
+      const event=report.timeline.findIndex(record=>record.label==='人员决定 · 建立检查待办')
+      if(event<0)report.timeline.push(...reviews)
+      else report.timeline.splice(event,0,...reviews)
+    }
   }
   return report
 }
 function attentionFollowupContent(store, id) {
   if (id === 'maintenance') return maintenanceFollowup(store)
+  const r02=r02Report(store,id)
+  if(r02)return r02
   if (id === 'vibration-trend') return {
     conclusion:'机体X向振动小幅变化后持平，Y向没有同步抬升，尚无需要人工响应的新证据，继续由 AI 跟踪。',
     recommendation:'继续比较相近转速与负荷样本；若出现持续单向变化或可复现异响，再请求现场核实。',
