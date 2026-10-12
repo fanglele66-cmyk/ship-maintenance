@@ -1,9 +1,12 @@
+import additionalScenarios from './additionalScenarios.json'
 // 演示观测值：用于呈现时间窗口与建议的关系，不作为设备阈值。
 export const observationConfig = {
   maintenance: { days:2, names:['轴承振动','轴承温度'], units:['mm/s','°C'], before:[3.0,65], samples:[[2.2,64],[2.2,64],[2.2,63]], abnormal:[2.9,66], basis:'回应提前保养时的振动缓升判断：对比换件前3.0 mm/s、65°C，跟踪振动回落及轴承温度稳定性。' },
   drift: { days:1, names:['同工况排温差','3#缸排温'], units:['°C','°C'], before:[10,432], samples:[[3,425],[3,425],[3,425]], abnormal:[9,431], basis:'回应原排温偏差扩大的判断：同工况偏差由10°C回落，同时核对原异响是否再次出现。' },
   fault: { days:1, names:['冷却水出口温度','冷却水流量'], units:['°C','m³/h'], before:[92.4,68.2], samples:[[79.1,86.5],[79.1,86.5],[79.1,86.5]], abnormal:[90.8,70.2], basis:'回应冷却能力下降的判断：核对出口温度回落与流量恢复是否同步，观察原异常是否反复。' }
 }
+
+for(const item of additionalScenarios)observationConfig[item.id]=item.observation
 
 export function observationResult(id, records, targetDays) {
   const config=observationConfig[id], last=records.at(-1)

@@ -34,7 +34,7 @@ const feedback = computed(() => store.attentionFeedback[props.scenario])
 const evidence = reactive({ reading:'', conditions:'', phenomenon:'', confirmed:false })
 const valid = computed(() => evidence.reading !== '' && Number.isFinite(Number(evidence.reading)) && Number(evidence.reading)>=0 && evidence.conditions.trim() && evidence.phenomenon.trim() && evidence.confirmed)
 function submit() { if(valid.value) store.submitAttentionFeedback(props.scenario, evidence) }
-function openEvent() { store.selectTodo(props.scenario); router.push('/event') }
+function openEvent() { store.selectTodo(props.scenario); router.push({path:'/event',query:{todo:props.scenario}}) }
 </script>
 <style>
 .p2-attention-action{margin:16px 0;padding:18px;border:1px solid #dce7f5;border-radius:10px;background:#f7faff;font-size:13px;line-height:1.7}.p2-attention-action h4{margin:0 0 8px;color:#284b78}.p2-attention-action p{margin:8px 0}.p2-attention-action form{display:grid;gap:12px;margin-top:12px}.p2-attention-action label{display:grid;gap:4px;color:#41556f}.p2-attention-action input:not([type=checkbox]),.p2-attention-action textarea{width:100%;box-sizing:border-box;border:1px solid #cbd9eb;border-radius:6px;padding:8px;background:white;font:inherit}.p2-attention-action .p2-action-confirm{display:flex;align-items:center;gap:8px}.p2-attention-action button{justify-self:start}.p2-attention-action button:disabled{opacity:.45;cursor:not-allowed}.p2-action-hint{color:#66788f}.p2-action-receipt{border-top:1px solid #dce7f5;margin-top:12px;padding-top:12px}

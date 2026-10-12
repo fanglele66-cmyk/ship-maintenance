@@ -3,7 +3,7 @@
   "role": "assistant",
   "purpose": "execution-record",
   "text": "实际执行记录待确认",
-  "hint": "左侧与此处共用同一份草稿。请核对实际措施、时间和验收；确认仅记录现场执行，不修改船管工单。",
+  "hint": "请核对实际措施、已发生的执行时间及验收结果。作业完成后仍异常，应继续原事件排查。",
   "status": "pending",
   "submitLabel": "确认执行记录",
   "fields": [
@@ -48,6 +48,26 @@
       ]
     },
     {
+      "key": "verification",
+      "label": "原异常验收结果",
+      "type": "select",
+      "required": true,
+      "options": [
+        {
+          "value": "resolved",
+          "label": "原异常已解决，验收通过"
+        },
+        {
+          "value": "unresolved",
+          "label": "原异常仍存在，继续排查"
+        },
+        {
+          "value": "pending",
+          "label": "尚未完成验收"
+        }
+      ]
+    },
+    {
       "key": "comparable",
       "label": "处理后可比监测数据",
       "type": "select",
@@ -55,7 +75,7 @@
       "options": [
         {
           "value": "available",
-          "label": "已有可比数据（演示）"
+          "label": "已有可比监测数据"
         },
         {
           "value": "missing",

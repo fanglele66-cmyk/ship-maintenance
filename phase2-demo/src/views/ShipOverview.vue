@@ -4,44 +4,14 @@
     <div class="status-header">
       <div class="sh-left">
         <img class="sh-icon" src="/detail-assets/device-situation-icon.svg" alt="" aria-hidden="true" />
-        <span class="sh-title">设备态势</span>
-        <span class="sh-demo-tag">演示数据</span>
+        <span class="sh-title">船舶态势</span>
+
       </div>
     </div>
 
+
     <!-- 中部：船舶数字孪生 + 浮动设备卡 -->
     <div ref="shipBodyRef" class="ship-body-container">
-      <div class="sh-meta">
-        <div class="sh-meta-item">
-          <span class="sh-meta-label">在线设备</span>
-          <span class="sh-meta-value online">{{ deviceStore.ship.onlineDevices }} / {{ deviceStore.ship.totalDevices }} 台</span>
-        </div>
-        <div class="sh-meta-item">
-          <span class="sh-meta-label">重点设备</span>
-          <span class="sh-meta-value">{{ floatingDevices.length }} / {{ deviceStore.devices.length }} 台</span>
-        </div>
-        <div class="sh-meta-item">
-          <span class="sh-meta-label">最近巡检时间</span>
-          <span class="sh-meta-value">{{ deviceStore.ship.lastInspectionAt }}</span>
-        </div>
-        <div class="sh-meta-item">
-          <span class="sh-meta-label">累计作业次数</span>
-          <span class="sh-meta-value">{{ deviceStore.ship.cumulativeOperations.toLocaleString() }} 次</span>
-        </div>
-        <div class="sh-meta-health">
-          <svg width="48" height="48" viewBox="0 0 56 56" aria-hidden="true">
-            <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(82,196,26,0.15)" stroke-width="4" />
-            <circle
-              cx="28" cy="28" r="22"
-              fill="none" stroke="#52C41A" stroke-width="4" stroke-linecap="round"
-              :stroke-dasharray="circumference"
-              :stroke-dashoffset="healthOffset"
-              transform="rotate(-90, 28, 28)"
-            />
-          </svg>
-          <span class="sh-health-text">{{ deviceStore.ship.healthScore }}</span>
-        </div>
-      </div>
 
       <div class="ship-scene" :class="{ 'is-compact': isCompactScene }">
         <img src="/ship-hologram-v6.png" class="ship-img" alt="清晰通透的蓝色全息工业船舶数字孪生模型" />
@@ -70,33 +40,25 @@
             `device-${device.id}`
           ]"
           :style="{ left: device.position.x, top: device.position.y }"
-          role="button"
-          tabindex="0"
-          :aria-label="`查看${device.name}的设备态势`"
+          tabindex="0" role="group"
+          :aria-label="`${device.name}运行情况`"
           @click="$emit('selectDevice', device)"
-          @keydown.enter="$emit('selectDevice', device)"
-          @keydown.space.prevent="$emit('selectDevice', device)"
+          @keydown.enter.self="$emit('selectDevice', device)"
+          @keydown.space.self.prevent="$emit('selectDevice', device)"
         >
-          <div class="fdc-name-row">
+          <button type="button" class="fdc-name-row fdc-open" :aria-label="`查看${device.name}设备概览`" @click.stop="emit('selectDevice',device)">
             <span class="fdc-name">{{ device.name }}</span>
             <span class="fdc-link-arrow" aria-hidden="true">→</span>
-          </div>
-          <div class="fdc-status-row">
-            <span class="fdc-dot" :class="device.status"></span>
-            <span class="fdc-status" :class="device.status">
-              {{ device.status === 'danger' ? '异常' : device.status === 'warning' ? '关注' : '正常' }}
-            </span>
-            <span
-              v-if="device.openEventCount"
-              class="fdc-event-badge"
-              :title="`${device.openEventCount} 项未处理待办`"
-              :aria-label="`${device.openEventCount} 项未处理待办`"
-            >待办 {{ device.openEventCount }}</span>
-          </div>
+          </button>
+          <div class="fdc-status-row"><span class="fdc-dot" :class="device.status" :aria-label="device.status==='danger'?'异常':device.status==='warning'?'关注':'正常'"></span><span class="fdc-caption">{{ device.id==='main-engine-1'?decisionItems.length+' 项关注 · '+activeTasks.length+' 项待办':'运行状态' }}</span></div>
+          <template v-if="device.id==='main-engine-1'"><button v-for="item in decisionItems" :key="item.id" class="fdc-issue" @click.stop="emit('selectItem',item.id)"><small>关注</small>{{ item.title }}</button><button v-for="task in activeTasks" :key="task.id" class="fdc-issue" @click.stop="openTask(task.id)"><small>待办</small>{{ task.initialTitle }}</button></template>
+          <button v-for="task in tasksFor(device)" :key="task.id" class="fdc-issue" @click.stop="openTask(task.id)"><small>待办</small>{{ task.initialTitle }}</button><p v-if="device.id!=='main-engine-1' && !tasksFor(device).length" class="fdc-reading">{{ device.metrics.map(metric=>metric.label+metric.value+metric.unit).join(' · ') }}</p>
+
         </div>
       </div>
     </div>
 
+    <section class="ship-brief"><header><strong>AI 全船运行概况</strong><span>{{ decisionItems.length }} 项待决策关注 · {{ allActiveTasks.length }} 项待办推进中</span></header><MarkdownContent :content="shipMarkdown"/></section>
     <!-- 底部：船舶工况条 -->
     <div class="ship-work-cond">
       <div class="wc-item">
@@ -124,19 +86,34 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import MarkdownContent from '@/components/MarkdownContent.vue'
+import { fleetAssessment } from '@/mock/captainAssessments'
+import { useRouter } from 'vue-router'
 import { useElementSize } from '@vueuse/core'
 import { useDeviceStore } from '@/stores/deviceStore'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 
-const emit = defineEmits(['selectDevice'])
+const emit = defineEmits(['selectDevice','selectItem'])
+const router=useRouter()
+
 
 const deviceStore = useDeviceStore()
 const demoStore = usePhase2DemoStore()
+const shipReport=computed(()=>fleetAssessment(demoStore))
+const allActiveTasks=computed(()=>demoStore.visibleTodos.filter(task=>!demoStore.isTaskHandled(task.id)))
+const activeTasks=computed(()=>allActiveTasks.value.filter(task=>!task.deviceId || task.deviceId==='main-engine-1'))
+const tasksFor=device=>allActiveTasks.value.filter(task=>task.deviceId===device.id)
+const shipMarkdown=computed(()=>`**当前结论**\n\n${shipReport.value.conclusion}\n\n**综合依据**\n\n${shipReport.value.basis}\n\n**下一步建议**\n\n${shipReport.value.recommendation}`)
+const decisionItems=computed(()=>[
+ {id:'drift',title:'3号缸排温偏离扩大',summary:'同工况相对偏差由8°C扩大至10°C，建议先核实仪表与现场现象。'},
+ {id:'maintenance',title:'连杆轴承提前检查建议',summary:'近7日振动2.1→3.0 mm/s，距周期检修约140小时，建议评估检查时机。'}
+].filter(item=>!demoStore.todoCreated[item.id]&&!demoStore.ignoredSuggestions[item.id]))
+function openTask(id){demoStore.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 const shipBodyRef = ref(null)
 const { width: shipBodyWidth } = useElementSize(shipBodyRef)
 const isCompactScene = computed(() => shipBodyWidth.value > 0 && shipBodyWidth.value <= 720)
 const compactCardX = (ratio) => {
-  const cardHalfWidth = 75
+  const cardHalfWidth = 120
   const edgeGutter = 8
   const safeInset = cardHalfWidth + edgeGutter
   const sceneWidth = shipBodyWidth.value
@@ -152,12 +129,13 @@ const openEventCounts = computed(() => {
 // 4 个关键设备的浮动位置（侧视图船体：船头朝左，船尾朝右）
 const floatingDevices = computed(() => {
   const devices = deviceStore.devices.filter(d =>
-    ['main-engine-1', 'boiler', 'steering-gear', 'air-compressor'].includes(d.id)
+    ['main-engine-1', 'aux-engine-2','boiler', 'steering-gear', 'air-compressor'].includes(d.id)
   )
   // 卡片围绕船身排布；窄画布使用错层布局，避免 150px 卡片互相覆盖
   const desktopPositions = {
+    'aux-engine-2': {position:{x:'52%',y:'21%'},anchor:{x:'58%',y:'50%'}},
     'main-engine-1': {
-      position: { x: '68%', y: '74%' },
+      position: { x: '42%', y: '74%' },
       anchor: { x: '68%', y: '55%' }
     },
     'boiler': {
@@ -169,32 +147,33 @@ const floatingDevices = computed(() => {
       anchor: { x: '79%', y: '50%' }
     },
     'air-compressor': {
-      position: { x: '46%', y: '40%' },
+      position: { x: '27%', y: '34%' },
       anchor: { x: '48%', y: '53%' }
     }
   }
   const compactPositions = {
+    'aux-engine-2': {position:{x:'50%',y:'48%'},anchor:{x:'58%',y:'50%'}},
     'main-engine-1': {
-      position: { x: compactCardX(0.59), y: '80%' },
+      position: { x: compactCardX(0.24), y: '75%' },
       anchor: { x: '69.8%', y: '55.5%' }
     },
     'boiler': {
-      position: { x: compactCardX(0.71), y: '27%' },
+      position: { x: compactCardX(0.76), y: '27%' },
       anchor: { x: '69.8%', y: '44.5%' }
     },
     'steering-gear': {
-      position: { x: compactCardX(0.78), y: '59%' },
+      position: { x: compactCardX(0.76), y: '75%' },
       anchor: { x: '81.9%', y: '50%' }
     },
     'air-compressor': {
-      position: { x: compactCardX(0.43), y: '41%' },
+      position: { x: compactCardX(0.24), y: '28%' },
       anchor: { x: '47.8%', y: '53.3%' }
     }
   }
   const positions = isCompactScene.value ? compactPositions : desktopPositions
   return devices.map(d => ({
     ...d,
-    status:d.id==='main-engine-1'?(demoStore.progress.fault<4||demoStore.todoCreated.drift&&demoStore.progress.drift>=2&&demoStore.progress.drift<6?'danger':demoStore.monitorStep.stable<2||!demoStore.todoCreated.drift||!demoStore.todoCreated.maintenance?'warning':'normal'):d.status,
+    status:tasksFor(d).length?'danger':d.id==='main-engine-1'?(demoStore.progress.fault<4||demoStore.todoCreated.drift&&demoStore.progress.drift>=2&&demoStore.progress.drift<6?'danger':demoStore.monitorStep.stable<2||!demoStore.todoCreated.drift||!demoStore.todoCreated.maintenance?'warning':'normal'):d.status,
     position: positions[d.id]?.position || { x: '50%', y: '50%' },
     anchor: positions[d.id]?.anchor || { x: '50%', y: '50%' },
     openEventCount: openEventCounts.value[d.id] || 0
@@ -361,10 +340,10 @@ const healthOffset = computed(() => {
 /* ===== 浮动设备卡 ===== */
 .float-dev-card {
   position: absolute;
-  width: 150px;
-  min-width: 150px;
+  width: 232px;
+  min-width: 0;
   box-sizing: border-box;
-  padding: 9px 10px;
+  padding: 15px 16px;
   border: 1px solid rgba(105,199,255,0.26);
   border-radius: 8px;
   background: rgba(7,29,51,0.88);
@@ -504,4 +483,7 @@ const healthOffset = computed(() => {
   .sh-meta-item { min-width: 72px; }
   .float-dev-card { min-width: 100px; }
 }
+.fdc-caption{color:#a5c5d6;font-size:12px}.fdc-issue{display:block;border:0;border-top:1px solid #284356;background:transparent;color:#dfedf4;padding:9px 0;width:100%;text-align:left;font-size:13px;line-height:1.5;cursor:pointer}.fdc-issue small{color:#91b5c9;margin-right:8px}.fdc-issue:hover{color:#fff;background:#19394c}.fdc-reading{font-size:13px;color:#abc7d9;margin:8px 0 0}.fdc-name{font-size:17px}.ship-scene{width:100%;top:55%}.ship-overview .float-dev-card{width:232px;max-width:calc(100% - 16px)}@media(max-width:1100px){.ship-overview{grid-template-columns:minmax(0,1fr) 310px}.ship-assessment{padding:16px}.ship-overview .float-dev-card{width:210px}}@media(max-width:780px){.ship-overview{overflow:auto;display:flex}.ship-body-container{min-height:520px;flex:none}.ship-assessment{overflow:visible}.ship-work-cond{flex-shrink:0}}
+.fdc-open{width:100%;border:0;padding:0;background:none;color:inherit;cursor:pointer;text-align:left;font:inherit}.fdc-open:focus-visible,.fdc-issue:focus-visible{outline:2px solid #7edaff;outline-offset:4px}
+ .ship-overview{display:flex;position:relative;overflow:auto}.ship-body-container{flex:1 0 450px;min-height:450px}.ship-overview .ship-scene{width:100%;height:100%;aspect-ratio:auto;top:50%}.ship-img{object-fit:contain}.ship-brief{flex:none;background:#fff;padding:20px 28px;border-top:1px solid #e2e7ee;color:#35465d}.ship-brief header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:16px}.ship-brief header strong{font-size:17px}.ship-brief header span{font-size:13px;color:#7a8595}.ship-brief :deep(.markdown-content){max-width:1200px}.ship-work-cond{flex:none}.ship-scene .device-main-engine-1{max-height:280px;overflow:auto}@media(max-width:900px){.ship-body-container{min-height:540px;flex-basis:540px}.ship-brief{padding:18px}.ship-brief header{align-items:flex-start;flex-direction:column}}
 </style>

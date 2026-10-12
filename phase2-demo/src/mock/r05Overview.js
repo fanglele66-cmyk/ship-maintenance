@@ -3,11 +3,11 @@ import { taskReceipt } from '../message-flows/taskReceipt.js'
 // Fictional execution snapshot. Current actions are separate from this immutable report.
 export const healthReview={
  runId:'main-engine-health-20261012-0800',completedAt:'2026/10/12 08:00',dataCutoff:'2026/10/12 07:55',analysisRange:'10/11 08:00—10/12 07:55 · 近24小时',
- conditions:'转速78–82 rpm，负荷68%–72%；剔除启停、机动及负荷快速变化片段',coverage:'有效覆盖率98.6%；不足部分不按正常处理',
- conclusion:'本次有3项需要人员跟进：冷却系统检查事件、3#缸现场核实、1#缸连杆轴承提前检查建议。4#缸排温相对偏差仍反复出现，暂未扩大，继续由系统跟踪。其余已覆盖指标暂未发现值得新增关注的变化；当前证据不足以确认相关部件故障，也不代表未覆盖部位正常。',
- recommendation:'先跟进冷却系统原事件中的检查要求；核对3#缸现场排温、当时工况与现场现象；结合已有维保安排和靠港条件，决定是否开展轴承提前检查。4#缸暂无需人工操作。',
+ conditions:'转速440–460 rpm，负荷68%–72%；剔除启停、机动及负荷快速变化片段',coverage:'有效覆盖率98.6%；不足部分不按正常处理',
+ conclusion:'本次有3项需要人员跟进：冷却系统检查事件、3#缸现场核实、1#缸连杆轴承提前检查建议。其余已覆盖指标暂未发现值得新增关注的变化；当前证据不足以确认相关部件故障，也不代表未覆盖部位正常。',
+ recommendation:'先跟进冷却系统原事件中的检查要求；核对3#缸现场排温、当时工况与现场现象；结合已有维保安排和靠港条件，决定是否开展轴承提前检查。',
  basis:'冷却水出口温度92.4°C、流量68.2 m³/h，温升与流量下降同时出现；3#缸排温430→432°C、缸间相对差9→10°C；4#缸相对差8→7°C，仍高于近期历史表现；轴承近7日振动2.1→3.0 mm/s，温度约65°C，尚无现场磨损确认记录。',
- change:'3#缸相对差9→10°C，需要现场核实；4#缸相对差8→7°C，关注安排不变。冷却系统与轴承的未完成行动继续沿原记录处理。',
+ change:'3#缸相对差9→10°C，需要现场核实；冷却系统与轴承的未完成行动继续沿原记录处理。',
  sections:[
  {title:'冷却系统：联合变化，继续核实',paragraphs:['出口水温偏高与流量下降同时出现，提示冷却侧供给或换热能力可能减弱。需结合负荷、现场读数及回路状态核实，不能直接定位滤器或泵故障。已有检查事件，继续沿原事件处理，不新增重复关注。']},
  {title:'3#缸：偏差扩大，等待现场核实',paragraphs:['相对偏差已在多个可比片段反复出现，本次由9°C扩大至10°C，排温升至432°C。请核实现场读数、工况与现象，当前不能确诊喷油器或气阀故障。完整核实后保留回执，是否开展检查仍依后续研判及人员决定。']},
@@ -17,7 +17,7 @@ export const healthReview={
  ]
 }
 export const healthReviewReceipt=taskReceipt({
- id:'main-engine-health-receipt-20261012-0800',runId:healthReview.runId,title:'主机每日健康回顾',completedAt:healthReview.completedAt,executionStatus:'completed',subject:'1号主机',analysisRange:healthReview.analysisRange,
+ id:'main-engine-health-receipt-20261012-0800',runId:healthReview.runId,title:'主机每日健康回顾',completedAt:healthReview.completedAt,executionStatus:'completed',subject:'主机',analysisRange:healthReview.analysisRange,
  conclusion:healthReview.conclusion,change:healthReview.change,arrangement:healthReview.recommendation,requiresAction:true,dataLimit:healthReview.coverage+'；结论仅覆盖已接入指标。',
  actions:[{id:'todo:fault',label:'查看冷却系统事件'},{id:'item:drift',label:'查看3#缸关注档案'},{id:'item:maintenance',label:'查看轴承维保建议'}]
 })

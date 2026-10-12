@@ -1,3 +1,4 @@
+import additionalScenarios from './additionalScenarios.json'
 import { maintenanceProposalScene } from './phase2SituationContent'
 import { mockEvents } from './events'
 
@@ -43,7 +44,10 @@ const english = ['Cyl Cool Water Out','Cyl Cool Water In','Cooling Water ΔT','C
 const faultSensors = mockEvents[0].snapshot.sensors.map((s,i)=>{const start=s.trendData[0].value,end=s.trendData.at(-1).value;return {...s,id:`fault-${i}`,nameEn:english[i],nameCn:s.name,trendData:s.trendData.map(p=>({...p,value:Number((start+(p.value-start)*(s.value-start)/(end-start||1)).toFixed(2))}))}})
 faultSensors[2].trendData=faultSensors[0].trendData.map((p,i)=>({...p,value:Number((p.value-faultSensors[1].trendData[i].value).toFixed(2))}))
 function sensor(id,nameEn,nameCn,unit,values,normalRange){return {id,nameEn,nameCn,name:nameCn,unit,value:values.at(-1),normalRange,trendData:values.map((value,i)=>({time:`09-${String(23+Math.floor(i/4)).padStart(2,'0')} ${String(i%4*6).padStart(2,'0')}:00`,value}))}}
+for(const item of additionalScenarios){overviewReports[item.id]=item.report;causeContent[item.id]=item.cause}
 export function scenarioSensors(id, stageId='event') {
+  const extra=additionalScenarios.find(item=>item.id===id)
+  if(extra)return mockEvents[extra.snapshotIndex].snapshot.sensors.map((s,i)=>({...s,id:extra.id+'-'+i,nameCn:s.name,nameEn:s.name,trendData:s.trendData.map(p=>{const first=s.trendData[0].value,last=s.trendData.at(-1).value;return {...p,value:Number((first+(p.value-first)*(s.value-first)/(last-first||1)).toFixed(3))}})}))
   if(id==='fault')return faultSensors
   if(id==='maintenance')return [sensor('vibration','Bearing Vibration','1#缸轴承振动','mm/s',[2.1,2.15,2.12,2.2,2.25,2.3,2.32,2.4,2.45,2.5,2.6,2.65,2.7,2.8,2.9,3.0],'历史稳定区间约2.1–2.3 mm/s'),sensor('bearing-temp','Bearing Temperature','轴承温度','°C',[62,62.4,62.1,63,63.2,63.1,63.5,64,64,64.2,64.5,64.8,65,65.2,65.1,65.4],'历史稳定区间62–65°C')]
   const values=stageId==='attention'?[420,421,421,422,423,422,423,424,424,425,426,427,428,429,431,432]:[420,421,421,422,423,422,423,424,424,425,426,427,428,429,431,432]
@@ -64,9 +68,9 @@ export function attentionScene(id, monitorStep=0) {
 
 export function stageScene(id, stage, observationReady=false) {
   const report=overviewReports[id==='drift'&&stage.id==='event'?'driftEvent':id]
-  if(stage.kind==='overview')return {title:stage.label,paragraphs:[{label:'当前情况',text:stage.summary},{label:'初判结论',text:report.conclusion},{label:'下一步建议',text:report.human},{label:'判断依据',text:report.basis}],question:stage.id==='event'?'要先查看数据趋势，还是结合候选原因安排排查？':id==='maintenance'?'现场是否具备检查条件？轴瓦磨损、间隙和备件信息都可以直接补充。':'现场仪表读数是否一致？有无可以复现的异响或振动？'}
+  if(stage.kind==='overview')return {title:stage.label,paragraphs:[{label:'初判结论',text:report.conclusion},{label:'判断依据',text:report.basis},{label:'下一步建议',text:report.human}],question:stage.id==='event'?'要先查看数据趋势，还是结合候选原因安排排查？':id==='maintenance'?'现场是否具备检查条件？轴瓦磨损、间隙和备件信息都可以直接补充。':'现场仪表读数是否一致？有无可以复现的异响或振动？'}
   if(stage.kind==='check')return {title:`已进入${stage.label}`,paragraphs:[{label:'本轮任务',text:stage.title},{label:'操作提示',text:`先查看当前${stage.label}项的注意事项，确认后逐步记录现场结果。提交后我会整理反馈并提示下一步。`}],question:id==='drift'&&stage.id==='check'?'请重点确认读数真实性和现场现象；补充证据后再判断异常事件是否成立。':'如有补充、修改或新的现场发现，可以直接告诉我。'}
-  if(stage.kind==='work')return {title:`已进入${stage.label}`,paragraphs:[{label:'处理目标',text:stage.title},{label:'操作安排',text:'依次核对准备、备件、作业步骤和验收结果。也可一次说明已完成的检查和处理过程，我会整理为记录供您确认。'}],question:id==='fault'?'滤器清洗后，实测流量和出口温度分别是多少？':id==='drift'?'喷油器处理后，喷雾形态、密封和同工况排温如何？':'换件后间隙、振动和轴承温度的复测结果如何？'}
+  if(stage.kind==='work')return {title:`已进入${stage.label}`,paragraphs:[{label:'处理目标',text:stage.title},{label:'操作安排',text:'依次核对准备、备件、作业步骤和验收结果。也可一次说明已完成的检查和处理过程，我会整理为记录供您确认。'}],question:id==='fault'?'滤器清洗后，实测流量和出口温度分别是多少？':id==='drift'?'喷油器处理后，喷雾形态、密封和同工况排温如何？':additionalScenarios.find(item=>item.id===id)?'处理后原异常指标与现场现象如何？请在执行记录中确认，并明确验收是否通过。':'换件后间隙、振动和轴承温度的复测结果如何？'}
   if(stage.kind==='observe'&&!observationReady)return {title:'已进入效果观察',paragraphs:[{label:'观察安排',text:stage.title},{label:'验证口径',text:id==='maintenance'?'跟踪同工况振动是否由3.0 mm/s回落，并观察轴承温度。':id==='drift'?'跟踪同工况排温相对差是否由10°C回落，同时确认异响是否消失。':'跟踪流量是否由68.2 m³/h恢复、出口温度是否由92.4°C回落，留意是否反复。'}],question:'当前观察窗口尚未完成。如发现新的现场异常，可以随时反馈。'}
   if(stage.kind==='observe')return {title:'处理后效果观察',paragraphs:[{label:'观察口径',text:stage.summary},{label:'监测证据',text:stage.evidence.join('；')},{label:'当前判断',text:stage.judgement}],question:'您是否确认观察期内没有新的异常？可确认闭环，或延长跟踪并补充现场情况。'}
   return {title:'本次处理已闭环',paragraphs:[{label:'处理摘要',text:stage.evidence.join('；')},{label:'后续建议',text:stage.judgement}],question:'需要回看哪一阶段的记录，或将本次处理提报为案例？'}

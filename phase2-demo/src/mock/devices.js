@@ -41,7 +41,7 @@ export const statusColors = {
 export const mockDevices = [
   {
     id: 'main-engine-1',
-    name: '1号主机',
+    name: '主机',
     system: '主机系统',
     status: 'danger',
     metrics: [
@@ -67,7 +67,7 @@ export const mockDevices = [
     system: '辅机系统',
     status: 'warning',
     metrics: [
-      { label: '油压', value: 2.1, unit: 'MPa', status: 'over' },
+      { label: '油压', value: 0.18, unit: 'MPa', status: 'over' },
       { label: '转速', value: 1750, unit: 'rpm', status: 'normal' }
     ],
     position: { x: '45%', y: '20%' }

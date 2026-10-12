@@ -1,3 +1,4 @@
+import additionalScenarios from './additionalScenarios.json'
 // 二期演示只保留四条可讲完整的故事。数值用于产品交互模拟，不作为船舶运行判断依据。
 export const attentionItems = [
   {
@@ -78,7 +79,7 @@ export const scenarioCases = {
   drift: {
     id: 'drift', cardType: '关注事项的证据补充请求', initialTitle: '主机3#缸排温偏离检查', eventTitle: '主机3#缸排温异常', device: '主机 · 3#缸', priority: '关注核实',
     stages: [
-      { id: 'attention', label: '状态关注', kind: 'overview', title: '偏差扩大后的现场证据请求', summary: '系统发现排温偏差从8°C扩大到10°C，伴轻微波动；仍未达到450°C告警线。', evidence: ['同工况相对差 8 → 10°C', '当前排温 432°C；AMS告警线 450°C', '系统无法仅凭该数据确认真实异常'], judgement: '请轮机员检查异响、振动与仪表读数，确认是否需要响应。', action: '进入现场检查', reply: '请核对现场仪表读数，并补充异响与振动是否可复现。' },
+      { id: 'attention', label: '任务概览', kind: 'overview', title: '偏差扩大后的现场证据请求', summary: '系统发现排温偏差从8°C扩大到10°C，伴轻微波动；仍未达到450°C告警线。', evidence: ['同工况相对差 8 → 10°C', '当前排温 432°C；AMS告警线 450°C', '系统无法仅凭该数据确认真实异常'], judgement: '请轮机员检查异响、振动与仪表读数，确认是否需要响应。', action: '进入现场检查', reply: '请核对现场仪表读数，并补充异响与振动是否可复现。' },
       { id: 'check', label: '检查', kind: 'check', title: '辅助确认异动是否真实且需要响应', summary: '先确认排温偏差是否真实、是否需要响应。', evidence: ['先核对现场仪表与采集值', '再查看3#缸附近是否有可复现异响'], tasks: [{ label: '核对现场排温读数', guide: '对比现场仪表与系统采集值。' }, { label: '观察3#缸异响与振动', guide: '记录现场现象能否复现。' }], judgement: '现场仪表与系统一致，轻微异响可复现；异动真实，建议确立异常事件。', action: '确认异常并形成事件', reply: '现场读数一致且异响可复现，已确认主机3#缸排温异常需要响应。接下来结合候选原因安排排查。' },
       { id: 'event', label: '事件概览', kind: 'overview', title: '主机3#缸排温异常已确立', summary: '由先前关注事项与现场检查接续形成，保留了8→10°C及异响证据。', evidence: ['来源：持续监测关注事项', '确立依据：现场仪表一致 + 异响可复现', '事件响应：安排针对性排查'], judgement: '喷油器雾化不良可能性较高，排气阀密封不良次之；现场仪表核对已降低测点偏差的可能性。', action: '进入排查', reply: '请先排查喷油器雾化与回油，再核对排气阀密封。' },
       { id: 'investigate', label: '排查', kind: 'check', title: '排查导致排温异常的原因', summary: '已确认排温异常，接下来缩小根因范围。', evidence: ['作业前停机隔离与高压油管泄压', '结合异常缸与相邻缸同工况对比'], tasks: [{ label: '校验3#缸喷油器雾化', guide: '检查喷孔积炭及喷雾形态。' }, { label: '检查排气阀密封', guide: '记录密封检查结果。' }], judgement: '喷油器喷孔积炭与现象吻合，排气阀未见异常；建议检修喷油器。', action: '提交排查并进入维修', reply: '根因范围收敛到喷油器雾化不良，进入维修处理。' },
@@ -98,3 +99,5 @@ export const scenarioCases = {
     ]
   }
 }
+
+for (const scenario of additionalScenarios) scenarioCases[scenario.id] = scenario

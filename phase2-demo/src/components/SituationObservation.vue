@@ -27,6 +27,6 @@ const store=usePhase2DemoStore(),router=useRouter(),activeTab=ref('今日观测'
 const result=computed(()=>store.getObservationResult(props.scenario))
 const title=computed(()=>props.scenario==='fault'?'冷却系统处理后效果观察':props.scenario==='maintenance'?'1#缸轴承保养后效果观察':'3#缸排温处理后效果观察')
 function recordText(record){return record.values?record.values.map((value,index)=>observationConfig[props.scenario].names[index]+' '+value+' '+observationConfig[props.scenario].units[index]).join(' · '):'待补齐同工况记录'}
-function openEvent(){store.selectTodo(props.scenario);router.push('/event')}
+function openEvent(){store.selectTodo(props.scenario);router.push({path:'/event',query:{todo:props.scenario}})}
 function reinspect(){store.reopenTodo(props.scenario);openEvent()}
 </script>

@@ -37,7 +37,7 @@ export function attentionDossier(store, id) {
     charts=config.names.map((name,i)=>({name,unit:config.units[i],labels:['处理前',...observations.map(r=>r.label)],values:[config.before[i],...observations.map(r=>r.values?.[i]??null)],reference:'处理前记录；处理后样本需在可比工况下比较'}))
   } else if(r02Report(store,id) || id==='drift') {
     const data=r02Telemetry[id]
-    charts=[{name:`${id==='cyl4-watch'?'4':id==='cyl2-ended'?'2':'3'}#缸排温`,unit:'°C',labels:data.labels,values:data.values,reference:'转速78–82 rpm、负荷68%–72%的稳定运行片段'}, {name:'与其余缸均值的差值',unit:'°C',labels:data.labels,values:data.gaps,reference:'同时段其余缸排温均值；不作为通用故障阈值'}]
+    charts=[{name:`${id==='cyl4-watch'?'4':id==='cyl2-ended'?'2':'3'}#缸排温`,unit:'°C',labels:data.labels,values:data.values,reference:'转速440–460 rpm、负荷68%–72%的稳定运行片段'}, {name:'与其余缸均值的差值',unit:'°C',labels:data.labels,values:data.gaps,reference:'同时段其余缸排温均值；不作为通用故障阈值'}]
   } else if(id==='drift') {
     const progressed=store.monitorStep.drift>0
     charts=[{name:'3#缸排温',unit:'°C',labels:progressed?['首次发现','后续比较']:['首次发现'],values:progressed?[428,432]:[428],reference:'相近转速与负荷下的本缸前后记录'}, {name:'与其余缸均值的差值',unit:'°C',labels:progressed?['首次发现','后续比较']:['首次发现'],values:progressed?[8,10]:[8],reference:'同一时段其余缸的平均排温，不是通用健康阈值'}]
@@ -63,6 +63,6 @@ export function attentionDossier(store, id) {
     limit:'缺少可比数据时保留事项，说明无法充分判断；不按正常处理，也不据此结束观察。'
   }
   return {id,title:handled?(id==='drift'?store.cases[id].eventTitle:store.cases[id].initialTitle)+' · 效果观察':item.title,device:item?.device||'主机 · 冷却系统',action,closure,conclusion:closure?.summary||observation?.text||report.conclusion,background:r02Report(store,id)?report.timeline.find(record=>/建立关注|进入关注/.test(record.label))?.text||item?.short:item?.short||observationConfig[id].basis,report,records,charts,feedback:store.attentionFeedback[id],first:records[0]?.at||'处理验收后',updated:records.at(-1)?.at||'待首测',analysisAt:lastAnalysis?.at||'尚无有效分析',analysisChange:changeSummary,notes,comparisonRows,tracking,observation,
-    context:{conditions:store.attentionFeedback[id]?.conditions||'转速78–82 rpm，负荷68%–72%；排除启停及机动时段。',maintenance:handled?'实际处理与验收记录来自关联事件；船管回传记录尚未接入。':'本事项未取得相关实际维护或换件记录，不假设已经维护。'},
+    context:{conditions:store.attentionFeedback[id]?.conditions||'转速440–460 rpm，负荷68%–72%；排除启停及机动时段。',maintenance:handled?'实际处理与验收记录来自关联事件；船管回传记录尚未接入。':'本事项未取得相关实际维护或换件记录，不假设已经维护。'},
     sources:[{label:'观测与分析依据',text:'机舱监测系统 · 逐缸排温、转速及负荷记录；最近更新2026/10/12 08:00。'},{label:'人员反馈',text:'现场核实回执与登记留言；两者分别保留，不将留言当作已核实事实。'},...(store.todoCreated[id]?[{label:'检查、处置与实际措施',text:'由关联事件保留，可进入原事件回看。',event:true}]:[]),{label:'手册及审核案例',text:'主机操作维护手册 · 排气温度监测章节；用于核对监测要求，不作为已确认故障原因。'}]}
 }

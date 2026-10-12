@@ -1,7 +1,7 @@
 <template>
   <div class="situation-view">
     <button
-      v-if="isAssistantCollapsed"
+      v-if="isAssistantCollapsed && !isShipLevel"
       class="compact-assistant-float"
       :class="{ 'is-active': compactAssistantOpen, 'is-dragging': isCompactFloatDragging }"
       :style="compactFloatStyle"
@@ -28,12 +28,12 @@
         <AttentionDossier v-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
         <MaintenanceAdviceDetail v-else-if="maintenanceId" standalone :planned="maintenanceId==='planned'" @back="returnToMaintenance" @show-advice="router.push('/situation/maintenance/maintenance')" @show-arrangements="router.push('/situation/maintenance/planned')" @open-event="openMaintenanceEvent" @open-observation="router.push('/situation/attention/maintenance')" />
         <!-- Layer 1: Ship Overview -->
-        <div v-show="!attentionId && !maintenanceId" class="layer" :class="layerClass(1)">
-          <ShipOverview @select-device="handleDeviceClick" />
+        <div v-show="!attentionId && !maintenanceId && currentLayer === 1" class="layer" :class="layerClass(1)">
+          <ShipOverview @select-device="handleDeviceClick" @select-item="openDemoItem" />
         </div>
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
-        <div v-show="!attentionId && !maintenanceId" class="layer" :class="layerClass(2)">
+        <div v-show="!attentionId && !maintenanceId && currentLayer === 2" class="layer" :class="layerClass(2)">
           <div class="layer-header">
             <BackButton label="返回船舶态势" @click="goToLayer(1)" />
             <span class="layer-subtitle">船舶态势</span>
@@ -59,7 +59,7 @@
 
       <!-- 拖拽手柄（在内容区和助手之间，独立元素不受 overflow 裁剪） -->
       <div
-        v-if="!isAssistantCollapsed"
+        v-if="!isAssistantCollapsed && !isShipLevel"
         class="panel-resize-handle"
         :class="{ resizing: isResizingAssistant }"
         @pointerdown="startResize"
@@ -75,12 +75,12 @@
       <!-- 助手面板容器（宽度由拖拽控制） -->
       <Transition name="compact-assistant-slide">
         <div
-          v-if="!isAssistantCollapsed || compactAssistantOpen"
+          v-if="!isShipLevel && (!isAssistantCollapsed || compactAssistantOpen)"
           class="assistant-wrapper"
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <Phase2Assistant :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition>
     </div>
@@ -152,6 +152,7 @@ const reportDialogOpen = ref(false)
 const reportPrefill = ref(null)
 const situationBodyRef = ref(null)
 const isResizingAssistant = ref(false)
+const isShipLevel=computed(()=>currentLayer.value===1&&!attentionId.value&&!maintenanceId.value)
 const isAssistantCollapsed = ref(false)
 const compactAssistantOpen = ref(false)
 const assistantRef=ref(null)
@@ -405,14 +406,11 @@ async function returnToMaintenance() {
   await nextTick()
   deviceSituationRef.value?.showMaintenanceList()
 }
-function openMaintenanceEvent(){demoStore.selectTodo('maintenance');router.push('/event')}
+function openMaintenanceEvent(){demoStore.selectTodo('maintenance');router.push({path:'/event',query:{todo:'maintenance'}})}
 onActivated(async () => { const id=route.query.observation; if(id && demoStore.isTaskHandled(id)){openDemoDevice();await nextTick();deviceSituationRef.value?.openObservation(id)} })
 async function openDemoItem(id) {
-  if (currentLayer.value === 1) {
-    openDemoDevice()
-    await nextTick()
-  }
-  deviceSituationRef.value?.openItem(id)
+  if(id==='fault'){demoStore.selectTodo(id);await router.push({path:'/event',query:{todo:id}});return}
+  await router.push(id==='maintenance'?'/situation/maintenance/maintenance':'/situation/attention/'+id)
 }
 
 function openDemoDevice() {
@@ -422,7 +420,7 @@ function openDemoDevice() {
 
 function openDemoTodo() {
   demoStore.selectTodo('fault')
-  router.push('/event')
+  router.push({path:'/event',query:{todo:'fault'}})
 }
 
 function handleSensorClick(sensor) {

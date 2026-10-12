@@ -9,7 +9,7 @@ test('shared execution draft validates, records once and waits for comparable da
   store.createTodo('maintenance');store.progress.maintenance=2;store.selectTodo('maintenance')
   let form=store.executionInquiry('maintenance');assert.ok(form)
   assert.equal(store.confirmExecutionRecord('maintenance',form.id,{}),false)
-  const values={equipment:'主机1#缸连杆轴承',task0:'已完成',task1:'待补充',measures:'复装并复测',executedAt:'2026-10-01T10:00',acceptance:'复测尚待补齐',completion:'completed',comparable:'missing'}
+  const values={equipment:'主机1#缸连杆轴承',task0:'已完成',task1:'待补充',measures:'复装并复测',executedAt:'2026-10-01T10:00',acceptance:'复测尚待补齐',completion:'completed',verification:'resolved',comparable:'missing'}
   store.updateExecutionRecord('maintenance',form.id,values);assert.equal(store.taskResults['maintenance:service:1'],'待补充')
   assert.equal(store.confirmExecutionRecord('maintenance',form.id,values),false)
   values.completion='partial';assert.equal(store.confirmExecutionRecord('maintenance',form.id,values),true);assert.equal(store.progress.maintenance,2)

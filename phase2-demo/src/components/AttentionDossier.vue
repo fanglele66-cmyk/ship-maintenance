@@ -1,7 +1,7 @@
 <template>
   <div class="attention-dossier">
     <header class="dossier-header">
-      <BackButton label="返回主机关注事项" @click="$emit('back')" />
+      <BackButton label="返回主机概览" @click="$emit('back')" />
       <template v-if="dossier"><div><p class="dossier-context">关注档案 · {{ dossier.device }}</p><h2>{{ dossier.title }}</h2></div><span class="p2-state-tag" :class="dossier.closure ? 'green' : dossier.action.required || dossier.action.linked ? 'amber' : 'blue'">{{ dossier.action.phase }}</span></template>
     </header>
     <template v-if="dossier">
@@ -11,7 +11,7 @@
         <template v-if="activeTab==='事项概览'">
           <section v-if="dossier.closure" class="dossier-section dossier-closure"><h3>事项已结束</h3><dl class="dossier-facts"><div><dt>结束原因</dt><dd>{{ dossier.closure.reason }}</dd></div><div><dt>结束时间</dt><dd>{{ dossier.closure.at }}</dd></div></dl><p>{{ dossier.closure.summary }}</p><p class="dossier-limit">{{ dossier.closure.boundary }}</p></section>
           <section class="dossier-section"><h3>{{ dossier.closure ? '结束前后的变化' : '最新判断' }}</h3><p v-if="!dossier.closure" class="dossier-conclusion">{{ dossier.conclusion }}</p><p><b>最近分析变化：</b>{{ dossier.analysisChange }}</p><p class="dossier-limit">最后有效分析：{{ dossier.analysisAt }}。留言时间不等于重新分析时间。</p><p class="dossier-limit">判断范围：依据当前已覆盖指标与已提交信息，不代表未覆盖部位正常，也不直接预测故障时间。</p></section>
-          <AttentionAction :key="scenario" :scenario="scenario" compact in-conversation @request-inquiry="$emit('request-inquiry')" />
+          <TaskAssignment v-if="scenario==='drift' && !store.isTaskHandled(scenario)" :key="scenario" :scenario="scenario" /><AttentionAction v-else :key="scenario" :scenario="scenario" compact in-conversation @request-inquiry="$emit('request-inquiry')" />
           <div v-if="dossier.observation?.type==='extend'" class="dossier-observation-action"><button class="p2-primary" @click="store.extendObservation(scenario)">按建议延长观察24小时</button></div>
           <div v-if="dossier.observation?.type==='reinspect'" class="dossier-observation-action"><button class="p2-primary" @click="reinspect">确认返回原事件复查</button></div>
           <section class="dossier-section"><h3>{{dossier.closure?'为何曾经关注':'为何关注'}}</h3><p>{{ dossier.background }}</p><p class="dossier-limit">持续性、发展方向和关联证据共同支撑关注；未触发报警本身不是建档依据。</p></section>
@@ -51,6 +51,7 @@ import { useRouter } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { attentionDossier } from '@/mock/attentionDossier'
 import AttentionAction from './AttentionAction.vue'
+import TaskAssignment from './TaskAssignment.vue'
 import BackButton from './BackButton.vue'
 const props=defineProps({scenario:String})
 defineEmits(['back','request-inquiry'])
@@ -65,7 +66,7 @@ function y(value){return 174-(value-bounds.value.min)*140/(bounds.value.max-boun
 const chartPoints=computed(()=>currentChart.value?.values.flatMap((value,i)=>value===null?[]:[{x:x(i),y:y(value),value,label:currentChart.value.labels[i]}])||[])
 const segments=computed(()=>{const parts=[];let part=[];currentChart.value?.values.forEach((value,i)=>{if(value===null){if(part.length)parts.push(part.join(' '));part=[]}else part.push(`${x(i)},${y(value)}`)});if(part.length)parts.push(part.join(' '));return parts})
 const chartTicks=computed(()=>[0,.5,1].map(r=>{const value=bounds.value.min+(bounds.value.max-bounds.value.min)*r;return {value:Number(value.toFixed(3)),y:y(value)}}))
-function openEvent(){store.selectTodo(props.scenario);router.push('/event')}
+function openEvent(){store.selectTodo(props.scenario);router.push({path:'/event',query:{todo:props.scenario}})}
 function reinspect(){store.reopenTodo(props.scenario);openEvent()}
 </script>
 <style scoped>

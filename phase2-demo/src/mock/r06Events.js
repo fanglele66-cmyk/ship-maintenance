@@ -2,12 +2,12 @@
 export function relatedEvents(store){
  return store.visibleTodos.map(item=>{
   const id=item.id,stage=item.stages[store.progress[id]],ended=store.eventStatus?.[id]==='closed',handled=store.isTaskHandled(id)
-  const source=id==='fault'?null:id==='drift'?{id,type:'关注事项',title:'主机3#缸排温偏离渐高'}:{id,type:'维保建议',title:'1#缸连杆轴承提前检查建议'}
+  const source=item.source?null:id==='fault'?null:id==='drift'?{id,type:'关注事项',title:'主机3#缸排温偏离渐高'}:{id,type:'维保建议',title:'1#缸连杆轴承提前检查建议'}
   const observation=handled?store.getObservationResult(id):null
   let action=ended?'暂无需人工操作，可回看本事件的处理及观察记录。':handled?observation.type==='reinspect'?'处理后出现反复，请进入原事件核对新证据并按要求复查。':observation.type==='extend'?'本轮可比记录不足，请补充数据或现场信息，不能按正常处理。':'暂无需人工操作，继续效果观察。':stage?.tasks?.length?'需要你：'+stage.tasks.map(task=>task.label).join('；')+'。':id==='fault'?'需要你：在原事件核对现场温度、流量及运行工况，按当前要求检查冷却回路。':'下一步：'+(stage?.action||'现场检查')+'。请进入原事件核对证据、范围与安全要求。'
   if(!ended&&observation?.type==='archive')action='本轮效果观察已结束，恢复常规监测；事件仍未结束，其他要求以原事件为准。'
-  return {id,eventId:'EVT-ME-'+({fault:'001',maintenance:'002',drift:'003'})[id],title:id==='drift'&&store.progress[id]>=2?item.eventTitle:item.initialTitle,source,
-   trigger:id==='fault'?'AI故障检测':id==='drift'?'关注事项转检查':'维保建议确认推进',ended,status:ended?'已结束':'未结束',stage:ended?'事件已结束':handled?(observation?.type==='archive'?'本轮效果观察已结束':'效果观察'):stage?.label||'阶段未同步',handled,
+  return {id,eventId:item.eventId||'EVT-ME-'+({fault:'001',maintenance:'002',drift:'003'})[id],title:id==='drift'&&store.progress[id]>=2?item.eventTitle:item.initialTitle,source,
+   trigger:item.source|| (id==='fault'?'AI故障检测':id==='drift'?'关注事项转检查':'维保建议确认推进'),ended,status:ended?'已结束':'未结束',stage:ended?'事件已结束':handled?(observation?.type==='archive'?'本轮效果观察已结束':'效果观察'):stage?.label||'阶段未同步',handled,
    processing:ended?'原事件已明确结束':handled?'人工处理已完成 · '+(observation?.type==='archive'?'本轮观察已结束':'效果观察中'):'待完成当前阶段要求',action,updatedAt:store.eventUpdatedAt?.[id]||'更新时间未同步'}
  })
 }

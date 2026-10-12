@@ -2,21 +2,24 @@
   <div class="p2-device-page">
     <div class="p2-device-head">
       <div><span class="p2-eyebrow">设备态势</span><h2>{{ deviceName }}</h2></div>
-      <div v-if="isMainEngine" class="p2-device-status"><span><i></i>航行中</span><span>关注事项 <b>{{ attentionCount }}</b></span><span>未结束事件 <b>{{ activeTodoCount }}</b></span></div>
+      <div v-if="isMainEngine" class="p2-device-status"><span><i></i>航行中</span><span>关注事项 <b>{{ attentionCount }}</b></span><span>当前待办 <b>{{ activeTodoCount }}</b></span></div>
     </div>
     <div class="p2-tab-row" role="tablist" aria-label="设备层内容">
-      <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id">{{ tab.label }}<span v-if="tab.id === 'attention' && attentionCount">{{ attentionCount }}</span><span v-if="tab.id === 'maintenance' && maintenanceCount">{{ maintenanceCount }}</span><span v-if="tab.id === 'todo' && activeTodoCount">{{ activeTodoCount }}</span></button>
+      <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id">{{ tab.label }}<span v-if="tab.id === 'attention' && attentionCount">{{ attentionCount }}</span><span v-if="isMainEngine && tab.id === 'maintenance' && maintenanceCount">{{ maintenanceCount }}</span><span v-if="isMainEngine && tab.id === 'todo' && activeTodoCount">{{ activeTodoCount }}</span></button>
     </div>
     <div ref="deviceScroll" class="p2-device-scroll">
       <template v-if="activeTab === 'data'"><slot name="data" /></template>
-      <template v-else-if="!isMainEngine"><div class="p2-empty"><strong>{{ deviceName }}当前无新增关注事项</strong><p>设备数据可在“传感器数据”页签查看。</p></div></template>
+      <template v-else-if="!isMainEngine">
+        <template v-if="activeTab==='overview'"><section class="p2-panel device-basic-overview"><h3>设备运行概况</h3><div class="device-metric-strip"><div v-for="metric in otherDevice?.metrics" :key="metric.label"><span>{{ metric.label }}</span><strong>{{ metric.value }} <small>{{ metric.unit }}</small></strong></div></div><h4>当前判断</h4><p>{{ otherOverview.conclusion }}</p><h4>依据与推断</h4><p>{{ otherOverview.basis }}</p><h4>下一步建议</h4><p>{{ otherOverview.next }}</p><button class="p2-secondary" @click="activeTab='data'">查看传感器数据</button></section><section class="p2-panel"><h3>值得关注</h3><p>{{ otherOverview.limit }}</p><button v-for="task in otherTasks" :key="task.id" class="p2-secondary" @click="openTodo(task.id)">查看{{ task.initialTitle }}</button></section></template>
+        <section v-else-if="activeTab==='history' && otherHistory.length" class="p2-panel"><h3>设备动态</h3><button v-for="task in otherHistory" :key="task.id" class="p2-attention-card human" @click="openTodo(task.id)"><strong>{{ task.initialTitle }}</strong><p>{{ store.isTaskHandled(task.id)?'本轮处理记录已提交，可回看现场反馈、执行和验收结果。':task.stages[store.progress[task.id]].summary }}</p><span>{{ store.isTaskHandled(task.id)?'已处理':'跟进中' }}</span></button></section><section v-else-if="activeTab==='todo' && otherTasks.length" class="p2-panel"><h3>当前待办</h3><button v-for="task in otherTasks" :key="task.id" class="p2-attention-card human" @click="openTodo(task.id)"><strong>{{ task.initialTitle }}</strong><p>{{ task.stages[store.progress[task.id]].summary }}</p><div class="p2-card-foot"><span>{{ store.assignments[task.id]?.owner }}</span><span>{{ task.stages[store.progress[task.id]].label }}</span></div></button></section><section v-else class="p2-panel"><h3>{{ tabs.find(t=>t.id===activeTab)?.label }}</h3><p>{{ activeTab==='todo'?'当前没有已建立的待办。新的现场异常应先补充证据，由轮机长判断是否安排检查。':activeTab==='maintenance'?'当前没有新增维保建议。仍应按设备说明书及既有维保安排执行，不因建议为空而跳过周期保养。':'当前没有可回查的处置动态。检查、指派及实际处理提交后，将在这里保留相应记录。' }}</p><button class="p2-link-button" @click="activeTab='overview'">返回设备概览</button></section>
+      </template>
       <template v-else-if="activeTab === 'overview'">
         <div class="p2-overview-layout">
         <div class="p2-panel">
           <div class="p2-section-title">设备健康研判</div>
           <div class="p2-health-meta"><span>分析完成 {{ runningAssessment.completedAt }}</span><span>数据截止 {{ runningAssessment.dataCutoff }}</span><span>{{ runningAssessment.analysisRange }}</span></div>
           <p class="p2-health-scope">{{ runningAssessment.conditions }} · {{ runningAssessment.coverage }}</p>
-          <p class="p2-health-scope">当次分析结果；当前行动随后续业务进展更新，不由留言时间替代分析时间。</p>
+          <p class="p2-health-scope">已结合当前运行工况、可比历史片段与现场反馈进行研判。</p>
           <div class="p2-overview-analysis">
             <p v-for="item in overviewAnalysis" :key="item.label"><span class="p2-analysis-tag" :class="item.tone">{{ item.label }}</span><span>{{ item.text }}</span></p>
           </div>
@@ -30,8 +33,7 @@
           </details>
         </div>
         <div class="p2-panel">
-          <div class="p2-section-title">设备关注与处置</div><p class="p2-health-scope">当前 {{ overviewItems.length }} 个业务入口 · 人员行动优先 · 已结束事项在历史中查看</p><p class="p2-health-scope">关注档案：当前 {{ attentionCount-attentionBuckets.ended.length }} 项 · 已结束 {{ attentionBuckets.ended.length }} 项（总数 {{ attentionCount }}）</p>
-          <div class="p2-overview-list">
+          <div class="p2-section-title">值得关注</div><p v-if="!overviewItems.length" class="p2-health-scope">当前没有待决策建议。已安排的事项可在“当前待办”中跟进。</p><div class="p2-overview-list">
             <button v-for="item in overviewItems" :key="item.id" type="button" class="p2-overview-item" @click="openItem(item.id)">
               <span class="p2-overview-item-main"><span class="p2-overview-type">{{ item.type }}</span><b>{{ item.title }}</b><small>{{ item.text }}</small></span>
               <span class="p2-state-tag" :class="item.priority<=2?'amber':'blue'">{{ item.tag }}</span>
@@ -40,40 +42,28 @@
         </div>
         </div>
       </template>
-      <template v-else-if="activeTab === 'attention'">
-
-          <div class="p2-attention-category-tabs" role="tablist" aria-label="关注事项状态分类"><button v-for="category in attentionCategories" :key="category.id" type="button" role="tab" :aria-selected="attentionCategory === category.id" :class="[{ active: attentionCategory === category.id }, category.id]" @click="attentionCategory = category.id">{{ category.label }}<span>{{ attentionBuckets[category.id].length }}</span></button></div>
-          <div class="p2-list-intro"><strong>{{ attentionCategories.find(item => item.id === attentionCategory)?.label }}</strong><span>按行动与阶段分类；同一事项可出现在两个入口，总数按事项去重</span></div>
-          <div v-if="attentionList.length" class="p2-attention-list">
-            <button v-for="item in attentionList" :key="item.id" class="p2-attention-card" :class="[item.tone, attentionStatusClass(item.id)]" @click="selectCard(item.id)"><div class="p2-card-top"><span class="p2-attention-status" :class="attentionStatusClass(item.id)">{{ attentionStatus(item.id) }}</span></div><strong>{{ item.title }}</strong><p v-if="endedInfo(item.id)">{{ endedInfo(item.id).reason }} · {{ endedInfo(item.id).at }}</p><p v-else>{{ store.isTaskHandled(item.id) ? store.getObservationResult(item.id).text : item.id === 'drift' && store.todoCreated.drift ? '已关联人工检查待办，当前阶段：' + store.cases.drift.stages[store.progress.drift].label + '。' : item.id === 'drift' && store.attentionFeedback.drift ? '现场核实已提交，后续分析尚未更新；不等于排除故障。' : item.id === 'drift' && store.monitorStep.drift ? '新的可比片段中偏差扩大，需要核对现场读数、工况和现象。' : item.short }}</p><p class="p2-card-action"><b>{{ store.attentionAction(item.id).required || store.attentionAction(item.id).linked ? '需要你：' : '当前安排：' }}</b>{{ store.attentionAction(item.id).text }}</p><div class="p2-card-foot"><span>{{ item.device }}</span><span>查看事项详情 →</span></div></button>
-          </div>
-          <div v-else class="p2-empty p2-attention-empty"><strong>{{ attentionCategory === 'human' ? '当前没有需要你处理的关注事项' : attentionCategory === 'ended' ? '当前没有已结束的事项' : attentionCategory === 'post' ? '当前没有处理后观察的事项' : '当前没有系统跟踪中的关注事项' }}</strong><p v-if="attentionCategory==='human'">没有待处理要求，不代表设备全部正常。</p><div v-if="attentionCategory==='human'"><button class="p2-link-button" @click="attentionCategory='ai'">系统跟踪中 {{ attentionBuckets.ai.length }} 项 →</button> · <button class="p2-link-button" @click="attentionCategory='post'">处理后观察 {{ attentionBuckets.post.length }} 项 →</button></div></div>
-      </template>
       <template v-else-if="activeTab === 'maintenance'">
           <div class="p2-history-head"><strong>维保建议</strong><div class="p2-maintenance-tools"><select v-model="adviceFilter" aria-label="维保建议筛选"><option value="pending">待处理建议</option><option value="all">全部建议</option></select><button class="p2-secondary" @click="openRegularPlan">查看已有维保安排 →</button></div></div>
           <div class="p2-attention-list"><button v-for="item in visibleAdvice" :key="item.id" type="button" class="p2-attention-card human" @click="openMaintenanceDetail(item.id)"><div class="p2-card-top"><span class="p2-attention-status human">{{ advice.status }}</span></div><strong>{{ item.title }}</strong><p>{{ store.isTaskHandled('maintenance') ? store.getObservationResult('maintenance').text : item.short }}</p><p class="p2-card-action"><b>当前需要你：</b>{{ advice.decision==='defer'?'暂不采纳原因已记录，可回看建议档案。':store.todoCreated.maintenance?'在原问题事件中继续检查或执行。':'确认是否开展检查，先补齐现场证据。' }}</p><div class="p2-card-foot"><span>{{ item.device }} · {{ advice.records.at(-1)?.at || '本日 · 计划评估（演示）' }}</span><span>查看建议详情 →</span></div></button></div>
           <div v-if="!visibleAdvice.length" class="p2-empty">当前没有待处理的维保建议，可切换“全部建议”回看已记录的决定及执行情况。</div>
       </template>
       <template v-else-if="activeTab === 'history'">
-        <SituationReport v-if="historyDetail" :title="historyDetail.title" :status="historyDetail.status" :meta="historyDetail.date + ' ' + historyDetail.time + ' · ' + historyDetail.source" tone="ai" :conclusion="historyDetail.conclusion" :recommendation="historyDetail.recommendation" :sections="historyDetail.sections" back-label="返回设备履历" @back="historyDetailId = null">
+        <SituationReport v-if="historyDetail" :title="historyDetail.title" :status="historyDetail.status" :meta="historyDetail.date + ' ' + historyDetail.time + ' · ' + historyDetail.source" tone="ai" :conclusion="historyDetail.conclusion" :recommendation="historyDetail.recommendation" :sections="historyDetail.sections" back-label="返回设备动态" @back="historyDetailId = null">
           <template #actions><template v-if="historyDetail.type === 'maintenance' && historyDetail.target"><button type="button" class="p2-link-button" @click="openTodo(historyDetail.target)">回看来源待办 →</button><button v-if="store.isTaskHandled(historyDetail.target)" type="button" class="p2-link-button" @click="openObservation(historyDetail.target)">查看效果观察 →</button></template></template>
         </SituationReport>
         <template v-else>
-          <div class="p2-history-head"><strong>设备履历</strong><select v-model="historyCategory" aria-label="履历记录类型"><option v-for="category in historyCategories" :key="category.id" :value="category.id">{{ category.label }}</option></select></div>
+          <div class="p2-history-head"><strong>设备动态</strong><select v-model="historyCategory" aria-label="履历记录类型"><option v-for="category in historyCategories" :key="category.id" :value="category.id">{{ category.label }}</option></select></div>
           <div class="p2-history-list"><button v-for="record in shownHistory" :key="record.id" type="button" class="p2-history-record" @click="openHistoryRecord(record)"><time>{{ record.date }}<small>{{ record.time }}</small></time><div><span class="p2-history-kind">{{ historyCategories.find(category => category.id === record.type)?.label }}</span><h3>{{ record.title }}</h3><p>{{ record.summary }}</p><small>{{ record.source }}</small></div><span class="p2-history-record-end">{{ record.status }}<b>{{ historyEntryLabel(record.type) }} →</b></span></button></div>
           <div v-if="!shownHistory.length" class="p2-empty">暂无{{ historyCategories.find(category => category.id === historyCategory)?.label }}。实际维护记录在现场作业提交并确认后生成。</div>
         </template>
       </template>
       <template v-else>
-        <div class="p2-list-intro"><strong>本设备关联事件</strong><span>未结束 {{ activeTodoCount }} 条 · 已结束 {{ endedEventCount }} 条；按事件去重</span></div>
-        <div class="p2-event-filters" role="group" aria-label="关联事件筛选"><button v-for="filter in [{id:'active',label:'未结束'},{id:'ended',label:'已结束'},{id:'all',label:'全部'}]" :key="filter.id" type="button" :aria-pressed="eventFilter===filter.id" :class="{active:eventFilter===filter.id}" @click="eventFilter=filter.id">{{filter.label}} {{filter.id==='active'?activeTodoCount:filter.id==='ended'?endedEventCount:todoCount}}</button></div>
-        <p class="p2-health-scope">事件状态由原事件提供；人工处理完成、观察结束和退出详情都不自动结束事件。</p>
-        <div v-if="!shownEvents.length" class="p2-empty">{{eventFilter==='ended'?'当前没有已结束的关联事件':eventFilter==='active'?'当前没有未结束的关联事件':'当前没有关联事件'}}。关注及普通留言不自动形成事件。</div>
+        <div class="p2-list-intro"><strong>当前待办</strong><span>{{ activeTodoCount }} 项正在跟进</span></div><div v-if="!shownEvents.length" class="p2-empty">当前没有待处理任务，已完成的记录可在设备动态中回看。</div>
         <article v-for="event in shownEvents" :key="event.id" class="p2-panel p2-related-event">
           <header><div><small>{{event.eventId}}</small><h3>{{event.title}}</h3></div><span class="p2-state-tag" :class="event.ended?'green':'blue'">{{event.status}}</span></header>
-          <dl><div><dt>触发来源</dt><dd>{{event.trigger}}</dd></div><div><dt>当前阶段</dt><dd>{{event.stage}}</dd></div><div><dt>处理进展</dt><dd>{{event.processing}}</dd></div><div><dt>最近更新</dt><dd>{{event.updatedAt}}</dd></div><div v-if="event.source"><dt>关联来源</dt><dd>{{event.source.title}}</dd></div></dl>
+          <dl><div><dt>触发来源</dt><dd>{{event.trigger}}</dd></div><div><dt>负责人</dt><dd>{{ store.assignments[event.id]?.owner }}</dd></div><div><dt>当前阶段</dt><dd>{{event.stage}}</dd></div><div><dt>处理进展</dt><dd>{{event.processing}}</dd></div><div><dt>最近更新</dt><dd>{{event.updatedAt}}</dd></div><div v-if="event.source"><dt>关联来源</dt><dd>{{event.source.title}}</dd></div></dl>
           <p class="p2-event-action">{{event.action}}</p>
-          <div class="p2-related-actions"><button v-if="event.source" class="p2-secondary" @click="openItem(event.source.id)">查看来源{{event.source.type}}</button><button v-if="event.handled" class="p2-secondary" @click="openObservation(event.id)">查看效果观察</button><button class="p2-primary" @click="openTodo(event.id)">进入事件</button></div>
+          <div class="p2-related-actions"><button v-if="event.source" class="p2-secondary" @click="openItem(event.source.id)">查看来源{{event.source.type}}</button><button v-if="event.handled" class="p2-secondary" @click="openObservation(event.id)">查看效果观察</button><button class="p2-primary" @click="openTodo(event.id)">进入待办</button></div>
         </article>
       </template>
     </div>
@@ -81,6 +71,8 @@
 </template>
 
 <script setup>
+import profiles from '@/mock/deviceOverviewProfiles.json'
+import { useDeviceStore } from '@/stores/deviceStore'
 import { useMaintenanceAdviceStore } from '@/stores/maintenanceAdviceStore'
 import { attentionDossier } from '@/mock/attentionDossier'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
@@ -97,9 +89,15 @@ const props = defineProps({ deviceName: { type: String, default: '主机' }, dev
 defineEmits(['select-sensor'])
 const router = useRouter()
 const store = usePhase2DemoStore()
+const deviceStore=useDeviceStore()
+const otherHistory=computed(()=>store.visibleTodos.filter(t=>t.deviceId===props.deviceId))
+const otherTasks=computed(()=>store.visibleTodos.filter(t=>t.deviceId===props.deviceId&&!store.isTaskHandled(t.id)))
+const otherDevice=computed(()=>deviceStore.getDeviceById(props.deviceId))
+const otherOverview=computed(()=>profiles[props.deviceId]||{conclusion:'当前已取得部分运行指标，暂无已建立的关注事项。',basis:'当前判断仅覆盖已采集指标，缺少连续趋势和现场核验结果，不据此确认设备所有部位正常。',next:'先查看传感器数据并按巡检规程核对现场；出现持续变化后再判断是否安排检查。',limit:'暂无待决策建议，继续执行原有巡检与维保安排。'})
+watch(()=>props.deviceId,()=>{activeTab.value='overview';historyDetailId.value=null})
 const advice=useMaintenanceAdviceStore(),adviceFilter=ref('pending')
 const visibleAdvice=computed(()=>store.attention.filter(item=>item.tab==='maintenance' && (adviceFilter.value==='all' || (!store.isTaskHandled(item.id)&&advice.decision!=='defer'))))
-const tabs = [{ id: 'overview', label: '设备概览' }, { id: 'data', label: '传感器数据' }, { id: 'attention', label: '关注事项' }, { id: 'maintenance', label: '维保建议' }, { id: 'todo', label: '关联事件' }, { id: 'history', label: '设备履历' }]
+const tabs = [{ id: 'overview', label: '设备概览' }, { id: 'data', label: '传感器数据' }, { id: 'maintenance', label: '维保建议' }, { id: 'todo', label: '当前待办' }, { id: 'history', label: '设备动态' }]
 const activeTab = ref('overview')
 const attentionCategory = ref('human')
 const deviceScroll = ref(null)
@@ -148,11 +146,11 @@ async function openObservation(id) { await openAttentionDetail(id) }
 async function openAttentionDetail(id) {
   const wasList = activeTab.value === 'attention'
   attentionScrollTop = wasList ? deviceScroll.value?.scrollTop || 0 : 0
-  if (!wasList) { activeTab.value='attention'; await nextTick() }
+  if (!wasList) { activeTab.value='overview'; await nextTick() }
   router.push('/situation/attention/' + encodeURIComponent(id))
 }
 async function showAttentionList() {
-  activeTab.value='attention'
+  activeTab.value='overview'
   store.attentionInFocus=false
   await nextTick()
   if(deviceScroll.value) deviceScroll.value.scrollTop=attentionScrollTop
@@ -170,11 +168,11 @@ watch(maintenanceDetailId, maintenanceId => {
 }, { flush: 'sync' })
 const relatedTodos = computed(() => relatedEvents(store))
 const eventFilter=ref('active')
-const shownEvents=computed(()=>relatedTodos.value.filter(event=>eventFilter.value==='all'||(eventFilter.value==='ended'?event.ended:!event.ended)))
+const shownEvents=computed(()=>relatedTodos.value.filter(event=>!store.cases[event.id]?.deviceId&&!store.isTaskHandled(event.id)))
 const endedEventCount=computed(()=>relatedTodos.value.filter(event=>event.ended).length)
 const todoCount = computed(() => relatedTodos.value.length)
-const activeTodoCount=computed(()=>relatedTodos.value.filter(event=>!event.ended).length)
-const attentionCount=computed(()=>new Set(Object.values(attentionBuckets.value).flat().map(item=>item.id)).size)
+const activeTodoCount=computed(()=>shownEvents.value.length)
+const attentionCount=computed(()=>['drift','maintenance'].filter(id=>!store.todoCreated[id]&&!store.ignoredSuggestions[id]).length)
 const maintenanceCount=computed(()=>store.attention.filter(item=>item.tab==='maintenance').length)
 const runningAssessment = computed(() => operationAssessment(store))
 const overviewAnalysis = computed(() => runningAssessment.value.summary)
@@ -185,7 +183,7 @@ function observationSummary(id) {
 }
 function observationTag(id) { return store.attentionAction(id).phase }
 function observationTone(id) { return store.getObservationResult(id).type === 'archive' ? 'green' : store.getObservationResult(id).type === 'reinspect' ? 'amber' : 'blue' }
-const overviewItems=computed(()=>overviewActions(store,advice))
+const overviewItems=computed(()=>overviewActions(store,advice).filter(item=>['drift','maintenance'].includes(item.id)&&!store.todoCreated[item.id]&&!store.ignoredSuggestions[item.id]&&!store.isTaskHandled(item.id)))
 const maintenanceAssessmentData = computed(() => maintenanceFollowup(store, maintenanceDetailId.value === 'planned'))
 const maintenanceConclusion = computed(() => maintenanceAssessmentData.value.conclusion)
 const maintenanceRecommendation = computed(() => maintenanceAssessmentData.value.recommendation)
@@ -205,7 +203,7 @@ async function openHistoryRecord(record) {
   historyDetailId.value = record.id
 }
 watch(maintenanceCategory, () => { if (activeTab.value === 'maintenance' && !maintenanceDetailId.value) { store.attentionInFocus = false; store.regularMaintenanceInFocus = false } })
-function openTodo(id) { store.selectTodo(id); router.push('/event') }
+function openTodo(id) { store.selectTodo(id); router.push({path:'/event',query:{todo:id}}) }
 function stateText(id) { if (id === 'maintenance' && store.isTaskHandled(id)) return '已处理 · '+(store.getObservationResult(id).type==='archive'?'观察已结束':'态势观察中'); if (id === 'maintenance' && store.todoCreated.maintenance) return store.cases.maintenance.stages[store.progress.maintenance].label === '完整闭环' ? '已闭环' : '已关联待办 · ' + store.cases.maintenance.stages[store.progress.maintenance].label; if(store.todoCreated[id]&&store.progress[id]===store.cases[id].stages.length-1)return '已闭环'; if (id === 'stable') return store.monitorStep.stable === 2 ? '已收束 · 未建待办' : '系统监测中'; if (id === 'drift') return store.todoCreated.drift ? '已形成待办' : store.monitorStep.drift ? '异动加剧' : '系统监测中'; return store.todoCreated.maintenance ? '已形成待办' : '待确认建议' }
 </script>
 
@@ -217,4 +215,6 @@ function stateText(id) { if (id === 'maintenance' && store.isTaskHandled(id)) re
 .p2-health-scope{font-size:12px;line-height:1.7;color:#727c8b;margin:6px 0 12px}
 .p2-overview-type{display:block;font-size:11px;color:#8b7959;margin-bottom:3px}
 .p2-maintenance-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.device-metric-strip{display:flex;gap:36px;margin:18px 0 24px}.device-metric-strip span{display:block;color:#7d8999;font-size:13px}.device-metric-strip strong{display:block;font-size:24px;margin-top:8px}.device-metric-strip small{font-size:13px}.p2-panel>p{font-size:14px;line-height:1.9;color:#53647a}
+.device-basic-overview h3{font-size:17px;margin:0 0 18px}.device-basic-overview h4{font-size:14px;font-weight:600;margin:22px 0 8px}.device-basic-overview p{margin:0 0 12px;line-height:1.9}.device-basic-overview .device-metric-strip{margin:14px 0 24px}
 </style>

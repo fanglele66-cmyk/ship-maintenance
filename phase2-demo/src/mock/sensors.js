@@ -2,59 +2,59 @@
  * 传感器数据 Mock - 态势感知第二层/第三层使用
  *
  * 层级结构：设备层(device) → 子系统(subsystem) → 传感器(sensor)
- * - 设备层：1号主机、锅炉、舵机、空压机 等
+ * - 设备层：主机、锅炉、舵机、空压机 等
  * - 子系统：燃油系统、排温系统、冷却系统 等（隶属于设备）
  */
 export const mockSensors = [
   // ==========================
-  // 1号主机 (main-engine-1)
+  // 主机 (main-engine-1)
   // ==========================
   // -- 燃油系统 --
-  { id: 's-001', nameEn: 'Fuel Oil Temp', nameCn: '燃油温度', system: '主机系统', subsystem: '燃油系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-001', nameEn: 'Fuel Oil Temp', nameCn: '燃油温度', system: '主机系统', subsystem: '燃油系统', device: '主机', deviceId: 'main-engine-1',
     value: 62.3, unit: '°C', range: '50-80', status: 'normal' },
-  { id: 's-002', nameEn: 'Fuel Oil Press', nameCn: '燃油压力', system: '主机系统', subsystem: '燃油系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-002', nameEn: 'Fuel Oil Press', nameCn: '燃油压力', system: '主机系统', subsystem: '燃油系统', device: '主机', deviceId: 'main-engine-1',
     value: 0.72, unit: 'MPa', range: '0.6-0.9', status: 'normal' },
-  { id: 's-003', nameEn: 'Fuel Oil Viscosity', nameCn: '燃油粘度', system: '主机系统', subsystem: '燃油系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-003', nameEn: 'Fuel Oil Viscosity', nameCn: '燃油粘度', system: '主机系统', subsystem: '燃油系统', device: '主机', deviceId: 'main-engine-1',
     value: 12.5, unit: 'cSt', range: '10-15', status: 'normal' },
   // -- 排温系统 --
-  { id: 's-004', nameEn: 'Exh.Gas Temp', nameCn: '排气温度', system: '主机系统', subsystem: '排温系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-004', nameEn: 'Exh.Gas Temp', nameCn: '排气温度', system: '主机系统', subsystem: '排温系统', device: '主机', deviceId: 'main-engine-1',
     value: 420, unit: '°C', threshold: 450, status: 'normal' },
-  { id: 's-005', nameEn: 'Cyl.3 Exh.Temp', nameCn: '3缸排气温度', system: '主机系统', subsystem: '排温系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-005', nameEn: 'Cyl.3 Exh.Temp', nameCn: '3缸排气温度', system: '主机系统', subsystem: '排温系统', device: '主机', deviceId: 'main-engine-1',
     value: 428, unit: '°C', threshold: 450, status: 'normal' },
-  { id: 's-006', nameEn: 'Exh.Manifold Press', nameCn: '排气管压力', system: '主机系统', subsystem: '排温系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-006', nameEn: 'Exh.Manifold Press', nameCn: '排气管压力', system: '主机系统', subsystem: '排温系统', device: '主机', deviceId: 'main-engine-1',
     value: 0.18, unit: 'MPa', range: '0.10-0.25', status: 'normal' },
   // -- 冷却系统 --
-  { id: 's-007', nameEn: 'Cyl Cool Water Out', nameCn: '缸套水出口温度', system: '主机系统', subsystem: '冷却系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-007', nameEn: 'Cyl Cool Water Out', nameCn: '缸套水出口温度', system: '主机系统', subsystem: '冷却系统', device: '主机', deviceId: 'main-engine-1',
     value: 92.4, unit: '°C', threshold: 85, status: 'over' },
-  { id: 's-008', nameEn: 'Cyl Cool Water In', nameCn: '缸套水进口温度', system: '主机系统', subsystem: '冷却系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-008', nameEn: 'Cyl Cool Water In', nameCn: '缸套水进口温度', system: '主机系统', subsystem: '冷却系统', device: '主机', deviceId: 'main-engine-1',
     value: 48.7, unit: '°C', threshold: 55, status: 'normal' },
   // -- 滑油系统 --
-  { id: 's-009', nameEn: 'Lube Oil Press', nameCn: '滑油压力', system: '主机系统', subsystem: '滑油系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-009', nameEn: 'Lube Oil Press', nameCn: '滑油压力', system: '主机系统', subsystem: '滑油系统', device: '主机', deviceId: 'main-engine-1',
     value: 0.38, unit: 'MPa', range: '0.3-0.5', status: 'normal' },
-  { id: 's-010', nameEn: 'Lube Oil Temp', nameCn: '滑油温度', system: '主机系统', subsystem: '滑油系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-010', nameEn: 'Lube Oil Temp', nameCn: '滑油温度', system: '主机系统', subsystem: '滑油系统', device: '主机', deviceId: 'main-engine-1',
     value: 55.2, unit: '°C', range: '45-65', status: 'normal' },
   // -- 扫气系统 --
-  { id: 's-011', nameEn: 'Scavenge Air Press', nameCn: '扫气压力', system: '主机系统', subsystem: '扫气系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-011', nameEn: 'Scavenge Air Press', nameCn: '扫气压力', system: '主机系统', subsystem: '扫气系统', device: '主机', deviceId: 'main-engine-1',
     value: 0.22, unit: 'MPa', range: '0.15-0.30', status: 'normal' },
   // -- 转速监测 --
-  { id: 's-012', nameEn: 'Engine Speed', nameCn: '主机转速', system: '主机系统', subsystem: '转速监测', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-012', nameEn: 'Engine Speed', nameCn: '主机转速', system: '主机系统', subsystem: '转速监测', device: '主机', deviceId: 'main-engine-1',
     value: 450, unit: 'rpm', threshold: 500, status: 'normal' },
   // -- 振动监测 --
-  { id: 's-013', nameEn: 'Vibration X', nameCn: '振动(X向)', system: '主机系统', subsystem: '振动监测', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-013', nameEn: 'Vibration X', nameCn: '振动(X向)', system: '主机系统', subsystem: '振动监测', device: '主机', deviceId: 'main-engine-1',
     value: 2.8, unit: 'mm/s', threshold: 7.1, status: 'normal' },
-  { id: 's-014', nameEn: 'Vibration Y', nameCn: '振动(Y向)', system: '主机系统', subsystem: '振动监测', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-014', nameEn: 'Vibration Y', nameCn: '振动(Y向)', system: '主机系统', subsystem: '振动监测', device: '主机', deviceId: 'main-engine-1',
     value: 3.1, unit: 'mm/s', threshold: 7.1, status: 'normal' },
-  { id: 's-015', nameEn: 'S.W. Pump Disch. Press', nameCn: '海水冷却泵出口压力', system: '主机系统', subsystem: '冷却系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-015', nameEn: 'S.W. Pump Disch. Press', nameCn: '海水冷却泵出口压力', system: '主机系统', subsystem: '冷却系统', device: '主机', deviceId: 'main-engine-1',
     value: 0.40, precision: 2, unit: 'MPa', range: '0.35-0.50', status: 'normal' },
-  { id: 's-016', nameEn: 'S.W. Pump Flow', nameCn: '海水冷却泵流量', system: '主机系统', subsystem: '冷却系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-016', nameEn: 'S.W. Pump Flow', nameCn: '海水冷却泵流量', system: '主机系统', subsystem: '冷却系统', device: '主机', deviceId: 'main-engine-1',
     value: 86.5, unit: 'm³/h', threshold: 80, status: 'normal' },
-  { id: 's-017', nameEn: 'Jacket Water Flow', nameCn: '缸套冷却水流量', system: '主机系统', subsystem: '冷却系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-017', nameEn: 'Jacket Water Flow', nameCn: '缸套冷却水流量', system: '主机系统', subsystem: '冷却系统', device: '主机', deviceId: 'main-engine-1',
     value: 68.2, unit: 'm³/h', threshold: 80, status: 'over' },
-  { id: 's-018', nameEn: 'Cyl.1 Bearing Vibration', nameCn: '1#缸连杆轴承振动', system: '主机系统', subsystem: '振动监测', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-018', nameEn: 'Cyl.1 Bearing Vibration', nameCn: '1#缸连杆轴承振动', system: '主机系统', subsystem: '振动监测', device: '主机', deviceId: 'main-engine-1',
     value: 3.0, precision: 1, unit: 'mm/s', status: 'warning' },
-  { id: 's-019', nameEn: 'Cyl.1 Bearing Temp', nameCn: '1#缸连杆轴承温度', system: '主机系统', subsystem: '振动监测', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-019', nameEn: 'Cyl.1 Bearing Temp', nameCn: '1#缸连杆轴承温度', system: '主机系统', subsystem: '振动监测', device: '主机', deviceId: 'main-engine-1',
     value: 65, unit: '°C', range: '62-65', status: 'normal' },
-  { id: 's-046', nameEn: 'Cyl.2 Exh.Temp', nameCn: '2缸排气温度', system: '主机系统', subsystem: '排温系统', device: '1号主机', deviceId: 'main-engine-1',
+  { id: 's-046', nameEn: 'Cyl.2 Exh.Temp', nameCn: '2缸排气温度', system: '主机系统', subsystem: '排温系统', device: '主机', deviceId: 'main-engine-1',
     value: 420, unit: '°C', status: 'normal' },
 
   // ==========================

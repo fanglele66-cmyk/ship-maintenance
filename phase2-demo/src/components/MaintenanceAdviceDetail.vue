@@ -22,12 +22,12 @@
         </section>
         <section class="maintenance-arrangement-side"><div class="maintenance-section-heading"><h3>已有维保安排</h3><button class="p2-link-button" @click="$emit('show-arrangements')">查看只读安排 →</button></div><Arrangement :plan="plan" /></section>
       </div>
-      <section v-show="activeTab==='建议概览'"><h3>当前操作</h3>
+      <section v-show="activeTab==='建议概览'"><TaskAssignment v-if="!handled && !core.todoCreated.maintenance" scenario="maintenance" /><h3 v-if="handled || core.todoCreated.maintenance">处理进展</h3>
         <div class="maintenance-actions">
-          <button v-if="!core.isTaskHandled('maintenance')&&!core.todoCreated.maintenance" class="p2-primary" @click="decide('check')">确认开展检查</button>
+
           <button v-if="!core.isTaskHandled('maintenance')&&advice.sufficient&&advice.decision!=='execute'" class="p2-primary" @click="decide('execute')">采纳并安排执行</button>
           <button v-if="!core.isTaskHandled('maintenance')&&advice.sufficient&&advice.decision!=='defer'" class="p2-secondary" @click="editor='defer';validation=''">暂不采纳</button>
-          <button v-if="!core.isTaskHandled('maintenance')" class="p2-secondary" @click="editor='supplement';validation=''">补充信息</button>
+          <button v-if="core.todoCreated.maintenance && !core.isTaskHandled('maintenance')" class="p2-secondary" @click="editor='supplement';validation=''">补充信息</button>
           <button v-if="core.isTaskHandled('maintenance')" class="p2-secondary" @click="$emit('open-observation')">查看效果观察 →</button>
           <button v-if="core.todoCreated.maintenance" class="p2-secondary" @click="$emit('open-event')">进入关联事件 →</button>
         </div>
@@ -48,6 +48,7 @@
 </template>
 <script setup>
 import { computed, ref } from 'vue'
+import TaskAssignment from './TaskAssignment.vue'
 import Arrangement from './MaintenanceArrangement.vue'
 import BackButton from './BackButton.vue'
 import SituationTimeline from './SituationTimeline.vue'

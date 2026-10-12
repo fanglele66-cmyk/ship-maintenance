@@ -1,3 +1,4 @@
+import additionalScenarios from '@/mock/additionalScenarios.json'
 import { defineStore } from 'pinia'
 import { computed, reactive, ref, watch } from 'vue'
 import { useSensorStore } from '@/stores/sensorStore'
@@ -18,6 +19,25 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const selectedAttentionId = ref('maintenance')
   const selectedTodoId = ref(null)
   const todoCreated = reactive({ maintenance: false, drift: false, fault: true })
+  const assignmentRequest=ref(null)
+  const assignments=reactive({})
+  const taskActors=reactive({fault:"王海涛（二管轮）",drift:"李建国（大管轮）",maintenance:"李建国（大管轮）"})
+  const assignmentRecords=reactive({})
+  const ignoredSuggestions=reactive({})
+  const suggestionDecisions=reactive([])
+  function defaultAssignment(id){return {owner:id==='fault'?'王海涛（二管轮）':'李建国（大管轮）',collaborator:'',type:id==='maintenance'?'检测排查':'现场核实',due:'本班次内完成首轮核实',scope:id==='drift'?'核对3号缸现场排温与系统读数，记录稳定负荷下转速、负荷及有无异响；核实测量连接，反馈读数、现象和检查结果。':id==='maintenance'?'复核轴承振动测点、润滑状态与运行工况，按设备规程补充检查证据，确认靠港作业条件；尚不安排换件。':'核对冷却水出口温度、流量及冷却回路状态，提交检查结果。',assignedBy:'陈志远（轮机长）'}}
+  assignments.fault=defaultAssignment('fault')
+  const stageAssignments=reactive({})
+  function assignStage(id,index,owner){
+    const stage=cases[id]?.stages[index]
+    if(!todoCreated[id]||!stage||!owner)return false
+    const previous=assignments[id]||defaultAssignment(id)
+    if(!assignTask(id,{...previous,owner,type:stage.label,scope:stage.summary,due:stage.kind==='work'?'具备作业条件后按计划执行':previous.due,stageId:stage.id,stageIndex:index}))return false
+    ;(stageAssignments[id] ||= {})[stage.id]={...assignments[id]}
+    return true
+  }
+  function assignTask(id,values){if(!todoCreated[id]||!values.owner||!values.scope?.trim()||!values.due?.trim())return false;const record={...values,assignedBy:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};assignments[id]=record;taskActors[id]=record.owner;(assignmentRecords[id] ||= []).push({...record});addLog(id,'user',`任务指派：${record.owner}负责${record.type}；${record.scope}；计划：${record.due}`);return true}
+  function ignoreSuggestion(id,reason){if(todoCreated[id]||!reason.trim())return false;ignoredSuggestions[id]={reason:reason.trim(),actor:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};suggestionDecisions.push({id,...ignoredSuggestions[id]});registerDossierNote(id,'忽略本次建议：'+reason.trim());return true}
   const eventUpdatedAt=reactive({fault:'2026/10/12 07:50'})
   const progress = reactive({ maintenance: 0, drift: 0, fault: 0 })
   const activeStage = reactive({ maintenance: 0, drift: 0, fault: 0 })
@@ -92,6 +112,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     return true
   }
   function attentionAction(id) {
+    if(ignoredSuggestions[id]&&!todoCreated[id])return {phase:'已忽略本次建议',text:ignoredSuggestions[id].reason}
     if (isTaskHandled(id)) {
       const result = getObservationResult(id)
       if (result.type === 'reinspect') return { phase:'处理后观察', linked:true, text:'进入关联事件，核实反复现象并补充复查结果' }
@@ -127,10 +148,13 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(bearingTemperature)bearingTemperature.value=progress.maintenance>=3?(maintenanceRecord?.values[1]??64):65
   },{immediate:true,deep:true})
 
+  const extraIds=additionalScenarios.map(item=>item.id)
+  for(const item of additionalScenarios){const id=item.id;todoCreated[id]=true;progress[id]=0;activeStage[id]=0;logs[id]=[];taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'本班次核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id]=[];observationHistory[id]=[];observationTargets[id]=item.observation.days}
   const selectedAttention = computed(() => attention.find(item => item.id === selectedAttentionId.value) || attention[0])
   const selectedTodo = computed(() => selectedTodoId.value ? cases[selectedTodoId.value] : null)
-  const visibleTodos = computed(() => ['fault', 'maintenance', 'drift'].filter(id => todoCreated[id]).map(id => cases[id]))
-  for(const id of ['fault','maintenance','drift'])watch(()=>[todoCreated[id],progress[id]],()=>{
+  const taskPortfolio=computed(()=>visibleTodos.value)
+  const visibleTodos = computed(() => ['fault', 'maintenance', 'drift',...extraIds].filter(id => todoCreated[id]).map(id => cases[id]))
+  for(const id of ['fault','maintenance','drift',...extraIds])watch(()=>[todoCreated[id],progress[id]],()=>{
     if(todoCreated[id])eventUpdatedAt[id]=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})
     else delete eventUpdatedAt[id]
   },{flush:'sync'})
@@ -138,7 +162,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   function isTaskHandled(id) { return Boolean(cases[id]) && progress[id] >= observationIndex(id) }
   const effectObservations = computed(() => visibleTodos.value.filter(item => isTaskHandled(item.id)&&executionObservationReady(item.id)))
   const caseMaterials = computed(() => Object.fromEntries(visibleTodos.value.filter(item=>isTaskHandled(item.id)||observationHistory[item.id].length).map(item => [item.id, {
-    sourceId: 'EVT-ME-' + ({fault:'001',maintenance:'002',drift:'003'})[item.id],
+    sourceId: item.eventId || 'EVT-ME-' + ({fault:'001',maintenance:'002',drift:'003'})[item.id],
     sourceTitle: item.id === 'drift' ? item.eventTitle : item.initialTitle,
     status: '待岸端审阅',
     content: '已自动汇集原始证据、原因分析、人员反馈和实际措施；后续效果记录继续关联补充。'
@@ -200,6 +224,8 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   function createTodo(id) {
     if (!['maintenance', 'drift'].includes(id) || todoCreated[id]) return false
     if (id === 'drift' && monitorStep.drift < 1) return false
+    delete ignoredSuggestions[id]
+    assignments[id] ||= defaultAssignment(id)
     todoCreated[id] = true
     addLog(id, 'assistant', `已建立“${cases[id].initialTitle}”待办。请到待办中心查看概览并继续处理；原关注证据已带入同一任务。`)
     return true
@@ -254,15 +280,17 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if (index <= progress[id]) { activeStage[id] = index; openStageConversation(id) }
   }
 
-  function openStageConversation(id) {
+  function openStageConversation(id, context = '') {
     const rawStage = cases[id].stages[activeStage[id]]
     const stage = ['observe','closed'].includes(rawStage.kind) ? handledReceipt(id) : rawStage
     if (stage.kind === 'handled') { startObservation(id); scheduleObservation(id) }
     const key = `${id}:${stage.id}`
     if (openedStages[key]) return
     openedStages[key] = true
-    addLog(id, 'user', stage.kind === 'handled' ? '查看处理结果' : stage.kind === 'overview' ? id==='maintenance'?'查看维保建议':stage.id==='attention'?'查看关注事项当前情况':'查看事件当前情况' : `进入${stage.label}`)
-    addLog(id, 'assistant', { kind: 'scene', stageId: stage.id, ...sceneFor(id, stage) })
+    if (!context) addLog(id, 'user', stage.kind === 'handled' ? '查看处理结果' : stage.kind === 'overview' ? id==='maintenance'?'查看维保建议':stage.id==='attention'?'查看关注事项当前情况':'查看事件当前情况' : `进入${stage.label}`)
+    const scene=sceneFor(id, stage)
+    if(context)scene.paragraphs=[{label:'本轮结果',text:context},...(scene.paragraphs||[])]
+    addLog(id, 'assistant', { kind: 'scene', stageId: stage.id, ...scene })
     if(stage.kind==='work')requestExecutionRecord(id)
   }
 
@@ -274,7 +302,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     const existing=executionInquiry(id);if(existing)return existing
     const previous=executionRecords[id]?.at(-1)
     const fields=stage.tasks.flatMap((task,i)=>[{key:'task'+i,label:task.label,type:'select',required:true,options:[{value:'已完成',label:'已完成'},{value:'待补充',label:'待补充'}]},{key:'note'+i,label:task.label+'备注',type:'textarea'}])
-    const values={...(previous?.values||{}),equipment:previous?.values.equipment||cases[id].device}
+    const values={...(previous?.values.completion==='partial'?previous.values:{}),equipment:previous?.values.equipment||cases[id].device,executor:taskActors[id]||assignments[id]?.owner}
     stage.tasks.forEach((task,i)=>{values['task'+i]=taskResults[id+':'+stage.id+':'+i]||values['task'+i]||'';values['note'+i]=taskNotes[id+':'+stage.id+':'+i]||values['note'+i]||''})
     const message={...JSON.parse(JSON.stringify(executionRecordTemplate)),id:'execution-'+id+'-'+(++executionSequence),stageId:stage.id,fields:[...fields,...JSON.parse(JSON.stringify(executionRecordTemplate.fields))],values}
     addLog(id,'assistant',message);return executionInquiry(id)
@@ -293,23 +321,34 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(Object.keys(errors).length){message.submitError='请补齐执行记录的必填信息。';return false}
     if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(values.executedAt)||Date.parse(values.executedAt)>Date.now()){message.submitError='实际执行时间须为有效的已发生时间。';return false}
     if(values.completion==='completed'&&stage.tasks.some((_,i)=>values['task'+i]!=='已完成')){message.submitError='仍有未完成步骤，请保留进展或补齐实际结果。';return false}
+    if(values.completion==='completed'&&values.verification==='pending'){message.submitError='验收尚未完成，请保留进展；不能确认处理完成。';return false}
     updateExecutionRecord(id,messageId,values)
     const at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})
-    const record={id:messageId,values:JSON.parse(JSON.stringify(values)),source:'人员确认',confirmedAt:at,stageId:stage.id}
+    const record={id:messageId,values:JSON.parse(JSON.stringify(values)),source:'人员确认',executor:values.executor||taskActors[id]||assignments[id]?.owner||defaultAssignment(id).owner,assignedBy:assignments[id]?.assignedBy||'陈志远（轮机长）',confirmedAt:at,stageId:stage.id}
     ;(executionRecords[id] ||= []).push(record)
-    message.status='submitted';message.submittedAt=at;message.receiptText=values.completion==='completed'?'实际执行与验收已确认；不修改原工单。':'已保留进展，当前阶段不推进。'
+    message.status='submitted';message.submittedAt=at;message.receiptText=values.completion!=='completed'?'已保留进展，当前阶段不推进。':values.verification==='unresolved'?'作业已记录，原异常仍存在；继续原事件排查。':'实际执行与验收已确认；不修改原工单。'
     addLog(id,'user','确认实际执行记录：'+values.measures+'；执行时间：'+values.executedAt)
-    addLog(id,'assistant',values.completion==='completed'?(values.comparable==='available'?'执行记录已保存，以实际执行时间为比较分界进入演示效果观察。':'执行记录已保存。缺少可比监测数据，效果观察待补充，不生成改善结论。'):'执行进展已保存，未完成的作业继续在当前事件补充。')
-    if(values.completion==='completed'){
-      progress[id]=observationIndex(id);activeStage[id]=progress[id];openStageConversation(id)
-    }else requestExecutionRecord(id)
+    if(values.completion==='completed'&&values.verification==='unresolved'){
+      restartAfterFailedVerification(id)
+    }else if(values.completion==='completed'){
+      progress[id]=observationIndex(id);activeStage[id]=progress[id];openStageConversation(id,values.comparable==='available'?'执行与验收记录已保存，以实际执行时间为比较分界，接续处理后效果跟踪。':'执行与验收记录已保存。缺少可比监测数据，效果观察待补充，当前不生成改善结论。')
+    }else {addLog(id,'assistant','执行进展已保存，未完成的作业继续在当前事件补充。');requestExecutionRecord(id)}
     return true
   }
-  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return !record||record.values.completion==='completed'&&record.values.comparable==='available' }
+  function restartAfterFailedVerification(id){
+    const index=cases[id].stages.findIndex(stage=>stage.kind==='check')
+    if(index<0)return
+    delete openedStages[id+':handled']
+    cases[id].stages.slice(index).forEach(stage=>{delete openedStages[`${id}:${stage.id}`];(stage.tasks||[]).forEach((_,i)=>{delete taskResults[`${id}:${stage.id}:${i}`];delete taskNotes[`${id}:${stage.id}:${i}`];delete taskAttachments[`${id}:${stage.id}:${i}`]})})
+    progress[id]=index;activeStage[id]=index;delete recordDrafts[id]
+    openStageConversation(id,'原异常仍存在，已回到原事件排查。上轮现场反馈、实际措施和未通过的验收记录全部保留；请补充新的证据，不重复建立待办。')
+  }
+  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return !record||record.values.completion==='completed'&&record.values.verification!=='unresolved'&&record.values.comparable==='available' }
   function advanceTodo(id, feedback = []) {
     const stage = cases[id].stages[activeStage[id]]
     if (!stage?.action) return
     if(activeStage[id]<progress[id]){selectStage(id,activeStage[id]+1);return}
+    if(stage.kind==='work')return {saved:false,advanced:false,message:'请在验收确认中提交实际执行记录及原异常验收结果。'}
     let checkResult
     if(stage.kind==='check'){
       checkResult=assessCheckFeedback(id,stage,feedback)
@@ -317,7 +356,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       const records=feedback.map(record=>({...record,attachments:[...(record.attachments||[])]}))
       const last=logs[id].filter(entry=>entry.kind==='feedbackRecord'&&entry.task===stage.title).at(-1)
       if(JSON.stringify(last?.records)!==JSON.stringify(records)){
-        addLog(id,'assistant',{kind:'feedbackRecord',title:`${stage.label}反馈已提交`,task:stage.title,records})
+        addLog(id,'assistant',{kind:'feedbackRecord',title:`${stage.label}反馈已提交`,task:stage.title,records,actor:taskActors[id],submittedAt:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})})
         eventUpdatedAt[id]=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})
       }
       if(!checkResult.advance){
@@ -326,12 +365,11 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       }
     }
     if(stage.kind==='observe'&&getObservationResult(id).type!=='archive')return
-    if (feedback.length && stage.kind!=='check') addLog(id, 'assistant', { kind:'feedbackRecord', title:`${stage.label}反馈已提交`, task:stage.title, records:feedback })
+    if (feedback.length && stage.kind!=='check') addLog(id, 'assistant', { kind:'feedbackRecord', title:`${stage.label}反馈已提交`, task:stage.title, records:feedback,actor:taskActors[id],submittedAt:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}) })
     const next = activeStage[id] + 1
     progress[id] = Math.max(progress[id], next)
     activeStage[id] = next
     delete recordDrafts[id]
-    addLog(id, 'assistant', stage.reply)
     openStageConversation(id)
     return {saved:true,advanced:true,message:checkResult?.message||'本轮反馈已保存。'}
   }
@@ -367,7 +405,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       const parts=[...(/^补充|^另外/.test(text)&&recordDrafts[id]?recordDrafts[id].records.map(r=>r.result):[]),...text.split(/[。；\n]+/).map(t=>t.trim()).filter(Boolean)]
       const hasProblem=/未消失|未完成|待复核|待补充|不一致|未恢复|仍有|无法/.test(stage.kind==='work'?parts.at(-1):text)
       const evidenceText=parts.join('；')
-      const evidenceOk=stage.kind==='work'? /复测|校验|试运转/.test(evidenceText)&&/合格|正常|稳定|恢复|无泄漏|2\.2|79\.1|86\.5|3°C/.test(evidenceText)&&/清洗|清洁|更换|处理/.test(evidenceText): id==='maintenance'?/偏磨/.test(evidenceText)&&/间隙/.test(evidenceText)&&/备件/.test(evidenceText): id==='drift'&&stage.id==='check'?/一致/.test(evidenceText)&&/异响/.test(evidenceText)&&/复现/.test(evidenceText):id==='fault'?/滤器/.test(evidenceText)&&/堵塞|脏污/.test(evidenceText)&&/温控阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText):/喷油器/.test(evidenceText)&&/积炭/.test(evidenceText)&&/排气阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText)
+      const evidenceOk=extraIds.includes(id)?false:stage.kind==='work'? /复测|校验|试运转/.test(evidenceText)&&/合格|正常|稳定|恢复|无泄漏|2\.2|79\.1|86\.5|3°C/.test(evidenceText)&&/清洗|清洁|更换|处理/.test(evidenceText): id==='maintenance'?/偏磨/.test(evidenceText)&&/间隙/.test(evidenceText)&&/备件/.test(evidenceText): id==='drift'&&stage.id==='check'?/一致/.test(evidenceText)&&/异响/.test(evidenceText)&&/复现/.test(evidenceText):id==='fault'?/滤器/.test(evidenceText)&&/堵塞|脏污/.test(evidenceText)&&/温控阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText):/喷油器/.test(evidenceText)&&/积炭/.test(evidenceText)&&/排气阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText)
       const draft={kind:'recordDraft',title:'现场反馈待确认',task:stage.title,stageId:stage.id,destination,canAdvance:evidenceOk&&!hasProblem,records:parts.map((p,i)=>({label:stage.tasks.find(t=>p.includes(t.label.slice(2,5)))?.label||`${stage.kind==='work'?'处理':'检查'}反馈 ${i+1}`,result:p,note:''})),confirmed:false}
       logs[id].filter(m=>m.kind==='recordDraft'&&!m.confirmed).forEach(m=>m.cancelled=true)
       recordDrafts[id]=draft
@@ -453,12 +491,13 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       return
     }
     if(mode==='device') {addLog(id,'assistant',eventQuestionReply({todoCreated},value)||deviceHealthReply({attentionAction},value));return}
-    if (/维保|轴承|1#缸/.test(value)) addLog(id, 'assistant', '1号主机的1#缸连杆轴承接近计划检修时数，振动缓升。请进入设备层“维保”查看建议，并决定是否建立人工检查待办。')
-    else if (/关注|排温|3#缸/.test(value)) addLog(id, 'assistant', '1号主机的3#缸需要核实，4#缸反复偏差由系统跟踪；2#缸已结束。压力和机体振动保留为普通数据，不计入关注。')
-    else addLog(id, 'assistant', mode === 'sensor' ? '可在左侧选择传感器查看趋势；设备层的关注和维保建议保留在上一层。' : '请先进入左侧1号主机设备层。系统监测、维保建议和人工待办会分别呈现。')
+    if (/维保|轴承|1#缸/.test(value)) addLog(id, 'assistant', '主机的1#缸连杆轴承接近计划检修时数，振动缓升。请进入设备层“维保”查看建议，并决定是否建立人工检查待办。')
+    else if (/关注|排温|3#缸/.test(value)) addLog(id, 'assistant', '主机的3#缸需要核实，4#缸反复偏差由系统跟踪；2#缸已结束。压力和机体振动保留为普通数据，不计入关注。')
+    else addLog(id, 'assistant', mode === 'sensor' ? '可在左侧选择传感器查看趋势；设备层的关注和维保建议保留在上一层。' : '请先进入左侧主机设备层。系统监测、维保建议和人工待办会分别呈现。')
   }
 
   function resetDemo() {
+    Object.keys(stageAssignments).forEach(id=>delete stageAssignments[id])
     Object.values(observationTimers).forEach(clearTimeout)
     Object.keys(observationTimers).forEach(id=>delete observationTimers[id])
     situationObservationId.value=null
@@ -478,6 +517,11 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     Object.keys(logs).forEach(id => { logs[id].splice(0) })
     Object.keys(openedStages).forEach(key=>delete openedStages[key])
     Object.keys(recordDrafts).forEach(key=>delete recordDrafts[key])
+    for(const records of [assignments,assignmentRecords,ignoredSuggestions])Object.keys(records).forEach(key=>delete records[key])
+    suggestionDecisions.splice(0)
+    assignmentRequest.value=null
+    assignments.fault=defaultAssignment('fault')
+    for(const id of ['fault','drift','maintenance'])taskActors[id]=defaultAssignment(id).owner
     Object.keys(executionRecords).forEach(key=>delete executionRecords[key])
     Object.keys(attentionFeedback).forEach(key=>delete attentionFeedback[key])
     Object.keys(dossierNotes).forEach(key=>delete dossierNotes[key])
@@ -488,10 +532,11 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     Object.keys(eventUpdatedAt).forEach(id=>delete eventUpdatedAt[id])
     eventUpdatedAt.fault='2026/10/12 07:50'
     ;['maintenance','drift','fault'].forEach(id=>{observationReady[id]=false;observationRounds[id]=1;observationRecords[id].splice(0);observationHistory[id].splice(0);observationTargets[id]=observationConfig[id].days})
+    for(const item of additionalScenarios){const id=item.id;todoCreated[id]=true;progress[id]=0;activeStage[id]=0;taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'本班次核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id].splice(0);observationHistory[id].splice(0);observationTargets[id]=item.observation.days}
     selectAttention('maintenance')
   }
 
   selectAttention('maintenance')
   // Action completion is explicit and independent from chat and event progress.
-  return { executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodoId, selectedTodo, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
+  return { taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodoId, selectedTodo, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
 })
