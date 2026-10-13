@@ -11,7 +11,7 @@
         v-for="(item, idx) in navItems"
         :key="item.path"
         :to="item.path"
-        @click="item.path === '/event' && demoStore.closeTodo()"
+        @click="navigate(item.path)"
         class="nav-item"
         :class="{ active: isActive(item.path) }"
       >
@@ -39,6 +39,7 @@ import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 const route = useRoute()
 const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
+function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
 const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:demoStore.visibleTodos.filter(todo=>demoStore.progress[todo.id]===0).length)
 
 // 精确匹配 + 子路由匹配
@@ -61,8 +62,8 @@ watch(totalUnread, (v) => {
 onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
 
 const navItems = [
-  { path: '/event', label: '待办', icon: '/nav-icons/event.svg' },
   { path: '/situation', label: '态势', icon: '/nav-icons/situation.svg' },
+  { path: '/event', label: '待办', icon: '/nav-icons/event.svg' },
   { path: '/inspection', label: '日志', icon: '/nav-icons/inspection.svg' },
   { path: '/knowledge', label: '知识', icon: '/nav-icons/knowledge.svg' }
 ]

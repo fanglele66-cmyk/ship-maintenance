@@ -147,6 +147,9 @@
 </template>
 
 <script setup>
+import {ElPagination} from 'element-plus'
+import 'element-plus/es/components/pagination/style/css'
+
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { knowledgeDocs, DEVICE_TYPES } from '@/mock/knowledge'

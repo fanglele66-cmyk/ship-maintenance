@@ -8,7 +8,7 @@ test('R03 closure shares evidence, records once and does not close events',async
  try {
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {attentionDossier}=await server.ssrLoadModule('/src/mock/attentionDossier.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore()
+  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   const ended=attentionDossier(store,'cyl2-ended')
   assert.equal(ended.closure.reason,'持续监测确认恢复正常')
   assert.equal(ended.closure.at,'2026/10/12 08:00')

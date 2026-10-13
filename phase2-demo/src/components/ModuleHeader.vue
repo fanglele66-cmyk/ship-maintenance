@@ -1,0 +1,3 @@
+<template><header class="module-header"><h3>{{title}}</h3><div class="module-tools"><slot/></div></header></template>
+<script setup>defineProps({title:String})</script>
+<style scoped>.module-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px 10px;flex-wrap:wrap;row-gap:4px}.module-header h3{font-size:17px;font-weight:600;line-height:1.5;color:#202020;margin:0}.module-tools{display:flex;gap:12px;align-items:center;min-width:0;margin-left:auto}.module-tools:deep(time){font-size:12px;color:#7c8797;white-space:nowrap}@media(max-width:1100px){.module-header{padding:16px 16px 10px}}</style>

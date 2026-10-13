@@ -1,6 +1,6 @@
 <template>
   <div class="p2-situation-observation">
-    <div class="p2-attention-detail-head"><button class="p2-link-button" type="button" @click="$emit('back')">← 返回关注事项</button><span class="p2-attention-status" :class="result.type==='archive'?'ended':result.type==='reinspect'?'human':'ai'">{{ result.type==='archive'?'观察已结束':result.type==='reinspect'?'需人工复查':'AI 效果观察' }}</span></div>
+    <div class="p2-attention-detail-head"><button class="p2-link-button" type="button" @click="$emit('back')">← 返回异动跟踪</button><span class="p2-attention-status" :class="result.type==='archive'?'ended':result.type==='reinspect'?'human':'ai'">{{ result.type==='archive'?'观察已结束':result.type==='reinspect'?'需人工复查':'AI 效果观察' }}</span></div>
     <h3 class="p2-attention-detail-title">{{ title }}</h3>
     <p class="p2-report-meta">来源事件 {{ store.caseMaterials[scenario]?.sourceId }} · <button class="p2-link-button" type="button" @click="openEvent">回看人工处理记录 →</button></p>
     <AttentionAction :scenario="scenario" />

@@ -10,7 +10,7 @@
         <div v-for="field in message.fields" :key="field.key" class="p2-inquiry-field" :class="{'is-boolean':field.type==='boolean'}">
           <label :for="fieldId(field)">{{ field.label }}<span v-if="field.required" class="p2-inquiry-required"> *</span></label>
           <textarea v-if="field.type==='textarea'" :id="fieldId(field)" v-model="values[field.key]" rows="2" :placeholder="field.placeholder" :aria-required="field.required" :aria-invalid="Boolean(errors[field.key])" :aria-describedby="errors[field.key] ? fieldId(field)+'-error' : undefined" @input="update" />
-          <select v-else-if="['select','multiselect'].includes(field.type)" :id="fieldId(field)" v-model="values[field.key]" :multiple="field.type==='multiselect'" :aria-required="field.required" :aria-invalid="Boolean(errors[field.key])" :aria-describedby="errors[field.key] ? fieldId(field)+'-error' : undefined" @change="update"><option v-if="field.type==='select'" value="" disabled>请选择</option><option v-for="option in field.options" :key="String(option.value)" :value="option.value">{{ option.label }}</option></select>
+          <FormSelect v-else-if="['select','multiselect'].includes(field.type)" :id="fieldId(field)" v-model="values[field.key]" :options="field.options" :multiple="field.type==='multiselect'" :aria-required="field.required" :aria-invalid="Boolean(errors[field.key])" :aria-describedby="errors[field.key] ? fieldId(field)+'-error' : undefined" @change="update" />
           <input v-else :id="fieldId(field)" v-model="values[field.key]" :type="field.type==='boolean' ? 'checkbox' : field.type" :min="field.min" :max="field.max" :step="field.type==='number' ? 'any' : undefined" :placeholder="field.placeholder" :aria-required="field.required" :aria-invalid="Boolean(errors[field.key])" :aria-describedby="errors[field.key] ? fieldId(field)+'-error' : undefined" @input="update" @change="field.type==='boolean' && update()" />
           <span v-if="errors[field.key]" :id="fieldId(field)+'-error'" class="p2-inquiry-error">{{ errors[field.key] }}</span>
         </div>
@@ -23,6 +23,7 @@
   </section>
 </template>
 <script setup>
+import FormSelect from '@/components/forms/FormSelect.vue'
 import { computed, reactive, ref, watch, useId } from 'vue'
 import { inquiryValues, validateInquiry, displayInquiryValue, assertInquiry } from '@/message-flows/inquiryFields'
 const props=defineProps({message:{type:Object,required:true}})

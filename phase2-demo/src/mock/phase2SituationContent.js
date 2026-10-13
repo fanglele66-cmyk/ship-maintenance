@@ -16,9 +16,9 @@ function followUp(store, id) {
 
 export function operationAssessment(store) {
   const coolingDone=store.isTaskHandled('fault'),driftDone=store.isTaskHandled('drift'),bearingDone=store.isTaskHandled('maintenance')
-  const conclusion=coolingDone?'主机冷却系统已提交处置与验收，研判重点转为同负荷下温度、流量是否持续恢复。其余局部变化需独立验证，不能因为一项任务完成而将整台主机判为恢复正常。':'主机当前同时存在冷却回路异常、单缸排温偏离和轴承振动缓升。温升与流量下降指向冷却能力受限，优先级最高；单缸相对偏差和局部振动变化仍需各自的现场证据，当前不足以判为同一原因。'
-  const basis='冷却水出口92.4℃、进口48.7℃，温差43.7℃，流量68.2 m³/h低于80 m³/h参考下限，关联信号支持先核对供流与换热。3号缸在可比工况下相对差由8℃扩大至10℃，而轴承近7日振动2.1→3.0 mm/s、温度约65℃；局部变化的机理和时间尺度不同，尚无依据把二者直接归因于冷却回路。'
-  const recommendation=(coolingDone?'先核对冷却系统处置后可比样本是否持续稳定。':'先进入当前待办，查看冷却回路的排查进展与现场反馈。')+(driftDone?'3号缸已有人工处理记录，复核后续效果。':store.todoCreated.drift?'3号缸沿已指派任务核对现场读数及可复现现象，避免重复建任务。':store.ignoredSuggestions.drift?'3号缸本次暂不检查的决定已保留，重新出现关联证据时再评估。':'再查看3号缸关注详情中的变化证据和核实建议，决定是否建立检查待办。')+(bearingDone?'轴承后续周期按实际作业范围核对。':'轴承先查看提前检查建议与靠港窗口的关系，原2,000 h周期计划仍保留；看清依据后再决定是否接受提前检查。')
+  const conclusion=coolingDone?'主机冷却系统已提交处置与验收，研判重点转为同负荷下温度、流量是否持续恢复。其余局部变化需独立验证，不能因为一项任务完成而将整台主机判为恢复正常。':'主机当前同时存在冷却水报警、润滑供油预警、单缸排温偏离和轴承振动缓升。温升与流量下降指向冷却能力受限，优先级最高；单缸相对偏差和局部振动变化仍需各自的现场证据，当前不足以判为同一原因。'
+  const basis='润滑油压力0.31→0.24 MPa与滤器压差0.03→0.07 MPa同步变化，需先核对现场仪表一致性，尚不确认堵塞部位。冷却水出口92.4℃、进口48.7℃，温差43.7℃，流量68.2 m³/h低于80 m³/h参考下限，关联信号支持先核对供流与换热。3号缸在可比工况下相对差由8℃扩大至10℃，而轴承近7日振动2.1→3.0 mm/s、温度约65℃；局部变化的机理和时间尺度不同，尚无依据把二者直接归因于冷却回路。'
+  const recommendation=(coolingDone?'先核对冷却系统处置后可比样本是否持续稳定。':store.todoCreated.fault?'查看已派发冷却回路任务的排查进展与现场反馈。':'先查看冷却水报警依据，指定负责人安排排查；随后核对润滑供油预警的真实性与处置范围。')+(driftDone?'3号缸已有人工处理记录，复核后续效果。':store.todoCreated.drift?'3号缸沿已指派任务核对现场读数及可复现现象，避免重复建任务。':store.ignoredSuggestions.drift?'3号缸本次暂不检查的决定已保留，重新出现关联证据时再评估。':'再查看3号缸异动跟踪详情中的变化证据和核实建议，决定是否建立检查待办。')+(bearingDone?'轴承后续周期按实际作业范围核对。':'轴承先查看提前检查建议与靠港窗口的关系，原2,000 h周期计划仍保留；看清依据后再决定是否接受提前检查。')
   return {...healthReview, sections:[{title:'跨指标分析与判断边界',paragraphs:[basis]},{title:'当前处置与人员安排',paragraphs:[recommendation]},{title:'什么新证据会改变判断',paragraphs:['若温度与流量在相近负荷下同步恢复，冷却受限方向的支持程度会降低；若单缸排温偏差仍独立扩大，应转向局部燃烧、密封与测量链路的核验。轴承是否提前处理则以测点、润滑和实物检查结果为依据，不从振动增幅直接推断磨损量或剩余寿命。']}], summary:[{label:'综合判断',tone:'blue',text:conclusion},{label:'分析依据',tone:'gray',text:basis},{label:'安排建议',tone:'amber',text:recommendation}], readings:{fault:latestValues(store,'fault',[79.1,86.5]),drift:latestValues(store,'drift',[3,425]),bearing:latestValues(store,'maintenance',[2.2,64])}}
 
 }

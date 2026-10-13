@@ -4,7 +4,7 @@ import { shipInfo, mockDevices } from '@/mock/devices'
 
 export const useDeviceStore = defineStore('device', () => {
   const ship = ref({ ...shipInfo })
-  const devices = ref([...mockDevices])
+  const devices = ref(mockDevices.filter(device=>device.id!=='aux-engine-2'))
   const selectedDeviceId = ref(null)
 
   const selectedDevice = computed(() => {

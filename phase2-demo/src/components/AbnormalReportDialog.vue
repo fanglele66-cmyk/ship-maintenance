@@ -166,6 +166,10 @@
 </template>
 
 <script setup>
+import 'element-plus/es/components/select/style/css'
+import 'element-plus/es/components/date-picker/style/css'
+import 'element-plus/es/components/upload/style/css'
+import 'element-plus/es/components/message/style/css'
 import { computed, reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElSelect, ElOption, ElDatePicker, ElUpload } from 'element-plus'
 import { useDeviceStore } from '@/stores/deviceStore'

@@ -8,12 +8,14 @@ test('first-phase examples use existing check, execution and unresolved return f
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {scenarioSensors}=await server.ssrLoadModule('/src/mock/phase2Content.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore()
-  assert.equal(store.visibleTodos.length,3)
-  for(const id of ['aux-oil','steering-heat']){
+  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
+  assert.equal(store.visibleTodos.length,2)
+  assert.equal(store.createTodo('air-delivery'),true)
+  assert.equal(store.createTodo('main-warning'),true)
+  for(const id of ['air-delivery','steering-heat','main-warning']){
    store.selectTodo(id)
    assert.equal(store.currentStage.kind,'overview')
-   assert.ok(scenarioSensors(id).length>=5)
+   assert.ok(scenarioSensors(id).length>=(id==='steering-heat'?5:2))
    store.advanceTodo(id)
    const stage=store.currentStage
    const feedback=stage.tasks.map((task,i)=>({label:task.label,result:i?'未见异常':'发现异常',note:'现场核实结果'}))
@@ -43,6 +45,6 @@ test('first-phase examples use existing check, execution and unresolved return f
    assert.equal(store.executionRecords[id].length,2)
    assert.equal(store.assignments[id].owner,store.cases[id].owner)
   }
-  store.resetDemo();assert.equal(store.visibleTodos.length,3);assert.equal(store.progress['steering-heat'],0);assert.equal(store.executionRecords['steering-heat'],undefined)
+  store.resetDemo();store.createTodo('fault');assert.equal(store.visibleTodos.length,2);assert.equal(store.progress['steering-heat'],0);assert.equal(store.executionRecords['steering-heat'],undefined)
  }finally{await server.close()}
 })

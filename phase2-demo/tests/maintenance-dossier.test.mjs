@@ -9,7 +9,7 @@ test('maintenance dossier keeps plan and early execution linked without changing
     const {usePhase2DemoStore} = await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
     const {maintenanceDossier} = await server.ssrLoadModule('/src/mock/maintenanceDossier.js')
     setActivePinia(createPinia())
-    const store = usePhase2DemoStore()
+    const store = usePhase2DemoStore();store.createTodo('fault')
     const initial = maintenanceDossier(store)
     assert.equal(initial.report.sections.length,5)
     assert.deepEqual(initial.actions,[])
@@ -29,6 +29,6 @@ test('maintenance dossier keeps plan and early execution linked without changing
     const before=JSON.stringify(observed)
     observed.report.sections[0].paragraphs[0]='external change'
     assert.equal(JSON.stringify(maintenanceDossier(store)),before,'presentation data must not mutate shared content')
-    store.resetDemo()
+    store.resetDemo();store.createTodo('fault')
   } finally { await server.close() }
 })

@@ -9,7 +9,7 @@ test('attention dossier reuses evidence, preserves history and handles all phase
     const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
     const {attentionDossier}=await server.ssrLoadModule('/src/mock/attentionDossier.js')
     setActivePinia(createPinia())
-    const store=usePhase2DemoStore()
+    const store=usePhase2DemoStore();store.createTodo('fault')
     const initial=attentionDossier(store,'drift')
     assert.deepEqual(initial.charts[0].values,[425,428,430,432])
     assert.equal(initial.charts[0].unit,'°C','prototype fixture has explicit units')
@@ -48,7 +48,7 @@ test('attention dossier reuses evidence, preserves history and handles all phase
     store.progress.maintenance=store.observationIndex('maintenance')
     store.observationRecords.maintenance.push({label:'首测',status:'normal',day:0,values:[2.2,64]},{label:'第1日',status:'normal',day:1,values:[2.2,64]})
     assert.equal(attentionDossier(store,'maintenance').records.filter(record=>record.label==='第1日').length,1,'observation records have one canonical source')
-    store.resetDemo()
+    store.resetDemo();store.createTodo('fault')
     assert.equal(Object.keys(store.dossierNotes).length,0)
   } finally {await server.close()}
 })

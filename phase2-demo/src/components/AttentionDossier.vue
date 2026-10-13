@@ -2,11 +2,11 @@
   <div class="attention-dossier">
     <header class="dossier-header">
       <BackButton label="返回主机概览" @click="$emit('back')" />
-      <template v-if="dossier"><div><p class="dossier-context">关注档案 · {{ dossier.device }}</p><h2>{{ dossier.title }}</h2></div><span class="p2-state-tag" :class="dossier.closure ? 'green' : dossier.action.required || dossier.action.linked ? 'amber' : 'blue'">{{ dossier.action.phase }}</span></template>
+      <template v-if="dossier"><div><p class="dossier-context">异动跟踪档案 · {{ dossier.device }}</p><h2>{{ dossier.title }}</h2></div><span class="p2-state-tag" :class="dossier.closure ? 'green' : dossier.action.required || dossier.action.linked ? 'amber' : 'blue'">{{ dossier.action.phase }}</span></template>
     </header>
     <template v-if="dossier">
       <div class="dossier-meta"><span>首次记录：{{ dossier.first }}</span><span>最近更新：{{ dossier.updated }}</span></div>
-      <nav class="dossier-tabs" role="tablist" aria-label="关注档案内容"><button v-for="tab in tabs" :key="tab" type="button" role="tab" :aria-selected="activeTab===tab" :class="{active:activeTab===tab}" @click="activeTab=tab">{{ tab }}</button></nav>
+      <nav class="dossier-tabs" role="tablist" aria-label="异动跟踪档案内容"><button v-for="tab in tabs" :key="tab" type="button" role="tab" :aria-selected="activeTab===tab" :class="{active:activeTab===tab}" @click="activeTab=tab">{{ tab }}</button></nav>
       <main class="dossier-body" role="tabpanel" :aria-label="activeTab">
         <template v-if="activeTab==='事项概览'">
           <section v-if="dossier.closure" class="dossier-section dossier-closure"><h3>事项已结束</h3><dl class="dossier-facts"><div><dt>结束原因</dt><dd>{{ dossier.closure.reason }}</dd></div><div><dt>结束时间</dt><dd>{{ dossier.closure.at }}</dd></div></dl><p>{{ dossier.closure.summary }}</p><p class="dossier-limit">{{ dossier.closure.boundary }}</p></section>
@@ -42,7 +42,7 @@
         </template>
       </main>
     </template>
-    <div v-else class="p2-empty">未找到该关注档案，请返回列表选择现有事项。</div>
+    <div v-else class="p2-empty">未找到该异动跟踪档案，请返回列表选择现有事项。</div>
   </div>
 </template>
 <script setup>

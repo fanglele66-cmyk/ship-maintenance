@@ -19,20 +19,20 @@ export const healthReview={
 export const healthReviewReceipt=taskReceipt({
  id:'main-engine-health-receipt-20261012-0800',runId:healthReview.runId,title:'主机每日健康回顾',completedAt:healthReview.completedAt,executionStatus:'completed',subject:'主机',analysisRange:healthReview.analysisRange,
  conclusion:healthReview.conclusion,change:healthReview.change,arrangement:healthReview.recommendation,requiresAction:true,dataLimit:healthReview.coverage+'；结论仅覆盖已接入指标。',
- actions:[{id:'todo:fault',label:'查看冷却系统事件'},{id:'item:drift',label:'查看3#缸关注档案'},{id:'item:maintenance',label:'查看轴承维保建议'}]
+ actions:[{id:'todo:fault',label:'查看冷却系统事件'},{id:'item:drift',label:'查看3#缸异动跟踪档案'},{id:'item:maintenance',label:'查看轴承维保建议'}]
 })
 
 export function overviewActions(store,advice={}){
  const observation=id=>{const result=store.getObservationResult(id);return {tag:store.attentionAction(id).phase,text:result.text,priority:result.type==='reinspect'||result.type==='extend'?0:5}}
  const rows=[
  {id:'fault',type:'关联事件',title:'冷却系统 · 温度与流量异常',tag:'检查处理中',text:'出口水温92.4°C、流量68.2 m³/h。需要继续原事件，核对现场读数及冷却回路状态。',priority:0},
- {id:'drift',type:'关注事项',title:'3#缸 · 排温偏离扩大',tag:store.attentionAction('drift').phase,text:store.attentionAction('drift').text,priority:store.attentionAction('drift').required||store.todoCreated.drift?1:4},
+ {id:'drift',type:'异动跟踪',title:'3#缸 · 排温偏离扩大',tag:store.attentionAction('drift').phase,text:store.attentionAction('drift').text,priority:store.attentionAction('drift').required||store.todoCreated.drift?1:4},
  {id:'maintenance',type:'维保建议',title:'1#缸连杆轴承 · 振动缓升',tag:advice.status||'待确认开展检查',text:advice.decision==='defer'?'暂不采纳的决定与原因已记录，保留原问题；已关联事件继续在原事件跟进。':advice.decision==='execute'?'已采纳，需在原问题事件中接续实际维护与验收。':store.todoCreated.maintenance?'已关联检查事件，继续现场检查；尚不直接确认磨损或换件。':'振动2.1→3.0 mm/s，距计划节点约140 h。需要决定是否开展提前检查，尚不能直接决定换件。',priority:2},
- {id:'cyl4-watch',type:'关注事项',title:'4#缸 · 相对偏差反复出现',tag:'系统跟踪中',text:'相对差8→7°C，暂未扩大。暂无需人员操作，系统继续跟踪。',priority:4}
+ {id:'cyl4-watch',type:'异动跟踪',title:'4#缸 · 相对偏差反复出现',tag:'系统跟踪中',text:'相对差8→7°C，暂未扩大。暂无需人员操作，系统继续跟踪。',priority:4}
  ]
  for(const row of rows){
-  if(store.isTaskHandled(row.id)){Object.assign(row,observation(row.id));row.type='关注事项'}
-  if(row.id==='drift'&&store.todoCreated.drift&&!store.isTaskHandled('drift')){row.type='关联事件';row.text='检查与补证在原事件接续；关注档案保留原证据，不重复建立任务。'}
+  if(store.isTaskHandled(row.id)){Object.assign(row,observation(row.id));row.type='异动跟踪'}
+  if(row.id==='drift'&&store.todoCreated.drift&&!store.isTaskHandled('drift')){row.type='关联事件';row.text='检查与补证在原事件接续；异动跟踪档案保留原证据，不重复建立任务。'}
  }
  return rows.filter(row=>row.tag!=='已结束' && !(row.id==='maintenance'&&advice.decision==='defer'&&!store.todoCreated.maintenance)).sort((a,b)=>a.priority-b.priority)
 }
@@ -40,7 +40,7 @@ export function overviewActions(store,advice={}){
 export function deviceHealthReply(store,text){
  if(/先做|做什么|今日|今天|待处理/.test(text))return '先查看冷却系统原事件的当前检查要求。3#缸：'+store.attentionAction('drift').text+'。轴承请查看维保建议中的最新人员决定与安排；4#缸暂无人工要求。'
  if(/滤器|堵塞|堵了/.test(text))return '温升与流量下降提示冷却侧可能发生变化，但尚不能定位滤器堵塞。需要结合现场读数、泵组和回路状态检查，具体排查沿原冷却系统事件接续。'
- if(/4#|4号/.test(text))return '4#缸相对差本次由8°C降至7°C，暂未扩大，但仍反复出现；继续系统跟踪，不单凭这项变化要求维修。新的现场情况可在该关注档案补充。'
+ if(/4#|4号/.test(text))return '4#缸相对差本次由8°C降至7°C，暂未扩大，但仍反复出现；继续系统跟踪，不单凭这项变化要求维修。新的现场情况可在该异动跟踪档案补充。'
  if(/3#|3号|核对了|核实了/.test(text))return '3#缸当前安排：'+store.attentionAction('drift').text+'。普通留言不能替代结构化核实，核实提交也不等于确诊或已开展检查。'
  if(/全部|正常|健康|没问题/.test(text))return '目前仍有待核实或处理的问题，不能认定整台主机全部正常。最后有效健康研判为'+healthReview.completedAt+'，仅覆盖已接入指标；未覆盖部位仍按原巡检规程检查。'
  if(/维保|轴承|1#/.test(text))return '轴承振动缓升值得核验，但不能据此确认磨损或直接换件。请在“维保建议”查看最新证据、人员决定与原计划关联，不重复建立任务。'

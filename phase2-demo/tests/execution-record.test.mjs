@@ -5,7 +5,7 @@ import {createPinia,setActivePinia} from 'pinia'
 test('shared execution draft validates, records once and waits for comparable data',async()=>{
  const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
-  const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js');setActivePinia(createPinia());const store=usePhase2DemoStore()
+  const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js');setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   store.createTodo('maintenance');store.progress.maintenance=2;store.selectTodo('maintenance')
   let form=store.executionInquiry('maintenance');assert.ok(form)
   assert.equal(store.confirmExecutionRecord('maintenance',form.id,{}),false)
@@ -20,6 +20,6 @@ test('shared execution draft validates, records once and waits for comparable da
   assert.equal(store.confirmExecutionRecord('maintenance',form.id,final),false)
   assert.equal(store.executionRecords.maintenance.length,2);assert.equal(store.executionObservationReady('maintenance'),false);assert.equal(store.observationRecords.maintenance.length,0)
   assert.equal(JSON.stringify(store.logs.maintenance.find(m=>m.id===JSON.parse(old).id)),old)
-  store.resetDemo();assert.equal(store.executionRecords.maintenance,undefined)
+  store.resetDemo();store.createTodo('fault');assert.equal(store.executionRecords.maintenance,undefined)
  }finally{await server.close()}
 })

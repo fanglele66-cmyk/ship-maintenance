@@ -7,7 +7,7 @@ test('R05 overview separates current actions from the shared execution snapshot'
  const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore()
+  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   assert.deepEqual(overviewActions(store).map(r=>r.id),['fault','drift','maintenance','cyl4-watch'])
   assert.equal(new Set(overviewActions(store).map(r=>r.id)).size,4)
   assert.equal(healthReviewReceipt.conclusion,healthReview.conclusion)

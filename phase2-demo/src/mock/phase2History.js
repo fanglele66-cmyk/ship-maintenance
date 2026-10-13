@@ -4,7 +4,7 @@ export const historyCategories = [
   { id: 'all', label: '全部记录' },
   { id: 'maintenance', label: '实际维护记录' },
   { id: 'event', label: '检查与处置事件' },
-  { id: 'attention', label: '历史关注事项' },
+  { id: 'attention', label: '历史异动跟踪' },
   { id: 'recommendation', label: '维保建议记录' },
   { id: 'review', label: '每日健康回顾' }
 ]
@@ -13,7 +13,7 @@ export const historyCategories = [
 // executed maintenance record until that task reaches effect observation.
 export function deviceHistory(store) {
   const records = []
-  for (const id of ['fault', 'maintenance', 'drift']) {
+  for (const id of store.visibleTodos.map(item=>item.id)) {
     if (!store.todoCreated[id]) continue
     const item = store.cases[id], index = store.progress[id], stage = item.stages[index]
     records.push({ id: `event-${id}`, type: 'event', date: '10月08日', time: '10:30', title: id === 'drift' && index >= 2 ? item.eventTitle : item.initialTitle, status: store.isTaskHandled(id)?'已处理':stage.label, source: '待办中心 · 阶段记录', target: id,
@@ -33,7 +33,7 @@ export function deviceHistory(store) {
   const maintenance = maintenanceAssessment(store)
   records.push({ id: 'recommendation-maintenance', type: 'recommendation', date: '10月08日', time: '08:10', title: '1#缸连杆轴承提前维保建议', status: store.isTaskHandled('maintenance') ? '已执行 · ' + store.getObservationResult('maintenance').title : store.todoCreated.maintenance ? '已关联待办' : '待确认建议', source: '维保建议 · 计划与趋势分析', target: 'maintenance', summary: '近7日振动2.1→3.0 mm/s；距周期检修约140 h，结合约48小时后的靠港窗口评估提前检查。', conclusion: maintenance.conclusion, recommendation: maintenance.recommendation, sections: maintenance.sections })
 
-  for(const [index,decision] of (store.suggestionDecisions||[]).entries()){const id=decision.id;records.push({id:'decision-'+id+(index?'-'+index:''),type:'attention',date:decision.at.split(' ')[0],time:decision.at.split(' ')[1]||'',title:'已忽略：'+(id==='drift'?'3号缸排温检查建议':'连杆轴承提前检查建议'),status:'已记录决定',source:decision.actor,summary:decision.reason,conclusion:decision.reason,recommendation:'本次未建立待办，运行数据继续采集；后续新证据需重新评估。',sections:[{title:'人员决定',paragraphs:[decision.reason,decision.actor+' · '+decision.at]}]})}
+  for(const [index,decision] of (store.suggestionDecisions||[]).entries()){const id=decision.id;records.push({id:'decision-'+id+(index?'-'+index:''),type:'attention',date:decision.at.split(' ')[0],time:decision.at.split(' ')[1]||'',target:id,title:'已记录决定：'+(store.cases[id]?.initialTitle||id),status:'已记录决定',source:decision.actor,summary:decision.reason,conclusion:decision.reason,recommendation:'本次未建立待办，运行数据继续采集；后续新证据需重新评估。',sections:[{title:'人员决定',paragraphs:[decision.reason,decision.actor+' · '+decision.at]}]})}
   for(const [id,entries] of Object.entries(store.assignmentRecords||{}))entries.forEach((entry,i)=>records.push({id:'assignment-'+id+'-'+i,type:'event',date:entry.at.split(' ')[0],time:entry.at.split(' ')[1]||'',title:store.cases[id].initialTitle+' · 人员指派',status:'已指派',source:entry.assignedBy,target:id,summary:entry.owner+' · '+entry.type,conclusion:entry.scope,recommendation:'计划：'+entry.due,sections:[{title:'人员与任务',paragraphs:[entry.assignedBy+'指派'+entry.owner,'协作：'+(entry.collaborator||'无'),entry.scope,'计划：'+entry.due]}]}))
   const assessment = operationAssessment(store)
   records.push({ id: 'review-today', type: 'review', date: '10月08日', time: '08:00', title: '主机每日健康回顾', status: '今日回顾', source: 'AI 健康分析 · 监测与已确认反馈', summary: assessment.conclusion, conclusion: assessment.conclusion, recommendation: assessment.recommendation, sections: assessment.sections })

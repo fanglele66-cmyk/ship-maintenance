@@ -22,14 +22,19 @@
           {{ statusLabel }}
         </span>
       </div>
+      <GlobalNotifications />
       <span class="header-time">{{ currentTime }}</span>
     </div>
   </header>
 </template>
 
 <script setup>
+import {ElPopover} from 'element-plus'
+import 'element-plus/es/components/popover/style/css'
+
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BackButton from './BackButton.vue'
+import GlobalNotifications from './GlobalNotifications.vue'
 import { shipInfo, statusLabels } from '@/mock/devices'
 import { knowledgeDocs } from '@/mock/knowledge'
 import { useEventStore } from '@/stores/eventStore'

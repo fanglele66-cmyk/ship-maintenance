@@ -149,6 +149,10 @@
 </template>
 
 <script setup>
+import {ElDatePicker,ElPagination} from 'element-plus'
+import 'element-plus/es/components/date-picker/style/css'
+import 'element-plus/es/components/pagination/style/css'
+
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { inspectionReports, inspectionReportDetails } from '@/mock/inspection'

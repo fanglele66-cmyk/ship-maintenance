@@ -1,4 +1,5 @@
 <template>
+ <ElConfigProvider size="small">
   <div class="app-container">
     <AppNav />
     <div class="app-main">
@@ -14,9 +15,11 @@
       </div>
     </div>
   </div>
+ </ElConfigProvider>
 </template>
 
 <script setup>
+import {ElConfigProvider} from 'element-plus'
 import AppNav from '@/components/AppNav.vue'
 import AppHeader from '@/components/AppHeader.vue'
 </script>

@@ -8,7 +8,7 @@ test('R01 action completion, linked events and post-treatment requirements', asy
   try {
     const {usePhase2DemoStore} = await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
     setActivePinia(createPinia())
-    const store = usePhase2DemoStore()
+    const store = usePhase2DemoStore();store.createTodo('fault')
     assert.equal(store.attentionAction('drift').required,true)
     store.selectAttention('drift')
     store.sendAttention('现场读数432，记录一下')
@@ -28,7 +28,7 @@ test('R01 action completion, linked events and post-treatment requirements', asy
     assert.equal(store.attentionAction('drift').phase,'处理后观察')
     assert.equal(store.attentionAction('drift').linked,true,'same post-treatment item also requires human action')
     assert.equal(store.effectObservations.filter(item=>item.id==='drift').length,1)
-    store.resetDemo()
+    store.resetDemo();store.createTodo('fault')
     assert.deepEqual({...store.attentionFeedback},{})
     assert.equal(store.attentionAction('drift').required,true)
   } finally { await server.close() }

@@ -1,7 +1,7 @@
 <template>
   <div v-if="todo && stage" class="p2-detail p2-pad-detail">
     <header class="p2-detail-head">
-      <BackButton label="返回待办中心" @click="store.closeTodo();router.replace('/event')" />
+      <BackButton :label="route.query.from==='issues'?'返回事项处置':'返回待办中心'" @click="returnToList" />
       <div><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
       <span class="p2-badge" :class="store.isTaskHandled(todo.id)?'blue':'red'">{{ store.isTaskHandled(todo.id)?'已处理':'未处理' }}</span>
     </header>
@@ -80,14 +80,16 @@
 
 import { computed, reactive, ref, watch } from 'vue'
 import { checkChoices } from '@/mock/eventFeedbackRules'
-import { useRouter } from 'vue-router'
+import { useRouter,useRoute } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
-import Phase2DataOverview from '@/components/Phase2DataOverview.vue'
+import {lazyPane} from '@/components/lazyPane'
+const Phase2DataOverview=lazyPane(()=>import('@/components/Phase2DataOverview.vue'))
 import InquiryMessage from '@/components/messages/InquiryMessage.vue'
 import EventWorkOrderLink from '@/components/EventWorkOrderLink.vue'
 import BackButton from '@/components/BackButton.vue'
 import { overviewReports, causeContent } from '@/mock/phase2Content'
-const router=useRouter(),store=usePhase2DemoStore(),todo=computed(()=>store.selectedTodo),stage=computed(()=>store.currentStage)
+function returnToList(){store.closeTodo();router.replace(route.query.from==='issues'?{path:'/situation/issues',query:{resume:'1',state:route.query.state,device:route.query.device,type:route.query.type}}:'/event')}
+const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),todo=computed(()=>store.selectedTodo),stage=computed(()=>store.currentStage)
 const subtab=computed({get:()=>store.detailTab,set:value=>store.detailTab=value})
 const results=store.taskResults,notes=store.taskNotes,attachments=store.taskAttachments,prepared=reactive({}),validation=ref(''),actionNote=ref(''),stepIndex=ref(0)
 const humanStages=computed(()=>(todo.value?.stages||[]).map((entry,index)=>({...entry,index})).filter(entry=>!['observe','closed'].includes(entry.kind)))

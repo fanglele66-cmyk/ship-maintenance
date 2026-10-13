@@ -18,14 +18,16 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const cases = scenarioCases
   const selectedAttentionId = ref('maintenance')
   const selectedTodoId = ref(null)
-  const todoCreated = reactive({ maintenance: false, drift: false, fault: true })
+  const captainEntry=ref(0)
+  function showCaptainWorkbench(){captainEntry.value++}
+  const todoCreated = reactive({ maintenance: false, drift: false, fault: false })
   const assignmentRequest=ref(null)
   const assignments=reactive({})
   const taskActors=reactive({fault:"王海涛（二管轮）",drift:"李建国（大管轮）",maintenance:"李建国（大管轮）"})
   const assignmentRecords=reactive({})
   const ignoredSuggestions=reactive({})
   const suggestionDecisions=reactive([])
-  function defaultAssignment(id){return {owner:id==='fault'?'王海涛（二管轮）':'李建国（大管轮）',collaborator:'',type:id==='maintenance'?'检测排查':'现场核实',due:'本班次内完成首轮核实',scope:id==='drift'?'核对3号缸现场排温与系统读数，记录稳定负荷下转速、负荷及有无异响；核实测量连接，反馈读数、现象和检查结果。':id==='maintenance'?'复核轴承振动测点、润滑状态与运行工况，按设备规程补充检查证据，确认靠港作业条件；尚不安排换件。':'核对冷却水出口温度、流量及冷却回路状态，提交检查结果。',assignedBy:'陈志远（轮机长）'}}
+  function defaultAssignment(id){return {owner:id==='fault'?'王海涛（二管轮）':'李建国（大管轮）',collaborator:'',type:['maintenance','fault'].includes(id)?'检测排查':'现场核实',due:'本班次内完成首轮核实',scope:id==='drift'?'核对3号缸现场排温与系统读数，记录稳定负荷下转速、负荷及有无异响；核实测量连接，反馈读数、现象和检查结果。':id==='maintenance'?'复核轴承振动测点、润滑状态与运行工况，按设备规程补充检查证据，确认靠港作业条件；尚不安排换件。':'核对冷却水出口温度、流量及冷却回路状态，提交检查结果。',assignedBy:'陈志远（轮机长）'}}
   assignments.fault=defaultAssignment('fault')
   const stageAssignments=reactive({})
   function assignStage(id,index,owner){
@@ -104,7 +106,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
   function registerDossierNote(id, text) {
     const value = text.trim()
-    if (!value || !logs[id] || (!attention.some(item=>item.id===id && item.tab==='attention') && !isTaskHandled(id))) return false
+    if (!value || !logs[id] || (!cases[id] && !attention.some(item=>item.id===id && item.tab==='attention') && !isTaskHandled(id))) return false
     const record = {id:`note-${++dossierNoteSequence}`,label:'人员留言',createdAt:Date.now(),at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}),actor:'轮机长',text:value,assessment:'人员补充，尚未经现场核实；不自动修改判断、完成要求或创建事件。',type:'note'}
     ;(dossierNotes[id] ||= []).push(record)
     addLog(id,'user',{text:value,dossierNoteId:record.id})
@@ -149,7 +151,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   },{immediate:true,deep:true})
 
   const extraIds=additionalScenarios.map(item=>item.id)
-  for(const item of additionalScenarios){const id=item.id;todoCreated[id]=true;progress[id]=0;activeStage[id]=0;logs[id]=[];taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'本班次核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id]=[];observationHistory[id]=[];observationTargets[id]=item.observation.days}
+  for(const item of additionalScenarios){const id=item.id;todoCreated[id]=item.initialCreated!==false;progress[id]=0;activeStage[id]=0;logs[id]=[];taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'本班次核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id]=[];observationHistory[id]=[];observationTargets[id]=item.observation.days}
   const selectedAttention = computed(() => attention.find(item => item.id === selectedAttentionId.value) || attention[0])
   const selectedTodo = computed(() => selectedTodoId.value ? cases[selectedTodoId.value] : null)
   const taskPortfolio=computed(()=>visibleTodos.value)
@@ -222,7 +224,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
 
   function createTodo(id) {
-    if (!['maintenance', 'drift'].includes(id) || todoCreated[id]) return false
+    if (!['fault','maintenance','drift','air-delivery','main-warning','steering-heat'].includes(id) || todoCreated[id]) return false
     if (id === 'drift' && monitorStep.drift < 1) return false
     delete ignoredSuggestions[id]
     assignments[id] ||= defaultAssignment(id)
@@ -287,7 +289,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     const key = `${id}:${stage.id}`
     if (openedStages[key]) return
     openedStages[key] = true
-    if (!context) addLog(id, 'user', stage.kind === 'handled' ? '查看处理结果' : stage.kind === 'overview' ? id==='maintenance'?'查看维保建议':stage.id==='attention'?'查看关注事项当前情况':'查看事件当前情况' : `进入${stage.label}`)
+    if (!context) addLog(id, 'user', stage.kind === 'handled' ? '查看处理结果' : stage.kind === 'overview' ? id==='maintenance'?'查看维保建议':stage.id==='attention'?'查看异动跟踪当前情况':'查看事件当前情况' : `进入${stage.label}`)
     const scene=sceneFor(id, stage)
     if(context)scene.paragraphs=[{label:'本轮结果',text:context},...(scene.paragraphs||[])]
     addLog(id, 'assistant', { kind: 'scene', stageId: stage.id, ...scene })
@@ -503,6 +505,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     situationObservationId.value=null
     selectedAttentionId.value = 'maintenance'
     selectedTodoId.value = null
+    todoCreated.fault = false
     todoCreated.maintenance = false
     todoCreated.drift = false
     progress.maintenance = 0
@@ -532,11 +535,11 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     Object.keys(eventUpdatedAt).forEach(id=>delete eventUpdatedAt[id])
     eventUpdatedAt.fault='2026/10/12 07:50'
     ;['maintenance','drift','fault'].forEach(id=>{observationReady[id]=false;observationRounds[id]=1;observationRecords[id].splice(0);observationHistory[id].splice(0);observationTargets[id]=observationConfig[id].days})
-    for(const item of additionalScenarios){const id=item.id;todoCreated[id]=true;progress[id]=0;activeStage[id]=0;taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'本班次核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id].splice(0);observationHistory[id].splice(0);observationTargets[id]=item.observation.days}
+    for(const item of additionalScenarios){const id=item.id;todoCreated[id]=item.initialCreated!==false;progress[id]=0;activeStage[id]=0;taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'本班次核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id].splice(0);observationHistory[id].splice(0);observationTargets[id]=item.observation.days}
     selectAttention('maintenance')
   }
 
   selectAttention('maintenance')
   // Action completion is explicit and independent from chat and event progress.
-  return { taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodoId, selectedTodo, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
+  return { captainEntry,showCaptainWorkbench,taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodoId, selectedTodo, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
 })

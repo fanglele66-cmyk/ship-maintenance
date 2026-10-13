@@ -67,7 +67,7 @@ export const maintenancePlans = [{
 
 export const scenarioCases = {
   maintenance: {
-    id: 'maintenance', cardType: '预测性维保建议', initialTitle: '主机1#缸连杆轴承提前维保', device: '主机 · 1#缸连杆轴承', priority: '建议提前',
+    id: 'maintenance', cardType: '维保建议', initialTitle: '主机1#缸连杆轴承提前维保', device: '主机 · 1#缸连杆轴承', priority: '建议提前',
     stages: [
       { id: 'overview', label: '建议速览', kind: 'overview', title: '建议在靠港窗口前确认轴承磨损', summary: '振动缓升与剩余运行小时数共同提示提前检查价值；系统尚未触发振动报警。', evidence: ['运行 1,860 / 2,000 h', '振动 2.1 → 3.0 mm/s，近7日约上升43%', '约48小时后有靠港检修窗口'], judgement: '先检查实际磨损；若磨损可见且备件齐备，再把计划检修提前。', action: '进入提前检查', reply: '先检查轴瓦表面、间隙与润滑情况。检查结论决定是否提前保养。' },
       { id: 'check', label: '检查', kind: 'check', title: '确认是否具备提前维保依据', summary: '核实轴瓦磨损、间隙和备件状态，判断是否具备提前保养条件。', evidence: ['需在安全停机与隔离后执行', '备件清单：1#缸连杆轴承轴瓦一套'], tasks: [{ label: '查看轴瓦表面磨损', guide: '记录拉伤、剥落或偏磨情况。' }, { label: '测量轴承间隙并核对备件', guide: '记录间隙测量值与备件状态。' }], judgement: '现场见轻微偏磨，间隙接近计划检修上限，备件可用；具备提前处理依据。', action: '提交检查并安排保养', reply: '已记录轻微偏磨及备件可用。建议在本次靠港窗口提前更换轴瓦。' },
@@ -77,19 +77,19 @@ export const scenarioCases = {
     ]
   },
   drift: {
-    id: 'drift', cardType: '关注事项的证据补充请求', initialTitle: '主机3#缸排温偏离检查', eventTitle: '主机3#缸排温异常', device: '主机 · 3#缸', priority: '关注核实',
+    id: 'drift', cardType: '异动跟踪', initialTitle: '主机3#缸排温偏离检查', eventTitle: '主机3#缸排温异常', device: '主机 · 3#缸', priority: '关注核实',
     stages: [
       { id: 'attention', label: '任务概览', kind: 'overview', title: '偏差扩大后的现场证据请求', summary: '系统发现排温偏差从8°C扩大到10°C，伴轻微波动；仍未达到450°C告警线。', evidence: ['同工况相对差 8 → 10°C', '当前排温 432°C；AMS告警线 450°C', '系统无法仅凭该数据确认真实异常'], judgement: '请轮机员检查异响、振动与仪表读数，确认是否需要响应。', action: '进入现场检查', reply: '请核对现场仪表读数，并补充异响与振动是否可复现。' },
       { id: 'check', label: '检查', kind: 'check', title: '辅助确认异动是否真实且需要响应', summary: '先确认排温偏差是否真实、是否需要响应。', evidence: ['先核对现场仪表与采集值', '再查看3#缸附近是否有可复现异响'], tasks: [{ label: '核对现场排温读数', guide: '对比现场仪表与系统采集值。' }, { label: '观察3#缸异响与振动', guide: '记录现场现象能否复现。' }], judgement: '现场仪表与系统一致，轻微异响可复现；异动真实，建议确立异常事件。', action: '确认异常并形成事件', reply: '现场读数一致且异响可复现，已确认主机3#缸排温异常需要响应。接下来结合候选原因安排排查。' },
-      { id: 'event', label: '事件概览', kind: 'overview', title: '主机3#缸排温异常已确立', summary: '由先前关注事项与现场检查接续形成，保留了8→10°C及异响证据。', evidence: ['来源：持续监测关注事项', '确立依据：现场仪表一致 + 异响可复现', '事件响应：安排针对性排查'], judgement: '喷油器雾化不良可能性较高，排气阀密封不良次之；现场仪表核对已降低测点偏差的可能性。', action: '进入排查', reply: '请先排查喷油器雾化与回油，再核对排气阀密封。' },
+      { id: 'event', label: '事件概览', kind: 'overview', title: '主机3#缸排温异常已确立', summary: '由先前异动跟踪与现场检查接续形成，保留了8→10°C及异响证据。', evidence: ['来源：持续监测异动跟踪', '确立依据：现场仪表一致 + 异响可复现', '事件响应：安排针对性排查'], judgement: '喷油器雾化不良可能性较高，排气阀密封不良次之；现场仪表核对已降低测点偏差的可能性。', action: '进入排查', reply: '请先排查喷油器雾化与回油，再核对排气阀密封。' },
       { id: 'investigate', label: '排查', kind: 'check', title: '排查导致排温异常的原因', summary: '已确认排温异常，接下来缩小根因范围。', evidence: ['作业前停机隔离与高压油管泄压', '结合异常缸与相邻缸同工况对比'], tasks: [{ label: '校验3#缸喷油器雾化', guide: '检查喷孔积炭及喷雾形态。' }, { label: '检查排气阀密封', guide: '记录密封检查结果。' }], judgement: '喷油器喷孔积炭与现象吻合，排气阀未见异常；建议检修喷油器。', action: '提交排查并进入维修', reply: '根因范围收敛到喷油器雾化不良，进入维修处理。' },
       { id: 'repair', label: '维修', kind: 'work', title: '清洁并校验3#缸喷油器', summary: '记录维修准备、喷油器处理与复装校验结果。', evidence: ['备件：喷嘴组件一套（备用）', '作业：拆检、清洁或更换喷嘴、校验喷雾形态'], tasks: [{ label: '拆检喷油器并处理积炭', guide: '记录拆检发现和处理内容。' }, { label: '复装后校验喷雾与密封', guide: '记录复装校验结果。' }], judgement: '维修完成后仍需看同工况排温偏差和异响是否消失。', action: '提交维修并完成处理', reply: '喷油器处理与验收已记录，本轮人工任务已处理。排温差与异响的持续效果在设备态势中自动跟踪。' },
       { id: 'observe', label: '效果观察', kind: 'observe', title: '维修后的24小时观察窗口', summary: '用最初的排温差与现场异响作为相同的验证口径。', evidence: ['同工况排温相对差 10 → 3°C', '3#缸异响未再复现', '24小时内排温维持稳定'], judgement: '处置效果与根因判断一致，可闭环。', action: '确认闭环归档', reply: '排温偏差和异响均已收束，事件完成观察并归档。' },
-      { id: 'closed', label: '完整闭环', kind: 'closed', title: '关注事项接续事件并闭环', summary: '状态关注、人工检查、事件确立、排查、维修、效果观察共用同一证据链。', evidence: ['关注：8→10°C', '检查：仪表一致、异响可复现', '排查：喷油器积炭', '维修及观察：偏差回落至3°C'], judgement: '案例材料已自动汇集并关联来源事件，待岸端审阅。' }
+      { id: 'closed', label: '完整闭环', kind: 'closed', title: '异动跟踪接续事件并闭环', summary: '状态关注、人工检查、事件确立、排查、维修、效果观察共用同一证据链。', evidence: ['关注：8→10°C', '检查：仪表一致、异响可复现', '排查：喷油器积炭', '维修及观察：偏差回落至3°C'], judgement: '案例材料已自动汇集并关联来源事件，待岸端审阅。' }
     ]
   },
   fault: {
-    id: 'fault', cardType: '故障/异常事件的排查与处置', initialTitle: '主机冷却水温异常偏高', device: '主机 · 冷却系统', priority: '立即处理',
+    id: 'fault', cardType: '报警事件', initialTitle: '主机冷却水温异常偏高', device: '主机 · 冷却系统', priority: '立即处理',
     stages: [
       { id: 'event', label: '事件概览', kind: 'overview', title: '主机冷却水温异常偏高', summary: '冷却水出口温度92.4°C，超过85°C阈值，已触发故障告警。', evidence: ['出口温度 92.4°C；上限 85°C', '冷却水流量 68.2 m³/h；要求 ≥80 m³/h', '进口温度 48.7°C，基本稳定'], judgement: '流量下降与温升同步出现，海水滤器堵塞可能性较高；优先核对滤器压差和脏污。', action: '进入排查', reply: '建议先检查海水滤器压差和滤芯情况。' },
       { id: 'investigate', label: '排查', kind: 'check', title: '定位冷却水温升原因', summary: '已确定故障现象，继续排查导致温升的原因。', evidence: ['按照主机负荷和安全条件安排检查', '复核现场仪表与系统读数，并记录阀位和压差'], tasks: [{ label: '检查海水滤器压差与滤芯', guide: '记录滤器压差和滤芯脏污情况。' }, { label: '检查温控阀动作', guide: '记录温控阀动作情况。' }], judgement: '滤器堵塞导致流量不足，与出口温升吻合。', action: '提交排查并进入维修', reply: '原因指向海水滤器堵塞，建议清洗滤器并复测流量。' },

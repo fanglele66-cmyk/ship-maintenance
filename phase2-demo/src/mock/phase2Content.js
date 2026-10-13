@@ -47,6 +47,8 @@ function sensor(id,nameEn,nameCn,unit,values,normalRange){return {id,nameEn,name
 for(const item of additionalScenarios){overviewReports[item.id]=item.report;causeContent[item.id]=item.cause}
 export function scenarioSensors(id, stageId='event') {
   const extra=additionalScenarios.find(item=>item.id===id)
+  if(id==='main-warning')return [{id:'warn-oil',name:'机油压力',nameCn:'机油压力',nameEn:'机油压力',value:.24,unit:'MPa',trendData:[{time:'前2班',value:.31},{time:'前1班',value:.27},{time:'本班',value:.24}]},{id:'warn-delta',name:'滤器压差',nameCn:'滤器压差',nameEn:'滤器压差',value:.07,unit:'MPa',trendData:[{time:'前2班',value:.03},{time:'前1班',value:.05},{time:'本班',value:.07}]}]
+  if(id==='air-delivery')return [{id:'air-time',name:'加载时间',nameCn:'加载时间',nameEn:'加载时间',value:128,unit:'s',trendData:[{time:'前2班',value:95},{time:'前1班',value:112},{time:'本班',value:128}]},{id:'air-pressure',name:'供气压力',nameCn:'供气压力',nameEn:'供气压力',value:0.82,unit:'MPa',trendData:[{time:'前2班',value:.82},{time:'前1班',value:.82},{time:'本班',value:.82}]}]
   if(extra)return mockEvents[extra.snapshotIndex].snapshot.sensors.map((s,i)=>({...s,id:extra.id+'-'+i,nameCn:s.name,nameEn:s.name,trendData:s.trendData.map(p=>{const first=s.trendData[0].value,last=s.trendData.at(-1).value;return {...p,value:Number((first+(p.value-first)*(s.value-first)/(last-first||1)).toFixed(3))}})}))
   if(id==='fault')return faultSensors
   if(id==='maintenance')return [sensor('vibration','Bearing Vibration','1#缸轴承振动','mm/s',[2.1,2.15,2.12,2.2,2.25,2.3,2.32,2.4,2.45,2.5,2.6,2.65,2.7,2.8,2.9,3.0],'历史稳定区间约2.1–2.3 mm/s'),sensor('bearing-temp','Bearing Temperature','轴承温度','°C',[62,62.4,62.1,63,63.2,63.1,63.5,64,64,64.2,64.5,64.8,65,65.2,65.1,65.4],'历史稳定区间62–65°C')]
@@ -59,7 +61,7 @@ export function attentionScene(id, monitorStep=0) {
   if(id==='stable')return {title:monitorStep===2?'本轮关注已收束':'海水冷却泵压力持续跟踪', paragraphs:[{label:'观测情况',text:monitorStep===2?'第三次同工况比对，压力波动收敛至0.39–0.40 MPa。':'出口压力在0.38–0.41 MPa之间小幅波动，连续样本未见扩大。'},{label:'关联证据',text:'流量和冷却水温没有同步恶化，尚未出现明确故障证据。'},{label:'后续安排',text:monitorStep===2?'结束本轮专项跟踪，恢复常规监测。':'继续做同工况比对，观察波动是否扩大。'}],question:monitorStep===2?'如后续出现新的现场现象，您可以继续补充。':'现场若有异响、泄漏或工况变化，请告诉我。'}
   if(id==='cyl2-ended')return {title:'2#缸排温观察结论',paragraphs:[{label:'监测结果',text:'三轮相近工况下排温依次为420°C、421°C、420°C；与其余缸均值的差值约为1°C、1°C、0°C。'},{label:'本轮判断',text:'未见持续偏离或差值扩大，现有记录不支持建立异常待办。'},{label:'后续安排',text:'结束专项观察并恢复常规监测；若后续出现持续偏离或现场异常，再重新评估。'}],question:'这条观察已收束，不需要创建待办。'}
   if(id==='vibration-trend')return {title:'主机机体振动状态跟踪',paragraphs:[{label:'监测情况',text:'相近工况下X向采集值近三轮为2.7、2.8、2.8 mm/s，变化幅度较小；Y向读数未见同步抬升。'},{label:'当前判断',text:'现有趋势没有形成连续上升，也没有现场异常反馈，暂不要求人工确认。'},{label:'后续安排',text:'继续自动比较同工况数据；若持续上行或出现可复现异响、振动，再请求现场核实。'}],question:'近期机体有异响或振动手感变化吗？如有，可直接补充现场现象。'}
-  return {title:monitorStep?'关注事项出现新事实':'主机3#缸排温持续关注',paragraphs:monitorStep?[
+  return {title:monitorStep?'异动跟踪出现新事实':'主机3#缸排温持续关注',paragraphs:monitorStep?[
     {label:'观测节点',text:'持续监测第2日，同工况比对已形成新的排温差证据。'},
     {label:'跟踪回顾',text:'同工况排温相对差由8°C扩大到10°C，并出现轻微波动；当前432°C，尚未触及450°C AMS报警线。'},
     {label:'建议',text:'建议人工核对现场仪表，并补充异响、振动等现象，确认异动是否真实且需要响应。'}

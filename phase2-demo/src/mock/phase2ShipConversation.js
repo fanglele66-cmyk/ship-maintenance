@@ -66,7 +66,7 @@ export function shipSituationReply(store, text) {
       { label: '3#缸关注', text: matters.cylinder },
       { label: '维保安排', text: matters.bearing }
     ], question: '先进入对应事项核对证据与当前阶段，再确认检查或处理安排。',
-    actions: [action(store.isTaskHandled('fault') ? 'item:fault' : 'todo:fault', store.isTaskHandled('fault') ? '查看冷却系统效果观察' : '跟进冷却系统待办'), action('item:drift', '查看3#缸关注材料')]
+    actions: [action(store.isTaskHandled('fault') ? 'item:fault' : 'todo:fault', store.isTaskHandled('fault') ? '查看冷却系统效果观察' : '跟进冷却系统待办'), action('item:drift', '查看3#缸异动跟踪材料')]
   }
   if (/舵机|空压|锅炉|设备|监测|回顾/.test(text)) return {
     ...base, title: '重点设备监测回顾', paragraphs: [

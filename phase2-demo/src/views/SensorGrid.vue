@@ -80,6 +80,9 @@
 </template>
 
 <script setup>
+import {ElPagination} from 'element-plus'
+import 'element-plus/es/components/pagination/style/css'
+
 import { ref, computed, watch, nextTick } from 'vue'
 import { useSensorStore } from '@/stores/sensorStore'
 import { systemTags } from '@/mock/sensors'

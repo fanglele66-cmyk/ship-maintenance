@@ -1,0 +1,65 @@
+{
+  "text": "指定本次任务负责人",
+  "fields": [
+    {
+      "key": "owner",
+      "label": "负责人",
+      "type": "select",
+      "required": true,
+      "options": []
+    }
+  ],
+  "optionalFields": [
+    {
+      "key": "type",
+      "label": "任务类型",
+      "type": "select",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "collaborator",
+      "label": "协作人员",
+      "type": "select",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "due",
+      "label": "计划时间",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "scope",
+      "label": "处理范围与反馈要求",
+      "type": "textarea",
+      "required": true
+    }
+  ],
+  "ignore": {
+    "text": "记录本次不采纳的依据",
+    "fields": [
+      {
+        "key": "reason",
+        "label": "决定依据",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "说明本次不安排检查的依据"
+      }
+    ]
+  },
+  "falseAlarm": {
+    "text": "反馈可能误报",
+    "hint": "提供现场核对依据；提交不会解除原报警。",
+    "fields": [
+      {
+        "key": "reason",
+        "label": "现场核对依据",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "记录现场仪表、系统读数和测点检查结果"
+      }
+    ]
+  }
+}

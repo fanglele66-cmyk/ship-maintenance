@@ -6,7 +6,7 @@ test('all actual check outcomes save without forcing the preset repair branch',a
  const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore()
+  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   store.progress.fault=1;store.activeStage.fault=1
   const stage=store.cases.fault.stages[1]
   const feedback=stage.tasks.map(task=>({label:task.label,result:'发现异常',note:'现场存在异常，待进一步核实',attachments:['现场照片.png']}))

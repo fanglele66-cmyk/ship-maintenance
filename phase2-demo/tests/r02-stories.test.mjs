@@ -26,7 +26,7 @@ test('R02 preserves three dossiers, qualitative evidence and explicit decision r
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {attentionDossier}=await server.ssrLoadModule('/src/mock/attentionDossier.js')
   const {deviceHistory}=await server.ssrLoadModule('/src/mock/phase2History.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore()
+  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   assert.deepEqual(store.attention.filter(i=>i.tab==='attention').map(i=>i.id).sort(),['cyl2-ended','cyl4-watch','drift'])
   for(const id of ['cyl2-ended','cyl4-watch','drift']){
    const dossier=attentionDossier(store,id)
@@ -68,6 +68,6 @@ test('R02 preserves three dossiers, qualitative evidence and explicit decision r
   store.registerDossierNote('cyl2-ended','发生时间：今天，工况与位置：2#缸附近，现象：新异响')
   assert.equal(attentionDossier(store,'cyl2-ended').action.phase,'已结束')
   assert.equal(attentionDossier(store,'cyl2-ended').records.filter(record=>record.type==='closure').length,1)
-  store.resetDemo();assert.equal(Object.keys(store.dossierReviews).length,0)
+  store.resetDemo();store.createTodo('fault');assert.equal(Object.keys(store.dossierReviews).length,0)
  } finally {await server.close()}
 })
