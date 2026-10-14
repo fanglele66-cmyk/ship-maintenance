@@ -137,17 +137,16 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
   const sensors=useSensorStore()
   watch(()=>[progress.fault,progress.drift,progress.maintenance,monitorStep.stable,monitorStep.drift,observationRecords.fault.at(-1),observationRecords.drift.at(-1),observationRecords.maintenance.at(-1)],()=>{
-    const outlet=sensors.allSensors.find(s=>s.id==='s-007'),exhaust=sensors.allSensors.find(s=>s.id==='s-005')
-    const coolingFlow=sensors.allSensors.find(s=>s.id==='s-017'),pumpPressure=sensors.allSensors.find(s=>s.id==='s-015')
-    const bearingVibration=sensors.allSensors.find(s=>s.id==='s-018'),bearingTemperature=sensors.allSensors.find(s=>s.id==='s-019')
     const faultRecord=observationRecords.fault.filter(r=>r.values).at(-1),driftRecord=observationRecords.drift.filter(r=>r.values).at(-1)
     const maintenanceRecord=observationRecords.maintenance.filter(r=>r.values).at(-1)
-    if(outlet){outlet.value=progress.fault>=3?(faultRecord?.values[0]??79.1):92.4;outlet.status=outlet.value>85?'over':'normal'}
-    if(coolingFlow){coolingFlow.value=progress.fault>=3?(faultRecord?.values[1]??86.5):68.2;coolingFlow.status=coolingFlow.value<80?'over':'normal'}
-    if(exhaust)exhaust.value=progress.drift>=5?(driftRecord?.values[1]??425):monitorStep.drift?432:428
-    if(pumpPressure)pumpPressure.value=monitorStep.stable>=2?0.395:0.40
-    if(bearingVibration){bearingVibration.value=progress.maintenance>=3?(maintenanceRecord?.values[0]??2.2):3.0;bearingVibration.status=progress.maintenance>=3?'normal':'warning'}
-    if(bearingTemperature)bearingTemperature.value=progress.maintenance>=3?(maintenanceRecord?.values[1]??64):65
+    sensors.setSimulationBaselines({
+      's-007':{value:progress.fault>=3?(faultRecord?.values[0]??79.1):92.4},
+      's-017':{value:progress.fault>=3?(faultRecord?.values[1]??86.5):68.2},
+      's-005':{value:progress.drift>=5?(driftRecord?.values[1]??425):monitorStep.drift?432:428},
+      's-015':{value:monitorStep.stable>=2?0.395:0.40},
+      's-018':{value:progress.maintenance>=3?(maintenanceRecord?.values[0]??2.2):3.0,status:progress.maintenance>=3?'normal':'warning'},
+      's-019':{value:progress.maintenance>=3?(maintenanceRecord?.values[1]??64):65},
+    })
   },{immediate:true,deep:true})
 
   const extraIds=additionalScenarios.map(item=>item.id)

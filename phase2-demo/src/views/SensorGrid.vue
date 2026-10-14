@@ -119,7 +119,7 @@ function scrollListTop() {
   listScrollRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-watch(filteredSensors, () => {
+watch(() => filteredSensors.value.map(sensor=>sensor.id).sort().join('|'), () => {
   currentPage.value = 1
   nextTick(() => listScrollRef.value?.scrollTo({ top: 0 }))
 })

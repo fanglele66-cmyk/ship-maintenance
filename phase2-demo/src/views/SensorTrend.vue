@@ -170,7 +170,6 @@
 import { ref, watch, onMounted, onUnmounted, nextTick, computed, reactive } from 'vue'
 import * as echarts from 'echarts'
 import { useSensorStore } from '@/stores/sensorStore'
-import { generateTrendData } from '@/mock/sensors'
 
 const emit = defineEmits(['back', 'quick-report'])
 const props = defineProps({
@@ -240,7 +239,7 @@ const customStart = ref('')
 const customEnd = ref('')
 
 function generateTrendForSensor(sensor, hours) {
-  const data = generateTrendData(sensor.value, sensor.value * 0.1, hours, sensor.id)
+  const data = sensorStore.getSimulationTrend(sensor.id,hours)
   if (!data.length) return data
   return data.map((item, index) => index === data.length - 1
     ? { ...item, value: Number(sensor.value) }
@@ -257,7 +256,7 @@ function getTrendDataForHours(hours) {
 const scopedSensors = computed(() => {
   let sensors = sensorStore.allSensors
   if (sensorStore.currentDeviceId) {
-    sensors = sensors.filter(sensor => sensor.deviceId === sensorStore.currentDeviceId)
+    sensors = sensors.filter(sensor => sensorStore.currentDeviceId==='aux-system'?sensor.deviceId.startsWith('aux-engine-'):sensor.deviceId === sensorStore.currentDeviceId)
   } else if (sensorStore.currentSystem !== '全部') {
     sensors = sensors.filter(sensor => sensor.system === sensorStore.currentSystem)
   }
@@ -393,12 +392,7 @@ function getCustomTrendData(sensor) {
   if (!hours) return []
   const startTime = new Date(customStart.value).getTime()
   const endTime = new Date(customEnd.value).getTime()
-  const count = Math.min(hours, 168)
-  const interval = (endTime - startTime) / count
-  return Array.from({ length: count }, (_, i) => ({
-    time: new Date(startTime + i * interval).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-    value: sensor.value + Math.sin(i / 4) * sensor.value * 0.1 + Math.random() * sensor.value * 0.03
-  }))
+  return sensorStore.getSimulationTrend(sensor.id,hours,startTime,endTime)
 }
 
 function buildOption() {
@@ -793,6 +787,7 @@ function buildSingleOption() {
     }],
     yAxis: {
       type: 'value',
+      scale: true,
       name: sensor.unit,
       nameLocation: 'end',
       nameGap: 12,
@@ -805,7 +800,7 @@ function buildSingleOption() {
       type: 'line',
       name: `${sensor.nameCn}(${sensor.nameEn})`,
       data: data.map(d => d.value),
-      smooth: true,
+      smooth: false,
       symbol: 'circle',
       symbolSize: 8,
       showSymbol: false,
@@ -915,7 +910,7 @@ function buildMultiOption() {
       name: `${sd.sensor.nameCn}(${sd.sensor.nameEn})`,
       data: sd.data.map(d => d.value),
       yAxisIndex: Math.max(0, yAxisKeys.indexOf(normalizeAxisUnit(sd.sensor.unit).key)),
-      smooth: true,
+      smooth: false,
       symbol: 'none',
       lineStyle: { color: sd.color, width: 2 },
       itemStyle: { color: sd.color }
@@ -1001,7 +996,7 @@ onUnmounted(() => {
 
 watch(() => sensorStore.selectedSensorId, () => renderChart())
 watch(() => sensorStore.trendHours, () => renderChart())
-watch(() => sensorStore.selectedSensor?.value, () => renderChart())
+watch(() => sensorStore.sampledAt, () => renderChart())
 watch(
   [() => groupedSensors.value.map(group => group.key).join('|'), () => sensorStore.selectedSensorId],
   syncGroupExpansion,

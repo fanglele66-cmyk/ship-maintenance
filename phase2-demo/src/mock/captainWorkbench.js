@@ -14,11 +14,12 @@ export function captainDeviceSignal(store,deviceId){
  const rows=workbenchIssues(store).filter(i=>i.deviceId===deviceId&&['待决策','已派发'].includes(i.state))
  return rows.some(i=>i.rank<=1)?'danger':rows.length?'warning':'normal'
 }
-export function captainAnalysis(store){
- const pending=workbenchIssues(store).filter(i=>i.state==='待决策'),assigned=workbenchIssues(store).filter(i=>i.state==='已派发')
+export function captainAnalysis(store,deviceIds){
+ const scoped=workbenchIssues(store).filter(i=>!deviceIds||deviceIds.includes(i.deviceId))
+ const pending=scoped.filter(i=>i.state==='待决策'),assigned=scoped.filter(i=>i.state==='已派发')
  const cooling=pending.some(i=>i.id==='fault'),warning=pending.some(i=>i.id==='main-warning')
- const conclusion=cooling||warning?'全船运行风险主要集中在主机，已有报警或多指标预警需要优先决策；其他设备按各自证据和处理进展分别评估。':'主机的高优先级事项已作出决定，当前重点转为核对已派发任务的现场结果，并评估尚未安排的异动与维保建议。'
- const basis='主机直接关系推进能力，温升与流量变化、润滑压力与阻力变化分别指向不同的风险，需要独立核实，不能归为同一个故障。舵机油温问题已派发处理；空压机加载时间延长尚不足以确认原因，应结合现场核实再判断。'
+ const conclusion=cooling||warning?(deviceIds?'当前展示的主机与辅机中，待决策风险主要集中在主机；已有报警或多指标预警需要优先决策，辅机按自身证据分别评估。':'全船运行风险主要集中在主机，已有报警或多指标预警需要优先决策；其他设备按各自证据和处理进展分别评估。'):'主机的高优先级事项已作出决定，当前重点转为核对已派发任务的现场结果，并评估尚未安排的异动与维保建议。'
+ const basis='主机直接关系推进能力，温升与流量变化、润滑压力与阻力变化分别指向不同的风险，需要独立核实，不能归为同一个故障。'+(deviceIds?'辅机应按各自测点及运行工况独立评估，不将主机结论直接套用于辅机；未生成事项不代表设备全部健康。':'舵机油温问题已派发处理；空压机加载时间延长尚不足以确认原因，应结合现场核实再判断。')
  const next=cooling?'优先了解主机冷却水报警并派发排查，核实报警真实性、原因与处置范围；随后核对润滑供油预警，安排现场指标比对。再决定局部异动和提前维保的检查安排。':warning?'优先核对主机润滑供油预警并派发现场检查，先确认读数是否一致，再定位原因；其他已派发事项沿原任务跟进。':pending.length?'查看下方仍待决策的事项，结合证据采纳并指定负责人，或记录本次不采纳的依据；已派发事项查看原任务进展。':'本轮需要决策的事项均已处理，可查看已派发任务的负责人及最新结果，不重复派发。'
  return `### 健康态势分析\n\n${conclusion}\n\n${basis}\n\n### 建议\n\n${next}`
 }

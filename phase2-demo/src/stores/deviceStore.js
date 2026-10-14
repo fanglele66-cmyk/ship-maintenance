@@ -1,10 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { shipInfo, mockDevices } from '@/mock/devices'
+import {useSensorStore} from '@/stores/sensorStore'
 
 export const useDeviceStore = defineStore('device', () => {
   const ship = ref({ ...shipInfo })
-  const devices = ref(mockDevices.filter(device=>device.id!=='aux-engine-2'))
+  const sensorStore=useSensorStore()
+  const devices = computed(()=>mockDevices.filter(device=>device.id!=='aux-engine-2').map(device=>{
+    const points=sensorStore.allSensors.filter(s=>s.deviceId===device.id)
+    return {...device,metrics:device.metrics.map(metric=>{
+      const point=metric.label==='转速'?points.find(s=>s.unit==='rpm'):metric.label.includes('水温')?points.find(s=>s.nameCn.includes('水出口温度')):null
+      return point?{...metric,value:point.value,status:point.status}:metric
+    })}
+  }))
   const selectedDeviceId = ref(null)
 
   const selectedDevice = computed(() => {

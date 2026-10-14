@@ -36,6 +36,7 @@
         <div v-if="!attentionId && !maintenanceId && !issueId && currentLayer === 2" class="layer" :class="layerClass(2)">
           <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-sensor="handleSensorClick" @back="goToLayer(1)">
             <template #data>
+              <SensorSimulationControls/>
               <div class="device-data-toolbar">
                 <label class="layer-header-search">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
@@ -102,6 +103,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 const AbnormalReportDialog=lazyPane(()=>import('@/components/AbnormalReportDialog.vue'))
 import ShipOverview from './ShipOverview.vue'
+import SensorSimulationControls from '@/components/SensorSimulationControls.vue'
 const SensorGrid=lazyPane(()=>import('./SensorGrid.vue'))
 const SensorTrend=lazyPane(()=>import('./SensorTrend.vue'))
 const DeviceSituation=lazyPane(()=>import('./DeviceSituation.vue'))

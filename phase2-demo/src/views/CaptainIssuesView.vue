@@ -21,6 +21,7 @@ import {computed,ref,watch,onActivated,onDeactivated,nextTick} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {activeWorkbenchIssues,issueDevices,issueTypes,filterIssueRows,issueBatch} from '@/mock/captainWorkbench'
+import {situationDeviceOptions,inSituationScope,matchesSituationDevice} from '@/mock/situationScope'
 import FormSelect from '@/components/forms/FormSelect.vue'
 import IssueFilterToolbar from '@/components/IssueFilterToolbar.vue'
 import BackButton from '@/components/BackButton.vue'
@@ -28,10 +29,11 @@ import CaptainIssueRow from '@/components/CaptainIssueRow.vue'
 const route=useRoute(),router=useRouter(),store=usePhase2DemoStore()
 const state=ref(''),device=ref(''),type=ref(''),batch=ref(1),scrollRef=ref(null)
 let savedScroll=0
-const deviceOptions=[{value:'',label:'全部设备'},...issueDevices]
+const engineScope=computed(()=>route.query.scope==='engines')
+const deviceOptions=computed(()=>[{value:'',label:'全部设备'},...(engineScope.value?situationDeviceOptions:issueDevices)])
 const typeOptions=[{value:'',label:'全部类型'},...issueTypes.map(value=>({value,label:value}))]
 const stateOptions=[{value:'',label:'全部状态'},{value:'待决策',label:'待决策'},{value:'已派发',label:'已派发'}]
-const filtered=computed(()=>filterIssueRows(activeWorkbenchIssues(store),{state:state.value,device:device.value,type:type.value}))
+const filtered=computed(()=>filterIssueRows(activeWorkbenchIssues(store).filter(i=>(!engineScope.value||inSituationScope(i))&&matchesSituationDevice(i,device.value)),{state:state.value,type:type.value}))
 const visible=computed(()=>issueBatch(filtered.value,batch.value)),hasFilters=computed(()=>Boolean(device.value||type.value||state.value))
 watch([state,device,type],()=>{batch.value=1;savedScroll=0;if(scrollRef.value)scrollRef.value.scrollTop=0})
 function clearFilters(){state.value='';device.value='';type.value=''}

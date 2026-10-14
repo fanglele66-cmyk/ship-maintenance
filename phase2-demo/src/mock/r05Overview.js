@@ -3,7 +3,7 @@ import { taskReceipt } from '../message-flows/taskReceipt.js'
 // Fictional execution snapshot. Current actions are separate from this immutable report.
 export const healthReview={
  runId:'main-engine-health-20261012-0800',completedAt:'2026/10/12 08:00',dataCutoff:'2026/10/12 07:55',analysisRange:'10/11 08:00—10/12 07:55 · 近24小时',
- conditions:'转速440–460 rpm，负荷68%–72%；剔除启停、机动及负荷快速变化片段',coverage:'有效覆盖率98.6%；不足部分不按正常处理',
+ conditions:'转速94–96 rpm，负荷68%–72%；剔除启停、机动及负荷快速变化片段',coverage:'有效覆盖率98.6%；不足部分不按正常处理',
  conclusion:'本次有3项需要人员跟进：冷却系统检查事件、3#缸现场核实、1#缸连杆轴承提前检查建议。其余已覆盖指标暂未发现值得新增关注的变化；当前证据不足以确认相关部件故障，也不代表未覆盖部位正常。',
  recommendation:'先跟进冷却系统原事件中的检查要求；核对3#缸现场排温、当时工况与现场现象；结合已有维保安排和靠港条件，决定是否开展轴承提前检查。',
  basis:'冷却水出口温度92.4°C、流量68.2 m³/h，温升与流量下降同时出现；3#缸排温430→432°C、缸间相对差9→10°C；4#缸相对差8→7°C，仍高于近期历史表现；轴承近7日振动2.1→3.0 mm/s，温度约65°C，尚无现场磨损确认记录。',

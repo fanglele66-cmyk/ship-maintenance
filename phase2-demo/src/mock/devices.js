@@ -6,7 +6,7 @@ export const shipInfo = {
   status: 'sailing',
   latitude: '23°N',
   longitude: '118°E',
-  speed: 14.2,
+  speed: 9.8,
   heading: 185,
   healthScore: 82,
   onlineDevices: 10,
