@@ -9,7 +9,7 @@ test('all actual check outcomes save without forcing the preset repair branch',a
   setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   store.progress.fault=1;store.activeStage.fault=1
   const stage=store.cases.fault.stages[1]
-  const feedback=stage.tasks.map(task=>({label:task.label,result:'发现异常',note:'现场存在异常，待进一步核实',attachments:['现场照片.png']}))
+  const feedback=stage.tasks.map((task,i)=>({label:task.label,result:i===0?'未见异常':'发现异常',note:'现场存在异常，待进一步核实',attachments:['现场照片.png']}))
   const result=store.advanceTodo('fault',feedback)
   assert.equal(result.saved,true);assert.equal(result.advanced,false);assert.equal(store.progress.fault,1)
   assert.equal(store.logs.fault.filter(m=>m.kind==='feedbackRecord').length,1)
@@ -26,4 +26,23 @@ test('all actual check outcomes save without forcing the preset repair branch',a
   assert.equal(store.advanceTodo('fault',supported).advanced,true);assert.equal(store.progress.fault,2)
   assert.equal(store.logs.fault.filter(m=>m.kind==='feedbackRecord').length,count+1)
  }finally{await server.close()}
+})
+test('cooling investigation accepts two abnormal findings without losing either result',async()=>{
+ const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ let store
+ try{
+  const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
+  setActivePinia(createPinia());store=usePhase2DemoStore();store.createTodo('fault')
+  store.progress.fault=1;store.activeStage.fault=1
+  const stage=store.cases.fault.stages[1]
+  const records=stage.tasks.map(task=>({label:task.label,result:'发现异常',note:'现场已发现异常，需按实际情况安排处置'}))
+  const outcome=store.advanceTodo('fault',records)
+  assert.equal(outcome.saved,true);assert.equal(outcome.advanced,true)
+  assert.equal(store.progress.fault,2);assert.equal(store.activeStage.fault,2)
+  assert.equal(store.cases.fault.stages[store.activeStage.fault].kind,'work')
+  const saved=store.logs.fault.find(entry=>entry.kind==='feedbackRecord')
+  assert.deepEqual(saved.records.map(r=>r.result),['发现异常','发现异常'])
+  assert.match(outcome.message,/两处异常均保留/)
+  assert.ok(store.logs.fault.some(entry=>typeof entry.content==='string'&&entry.content.includes('两处异常均保留'))||store.logs.fault.some(entry=>typeof entry.text==='string'&&entry.text.includes('两处异常均保留')))
+ }finally{store?.$dispose();await server.close()}
 })

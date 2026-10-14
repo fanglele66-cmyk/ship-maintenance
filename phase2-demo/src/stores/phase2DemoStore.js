@@ -360,7 +360,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     progress[id] = Math.max(progress[id], next)
     activeStage[id] = next
     delete recordDrafts[id]
-    addLog(id, 'assistant', stage.reply)
+    addLog(id, 'assistant', checkResult?.reply || stage.reply)
     openStageConversation(id)
     return {saved:true,advanced:true,message:checkResult?.message||'本轮反馈已保存。'}
   }
