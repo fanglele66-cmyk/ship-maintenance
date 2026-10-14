@@ -6,11 +6,11 @@ export const checkFeedbackRules={
  'drift:check':{options:[['现场与系统一致','读数不一致','无法确认'],['异响可复现','未见异常','无法确认']],expected:['现场与系统一致','异响可复现'],pending:'现场检查反馈已保存，当前尚不足以确立本示例的异常，继续核实；未见异常或无法确认同样保留为有效反馈。'},
  'maintenance:check':{options:[['发现轻微偏磨','未见异常','无法确认'],['间隙接近上限，备件可用','暂不具备条件','无法确认']],expected:['发现轻微偏磨','间隙接近上限，备件可用'],pending:'检查反馈已保存，当前尚不足以安排预设提前换件。保留实际结果，继续跟踪或补充作业条件。'}
 }
-for(const item of additionalScenarios)checkFeedbackRules[item.id+':investigate']={options:item.stages[1].tasks.map(()=>['发现异常','未见异常','无法确认']),expected:['发现异常','未见异常'],pending:'现场反馈已保存。当前结果不足以确认本案例首要处置方向，请继续核实其他候选原因；不会自动生成维修结论。'}
+for(const item of additionalScenarios)checkFeedbackRules[item.id+':investigate']={options:item.stages[1].tasks.map(()=>['发现异常','未见异常','无法确认']),pending:'现场反馈已保存。'}
 export function checkChoices(eventId,stageId,index){return checkFeedbackRules[`${eventId}:${stageId}`]?.options[index]||['发现异常','未见异常','无法确认']}
 export function assessCheckFeedback(eventId,stage,feedback){
  if(!Array.isArray(feedback)||feedback.length!==stage.tasks?.length||feedback.some((entry,i)=>entry.label!==stage.tasks[i].label||!checkChoices(eventId,stage.id,i).includes(entry.result)))return {valid:false,advance:false,message:'请完整填写各项实际检查结果后提交。'}
  const rule=checkFeedbackRules[`${eventId}:${stage.id}`]
- const advance=Boolean(rule&&rule.expected.every((value,i)=>feedback[i].result===value))
+ const advance=Boolean(rule && (!rule.expected || rule.expected.every((value,i)=>feedback[i].result===value)))
  return {valid:true,advance,message:advance?'本轮反馈已保存，按当前已支持的方案接续下一阶段。':rule?.pending||'本轮反馈已保存，尚无可用的下一阶段规则，请继续研判。'}
 }

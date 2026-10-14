@@ -304,7 +304,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     const existing=executionInquiry(id);if(existing)return existing
     const previous=executionRecords[id]?.at(-1)
     const fields=stage.tasks.flatMap((task,i)=>[{key:'task'+i,label:task.label,type:'select',required:true,options:[{value:'已完成',label:'已完成'},{value:'待补充',label:'待补充'}]},{key:'note'+i,label:task.label+'备注',type:'textarea'}])
-    const values={...(previous?.values.completion==='partial'?previous.values:{}),equipment:previous?.values.equipment||cases[id].device,executor:taskActors[id]||assignments[id]?.owner}
+    const values={...(previous?.values||{}),equipment:previous?.values.equipment||cases[id].device,executor:taskActors[id]||assignments[id]?.owner}
     stage.tasks.forEach((task,i)=>{values['task'+i]=taskResults[id+':'+stage.id+':'+i]||values['task'+i]||'';values['note'+i]=taskNotes[id+':'+stage.id+':'+i]||values['note'+i]||''})
     const message={...JSON.parse(JSON.stringify(executionRecordTemplate)),id:'execution-'+id+'-'+(++executionSequence),stageId:stage.id,fields:[...fields,...JSON.parse(JSON.stringify(executionRecordTemplate.fields))],values}
     addLog(id,'assistant',message);return executionInquiry(id)
@@ -323,34 +323,23 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(Object.keys(errors).length){message.submitError='请补齐执行记录的必填信息。';return false}
     if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(values.executedAt)||Date.parse(values.executedAt)>Date.now()){message.submitError='实际执行时间须为有效的已发生时间。';return false}
     if(values.completion==='completed'&&stage.tasks.some((_,i)=>values['task'+i]!=='已完成')){message.submitError='仍有未完成步骤，请保留进展或补齐实际结果。';return false}
-    if(values.completion==='completed'&&values.verification==='pending'){message.submitError='验收尚未完成，请保留进展；不能确认处理完成。';return false}
     updateExecutionRecord(id,messageId,values)
     const at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})
-    const record={id:messageId,values:JSON.parse(JSON.stringify(values)),source:'人员确认',executor:values.executor||taskActors[id]||assignments[id]?.owner||defaultAssignment(id).owner,assignedBy:assignments[id]?.assignedBy||'陈志远（轮机长）',confirmedAt:at,stageId:stage.id}
+    const record={id:messageId,values:JSON.parse(JSON.stringify(values)),source:'人员确认',executor:values.executor||taskActors[id]||assignments[id]?.owner,assignedBy:assignments[id]?.assignedBy||'陈志远（轮机长）',confirmedAt:at,stageId:stage.id}
     ;(executionRecords[id] ||= []).push(record)
-    message.status='submitted';message.submittedAt=at;message.receiptText=values.completion!=='completed'?'已保留进展，当前阶段不推进。':values.verification==='unresolved'?'作业已记录，原异常仍存在；继续原事件排查。':'实际执行与验收已确认；不修改原工单。'
+    message.status='submitted';message.submittedAt=at;message.receiptText=values.completion==='completed'?'实际执行与验收已确认；不修改原工单。':'已保留进展，当前阶段不推进。'
     addLog(id,'user','确认实际执行记录：'+values.measures+'；执行时间：'+values.executedAt)
-    if(values.completion==='completed'&&values.verification==='unresolved'){
-      restartAfterFailedVerification(id)
-    }else if(values.completion==='completed'){
-      progress[id]=observationIndex(id);activeStage[id]=progress[id];openStageConversation(id,values.comparable==='available'?'执行与验收记录已保存，以实际执行时间为比较分界，接续处理后效果跟踪。':'执行与验收记录已保存。缺少可比监测数据，效果观察待补充，当前不生成改善结论。')
-    }else {addLog(id,'assistant','执行进展已保存，未完成的作业继续在当前事件补充。');requestExecutionRecord(id)}
+    addLog(id,'assistant',values.completion==='completed'?(values.comparable==='available'?'执行记录已保存，以实际执行时间为比较分界进入演示效果观察。':'执行记录已保存。缺少可比监测数据，效果观察待补充，不生成改善结论。'):'执行进展已保存，未完成的作业继续在当前事件补充。')
+    if(values.completion==='completed'){
+      progress[id]=observationIndex(id);activeStage[id]=progress[id];openStageConversation(id)
+    }else requestExecutionRecord(id)
     return true
   }
-  function restartAfterFailedVerification(id){
-    const index=cases[id].stages.findIndex(stage=>stage.kind==='check')
-    if(index<0)return
-    delete openedStages[id+':handled']
-    cases[id].stages.slice(index).forEach(stage=>{delete openedStages[`${id}:${stage.id}`];(stage.tasks||[]).forEach((_,i)=>{delete taskResults[`${id}:${stage.id}:${i}`];delete taskNotes[`${id}:${stage.id}:${i}`];delete taskAttachments[`${id}:${stage.id}:${i}`]})})
-    progress[id]=index;activeStage[id]=index;delete recordDrafts[id]
-    openStageConversation(id,'原异常仍存在，已回到原事件排查。上轮现场反馈、实际措施和未通过的验收记录全部保留；请补充新的证据，不重复建立待办。')
-  }
-  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return !record||record.values.completion==='completed'&&record.values.verification!=='unresolved'&&record.values.comparable==='available' }
+  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return !record||record.values.completion==='completed'&&record.values.comparable==='available' }
   function advanceTodo(id, feedback = []) {
     const stage = cases[id].stages[activeStage[id]]
     if (!stage?.action) return
     if(activeStage[id]<progress[id]){selectStage(id,activeStage[id]+1);return}
-    if(stage.kind==='work')return {saved:false,advanced:false,message:'请在验收确认中提交实际执行记录及原异常验收结果。'}
     let checkResult
     if(stage.kind==='check'){
       checkResult=assessCheckFeedback(id,stage,feedback)
@@ -367,11 +356,12 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       }
     }
     if(stage.kind==='observe'&&getObservationResult(id).type!=='archive')return
-    if (feedback.length && stage.kind!=='check') addLog(id, 'assistant', { kind:'feedbackRecord', title:`${stage.label}反馈已提交`, task:stage.title, records:feedback,actor:taskActors[id],submittedAt:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}) })
+    if (feedback.length && stage.kind!=='check') addLog(id, 'assistant', { kind:'feedbackRecord', title:`${stage.label}反馈已提交`, task:stage.title, records:feedback })
     const next = activeStage[id] + 1
     progress[id] = Math.max(progress[id], next)
     activeStage[id] = next
     delete recordDrafts[id]
+    addLog(id, 'assistant', stage.reply)
     openStageConversation(id)
     return {saved:true,advanced:true,message:checkResult?.message||'本轮反馈已保存。'}
   }
@@ -407,7 +397,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       const parts=[...(/^补充|^另外/.test(text)&&recordDrafts[id]?recordDrafts[id].records.map(r=>r.result):[]),...text.split(/[。；\n]+/).map(t=>t.trim()).filter(Boolean)]
       const hasProblem=/未消失|未完成|待复核|待补充|不一致|未恢复|仍有|无法/.test(stage.kind==='work'?parts.at(-1):text)
       const evidenceText=parts.join('；')
-      const evidenceOk=extraIds.includes(id)?false:stage.kind==='work'? /复测|校验|试运转/.test(evidenceText)&&/合格|正常|稳定|恢复|无泄漏|2\.2|79\.1|86\.5|3°C/.test(evidenceText)&&/清洗|清洁|更换|处理/.test(evidenceText): id==='maintenance'?/偏磨/.test(evidenceText)&&/间隙/.test(evidenceText)&&/备件/.test(evidenceText): id==='drift'&&stage.id==='check'?/一致/.test(evidenceText)&&/异响/.test(evidenceText)&&/复现/.test(evidenceText):id==='fault'?/滤器/.test(evidenceText)&&/堵塞|脏污/.test(evidenceText)&&/温控阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText):/喷油器/.test(evidenceText)&&/积炭/.test(evidenceText)&&/排气阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText)
+      const evidenceOk=extraIds.includes(id)?true:stage.kind==='work'? /复测|校验|试运转/.test(evidenceText)&&/合格|正常|稳定|恢复|无泄漏|2\.2|79\.1|86\.5|3°C/.test(evidenceText)&&/清洗|清洁|更换|处理/.test(evidenceText): id==='maintenance'?/偏磨/.test(evidenceText)&&/间隙/.test(evidenceText)&&/备件/.test(evidenceText): id==='drift'&&stage.id==='check'?/一致/.test(evidenceText)&&/异响/.test(evidenceText)&&/复现/.test(evidenceText):id==='fault'?/滤器/.test(evidenceText)&&/堵塞|脏污/.test(evidenceText)&&/温控阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText):/喷油器/.test(evidenceText)&&/积炭/.test(evidenceText)&&/排气阀/.test(evidenceText)&&/正常|未见异常/.test(evidenceText)
       const draft={kind:'recordDraft',title:'现场反馈待确认',task:stage.title,stageId:stage.id,destination,canAdvance:evidenceOk&&!hasProblem,records:parts.map((p,i)=>({label:stage.tasks.find(t=>p.includes(t.label.slice(2,5)))?.label||`${stage.kind==='work'?'处理':'检查'}反馈 ${i+1}`,result:p,note:''})),confirmed:false}
       logs[id].filter(m=>m.kind==='recordDraft'&&!m.confirmed).forEach(m=>m.cancelled=true)
       recordDrafts[id]=draft
