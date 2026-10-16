@@ -14,6 +14,7 @@ import { validateInquiry } from '@/message-flows/inquiryFields'
 import { assessCheckFeedback } from '@/mock/eventFeedbackRules'
 
 export const usePhase2DemoStore = defineStore('phase2-demo', () => {
+  let businessRecordSequence = 0
   const attention = attentionItems
   const cases = scenarioCases
   const selectedAttentionId = ref('maintenance')
@@ -38,7 +39,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     ;(stageAssignments[id] ||= {})[stage.id]={...assignments[id]}
     return true
   }
-  function assignTask(id,values){if(!todoCreated[id]||!values.owner||!values.scope?.trim()||!values.due?.trim())return false;const record={...values,assignedBy:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};assignments[id]=record;taskActors[id]=record.owner;(assignmentRecords[id] ||= []).push({...record});addLog(id,'user',`任务指派：${record.owner}负责${record.type}；${record.scope}；计划：${record.due}`);return true}
+  function assignTask(id,values){if(!todoCreated[id]||!values.owner||!values.scope?.trim()||!values.due?.trim())return false;const record={...values,id:`assignment-${id}-${++businessRecordSequence}`,assignedBy:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};assignments[id]=record;taskActors[id]=record.owner;(assignmentRecords[id] ||= []).push({...record});addLog(id,'user',`任务指派：${record.owner}负责${record.type}；${record.scope}；计划：${record.due}`);return true}
   function ignoreSuggestion(id,reason){if(todoCreated[id]||!reason.trim())return false;ignoredSuggestions[id]={reason:reason.trim(),actor:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};suggestionDecisions.push({id,...ignoredSuggestions[id]});registerDossierNote(id,'忽略本次建议：'+reason.trim());return true}
   const eventUpdatedAt=reactive({fault:'2026/10/12 07:50'})
   const progress = reactive({ maintenance: 0, drift: 0, fault: 0 })
@@ -142,7 +143,8 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     sensors.setSimulationBaselines({
       's-007':{value:progress.fault>=3?(faultRecord?.values[0]??79.1):92.4},
       's-017':{value:progress.fault>=3?(faultRecord?.values[1]??86.5):68.2},
-      's-005':{value:progress.drift>=5?(driftRecord?.values[1]??425):monitorStep.drift?432:428},
+      's-005':{value:progress.drift>=5?(driftRecord?.values[1]??361.8):todoCreated.drift?371.8:361.8},
+      's-046':{value:357.0},
       's-015':{value:monitorStep.stable>=2?0.395:0.40},
       's-018':{value:progress.maintenance>=3?(maintenanceRecord?.values[0]??2.2):3.0,status:progress.maintenance>=3?'normal':'warning'},
       's-019':{value:progress.maintenance>=3?(maintenanceRecord?.values[1]??64):65},
@@ -208,7 +210,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
 
   function addLog(id, role, text) {
-    logs[id].push({ role, ...(typeof text === 'string' ? { text } : text), at: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) })
+    logs[id].push({ id:`record-${id}-${++businessRecordSequence}`, role, ...(typeof text === 'string' ? { text } : text), at: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) })
   }
 
   function selectAttention(id) {
@@ -223,7 +225,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
 
   function createTodo(id) {
-    if (!['fault','maintenance','drift','air-delivery','main-warning','steering-heat'].includes(id) || todoCreated[id]) return false
+    if (!['fault','maintenance','drift',...extraIds].includes(id) || todoCreated[id]) return false
     if (id === 'drift' && monitorStep.drift < 1) return false
     delete ignoredSuggestions[id]
     assignments[id] ||= defaultAssignment(id)
@@ -328,7 +330,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     ;(executionRecords[id] ||= []).push(record)
     message.status='submitted';message.submittedAt=at;message.receiptText=values.completion==='completed'?'实际执行与验收已确认；不修改原工单。':'已保留进展，当前阶段不推进。'
     addLog(id,'user','确认实际执行记录：'+values.measures+'；执行时间：'+values.executedAt)
-    addLog(id,'assistant',values.completion==='completed'?(values.comparable==='available'?'执行记录已保存，以实际执行时间为比较分界进入演示效果观察。':'执行记录已保存。缺少可比监测数据，效果观察待补充，不生成改善结论。'):'执行进展已保存，未完成的作业继续在当前事件补充。')
+    addLog(id,'assistant',values.completion==='completed'?(values.comparable==='available'?'执行记录已保存，以实际执行时间为比较分界进入效果观察。':'执行记录已保存。缺少可比监测数据，效果观察待补充，不生成改善结论。'):'执行进展已保存，未完成的作业继续在当前事件补充。')
     if(values.completion==='completed'){
       progress[id]=observationIndex(id);activeStage[id]=progress[id];openStageConversation(id)
     }else requestExecutionRecord(id)
@@ -423,7 +425,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
 
   function startObservation(id){
     if(!executionObservationReady(id)||observationRecords[id].length)return
-    observationRecords[id].push({day:0,label:'处理后首测',values:[...observationConfig[id].samples[0]],status:'normal',executedAt:executionRecords[id]?.at(-1)?.values.executedAt||null,source:'演示监测样本',note:'演示首测，待验证持续效果'})
+    observationRecords[id].push({day:0,label:'处理后首测',values:[...observationConfig[id].samples[0]],status:'normal',executedAt:executionRecords[id]?.at(-1)?.values.executedAt||null,source:'监测样本',note:'处理后首测，待验证持续效果'})
   }
   function getObservationResult(id){return observationResult(id,observationRecords[id],observationTargets[id])}
   function sceneFor(id,stage){if(stage.kind==='handled')return {title:'本轮处理已完成',paragraphs:[{label:'已提交措施',text:cases[id].stages[observationIndex(id)-1].title},{label:'后续跟踪',text:'现场验收记录已保存，设备态势将自动记录处理后趋势并判断是否稳定。待办保留本轮人工处理结果。'},{label:'案例材料',text:'来源：'+caseMaterials.value[id].sourceId+' · '+caseMaterials.value[id].sourceTitle+'。原始证据、现场反馈与处理措施已自动汇集，待岸端审阅；岸端可补充建议、修改或直接沉淀。'}]};if(stage.kind==='observe')return observationScene(id,observationRecords[id],observationTargets[id]);if(stage.kind==='closed'){const scene=stageScene(id,stage);scene.paragraphs.push({label:'观察结论',text:getObservationResult(id).text});return scene}return stageScene(id,stage)}
@@ -469,7 +471,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(!logs[mode]||situationVersions[mode]===version)return
     situationVersions[mode]=version
     if(mode!=='ship')addLog(mode,'user',mode==='device'?'查看主机的近期态势情况':'查看当前传感器趋势')
-    addLog(mode,'assistant',{kind:'scene',title:mode==='ship'?'船舶运行概况 · 自动播报':mode==='device'?'主机每日健康回顾':'传感器趋势',paragraphs:mode==='ship'?[{label:'运行概要',text:'远洋6号当前航行中，接入10台设备，4台重点设备在线展示。'},{label:'关注分布',text:`主机有${attention.filter(item=>item.tab==='attention' && attentionAction(item.id).phase!=='已结束').length}项未结束关注、${todoCreated.maintenance?0:1}项待确认维保建议，${visibleTodos.value.filter(t=>!isTaskHandled(t.id)).length}项未处理待办。`}]:mode==='device'?[{label:'当前结论',text:`${todoCreated.drift?(progress.drift>=2?'3#缸异常已确立，排查由关联待办接续，持续效果由设备态势跟踪':'3#缸检查待办已建立，等待现场确认'):'3#缸排温单缸偏离正在监测'}；4#缸反复偏差由系统跟踪；压力与机体振动为普通数据，不计入关注。`},{label:'计划与执行',text:`1#缸连杆轴承${todoCreated.maintenance?'维保待办已建立':'有1项提前维保建议'}；冷却水温异常${progress.fault===4?'已闭环':'仍需跟进'}。`}]:[{label:'数据查看',text:'可切换传感器、时间范围或多趋势对比，查看同一工况下的变化。'}],question:mode==='ship'?'以下为系统连续推送的设备变化、证据与待办建议。':mode==='device'?'优先核对3#缸异动和冷却系统处理进展；稳定监测仍由系统持续跟踪。有现场发现可以直接补充。':'哪个时间段或现场现象需要一起核对？'})
+    addLog(mode,'assistant',{kind:'scene',title:mode==='ship'?'船舶运行概况 · 自动播报':mode==='device'?'主机每日健康回顾':'传感器趋势',paragraphs:mode==='ship'?[{label:'运行概要',text:'远洋6号当前航行中，接入10台设备，4台重点设备在线展示。'},{label:'关注分布',text:`主机有${attention.filter(item=>item.tab==='attention' && attentionAction(item.id).phase!=='已结束').length}项未结束关注、${todoCreated.maintenance?0:1}项待确认维保建议，${visibleTodos.value.filter(t=>!isTaskHandled(t.id)).length}项未处理待办。`}]:mode==='device'?[{label:'当前结论',text:`${todoCreated.drift?(progress.drift>=2?'3#缸异常已确立，排查由关联待办接续，持续效果由设备态势跟踪':'3#缸检查待办已建立，等待现场确认'):'3#缸排温单缸偏离正在监测'}；4#缸反复偏差由系统跟踪；压力与机体振动为普通数据，不计入关注。`},{label:'计划与执行',text:`3号缸喷油器有1项清洁与复校建议，维护尚待审阅安排；冷却水温异常${progress.fault===4?'已闭环':'仍需跟进'}。`}]:[{label:'数据查看',text:'可切换传感器、时间范围或多趋势对比，查看同一工况下的变化。'}],question:mode==='ship'?'以下为系统连续推送的设备变化、证据与待办建议。':mode==='device'?'优先核对3#缸异动和冷却系统处理进展；稳定监测仍由系统持续跟踪。有现场发现可以直接补充。':'哪个时间段或现场现象需要一起核对？'})
   }
 
   function sendSituation(text, mode) {

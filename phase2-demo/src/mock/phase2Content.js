@@ -1,3 +1,4 @@
+import {maintenanceExample as example} from './maintenanceExample.js'
 import additionalScenarios from './additionalScenarios.json'
 import { maintenanceProposalScene } from './phase2SituationContent'
 import { mockEvents } from './events'
@@ -5,11 +6,7 @@ import { mockEvents } from './events'
 // 结构来源：墨刀“改造和新增的部分”概览类、检测类、处置类及其助手说明。
 // 冷却水案例沿用一期事件快照；其余为本次已约定的模拟故事。
 export const overviewReports = {
-  maintenance: {
-    basis: '近7日轴承振动由2.1升至3.0 mm/s，较起始值增加约43%；累计运行1,860 h，距2,000 h周期检修节点约140 h。约48小时后有靠港窗口。',
-    conclusion: '振动持续上行且周期检修临近，提示轴承状态可能偏离历史稳定区间；但系统尚未触发振动报警，趋势本身不能证明轴瓦磨损或直接决定换件。',
-    system: '继续跟踪振动与轴承温度。', operation: '结合靠港窗口安排检查，作业前按现有规程确认停机与隔离条件。', human: '检查轴瓦表面、测量间隙并核对备件，再决定是否提前保养。'
-  },
+  maintenance:{basis:example.provenance,conclusion:example.conclusion,system:'持续比较排温及缸间对照差。',operation:'人员确认实际时间、停机隔离及许可。',human:example.recommendation},
   drift: {
     basis: '同工况下3#缸排温相对差由8°C扩大到10°C；当前排温432°C，低于450°C AMS报警线，出现轻微波动。',
     conclusion: '3#缸排温相对差持续扩大，可能增加燃烧效率下降和后燃风险；现有监测数据仍需现场证据核实。',
@@ -46,6 +43,7 @@ faultSensors[2].trendData=faultSensors[0].trendData.map((p,i)=>({...p,value:Numb
 function sensor(id,nameEn,nameCn,unit,values,normalRange){return {id,nameEn,nameCn,name:nameCn,unit,value:values.at(-1),normalRange,trendData:values.map((value,i)=>({time:`09-${String(23+Math.floor(i/4)).padStart(2,'0')} ${String(i%4*6).padStart(2,'0')}:00`,value}))}}
 for(const item of additionalScenarios){overviewReports[item.id]=item.report;causeContent[item.id]=item.cause}
 export function scenarioSensors(id, stageId='event') {
+  if(id==='cyl5-drift')return [{id:'demo-cyl5-gap',name:'5号缸排温相对差',nameCn:'5号缸排温相对差',nameEn:'Cyl.5 relative deviation',value:12,unit:'°C',trendData:[3,6,9,12].map((value,i)=>({time:'第'+(i+1)+'片段',value}))},{id:'demo-cyl5-temperature',name:'5号缸排温',nameCn:'5号缸排温',nameEn:'Cyl.5 exhaust temperature',value:364,unit:'°C',trendData:[355,358,361,364].map((value,i)=>({time:'第'+(i+1)+'片段',value}))}]
   const extra=additionalScenarios.find(item=>item.id===id)
   if(id==='main-warning')return [{id:'warn-oil',name:'机油压力',nameCn:'机油压力',nameEn:'机油压力',value:.24,unit:'MPa',trendData:[{time:'前2班',value:.31},{time:'前1班',value:.27},{time:'本班',value:.24}]},{id:'warn-delta',name:'滤器压差',nameCn:'滤器压差',nameEn:'滤器压差',value:.07,unit:'MPa',trendData:[{time:'前2班',value:.03},{time:'前1班',value:.05},{time:'本班',value:.07}]}]
   if(id==='air-delivery')return [{id:'air-time',name:'加载时间',nameCn:'加载时间',nameEn:'加载时间',value:128,unit:'s',trendData:[{time:'前2班',value:95},{time:'前1班',value:112},{time:'本班',value:128}]},{id:'air-pressure',name:'供气压力',nameCn:'供气压力',nameEn:'供气压力',value:0.82,unit:'MPa',trendData:[{time:'前2班',value:.82},{time:'前1班',value:.82},{time:'本班',value:.82}]}]

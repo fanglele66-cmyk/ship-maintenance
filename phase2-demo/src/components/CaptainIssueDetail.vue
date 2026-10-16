@@ -1,9 +1,9 @@
 <template>
 <article v-if="issue" ref="rootRef" class="captain-detail">
-  <BackButton :label="route.query.from==='issues'?'返回事项处置':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事项':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
-  <header>
-    <div><span class="issue-type">{{issue.type}} · {{issue.device}}</span><h2>{{issue.title}}</h2></div>
-    <span>{{store.todoCreated[issue.id]?'已派发':store.ignoredSuggestions[issue.id]?'已记录决定':'待决策'}}</span>
+  <header class="issue-header">
+    <BackButton :label="route.query.from==='issues'?'返回事项处置':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事项':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
+    <div class="issue-heading"><span class="issue-type">{{issue.type}} · {{issue.device}}</span><h2>{{issue.title}}</h2></div>
+    <span class="issue-state">{{store.todoCreated[issue.id]?'已派发':store.ignoredSuggestions[issue.id]?'已记录决定':'待决策'}}</span>
   </header>
   <nav role="tablist">
     <button v-for="tab in tabs" :key="tab" role="tab" :aria-selected="active===tab" :class="{active:active===tab}" @click="goTab(tab)">{{tab}}</button>
@@ -199,7 +199,7 @@ defineEmits(['back'])
 </script>
 <style scoped>
 .captain-detail{width:100%;min-width:0;height:100%;overflow:auto;scrollbar-gutter:stable;background:white;padding:24px;box-sizing:border-box;color:#445870;font-size:var(--wb-body,14px);line-height:1.8}
-.captain-detail header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:20px 0}
+.captain-detail .issue-header{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:16px;margin:0 0 20px}
 .captain-detail h2{color:#202020;font-size:22px;margin:5px 0}
 .issue-type{color:#7a8595;font-size:13px}
 .captain-detail nav{display:flex;gap:26px;flex-wrap:wrap;border-bottom:1px solid #e4eaf1}

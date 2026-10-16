@@ -1,0 +1,337 @@
+/* Shared type scale for situation and task workspaces; other modules unchanged. */
+.app-container.app-container :is(.situation-view, .issues-page, .p2-todo-center) {
+  --sit-body: 14px;
+  --sit-label: 12px;
+  --sit-title: 22px;
+  --sit-section: 16px;
+  --sit-card: 15px;
+  --sit-value: 22px;
+  --sit-space: 20px;
+  font-size: var(--sit-body);
+}
+@media (min-width: 1600px) {
+  .app-container.app-container :is(.situation-view, .issues-page, .p2-todo-center) {
+    --sit-body: 15px;
+    --sit-label: 13px;
+    --sit-title: 24px;
+    --sit-section: 18px;
+    --sit-card: 16px;
+    --sit-value: 24px;
+    --sit-space: 24px;
+  }
+}
+@media (min-width: 2300px) {
+  .app-container.app-container :is(.situation-view, .issues-page, .p2-todo-center) {
+    --sit-body: 16px;
+    --sit-label: 14px;
+    --sit-title: 26px;
+    --sit-card: 17px;
+    --sit-value: 26px;
+    --sit-space: 28px;
+  }
+}
+
+.app-container.app-container .situation-view :is(.captain-detail, .p2-device-page) {
+  padding: var(--sit-space);
+  font-size: var(--sit-body);
+  line-height: 1.7;
+}
+.app-container.app-container .situation-view :is(.captain-detail h2, .p2-device-head h2, .dossier-header h2, .maintenance-advice-heading h2),
+.app-container.app-container .issues-page .issues-page-head h2 {
+  font-size: var(--sit-title);
+  line-height: 1.4;
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.app-container.app-container .situation-view :is(.module-header h3, .captain-detail h3, .dossier-section h3, .maintenance-advice-detail h3, .p2-device-page h3) {
+  font-size: var(--sit-section);
+  line-height: 1.5;
+}
+.app-container.app-container .situation-view :is(.issue-row strong, .captain-analysis .markdown-content h4, .maintenance-tab-body h4) {
+  font-size: var(--sit-card);
+  line-height: 1.6;
+}
+.app-container.app-container .situation-view :is(.captain-analysis .markdown-content, .captain-analysis .markdown-content p, .issue-row p, .lead-conclusion, .p2-overview-analysis p, .p2-history-record p, .p2-unified-report p, .dossier-section, .dossier-evidence-detail, .dossier-record, .maintenance-advice-detail section, .reason-step p, .candidate-table) {
+  font-size: var(--sit-body);
+  line-height: 1.75;
+}
+.app-container.app-container .situation-view :is(.issue-meta, .issue-type, .snapshot-card small, .snapshot-card p, .snapshot-card span, .snapshot-card em, .reason-step span, .dossier-context, .dossier-meta, .dossier-limit, .dossier-chart-note, .dossier-record small, .dossier-latest small, .p2-health-meta, .p2-health-scope, .maintenance-limit, .maintenance-advice-heading p, .sc-name-en, .sc-unit, .sg-stats) {
+  font-size: var(--sit-label);
+  line-height: 1.65;
+}
+.app-container.app-container .situation-view :is(.snapshot-card strong, .sc-value) {
+  font-size: var(--sit-value);
+  line-height: 1.4;
+}
+.app-container.app-container .situation-view :is(.sc-name-cn, .stl-cn, .stl-name, .reason-step b, .reasoning summary, .dossier-table) {
+  font-size: var(--sit-body);
+  line-height: 1.65;
+}
+.app-container.app-container .situation-view :is(.limit-note, .series-block header span, .series-block header small, .candidate-table thead th, .maintenance-metrics span, .maintenance-metrics p, .maintenance-metrics strong small, .maintenance-check-list span, .maintenance-decision time) {
+  font-size: var(--sit-label);
+  line-height: 1.65;
+}
+.app-container.app-container .situation-view :is(.series-block header b, .block-empty, .maintenance-summary, .maintenance-evidence-table, .maintenance-check-list b, .maintenance-check-list p, .maintenance-analysis-item p) {
+  font-size: var(--sit-body);
+  line-height: 1.75;
+}
+.app-container.app-container .situation-view .maintenance-metrics strong {
+  font-size: var(--sit-value);
+  line-height: 1.5;
+}
+.app-container.app-container .situation-view :is(.captain-detail nav, .p2-tab-row, .dossier-tabs, .maintenance-tabs) {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  gap: clamp(18px, 1.4vw, 28px);
+}
+.app-container.app-container .situation-view :is(.captain-detail nav button, .p2-tab-row button, .dossier-tabs button, .maintenance-tabs button) {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: var(--sit-body);
+  min-height: 44px;
+}
+.app-container.app-container .situation-view :is(.p2-primary, .p2-secondary, .quick-links button, .p2-link-button) {
+  font-size: var(--sit-body);
+}
+.app-container.app-container .situation-view .captain-detail .issue-header {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 16px;
+  margin-bottom: var(--sit-space);
+}
+.app-container.app-container .situation-view .captain-detail .issue-header .wb-back-button {
+  width: 36px;
+  height: 36px;
+}
+.app-container.app-container .situation-view .captain-detail .issue-state {
+  font-size: var(--sit-label);
+}
+.app-container.app-container .situation-view .snapshot-card {
+  min-width: 0;
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+.app-container.app-container .situation-view .dossier-header {
+  padding: var(--sit-space) var(--sit-space) 10px;
+}
+.app-container.app-container .situation-view .dossier-meta {
+  padding-inline: var(--sit-space);
+}
+.app-container.app-container .situation-view .dossier-tabs {
+  margin-inline: var(--sit-space);
+}
+.app-container.app-container .situation-view .dossier-body {
+  padding-inline: var(--sit-space);
+}
+
+/* Assistant uses the same body size as the content it explains. */
+.app-container.app-container .situation-view .p2-restored-assistant .p2-assistant-head strong {
+  font-size: var(--sit-section);
+  line-height: 1.5;
+}
+.app-container.app-container .situation-view .p2-restored-assistant :is(.p2-bubble, .p2-message.user .p2-bubble, .p2-dialog-paragraph p, .p2-dialog-question, .p2-scene-details > summary h3, .p2-compose textarea) {
+  font-size: var(--sit-body);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.app-container.app-container .situation-view .p2-restored-assistant :is(.p2-dialog-paragraph b, .p2-assistant-head small) {
+  font-size: var(--sit-label);
+  line-height: 1.65;
+}
+.app-container.app-container .situation-view .twin-running dt,
+.app-container.app-container .situation-view .twin-running :is(small, time) {
+  font-size: var(--sit-label);
+}
+.app-container.app-container .situation-view .twin-running dd {
+  font-size: var(--sit-section);
+  line-height: 1.5;
+}
+
+/* Workbench controls follow the type scale, rather than staying at 13px on 2K. */
+.app-container.app-container .situation-view .captain-issues .module-header {
+  align-items: center;
+  padding-bottom: 8px;
+}
+.app-container.app-container .situation-view .captain-issues .standard-select {
+  font-size: var(--sit-body);
+  min-height: 40px;
+  min-width: 128px;
+  padding: 8px 12px;
+  border-color: #dce1e8;
+  border-radius: 6px;
+}
+.app-container.app-container .situation-view .captain-issues .issue-states {
+  gap: 8px;
+  padding-top: 4px;
+  padding-bottom: 12px;
+}
+.app-container.app-container .situation-view .captain-issues .issue-states button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: var(--sit-body);
+  line-height: 1.5;
+  background: #f5f6f8;
+  color: #626d7d;
+}
+.app-container.app-container .situation-view .captain-issues .issue-states button.active {
+  background: #faf6ed;
+  border-color: #dfcba8;
+  color: #846336;
+  font-weight: 600;
+}
+.app-container.app-container .situation-view .captain-issues .issue-state-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #e9ecf0;
+  color: #626d7d;
+  font-size: var(--sit-label);
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+.app-container.app-container .situation-view .captain-issues .active .issue-state-count {
+  background: #eee2c9;
+  color: #846336;
+}
+.app-container.app-container .situation-view .captain-issues .issue-list-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-top: 1px solid #edf0f5;
+}
+.app-container.app-container .situation-view .captain-issues .issue-more {
+  display: inline-flex;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 20px;
+  border: 1px solid #dfcba8;
+  border-radius: 6px;
+  background: #fff;
+  font-size: var(--sit-body);
+  line-height: 1.5;
+}
+.app-container.app-container .situation-view .captain-issues :is(.issue-more, .issue-states button):hover {
+  background: #faf6ed;
+  border-color: #cbb58e;
+}
+.app-container.app-container .situation-view .captain-issues :is(.issue-more, .issue-states button):focus-visible {
+  outline: 2px solid #b49359;
+  outline-offset: 2px;
+}
+
+/* Standalone issue browser uses the same workspace surface and type hierarchy. */
+.app-container.app-container .issues-page {
+  padding: 12px;
+  background: #f4f5f7;
+}
+.app-container.app-container .issues-page .issues-page-head {
+  padding: var(--sit-space);
+  gap: 16px;
+  border-bottom: 1px solid #ebeef5;
+  background: #fff;
+}
+.app-container.app-container .issues-page .wb-back-button {
+  width: 36px;
+  height: 36px;
+}
+.app-container.app-container .issues-page .issues-toolbar {
+  padding: 16px var(--sit-space);
+  gap: 16px 28px;
+  background: #fff;
+}
+.app-container.app-container .issues-page .issues-toolbar label {
+  font-size: var(--sit-label);
+  gap: 10px;
+}
+.app-container.app-container .issues-page .standard-select {
+  font-size: var(--sit-body);
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-color: #dce1e8;
+}
+.app-container.app-container .issues-page .issues-scroll {
+  padding-inline: var(--sit-space);
+}
+.app-container.app-container .issues-page .issue-row {
+  padding-block: 18px;
+}
+.app-container.app-container .issues-page .issue-row > strong {
+  font-size: var(--sit-card);
+  line-height: 1.6;
+}
+.app-container.app-container .issues-page :is(.issue-row p, .empty, .p2-secondary, .load-more) {
+  font-size: var(--sit-body);
+  line-height: 1.75;
+}
+.app-container.app-container .issues-page :is(.issue-meta, .issue-next, .list-end) {
+  font-size: var(--sit-label);
+  line-height: 1.65;
+}
+.app-container.app-container .issues-page .issue-meta {
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.app-container.app-container .issues-page .issue-next {
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: #faf6ed;
+  white-space: nowrap;
+}
+.app-container.app-container .issues-page .load-more {
+  display: block;
+  width: auto;
+  min-height: 40px;
+  margin: 16px auto;
+  padding: 8px 20px;
+  border: 1px solid #dfcba8;
+  border-radius: 6px;
+}
+.app-container.app-container .issues-page .list-end {
+  padding: 20px 0;
+  margin: 0;
+}
+/* Touch-sized targets and narrower evidence grids for Pad. */
+@media (max-width: 1199px) {
+  .app-container.app-container .issues-page { --sit-space: 16px; }
+  .app-container.app-container .issues-page .wb-back-button { width: 40px; height: 40px; }
+  .app-container.app-container .situation-view { --sit-space: 16px; }
+  .app-container.app-container .situation-view .snapshot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-container.app-container .situation-view :is(.wb-back-button, .sensor-view-switch button) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .app-container.app-container .situation-view .captain-detail .issue-header {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .app-container.app-container .situation-view .snapshot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-container.app-container .situation-view .captain-detail .issue-header {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .app-container.app-container .situation-view .captain-detail .issue-state {
+    grid-column: 2;
+  }
+  .app-container.app-container .situation-view .twin-running {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

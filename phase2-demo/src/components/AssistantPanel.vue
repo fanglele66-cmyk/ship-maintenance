@@ -1364,7 +1364,7 @@ function handleManualCloseForm() {
   scrollToBottom()
   setTimeout(() => {
     pushMsg(eid, {
-      content: '请在输入框描述<b>实际异常情况与处理方式</b>，完成后自动记录并闭环。<br><br>示例："<b>检查发现传感器接头松动，已重新紧固并校准，当前读数正常。</b>"'
+      content: '请在输入框描述<b>实际异常情况与处理方式</b>，完成后自动记录并闭环。<br><br>参考填写："<b>检查发现传感器接头松动，已重新紧固并校准，当前读数正常。</b>"'
     })
     eventAssistantAction[eid] = 'manual_close_followup'
     refreshChips()

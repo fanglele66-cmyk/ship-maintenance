@@ -1,3 +1,4 @@
+import {maintenanceExample as example} from './maintenanceExample.js'
 import { shipInfo, mockDevices } from './devices'
 import { operationAssessment } from './phase2SituationContent'
 
@@ -17,11 +18,7 @@ function currentMatters(store) {
       : store.monitorStep.drift
         ? '3#缸反复偏差在新增可比片段中扩大；需要核实现场读数和现象，尚未建立事件。'
         : '3#缸相对偏差反复出现，暂由系统比较。'
-  const bearing = store.isTaskHandled('maintenance')
-    ? `轴承人工保养已完成，${store.getObservationResult('maintenance').title}；持续效果在设备态势跟踪。`
-    : store.todoCreated.maintenance
-      ? `轴承提前维保建议已关联待办，当前为${store.cases.maintenance.stages[store.progress.maintenance].label}。`
-      : '轴承近7日振动2.1→3.0 mm/s，距周期检修约140运行小时；约48小时后的靠港窗口可评估提前检查，尚未确认换件。'
+  const bearing=example.recommendation
   return { cooling, cylinder, bearing }
 }
 
@@ -56,9 +53,9 @@ export function shipSituationReply(store, text) {
   if (/维保|轴承|1#缸/.test(text)) return {
     ...base, title: '提前维保建议的依据', paragraphs: [
       { label: '当前材料', text: matters.bearing },
-      { label: '判断逻辑', text: '振动持续上行与周期临近共同支持提前核验，但趋势不能直接证明磨损。先核验可比工况、测点及润滑，再结合现场检查决定是否提前保养。' },
-      { label: '下一步', text: '进入轴承建议查看完整材料和常规计划。是否建立检查待办、是否保养换件，在对应事项内由人员确认。' }
-    ], actions: [action('item:maintenance', '查看轴承维保建议'), mainEntry]
+      { label: '判断逻辑', text: '排温偏差与确认的部件证据支持维护评估，尚不能直接批准换件；前置取证与实施条件分别核对。' },
+      { label: '下一步', text: '进入喷油器建议审阅取证与措施，在原3号缸事件安排实施。' }
+    ], actions: [action('item:maintenance', '查看喷油器维保建议'), mainEntry]
   }
   if (/人工|处理|待办|优先/.test(text)) return {
     ...base, title: '当前需要人工跟进的事项', paragraphs: [

@@ -43,7 +43,7 @@ export function attentionDossier(store, id) {
     charts=[{name:'3#缸排温',unit:'°C',labels:progressed?['首次发现','后续比较']:['首次发现'],values:progressed?[428,432]:[428],reference:'相近转速与负荷下的本缸前后记录'}, {name:'与其余缸均值的差值',unit:'°C',labels:progressed?['首次发现','后续比较']:['首次发现'],values:progressed?[8,10]:[8],reference:'同一时段其余缸的平均排温，不是通用健康阈值'}]
   } else if(id==='cyl2-ended') charts=[{name:'2#缸排温',unit:'°C',labels:['第1轮','第2轮','第3轮'],values:[420,421,420],reference:'相近工况下的连续三轮记录'},{name:'与其余缸均值的差值',unit:'°C',labels:['第1轮','第2轮','第3轮'],values:[1,1,0],reference:'同工况其余缸均值'}]
   else if(id==='vibration-trend') charts=[{name:'机体X向振动',unit:'mm/s',labels:['第1轮','第2轮','第3轮'],values:[2.7,2.8,2.8],reference:'相近工况下本测点历史；Y向仅有未同步抬升的文字记录'}]
-  else charts=[{name:'泵出口压力范围',unit:'MPa',labels:['首次记录',...(store.monitorStep.stable>=1?['第2轮']:[]),...(store.monitorStep.stable>=2?['第3轮']:[])],values:[],ranges:[ '0.38–0.41',...(store.monitorStep.stable>=1?['未见扩大']:[]),...(store.monitorStep.stable>=2?['0.39–0.40']:[])],reference:'记录为区间，不提供虚构的连续采样曲线',rangeOnly:true}]
+  else charts=[{name:'泵出口压力范围',unit:'MPa',labels:['首次记录',...(store.monitorStep.stable>=1?['第2轮']:[]),...(store.monitorStep.stable>=2?['第3轮']:[])],values:[],ranges:[ '0.38–0.41',...(store.monitorStep.stable>=1?['未见扩大']:[]),...(store.monitorStep.stable>=2?['0.39–0.40']:[])],reference:'记录为区间，未取得连续采样曲线',rangeOnly:true}]
   const comparisonRows=[
     {name:'近期可比时段',result:charts[0]?.qualitative?'定性阶段说明：此前参考、反复出现与后续变化；原始采样未取得':charts[0]?.rangeOnly?'已有区间及后续变化记录':charts[0]?.values.filter(value=>value!==null).length>1?'已有前后观测节点，见关键指标变化':'目前仅有起始节点，尚不足以判断持续性',scope:'2026/10/06–10/12；仅比较稳定运行片段'},
     {name:'较长期历史',result:'近30天同工况排温相对差通常为3–4°C',scope:'剔除启停、机动及负荷快速变化时段'},

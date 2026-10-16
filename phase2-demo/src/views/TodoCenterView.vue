@@ -1,5 +1,5 @@
 <template>
-  <div class="p2-todo-center">
+  <div ref="centerRef" class="p2-todo-center" :class="{'todo-compact':isCompact}">
     <div v-if="!store.selectedTodoId" class="p2-todo-list">
       <div class="p2-todo-list-head"><h2>待办中心</h2><div class="p2-todo-tools"><input v-model="query" type="search" placeholder="搜索待办 / 设备" aria-label="搜索待办或设备" /><FormSelect v-model="owner" :options="[{value:'',label:'全部负责人'},...owners.map(name=>({value:name,label:name}))]" placeholder="" aria-label="按负责人查看任务"/><FormSelect v-model="filter" :options="[{value:'all',label:'全部状态'},{value:'active',label:'未处理'},{value:'closed',label:'已处理'}]" placeholder="" aria-label="筛选处理状态"/></div></div>
       <details open class="todo-ai-summary"><summary><strong>AI待办建议</strong><time :datetime="updatedAt.toISOString()">更新于 {{ updateLabel }}</time><span class="summary-chevron" aria-hidden="true"></span></summary>
@@ -14,7 +14,14 @@
       <div v-if="!groups.some(group=>group.items.length)" class="p2-empty">暂无符合条件的待办</div>
       <div class="p2-list-jump"><button class="p2-secondary" @click="router.push('/situation')">查看设备态势 →</button></div>
     </div>
-    <template v-else><TodoDetail /><Phase2Assistant mode="todo" /></template>
+    <template v-else>
+      <TodoDetail />
+      <button v-if="isCompact && !assistantOpen" class="todo-assistant-toggle" type="button" aria-label="打开事件助手" title="打开事件助手" @click="assistantOpen=true"><img src="/assistant-icons/knowledge-entry.svg" alt="" /></button>
+      <div v-show="!isCompact || assistantOpen" class="todo-assistant-shell" :class="{'is-overlay':isCompact}" aria-label="事件助手">
+        <div v-if="isCompact" class="todo-assistant-mobile-head"><span>事件助手</span><button type="button" aria-label="关闭事件助手" @click="assistantOpen=false">✕</button></div>
+        <Phase2Assistant mode="todo" />
+      </div>
+    </template>
   </div>
 </template>
 <script setup>
@@ -22,25 +29,35 @@ import FormSelect from '@/components/forms/FormSelect.vue'
 import {issueCatalog} from '@/mock/captainWorkbench'
 import StreamingMarkdown from '@/components/StreamingMarkdown.vue'
 import { todoBrief } from '@/mock/captainAssessments'
-import { computed,ref,watch } from 'vue'
+import { computed,ref,watch,onMounted,onUnmounted } from 'vue'
+import { shouldCollapseTodoAssistant } from '@/utils/todoLayout'
 import { useRouter,useRoute } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import TodoDetail from './TodoDetailPad.vue'
 import Phase2Assistant from '@/components/Phase2Assistant.vue'
 const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),query=ref(''),filter=ref('all'),owner=ref('')
+const centerRef=ref(null),isCompact=ref(false),assistantOpen=ref(false)
+let layoutObserver
+onMounted(()=>{
+ const update=()=>{isCompact.value=shouldCollapseTodoAssistant(centerRef.value?.clientWidth || 0)}
+ layoutObserver=new ResizeObserver(update)
+ if(centerRef.value)layoutObserver.observe(centerRef.value)
+ update()
+})
+onUnmounted(()=>layoutObserver?.disconnect())
+watch(()=>store.selectedTodoId,()=>{assistantOpen.value=false})
+watch(isCompact,()=>{assistantOpen.value=false})
 const owners=computed(()=>[...new Set(store.taskPortfolio.map(t=>store.assignments[t.id]?.owner||t.owner).filter(Boolean))])
 function closed(todo){return store.isTaskHandled(todo.id)}
 function cardTitle(todo){return todo.id==='drift'&&store.progress.drift>=2?todo.eventTitle:todo.initialTitle}
 function cardType(todo){return issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
 function summary(todo){return closed(todo)?'本轮检查、处置与验收已提交；持续效果在设备态势跟踪，案例材料按来源事件自动汇集。':todo.stages[store.progress[todo.id]].summary}
 
-const todoMarkdown=computed(()=>{
- const report=todoBrief(store,owner.value)
- return `### 概况\n\n${report.overview}\n\n${report.bottleneck}\n\n### 建议\n\n${report.suggestionText}\n\n### 原因\n\n${report.reason}`
-})
+const filteredTodos=computed(()=>store.taskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim())&&(filter.value==='all'||(filter.value==='closed')===closed(todo))))
+const todoMarkdown=computed(()=>todoBrief(store,{portfolio:filteredTodos.value}).markdown)
 function openTodo(id){store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 watch(()=>route.query.todo,id=>{if(id&&store.todoCreated[id])store.selectTodo(id);else store.closeTodo()},{immediate:true})
-const groups=computed(()=>{const items=store.taskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim())&&(filter.value==='all'||(filter.value==='closed')===closed(todo)));return[{title:'优先处理',items:items.filter(todo=>todo.id==='fault'&&!closed(todo))},{title:'待办',items:items.filter(todo=>todo.id!=='fault'&&!closed(todo))},{title:'已处理',items:items.filter(closed)}]})
+const groups=computed(()=>{const items=filteredTodos.value;return[{title:'优先处理',items:items.filter(todo=>todo.id==='fault'&&!closed(todo))},{title:'待办',items:items.filter(todo=>todo.id!=='fault'&&!closed(todo))},{title:'已处理',items:items.filter(closed)}]})
 const updatedAt=ref(new Date())
 const updateLabel=computed(()=>updatedAt.value.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Shanghai'}))
 watch(todoMarkdown,()=>{updatedAt.value=new Date()})

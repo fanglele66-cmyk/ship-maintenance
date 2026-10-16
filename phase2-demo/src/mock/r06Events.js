@@ -3,7 +3,7 @@ import {isIssueClosed} from './captainWorkbench.js'
 export function relatedEvents(store){
  return store.visibleTodos.map(item=>{
   const id=item.id,stage=item.stages[store.progress[id]],ended=isIssueClosed(store,id),handled=store.isTaskHandled(id)
-  const source=id==='main-warning'?{id,type:'预警事件',title:'主机润滑供油异常预警'}:id==='air-delivery'?{id,type:'异动跟踪',title:'空压机加载时间持续延长'}:item.source?null:id==='fault'?null:id==='drift'?{id,type:'异动跟踪',title:'主机3#缸排温偏离渐高'}:{id,type:'维保建议',title:'1#缸连杆轴承提前检查建议'}
+  const source=id==='cyl5-drift'?{id,type:'异动跟踪',title:'5号缸排温相对偏差扩大'}:id==='main-warning'?{id,type:'预警事件',title:'主机润滑供油异常预警'}:id==='air-delivery'?{id,type:'异动跟踪',title:'空压机加载时间持续延长'}:item.source?null:id==='fault'?null:id==='drift'?{id,type:'异动跟踪',title:'主机3#缸排温偏离渐高'}:{id,type:'维保建议',title:'1#缸连杆轴承提前检查建议'}
   const observation=handled?store.getObservationResult(id):null
   let action=ended?'暂无需人工操作，可回看本事件的处理及观察记录。':handled?observation.type==='reinspect'?'处理后出现反复，请进入原事件核对新证据并按要求复查。':observation.type==='extend'?'本轮可比记录不足，请补充数据或现场信息，不能按正常处理。':'暂无需人工操作，继续效果观察。':stage?.tasks?.length?'需要你：'+stage.tasks.map(task=>task.label).join('；')+'。':id==='fault'?'需要你：在原事件核对现场温度、流量及运行工况，按当前要求检查冷却回路。':'下一步：'+(stage?.action||'现场检查')+'。请进入原事件核对证据、范围与安全要求。'
   if(!ended&&observation?.type==='archive')action='本轮效果观察已结束，恢复常规监测；事件仍未结束，其他要求以原事件为准。'

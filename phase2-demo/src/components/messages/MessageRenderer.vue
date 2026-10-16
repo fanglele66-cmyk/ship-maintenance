@@ -21,7 +21,9 @@ import TaskReceiptMessage from './TaskReceiptMessage.vue'
 import FeedbackRecordMessage from './FeedbackRecordMessage.vue'
 import InquiryMessage from './InquiryMessage.vue'
 import { messageType } from '@/message-flows/resolveMessageFlow'
+import { businessMessage } from '@/utils/businessCopy'
 const props=defineProps({message:{type:Object,required:true},expanded:Boolean,disabledActions:{type:Array,default:()=>[]}})
+const message=computed(()=>businessMessage(props.message))
 defineEmits(['action','confirm-record','submit-inquiry','update-inquiry'])
 const type=computed(()=>messageType(props.message))
 const daily=computed(()=>type.value==='dailyBrief')

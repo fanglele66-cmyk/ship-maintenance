@@ -16,6 +16,7 @@ test('situation groups three auxiliaries under one system entry',()=>{
 })
 test('scoped analysis does not refer to hidden equipment',()=>{
  const text=captainAnalysis({todoCreated:{},ignoredSuggestions:{},assignments:{},cases:{},progress:{},eventStatus:{}},situationDeviceIds)
- assert.match(text,/辅机/)
+ assert.match(text,/主机冷却系统需优先核实/)
+ assert.doesNotMatch(text,/辅机正常|全船健康/)
  assert.doesNotMatch(text,/舵机|空压机|锅炉/)
 })

@@ -1,10 +1,11 @@
 <template>
   <div v-if="todo && stage" class="p2-detail p2-pad-detail">
     <header class="p2-detail-head">
-      <BackButton :label="route.query.from==='issues'?'返回事项处置':'返回待办中心'" @click="returnToList" />
+      <BackButton :label="route.query.returnDossier==='1'?'返回跟踪档案':route.query.returnAdvice==='1'?'返回维保建议':route.query.from==='issues'?'返回事项处置':'返回待办中心'" @click="returnToList" />
       <div><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
       <span class="p2-badge" :class="store.isTaskHandled(todo.id)?'blue':'red'">{{ store.isTaskHandled(todo.id)?'已处理':'未处理' }}</span>
     </header>
+    <div v-if="isTrackingDossier(todo.id)" class="p2-panel" style="margin:0 24px 12px;padding:10px 14px"><button class="p2-link-button" @click="openTracking">查看来源异动跟踪档案 →</button><span style="font-size:12px;color:#7c8692;margin-left:12px">派工不表示已确认故障；原档案持续跟踪。</span></div>
     <nav class="p2-stage-rail" :style="{'--stage-count':displayStages.length}" aria-label="处理阶段">
       <button v-for="(step,position) in displayStages" :key="step.id" class="p2-stage-card" :class="{active:step.kind==='handled'?stage.kind==='handled':store.activeStage[todo.id]===step.index,done:step.kind!=='handled'&&store.progress[todo.id]>step.index,locked:store.progress[todo.id]<step.index}" :disabled="store.progress[todo.id]<step.index" @click="store.selectStage(todo.id,step.index)">
         <span>{{ String(position+1).padStart(2,'0') }}</span><strong>{{ step.label }}</strong><small>{{ step.kind==='handled'?'处理记录':store.progress[todo.id]>step.index?'已完成':store.progress[todo.id]===step.index?'当前阶段':'待接续' }}</small>
@@ -40,7 +41,7 @@
         <p class="p2-stage-purpose">{{ stage.summary }}</p>
         <div v-for="(fact,i) in closedEvidence" :key="fact" class="p2-pad-list-row"><span>{{ String(i+1).padStart(2,'0') }}</span>{{ fact }}</div>
         <div class="p2-pad-conclusion"><b>现场操作</b><p>确认设备与作业条件，按当前任务逐项反馈。遇到条件不具备或无法确认的情况，请记录实际原因。</p></div>
-        <EventWorkOrderLink v-if="todo.id==='maintenance'" :event-id="todo.id" />
+        <EventWorkOrderLink v-if="['maintenance','drift'].includes(todo.id)" :event-id="todo.id" />
         <button class="p2-primary p2-ready-button" @click="prepared[stageKey]=true;subtab=stage.label+'步骤'">已了解，开始{{ stage.label }}</button>
       </section>
       <section v-else-if="stage.kind==='check'||stage.kind==='work'&&subtab.includes('步骤')" class="p2-panel p2-step-content">
@@ -57,7 +58,7 @@
 
       <section v-else-if="stage.kind==='work'" class="p2-panel p2-pad-single">
         <div class="p2-section-title">{{ subtab }}</div>
-        <template v-if="subtab.includes('准备')"><EventWorkOrderLink v-if="todo.id==='maintenance'" :event-id="todo.id" /><p class="p2-stage-purpose">{{ stage.title }}</p><div v-for="(text,i) in workDetails.preparation" :key="text" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ text }}</div></template>
+        <template v-if="subtab.includes('准备')"><EventWorkOrderLink v-if="['maintenance','drift'].includes(todo.id)" :event-id="todo.id" /><p class="p2-stage-purpose">{{ stage.title }}</p><div v-for="(text,i) in workDetails.preparation" :key="text" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ text }}</div></template>
         <template v-else-if="subtab==='备件清单'"><table class="p2-cause-table"><thead><tr><th>名称</th><th>数量</th><th>用途</th></tr></thead><tbody><tr v-for="part in workDetails.parts" :key="part.name"><td><strong>{{ part.name }}</strong></td><td>{{ part.amount }}</td><td>{{ part.use }}</td></tr></tbody></table></template>
         <template v-else-if="subtab==='验收确认'"><p class="p2-stage-purpose">先核对验收项目，再记录实际措施与复测。作业完成后仍异常，应继续原事件排查。</p><table class="p2-cause-table"><thead><tr><th>验收项目</th><th>验收要求</th><th>核对方法</th></tr></thead><tbody><tr v-for="row in acceptanceRows" :key="row.name"><td>{{ row.name }}</td><td>{{ row.req }}</td><td>{{ row.method }}</td></tr></tbody></table><InquiryMessage v-if="executionForm" :message="executionForm" @update-inquiry="updateExecution" @submit-inquiry="confirmExecution" /></template>
         <template v-else-if="subtab==='关联工单'"><EventWorkOrderLink :event-id="todo.id" /></template>
@@ -78,6 +79,7 @@
 </template>
 <script setup>
 
+import {isTrackingDossier,trackingPath} from '@/utils/trackingNavigation'
 import { computed, reactive, ref, watch } from 'vue'
 import { checkChoices } from '@/mock/eventFeedbackRules'
 import { useRouter,useRoute } from 'vue-router'
@@ -88,7 +90,8 @@ import InquiryMessage from '@/components/messages/InquiryMessage.vue'
 import EventWorkOrderLink from '@/components/EventWorkOrderLink.vue'
 import BackButton from '@/components/BackButton.vue'
 import { overviewReports, causeContent } from '@/mock/phase2Content'
-function returnToList(){store.closeTodo();router.replace(route.query.from==='issues'?{path:'/situation/issues',query:{resume:'1',state:route.query.state,device:route.query.device,type:route.query.type}}:'/event')}
+function openTracking(){router.push({path:trackingPath(todo.value.id),query:{returnTracking:'1',todo:todo.value.id}})}
+function returnToList(){if(route.query.returnDossier==='1'&&isTrackingDossier(route.query.dossier)){const query={...route.query};delete query.returnDossier;delete query.todo;delete query.dossier;store.closeTodo();router.replace({path:trackingPath(route.query.dossier),query});return}if(route.query.returnAdvice==='1'){const query={...route.query};delete query.todo;delete query.returnAdvice;store.closeTodo();router.replace({path:'/situation/maintenance/injector-3-cleaning',query});return}store.closeTodo();router.replace(route.query.from==='issues'?{path:'/situation/issues',query:{resume:'1',state:route.query.state,device:route.query.device,type:route.query.type}}:'/event')}
 const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),todo=computed(()=>store.selectedTodo),stage=computed(()=>store.currentStage)
 const subtab=computed({get:()=>store.detailTab,set:value=>store.detailTab=value})
 const results=store.taskResults,notes=store.taskNotes,attachments=store.taskAttachments,prepared=reactive({}),validation=ref(''),actionNote=ref(''),stepIndex=ref(0)

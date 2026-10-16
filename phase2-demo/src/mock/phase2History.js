@@ -1,3 +1,5 @@
+import {maintenanceExample as example} from './maintenanceExample.js'
+import {trackingDossier,trackingIds} from './trackingDossier.js'
 import { operationAssessment, maintenanceAssessment } from './phase2SituationContent'
 
 export const historyCategories = [
@@ -13,6 +15,7 @@ export const historyCategories = [
 // executed maintenance record until that task reaches effect observation.
 export function deviceHistory(store) {
   const records = []
+  for(const id of trackingIds){const d=trackingDossier(store,id);records.push({id:'tracking-'+id,type:'attention',date:d.analysisAt.split(' ')[0],time:d.analysisAt.split(' ')[1]||'',title:d.title,status:d.ended?'已结束':d.assigned?'跟踪中 · 已派工':'系统跟踪中',source:'持续跟踪档案 · 观测记录',deviceId:d.deviceId,target:id,summary:d.direction+'；'+d.taskState,conclusion:d.conclusion,recommendation:d.tracking,sections:[]})}
   for (const id of store.visibleTodos.map(item=>item.id)) {
     if (!store.todoCreated[id]) continue
     const item = store.cases[id], index = store.progress[id], stage = item.stages[index]
@@ -31,7 +34,7 @@ export function deviceHistory(store) {
     }
   }
   const maintenance = maintenanceAssessment(store)
-  records.push({ id: 'recommendation-maintenance', type: 'recommendation', date: '10月08日', time: '08:10', title: '1#缸连杆轴承提前维保建议', status: store.isTaskHandled('maintenance') ? '已执行 · ' + store.getObservationResult('maintenance').title : store.todoCreated.maintenance ? '已关联待办' : '待确认建议', source: '维保建议 · 计划与趋势分析', target: 'maintenance', summary: '近7日振动2.1→3.0 mm/s；距周期检修约140 h，结合约48小时后的靠港窗口评估提前检查。', conclusion: maintenance.conclusion, recommendation: maintenance.recommendation, sections: maintenance.sections })
+  records.push({id:'recommendation-maintenance',type:'recommendation',date:'观测记录',time:'取证确认后',title:example.title,status:'待审阅安排',source:'维保建议 · 原3号缸现场取证',target:'maintenance',summary:example.recommendation,conclusion:maintenance.conclusion,recommendation:maintenance.recommendation,sections:maintenance.sections})
 
   for(const [index,decision] of (store.suggestionDecisions||[]).entries()){const id=decision.id;records.push({id:'decision-'+id+(index?'-'+index:''),type:'attention',date:decision.at.split(' ')[0],time:decision.at.split(' ')[1]||'',target:id,title:'已记录决定：'+(store.cases[id]?.initialTitle||id),status:'已记录决定',source:decision.actor,summary:decision.reason,conclusion:decision.reason,recommendation:'本次未建立待办，运行数据继续采集；后续新证据需重新评估。',sections:[{title:'人员决定',paragraphs:[decision.reason,decision.actor+' · '+decision.at]}]})}
   for(const [id,entries] of Object.entries(store.assignmentRecords||{}))entries.forEach((entry,i)=>records.push({id:'assignment-'+id+'-'+i,type:'event',date:entry.at.split(' ')[0],time:entry.at.split(' ')[1]||'',title:store.cases[id].initialTitle+' · 人员指派',status:'已指派',source:entry.assignedBy,target:id,summary:entry.owner+' · '+entry.type,conclusion:entry.scope,recommendation:'计划：'+entry.due,sections:[{title:'人员与任务',paragraphs:[entry.assignedBy+'指派'+entry.owner,'协作：'+(entry.collaborator||'无'),entry.scope,'计划：'+entry.due]}]}))

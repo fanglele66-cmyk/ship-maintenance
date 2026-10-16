@@ -1,29 +1,13 @@
+import {maintenanceExample as example} from './maintenanceExample.js'
 import { r02Report, r02Reports } from './r02Stories.js'
 import { maintenanceAssessment } from './phase2SituationContent'
 
 const point = (label, at, actor, text, assessment, current = false) => ({ label, at, actor, text, assessment, done: !current, current })
 const taskName = (store, id) => store.todoCreated[id] ? (id === 'drift' && store.progress.drift >= 2 ? store.cases[id].eventTitle : store.cases[id].initialTitle) : '尚未建立待办'
 
-export function maintenanceFollowup(store, planned = false) {
-  const report = maintenanceAssessment(store, planned), created = store.todoCreated.maintenance, checked = store.progress.maintenance >= 2, handled = store.isTaskHandled('maintenance')
-  const result = handled ? store.getObservationResult('maintenance') : null
-  const timeline = [
-    point('首次发现 · 振动缓升', '近7日 · 起始观察', 'AI 状态分析', '轴承振动起始约2.1 mm/s。连续样本开始出现缓升，温度未同步明显上行。', '先保留趋势并核对样本工况，尚无轴瓦磨损的现场证据。'),
-    point('分析更新 · 趋势持续', '近7日 · 最新比较', 'AI 状态分析', '最新振动3.0 mm/s，较起始约增加43%；温度约65°C，系统未触发振动报警。', '连续上行比单次变化更值得核验，但还需区分间隙、润滑、载荷与测点固定的影响。'),
-    point('建议更新 · 结合周期与窗口', '本日 · 计划评估', 'AI 维保建议', '累计1,860 / 2,000 h，距周期节点约140 h；下一靠港窗口约48小时后。', '建议评估提前检查。靠港是安排机会，是否能作业仍需人员确认停机、备件和检查条件。', !created),
-    ...(created ? [point('人员决定 · 同意补证', '人员确认后', '轮机员', '已同意建立提前维保检查待办，原振动趋势与周期计划一并关联。', '先检查是否存在值得提前处理的实际问题，尚不能将同意检查视为同意换件。', !checked)] : []),
-    ...(checked ? [point('现场反馈 · 检查证据补齐', '现场检查确认后', '轮机员 → AI', '轴瓦轻微偏磨，间隙接近计划检修上限，备件可用。', '实物证据与缓升趋势相符，建议已由“提前核验”更新为“具备提前保养依据”。', !handled)] : []),
-    ...(handled ? [point('执行反馈 · 换件与验收', '保养验收后', '轮机员 → AI', '轴瓦换件及复装验收已提交；处理后首测振动2.2 mm/s、温度64°C。', '本轮人工处理已完成，态势接续48小时效果观察；首测改善仍需连续数据验证。'),
-      ...store.observationRecords.maintenance.filter(r => r.day > 0).map(r => point(r.status === 'abnormal' ? '建议更新 · 效果反复' : r.status === 'incomplete' ? '补证请求 · 数据不足' : '每日回顾 · 效果验证', r.label, 'AI 效果跟踪', r.values ? `振动${r.values[0]} mm/s、温度${r.values[1]}°C。${r.note}` : r.note, r.status === 'abnormal' ? '请求人工复查新的异常证据，保留来源待办与本轮观察的关联。' : r.status === 'incomplete' ? '补齐可比工况数据后重新判断，当前不结束观察。' : '将本日表现与处理前缓升趋势及验收首测连续比较。')),
-      point('当前效果建议', '最新观测后', 'AI 效果跟踪', result.text, result.type === 'archive' ? '专项观察收束，保留处理与效果证据，恢复常规监测。' : report.recommendation, true)
-    ] : [])
-  ]
-  return { ...report, timeline, arrangement: [
-    {label:'当前安排',text:handled ? result.title : checked ? '落实已确认的提前保养' : created ? '完成已建立的现场检查' : planned ? '保留周期计划，评估提前执行条件' : '等待是否建立提前检查待办的决定'},
-    {label:'负责与接续',text:handled ? result.type === 'reinspect' ? '轮机员复查，AI 保留新旧证据对比' : 'AI 跟踪；有新现场现象可补充反馈' : created ? '轮机员现场检查，AI 接续分析结果' : 'AI 保留趋势；轮机员确认检查及作业条件'},
-    {label:'下次复核',text:handled ? result.type === 'archive' ? '恢复常规监测窗口' : `${store.observationTargets.maintenance * 24}小时观察窗口内继续记录` : '下一同工况样本；靠港前复核检查与备件条件'},
-    {label:'关联材料',text:`常规周期计划 · ${taskName(store, 'maintenance')}`}
-  ] }
+export function maintenanceFollowup(store,planned=false){
+ const report=maintenanceAssessment(store,planned),confirmed=store.logs.drift.some(m=>m.id==='injector-demo-evidence')
+ return {...report,timeline:(confirmed?example.origins:example.origins.slice(0,2)).map(n=>({...n,done:true,current:false})),arrangement:[{label:'当前安排',text:'前置取证与本次维护分别记录，维护尚待人员决定。'},{label:'来源事件',text:'3号缸排温偏离原事件'},{label:'正式计划',text:example.plan.basis}]}
 }
 
 export function attentionFollowup(store, id) {

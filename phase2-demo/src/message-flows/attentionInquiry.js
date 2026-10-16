@@ -11,5 +11,5 @@ export function attentionInquiry(store,id,drafts={}) {
   return {id:messageId,type:'inquiry',role:'assistant',text:feedback?'本次现场核实记录':'请补充本次现场核实记录。',hint:feedback?'保留原提交信息，供后续分析与回看。':'普通留言不自动完成核实；提交不代表确认故障，也不会自动创建事件。',fields,
     status:feedback?'submitted':action.linked?'inactive':'pending',
     values:feedback || drafts[messageId] || {},submitLabel:'提交现场核实',submittedAt:feedback?.at,
-    receiptText:store.dossierReviews?.[id]?'该项核实已完成，演示研判分支已更新。':'该项核实已完成，后续分析尚未更新。'}
+    receiptText:store.dossierReviews?.[id]?'该项核实已完成，研判分支已更新。':'该项核实已完成，后续分析尚未更新。'}
 }

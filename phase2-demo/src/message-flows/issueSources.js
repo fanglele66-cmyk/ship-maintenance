@@ -1,8 +1,9 @@
+import {pendingTrackingExample} from '@/mock/pendingTrackingExample'
 import dossiers from '@/mock/issueDossiers.json'
 import {issueCatalog} from '@/mock/captainWorkbench'
 
 export function issueContext(id,store){
- const issue=issueCatalog.find(item=>item.id===id),dossier=dossiers[id]
+ const issue=issueCatalog.find(item=>item.id===id),dossier=id===pendingTrackingExample.id?{conclusion:pendingTrackingExample.baseline.conclusion,recommendation:pendingTrackingExample.config.scope,comparisons:[]}:dossiers[id]
  if(!issue||!dossier)return null
  const assigned=store.todoCreated[id],ignored=store.ignoredSuggestions[id]
  const next=assigned?`已派发给${store.assignments[id]?.owner||'原负责人'}，沿原任务查看现场反馈和当前进展，不重复安排。`:ignored?`本次不采纳依据：${ignored.reason}。原材料和周期计划保留；这不代表设备已恢复正常，可在左侧重新评估。`:dossier.recommendation

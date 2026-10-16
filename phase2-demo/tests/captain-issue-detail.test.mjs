@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import dossiers from '../src/mock/issueDossiers.json' with { type: 'json' }
 import {issueCatalog} from '../src/mock/captainWorkbench.js'
 
-test('SIT-04 dossiers cover all six issues with overview-first structure',()=>{
- const ids=issueCatalog.map(item=>item.id)
+test('SIT-04 legacy dossiers retain their overview-first structure',()=>{
+ const ids=issueCatalog.filter(item=>item.id!=='cyl5-drift').map(item=>item.id) // The new continuous archive is covered by pending-tracking-example.test.mjs.
  for(const id of ids){
   const dossier=dossiers[id]
   assert.ok(dossier,id+' has a dossier')

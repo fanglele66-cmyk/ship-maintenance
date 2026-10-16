@@ -50,8 +50,10 @@
 </template>
 
 <script setup>
-import {computed,nextTick,onUnmounted,ref,watch} from 'vue'
-import {useRouter} from 'vue-router'
+import {isTrackingDossier,trackingPath} from '@/utils/trackingNavigation'
+import {issueDetailPath} from '@/utils/maintenanceNavigation'
+import {computed,nextTick,onMounted,onUnmounted,ref,watch} from 'vue'
+import {useRouter,useRoute} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {workbenchIssues,issueCatalog} from '@/mock/captainWorkbench'
 import profiles from '@/mock/deviceOverviewProfiles.json'
@@ -64,7 +66,7 @@ import FormSelect from '@/components/forms/FormSelect.vue'
 import SituationReport from '@/components/SituationReport.vue'
 const props=defineProps({deviceName:{type:String,default:'主机'},deviceId:{type:String,default:'main-engine-1'}})
 defineEmits(['select-sensor','back'])
-const router=useRouter(),store=usePhase2DemoStore()
+const route=useRoute(),router=useRouter(),store=usePhase2DemoStore()
 const tabs=[{id:'overview',label:'健康概览'},{id:'data',label:'传感器数据'},{id:'history',label:'动态记录'},{id:'related',label:'相关事项'}]
 const activeTab=ref('overview'),relatedType=ref(''),relatedState=ref('待决策'),deviceScroll=ref(null),historyCategory=ref('all'),historyDetailId=ref(null)
 const isMainEngine=computed(()=>props.deviceId==='main-engine-1')
@@ -73,23 +75,25 @@ const activeTodoCount=computed(()=>workbenchIssues(store).filter(i=>i.deviceId==
 const otherHistory=computed(()=>store.visibleTodos.filter(t=>t.deviceId===props.deviceId))
 const otherOverview=computed(()=>({...profiles[props.deviceId]||{conclusion:'当前已取得部分运行指标，暂无需要决策的异动。',basis:'研判仅覆盖已采集指标，缺少连续趋势与现场核验，不据此确认所有部位正常。',next:'查看传感器数据并按巡检规程核对现场。'},...(props.deviceId==='air-compressor'&&store.todoCreated['air-delivery']?{next:'查看已派发的检查任务，了解现场反馈和当前进展，沿原任务继续处理。'}:{})}))
 const historyRecords=computed(()=>deviceHistory(store))
-const shownHistory=computed(()=>historyRecords.value.filter(item=>(store.cases[item.target]?.deviceId||'main-engine-1')===props.deviceId&&(historyCategory.value==='all'||item.type===historyCategory.value)))
+const shownHistory=computed(()=>historyRecords.value.filter(item=>(item.deviceId||store.cases[item.target]?.deviceId||'main-engine-1')===props.deviceId&&(historyCategory.value==='all'||item.type===historyCategory.value)))
 const historyDetail=computed(()=>historyRecords.value.find(item=>item.id===historyDetailId.value))
 const runningAssessment=computed(()=>operationAssessment(store)),overviewAnalysis=computed(()=>runningAssessment.value.summary)
 watch(()=>props.deviceId,()=>{activeTab.value='overview';historyDetailId.value=null;relatedType.value=''})
 watch(activeTab,()=>{store.attentionInFocus=false;store.regularMaintenanceInFocus=false;store.clearObservationFocus();historyDetailId.value=null})
 onUnmounted(()=>{store.clearObservationFocus();store.regularMaintenanceInFocus=false})
 let listScroll=0
-async function openMaintenanceDetail(id='maintenance'){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/maintenance/'+encodeURIComponent(id))}
+async function openMaintenanceDetail(id='maintenance'){listScroll=deviceScroll.value?.scrollTop||0;router.push({path:'/situation/maintenance/'+encodeURIComponent(id),query:{from:activeTab.value==='history'?'history':'device',device:props.deviceId,category:historyCategory.value,type:relatedType.value,state:relatedState.value,scroll:String(listScroll)}})}
 async function showMaintenanceList(){await showRelated('维保建议')}
 async function showAttentionList(){await showRelated('异动跟踪')}
 async function showRelated(type='',state='待决策'){activeTab.value='related';relatedType.value=type;relatedState.value=state;store.attentionInFocus=false;await nextTick();if(deviceScroll.value)deviceScroll.value.scrollTop=listScroll}
 function openObservation(id){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/attention/'+encodeURIComponent(id))}
-function openItem(id){if(issueCatalog.some(i=>i.id===id)&&!store.todoCreated[id]){router.push('/situation/issue/'+id);return}if(['stable','vibration-trend'].includes(id)){activeTab.value='data';store.attentionInFocus=false;store.deviceDataTopic=id;store.sendR02Message('device',id==='stable'?'泵出口压力有波动，要处理吗？':'机体振动小幅变化，是设备退化吗？',id);return}if(store.isTaskHandled(id)){openObservation(id);return}if(id==='fault'){openTodo(id);return}if(id==='maintenance'){openMaintenanceDetail(id);return}openObservation(id)}
+function openItem(id){if(isTrackingDossier(id)){router.push({path:trackingPath(id),query:{from:activeTab.value==='history'?'history':'device',device:props.deviceId,category:historyCategory.value,type:relatedType.value,state:relatedState.value,scroll:String(deviceScroll.value?.scrollTop||0)}});return}if(issueCatalog.some(i=>i.id===id)&&!store.todoCreated[id]){router.push(issueDetailPath(id));return}if(['stable','vibration-trend'].includes(id)){activeTab.value='data';store.attentionInFocus=false;store.deviceDataTopic=id;store.sendR02Message('device',id==='stable'?'泵出口压力有波动，要处理吗？':'机体振动小幅变化，是设备退化吗？',id);return}if(store.isTaskHandled(id)){openObservation(id);return}if(id==='fault'){openTodo(id);return}if(id==='maintenance'){openMaintenanceDetail(id);return}openObservation(id)}
 function openTodo(id){store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 function historyEntryLabel(type){return ({event:'打开关联待办',attention:'查看异动跟踪材料',recommendation:'查看维保建议',maintenance:'查看维护记录',review:'查看回顾报告'})[type]||'查看记录'}
+async function restoreMaintenanceContext(query){activeTab.value=query.restoreTab==='history'?'history':'related';historyCategory.value=query.category||'all';relatedType.value=query.type||'';relatedState.value=query.state||'待决策';await nextTick();if(deviceScroll.value)deviceScroll.value.scrollTop=Number(query.scroll)||0}
 function openHistoryRecord(record){if(record.type==='event'&&record.target){openTodo(record.target);return}if(record.type==='attention'&&record.target){openItem(record.target);return}if(record.type==='recommendation'&&record.target){openMaintenanceDetail(record.target);return}historyDetailId.value=record.id}
-defineExpose({openItem,openObservation,showAttentionList,showMaintenanceList,showRelated})
+onMounted(()=>{if(route.query.restoreDevice===props.deviceId)restoreMaintenanceContext(route.query)})
+defineExpose({openItem,openObservation,showAttentionList,showMaintenanceList,showRelated,restoreMaintenanceContext})
 </script>
 
 <style scoped>

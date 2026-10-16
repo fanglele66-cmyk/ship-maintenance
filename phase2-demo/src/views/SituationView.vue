@@ -1,7 +1,7 @@
 <template>
   <div class="situation-view">
     <button
-      v-if="isAssistantCollapsed && !isShipLevel "
+      v-if="isAssistantCollapsed && !isShipLevel && (!isTrackingDossier(attentionId) || trackingAssistantId)"
       class="compact-assistant-float"
       :class="{ 'is-active': compactAssistantOpen, 'is-dragging': isCompactFloatDragging }"
       :style="compactFloatStyle"
@@ -25,8 +25,8 @@
     </button>
     <div ref="situationBodyRef" class="situation-body">
       <div class="situation-content">
-        <CaptainIssueDetail ref="issueDetailRef" v-if="issueId" :key="issueId" :scenario="issueId" @back="returnFromIssue"/><AirAttentionDetail v-else-if="attentionId==='air-delivery'" @back="returnToAir"/><AttentionDossier v-else-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
-        <MaintenanceAdviceDetail v-else-if="maintenanceId" standalone :planned="maintenanceId==='planned'" @back="returnToMaintenance" @show-advice="router.push('/situation/maintenance/maintenance')" @show-arrangements="router.push('/situation/maintenance/planned')" @open-event="openMaintenanceEvent" @open-observation="router.push('/situation/attention/maintenance')" />
+        <TrackingDossier ref="issueDetailRef" v-if="isTrackingDossier(attentionId)" :key="attentionId" :scenario="attentionId" @back="returnFromTracking"/><CaptainIssueDetail ref="issueDetailRef" v-else-if="issueId" :key="issueId" :scenario="issueId" @back="returnFromIssue"/><AirAttentionDetail v-else-if="attentionId==='air-delivery'" @back="returnToAir"/><AttentionDossier v-else-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
+        <MaintenanceAdviceDetail v-else-if="maintenanceId" standalone :planned="maintenanceId==='planned'" @back="returnToMaintenance" @show-advice="router.push({path:'/situation/maintenance/injector-3-cleaning',query:route.query})" @show-arrangements="router.push({path:'/situation/maintenance/planned',query:{...route.query,returnAdvice:'1'}})" @open-event="openMaintenanceEvent" @open-observation="router.push('/situation/attention/drift')" />
         <!-- Layer 1: Ship Overview -->
         <div v-show="!attentionId && !maintenanceId && !issueId && currentLayer === 1" class="layer" :class="layerClass(1)">
           <ShipOverview @select-device="handleDeviceClick" @select-item="openDemoItem" />
@@ -56,7 +56,7 @@
 
       <!-- 拖拽手柄（在内容区和助手之间，独立元素不受 overflow 裁剪） -->
       <div
-        v-if="!isAssistantCollapsed && !isShipLevel && attentionId!=='air-delivery'"
+        v-if="!isAssistantCollapsed && !isShipLevel && (!isTrackingDossier(attentionId) || trackingAssistantId)"
         class="panel-resize-handle"
         :class="{ resizing: isResizingAssistant }"
         @pointerdown="startResize"
@@ -72,12 +72,12 @@
       <!-- 助手面板容器（宽度由拖拽控制） -->
       <template v-if="!isShipLevel "><Transition name="compact-assistant-slide">
         <div
-          v-if="!isShipLevel && attentionId!=='air-delivery' && (!isAssistantCollapsed || compactAssistantOpen)"
+          v-if="!isShipLevel && (!isTrackingDossier(attentionId) || trackingAssistantId) && (!isAssistantCollapsed || compactAssistantOpen)"
           class="assistant-wrapper"
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant :title="issueId ? 'AI事项助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <Phase2Assistant :title="trackingAssistantId ? 'AI异动跟踪助手' : maintenanceId ? (maintenanceId==='planned'?'AI维保安排核对助手':'AI维保建议助手') : issueId ? 'AI事项助手' : 'AI设备态势助手'" :issue-id="trackingAssistantId || issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="trackingAssistantId ? 'issue:'+trackingAssistantId : issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId) && !isTrackingDossier(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition></template>
     </div>
@@ -93,6 +93,9 @@
 </template>
 
 <script setup>
+import {isTrackingDossier,trackingReturnLocation} from '@/utils/trackingNavigation'
+import TrackingDossier from '@/components/TrackingDossier.vue'
+import {maintenanceReturnLocation,issueDetailPath} from '@/utils/maintenanceNavigation'
 import {lazyPane} from '@/components/lazyPane'
 import {issueCatalog} from '@/mock/captainWorkbench'
 const CaptainIssueDetail=lazyPane(()=>import('@/components/CaptainIssueDetail.vue'))
@@ -125,6 +128,7 @@ const router = useRouter()
 const route = useRoute()
 const issueId=computed(()=>route.params.section==='issue'?String(route.params.attentionId||''):'')
 const attentionId = computed(() => route.params.section === 'attention' ? String(route.params.attentionId || '') : '')
+const trackingAssistantId=computed(()=>['drift','air-delivery','cyl5-drift'].includes(attentionId.value)?attentionId.value:'')
 const maintenanceId=computed(()=>route.params.section==='maintenance'?String(route.params.attentionId || ''):'')
 const { createAbnormalEvent } = useAbnormalReport()
 const {
@@ -402,6 +406,22 @@ watch([attentionId,maintenanceId], async ([id, maintenance]) => {
 }, {immediate:true,flush:'post'})
 onMounted(()=>{if(maintenanceId.value){demoStore.selectAttention('maintenance');demoStore.attentionInFocus=true;demoStore.regularMaintenanceInFocus=maintenanceId.value==='planned'}})
 async function returnFromIssue(deviceId){if(route.query.from==='device'){const type=route.query.type,state=route.query.state;await router.push('/situation');if(currentLayer.value!==2||selectedDeviceId.value!==deviceId)handleDeviceClick(deviceStore.getDeviceById(deviceId));await nextTick();deviceSituationRef.value?.showRelated(type,state);return}if(route.query.from==='workbench'){demoStore.showCaptainWorkbench();await router.push('/situation');return}if(route.query.from==='issues'){await router.push({path:'/situation/issues',query:{resume:'1',state:route.query.state,device:route.query.device,type:route.query.type}});return}await router.push('/situation');handleDeviceClick(deviceStore.getDeviceById(deviceId))}
+watch(()=>[route.path,route.query.restoreDevice,route.query.restoreTab,route.query.scroll],async()=>{
+ if(route.path!=='/situation'||!route.query.restoreDevice)return
+ const context={...route.query}
+ await nextTick()
+ if(currentLayer.value!==2||selectedDeviceId.value!==context.restoreDevice)handleDeviceClick(deviceStore.getDeviceById(context.restoreDevice))
+ await nextTick();deviceSituationRef.value?.restoreMaintenanceContext(context)
+},{flush:'post',immediate:true})
+async function returnFromTracking(deviceId){
+ const target=trackingReturnLocation(route.query,deviceId)
+ if(route.query.from==='workbench')demoStore.showCaptainWorkbench()
+ await router.push(target)
+ if(target.query?.restoreDevice){
+  if(currentLayer.value!==2||selectedDeviceId.value!==target.query.restoreDevice)handleDeviceClick(deviceStore.getDeviceById(target.query.restoreDevice))
+  await nextTick();deviceSituationRef.value?.restoreMaintenanceContext(target.query)
+ }
+}
 async function returnToAir(){await router.push('/situation');handleDeviceClick(deviceStore.getDeviceById('air-compressor'))}
 async function returnToAttention() {
   await router.push('/situation')
@@ -410,17 +430,21 @@ async function returnToAttention() {
   deviceSituationRef.value?.showAttentionList()
 }
 async function returnToMaintenance() {
-  await router.push('/situation')
-  if(currentLayer.value!==2 || selectedDeviceId.value!=='main-engine-1')openDemoDevice()
-  await nextTick()
-  deviceSituationRef.value?.showMaintenanceList()
+  if(maintenanceId.value==='planned'&&route.query.returnAdvice==='1'){const query={...route.query};delete query.returnAdvice;await router.push({path:'/situation/maintenance/injector-3-cleaning',query});return}
+  const target=maintenanceReturnLocation(route.query)
+  if(route.query.from==='workbench')demoStore.showCaptainWorkbench()
+  await router.push(target)
+  if(target.query?.restoreDevice){
+    if(currentLayer.value!==2||selectedDeviceId.value!==target.query.restoreDevice)handleDeviceClick(deviceStore.getDeviceById(target.query.restoreDevice))
+    await nextTick();deviceSituationRef.value?.restoreMaintenanceContext(target.query)
+  }
 }
-function openMaintenanceEvent(){demoStore.selectTodo('maintenance');router.push({path:'/event',query:{todo:'maintenance'}})}
+function openMaintenanceEvent(){demoStore.selectTodo('drift');router.push({path:'/event',query:{...route.query,todo:'drift',returnAdvice:'1'}})}
 onActivated(async () => { const id=route.query.observation; if(id && demoStore.isTaskHandled(id)){openDemoDevice();await nextTick();deviceSituationRef.value?.openObservation(id)} })
 async function openDemoItem(id) {
-  if(issueCatalog.some(i=>i.id===id)&&!demoStore.todoCreated[id]){await router.push('/situation/issue/'+id);return}
+  if(issueCatalog.some(i=>i.id===id)&&!demoStore.todoCreated[id]){await router.push(issueDetailPath(id));return}
   if(id==='fault'){demoStore.selectTodo(id);await router.push({path:'/event',query:{todo:id}});return}
-  await router.push(id==='maintenance'?'/situation/maintenance/maintenance':'/situation/attention/'+id)
+  await router.push(id==='maintenance'?'/situation/maintenance/injector-3-cleaning':'/situation/attention/'+id)
 }
 
 function openDemoDevice() {

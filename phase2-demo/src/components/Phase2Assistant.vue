@@ -20,7 +20,7 @@ import sendIcon from '@/assets/figma/send.svg'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { useRouter } from 'vue-router'
 import { observationScene } from '@/mock/phase2Observation'
-import { useAgentConversations, demoConversations } from '@/composables/useAgentConversations'
+import { useAgentConversations, demoConversations, migrateAgentConversations } from '@/composables/useAgentConversations'
 import MessageRenderer from './messages/MessageRenderer.vue'
 import ConversationHistory from './messages/ConversationHistory.vue'
 import deviceFlow from '@/message-flows/device-overview.json'
@@ -48,7 +48,8 @@ const genericDevice=computed(()=>Boolean(props.deviceId && props.deviceId!=='mai
 const genericProfile=computed(()=>deviceProfiles[props.deviceId]||{conclusion:'当前没有已建立的异动跟踪，运行判断仅覆盖已采集指标。',basis:'缺少连续趋势和现场核验信息，不能确认未覆盖部位正常。',next:'先查看数据并按值班规程核对现场。'})
 const genericReplies=reactive({})
 const genericConversation=computed(()=>[{role:'user',text:`查看${props.deviceName}当前运行情况和建议`},{role:'assistant',kind:'scene',title:props.deviceName+'运行概况',paragraphs:[{label:'当前判断',text:genericProfile.value.conclusion},{label:'判断依据',text:genericProfile.value.basis},{label:'下一步',text:genericProfile.value.next}]},...(genericReplies[props.deviceId]||[])])
-const agentId=computed(()=>props.issueId?'issue:'+props.issueId:genericDevice.value?'device:'+props.deviceId:props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:1'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
+// New business case: never relabel archived bearing conversations as injector history.
+const agentId=computed(()=>props.issueId?'issue:'+props.issueId:genericDevice.value?'device:'+props.deviceId:props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:injector-3-cleaning'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
 const sessions=useAgentConversations(agentId,id=>props.issueId?[]:demoConversations(id))
 const draft=sessions.draft
 const inquiryDrafts=reactive({}),inquiryErrors=reactive({})
@@ -119,7 +120,7 @@ function openLinkedTodo(){store.selectTodo(key.value);router.push({path:'/event'
 const shipConversation = computed(() => [shipOverviewConversation(store), ...messages.value.filter(message => message.role === 'user' || message.shipFollowup)])
 const deviceConversation = computed(() => [
  {role:'user',text:'查看主机当前运行情况和需要关注的事项'},
- {role:'assistant',kind:'scene',title:'主机运行研判',paragraphs:operationAssessment(store).summary.filter(item=>item.label!=='分析依据').map(item=>({label:item.label,text:item.text})),actions:[...(!store.todoCreated.drift&&!store.ignoredSuggestions.drift?[{id:'item:drift',label:'了解3号缸检查依据'}]:[]),{id:'item:maintenance',label:'了解轴承提前检查建议'}]},
+ {role:'assistant',kind:'scene',title:'主机运行研判',paragraphs:operationAssessment(store).summary.filter(item=>item.label!=='分析依据').map(item=>({label:item.label,text:item.text})),actions:[...(!store.todoCreated.drift&&!store.ignoredSuggestions.drift?[{id:'item:drift',label:'了解3号缸检查依据'}]:[]),{id:'item:maintenance',label:'了解喷油器清洁与复校建议'}]},
  ...deviceConversationRecords(messages.value)
 ])
 const observationConversation=computed(()=>{
@@ -140,7 +141,7 @@ const dossierMessages=computed(()=>{
   const summary=r02InitialMessage(store,key.value) || {role:'assistant',kind:'scene',title:'当前异动跟踪档案',paragraphs:[{label:'本次重点',text:dossier.action.text}]}
   return [summary,...(currentInquiry.value?[{...currentInquiry.value,submitError:inquiryErrors[currentInquiry.value.id]}]:[]),...replies ]
 })
-const maintenanceMessages=computed(()=>[...maintenanceMessageFlow(store,advice,store.regularMaintenanceInFocus,workOrders.state('maintenance')),...advice.chatMessages.filter(message=>message.conversationId===sessions.agent.value.primaryId)])
+const maintenanceMessages=computed(()=>[...maintenanceMessageFlow(store,advice,store.regularMaintenanceInFocus,workOrders.state(advice.sourceEventId)),...advice.chatMessages.filter(message=>message.conversationId===sessions.agent.value.primaryId)])
 const todoConversation=computed(()=>{const rows=messages.value;const first=rows.findIndex(row=>row.stageId);return rows.slice(Math.max(0,first-1)).filter(row=>!row.observationContext&&!row.title?.startsWith('效果观察')&&!row.text?.startsWith('本轮效果观察已自动结束'))})
 const automaticMessages=computed(()=>props.issueId?initialIssueMessages(props.issueId,store):genericDevice.value?genericConversation.value:props.maintenanceDetail?maintenanceMessages.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='observation'?observationConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?todoConversation.value:messages.value)
 watch(automaticMessages, value=>{
@@ -149,14 +150,14 @@ watch(automaticMessages, value=>{
   else primary.messages=value
 }, {immediate:true,deep:true})
 const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
- ...(store.todoCreated.maintenance || store.isTaskHandled('maintenance')?['maintenance:check']:[]),
- ...(!advice.sufficient || advice.decision==='execute' || store.isTaskHandled('maintenance')?['maintenance:execute']:[]),
- ...(!advice.sufficient || advice.decision==='defer' || store.isTaskHandled('maintenance')?['maintenance:defer']:[])
+ ...(store.todoCreated[advice.sourceEventId] || store.isTaskHandled(advice.sourceEventId)?['maintenance:check']:[]),
+ ...(!advice.sufficient || advice.decision==='execute' || store.isTaskHandled(advice.sourceEventId)?['maintenance:execute']:[]),
+ ...(!advice.sufficient || advice.decision==='defer' || store.isTaskHandled(advice.sourceEventId)?['maintenance:defer']:[])
 ]:[])
 const displayedMessages=computed(()=>sessions.active.value.messages)
 watch(()=>sessions.active.value.id,async()=>{if(props.issueId && !sessions.active.value.messages.length){appendMessages(sessions.active.value.messages,initialIssueMessages(props.issueId,store));sessions.touch()}await nextTick();scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight})})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
-const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.device+' · '+issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
+const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.device+' · '+issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'3号缸喷油器 · 已有安排核对':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
 const placeholder=computed(()=>props.issueId?'询问判断依据、缺失证据或下一步安排…':props.maintenanceDetail?'询问检查依据，或补充现场与安排信息…':props.dossier?'询问当前判断、变化证据或后续安排…':mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
 function send(){
   const text=draft.value.trim();if(!text)return
@@ -209,7 +210,7 @@ function clearMonitorTimer(){if(monitorTimer){clearTimeout(monitorTimer);monitor
 function askMaintenance(text){
  const id=sessions.active.value.id,at=new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})
  const userOrder=advice.nextOrder(),replyOrder=advice.nextOrder()
- const added=[{id:`maintenance-chat-${userOrder}`,order:userOrder,role:'user',text,at,conversationId:id},{id:`maintenance-chat-${replyOrder}`,order:replyOrder,...maintenanceReply(store,text,workOrders.state('maintenance')),at,conversationId:id}]
+ const added=[{id:`maintenance-chat-${userOrder}`,order:userOrder,role:'user',text,at,conversationId:id},{id:`maintenance-chat-${replyOrder}`,order:replyOrder,...maintenanceReply(store,text,workOrders.state(advice.sourceEventId)),at,conversationId:id}]
  advice.chatMessages.push(...added)
  if(id!==sessions.agent.value.primaryId)sessions.active.value.messages.push(...added)
  sessions.touch()
@@ -219,10 +220,10 @@ function runDemoAction(id){
  if(props.issueId){if(id==='issue:ask:evidence')askIssue('还需核实哪些信息？');else if(id==='issue:ask:next')askIssue('下一步如何安排？');else if(id.startsWith('issue:section:'))emit('issue-section',id.slice('issue:section:'.length));else if(id==='issue:task'&&store.todoCreated[props.issueId]){store.selectTodo(props.issueId);router.push({path:'/event',query:{todo:props.issueId}})}return}
 
  if(props.maintenanceDetail && id.startsWith('maintenance:')){
-  if(id.startsWith('maintenance:ask:')){const topic=id.split(':').at(-1);askMaintenance({basis:'为什么建议提前检查？',evidence:'需要补齐哪些检查证据？',arrangement:'已有安排是否冲突？'}[topic]);return}
-  if(id==='maintenance:event'){store.selectTodo('maintenance');router.push({path:'/event',query:{todo:'maintenance'}});return}
-  if(id==='maintenance:observation'){router.push('/situation/attention/maintenance');return}
-  if(id==='maintenance:advice'){router.push('/situation/maintenance/maintenance');return}
+  if(id.startsWith('maintenance:ask:')){const topic=id.split(':').at(-1);askMaintenance({basis:'为什么建议清洁与复校？',evidence:'前置取证有哪些？',arrangement:'已有安排是否冲突？'}[topic]);return}
+  if(id==='maintenance:event'){store.selectTodo(advice.sourceEventId);router.push({path:'/event',query:{...router.currentRoute.value.query,todo:advice.sourceEventId,returnAdvice:'1'}});return}
+  if(id==='maintenance:observation'){router.push('/situation/attention/drift');return}
+  if(id==='maintenance:advice'){const query={...router.currentRoute.value.query};delete query.returnAdvice;router.push({path:'/situation/maintenance/injector-3-cleaning',query});return}
   sessions.select(sessions.agent.value.primaryId)
   if(id==='maintenance:check'){store.assignmentRequest='maintenance';return}
   if(id==='maintenance:execute'){advice.decide('execute');return}

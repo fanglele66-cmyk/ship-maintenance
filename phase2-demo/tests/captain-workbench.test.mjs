@@ -10,8 +10,8 @@ test('captain decides origins before dispatch; assignment is unique, traceable a
  setActivePinia(createPinia());const store=usePhase2DemoStore()
  assert.deepEqual(store.visibleTodos.map(t=>t.id),['steering-heat'])
  let rows=workbenchIssues(store)
- assert.equal(rows.filter(i=>i.state==='待决策').length,5)
- assert.deepEqual(rows.filter(i=>i.deviceId==='main-engine-1').map(i=>i.type),['报警事件','预警事件','异动跟踪','维保建议'])
+ assert.equal(rows.filter(i=>i.state==='待决策').length,6)
+ assert.deepEqual(rows.filter(i=>i.deviceId==='main-engine-1').map(i=>i.type),['报警事件','预警事件','异动跟踪','异动跟踪','维保建议'])
  assert.equal(captainDeviceSignal(store,'main-engine-1'),'danger')
  assert.equal(captainDeviceSignal(store,'air-compressor'),'warning')
  assert.equal(store.registerDossierNote('fault','可能误报反馈：现场仪表与采集读数不一致，待核对'),true)
@@ -39,6 +39,6 @@ test('captain decides origins before dispatch; assignment is unique, traceable a
  assert.equal(activeWorkbenchIssues(store).filter(i=>i.state==='待决策').length,0,'all-dispatched empty state has no pending rows')
  assert.ok(activeWorkbenchIssues(store).filter(i=>i.state==='已派发').length>0)
  store.resetDemo();assert.equal(store.todoCreated.fault,false);assert.equal(store.todoCreated['main-warning'],false)
- assert.equal(workbenchIssues(store).filter(i=>i.state==='待决策').length,5)
+ assert.equal(workbenchIssues(store).filter(i=>i.state==='待决策').length,6)
  }finally{await server.close()}
 })

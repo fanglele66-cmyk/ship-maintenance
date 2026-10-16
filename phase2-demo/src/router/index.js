@@ -2,6 +2,9 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
   { path: '/', redirect: '/situation' },
+  {path:'/situation/maintenance/maintenance',redirect:to=>({path:'/situation/maintenance/injector-3-cleaning',query:to.query})},
+  {path:'/situation/issue/maintenance',redirect:to=>({path:'/situation/maintenance/injector-3-cleaning',query:to.query})},
+  {path:'/situation/issue/:id(drift|air-delivery|cyl5-drift)',redirect:to=>({path:'/situation/attention/'+to.params.id,query:to.query})},
   {path:'/situation/issues',name:'SituationIssues',component:()=>import('@/views/CaptainIssuesView.vue'),meta:{title:'态势中心'}},
   {
     path: '/event',

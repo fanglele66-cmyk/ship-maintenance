@@ -1,7 +1,7 @@
 <template>
  <main class="issues-page">
-  <div class="issues-page-head"><BackButton label="返回船舶态势" @click="router.push('/situation')"/><h2>事项处置</h2></div>
   <section class="issues-browser">
+   <div class="issues-page-head"><BackButton label="返回船舶态势" @click="router.push('/situation')"/><h2>事项处置</h2></div>
    <IssueFilterToolbar>
     <label>设备<FormSelect v-model="device" :options="deviceOptions" placeholder=""/></label>
     <label>事项类型<FormSelect v-model="type" :options="typeOptions" placeholder=""/></label>
@@ -17,6 +17,7 @@
  </main>
 </template>
 <script setup>
+import {issueDetailPath} from '@/utils/maintenanceNavigation'
 import {computed,ref,watch,onActivated,onDeactivated,nextTick} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
@@ -39,7 +40,7 @@ watch([state,device,type],()=>{batch.value=1;savedScroll=0;if(scrollRef.value)sc
 function clearFilters(){state.value='';device.value='';type.value=''}
 onActivated(async()=>{if(route.query.resume!=='1'){clearFilters();batch.value=1;savedScroll=0}await nextTick();if(scrollRef.value)scrollRef.value.scrollTop=savedScroll})
 onDeactivated(()=>{if(scrollRef.value)savedScroll=scrollRef.value.scrollTop})
-function open(item){savedScroll=scrollRef.value?.scrollTop||0;const context={from:'issues',state:state.value,device:device.value,type:type.value};if(item.state==='已派发'){store.selectTodo(item.id);router.push({path:'/event',query:{...context,todo:item.id}})}else router.push({path:'/situation/issue/'+item.id,query:context})}
+function open(item){savedScroll=scrollRef.value?.scrollTop||0;const context={from:'issues',scope:route.query.scope,state:state.value,device:device.value,type:type.value};if(item.state==='已派发'){store.selectTodo(item.targetEventId||item.id);router.push({path:'/event',query:{...context,todo:item.targetEventId||item.id}})}else router.push({path:issueDetailPath(item.id),query:context})}
 </script>
 <style scoped>
 .issues-page{height:100%;width:100%;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;padding:16px;background:#f3f5f8;box-sizing:border-box;overflow:hidden}

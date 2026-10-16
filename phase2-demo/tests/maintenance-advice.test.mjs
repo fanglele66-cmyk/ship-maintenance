@@ -12,17 +12,20 @@ test('R04 decisions validate evidence, retain reason and reuse the same event',a
   assert.equal(advice.decide('execute'),false)
   advice.supplement('靠港时间待核对')
   assert.equal(core.todoCreated.maintenance,false)
-  assert.equal(advice.decide('check'),true)
   assert.equal(advice.decide('check'),false)
+  advice.enableExample()
+  assert.equal(core.todoCreated.drift,true)
+  assert.equal(core.todoCreated.maintenance,false)
+  assert.equal(advice.sufficient,true)
   const count=core.visibleTodos.length
-  core.progress.maintenance=2
+  core.progress.drift=4
   assert.equal(advice.decide('defer',''),false)
   assert.equal(advice.decide('defer','备件暂未到船'),true)
   assert.equal(advice.status,'暂不采纳')
   assert.match(advice.records.at(-1).text,/不代表设备已恢复正常/)
   assert.equal(advice.decide('execute'),true)
   assert.equal(core.visibleTodos.length,count)
-  assert.equal(core.progress.maintenance,2,'a decision never claims execution or advances the event')
+  assert.equal(core.progress.drift,4,'a decision never claims execution or advances the event')
   assert.equal(advice.decide('execute'),false)
   core.resetDemo();await nextTick()
   assert.equal(advice.records.length,0)

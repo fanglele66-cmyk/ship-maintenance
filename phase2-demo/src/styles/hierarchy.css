@@ -156,7 +156,7 @@
 /* Chronological rows preserve every existing report field and interaction. */
 .app-container.app-container .inspection-home { background: var(--wb-background); }
 .app-container.app-container .inspection-home .top-bar { background: transparent; }
-.app-container.app-container .inspection-home .report-list { display: flex; flex-direction: column; gap: 10px; max-width: 1520px; width: 100%; padding-top: 8px; }
+.app-container.app-container .inspection-home .report-list { display: flex; flex-direction: column; gap: 10px; max-width: none; width: 100%; min-width: 0; box-sizing: border-box; padding-top: 8px; }
 .app-container.app-container .inspection-home .report-card { display: grid; grid-template-columns: 100px minmax(0,1fr) 130px; grid-template-rows: auto auto; align-items: start; gap: 5px 20px; height: auto; min-height: 104px; padding: 18px 22px; }
 .app-container.app-container .inspection-home .rc-head { display: contents; }
 .app-container.app-container .inspection-home .rc-date { grid-column: 1; grid-row: 1 / 3; padding-top: 2px; font-size: 15px; color: var(--wb-text); }

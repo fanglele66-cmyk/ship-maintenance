@@ -1,0 +1,140 @@
+/* Use the same responsive type tokens as the situation workspace. */
+.app-container.app-container .p2-todo-center {
+  position: relative;
+  flex-direction: row;
+}
+.app-container.app-container .p2-todo-center :is(.p2-todo-list, .p2-pad-detail) {
+  padding: var(--sit-space);
+  font-size: var(--sit-body);
+  min-width: 0;
+  box-sizing: border-box;
+}
+.app-container.app-container .p2-todo-center :is(.p2-todo-list-head h2, .p2-detail-head h2) {
+  font-size: var(--sit-title);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.app-container.app-container .p2-todo-center .p2-detail-head {
+  height: auto;
+  min-height: 62px;
+  align-items: center;
+}
+.app-container.app-container .p2-todo-center .p2-detail-head > div {
+  min-width: 0;
+}
+.app-container.app-container .p2-todo-center :is(.todo-ai-summary summary strong, .p2-list-intro strong, .p2-report-block h3, .p2-section-title, .p2-current-task h3) {
+  font-size: var(--sit-section);
+  line-height: 1.5;
+}
+.app-container.app-container .p2-todo-center :is(.p2-todo-card > strong, .todo-ai-summary .markdown-content h4, .p2-stage-card strong) {
+  font-size: var(--sit-card);
+  line-height: 1.5;
+}
+.app-container.app-container .p2-todo-center :is(.p2-todo-card > p, .todo-ai-summary .markdown-content, .todo-ai-summary .markdown-content p, .p2-report-block > p, .p2-pad-cause > p, .p2-cause-table, .p2-current-task > p, .p2-stage-purpose, .p2-next-advice, .p2-pad-list-row, .p2-step-note, .p2-check-options, .p2-step-note textarea, .p2-subtabs button, .p2-primary, .p2-secondary) {
+  font-size: var(--sit-body);
+  line-height: 1.75;
+}
+.app-container.app-container .p2-todo-center :is(.p2-stage-card small, .p2-stage-card > span, .p2-cause-table small, .p2-card-foot, .p2-card-state, .p2-badge, .p2-overview-meta dl > div, .todo-ai-summary time, .p2-todo-tools input, .p2-todo-tools select) {
+  font-size: var(--sit-label);
+  line-height: 1.65;
+}
+.app-container.app-container .p2-todo-center .p2-stage-card {
+  min-height: 60px;
+}
+.app-container.app-container .p2-todo-center .p2-subtabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.app-container.app-container .p2-todo-center .p2-subtabs button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.app-container.app-container .p2-todo-center .p2-pad-footer {
+  max-width: none;
+  width: 100%;
+}
+.app-container.app-container .p2-todo-center .todo-assistant-shell {
+  width: clamp(320px, 23vw, 480px);
+  min-width: 320px;
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.app-container.app-container .p2-todo-center .todo-assistant-shell > .p2-restored-assistant {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  box-sizing: border-box;
+}
+.app-container.app-container .p2-todo-center .p2-restored-assistant .p2-assistant-head strong {
+  font-size: var(--sit-section);
+  line-height: 1.5;
+}
+.app-container.app-container .p2-todo-center .p2-restored-assistant :is(.p2-bubble, .p2-message.user .p2-bubble, .p2-dialog-paragraph p, .p2-dialog-question, .p2-scene-details > summary h3, .p2-compose textarea) {
+  font-size: var(--sit-body);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.app-container.app-container .p2-todo-center .p2-restored-assistant :is(.p2-dialog-paragraph b, .p2-assistant-head small) {
+  font-size: var(--sit-label);
+  line-height: 1.65;
+}
+.app-container.app-container .p2-todo-center .todo-assistant-shell.is-overlay {
+  position: absolute;
+  inset: 12px 12px 12px auto;
+  z-index: 90;
+  width: min(400px, calc(100% - 24px));
+  min-width: 0;
+  box-shadow: -6px 0 24px rgba(25, 33, 61, .16);
+}
+.todo-assistant-mobile-head {
+  display: flex;
+  flex: none;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ebeef5;
+  color: #586171;
+  font-size: var(--sit-label);
+}
+.todo-assistant-mobile-head button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: #f5f7fa;
+  cursor: pointer;
+}
+.todo-assistant-toggle {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 91;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: #106bff;
+  box-shadow: 0 4px 16px rgba(22, 119, 255, .35);
+  cursor: pointer;
+}
+.todo-assistant-toggle img { width: 24px; height: 24px; }
+.todo-assistant-toggle:focus-visible,
+.todo-assistant-mobile-head button:focus-visible { outline: 2px solid #b7935a; outline-offset: 3px; }
+@media (max-width: 1199px) {
+  .app-container.app-container .p2-todo-center { --sit-space: 16px; }
+  .app-container.app-container .p2-todo-center :is(.wb-back-button, .p2-todo-tools input, .p2-todo-tools select) { min-height: 40px; }
+  .app-container.app-container .p2-todo-center .wb-back-button { min-width: 40px; }
+}

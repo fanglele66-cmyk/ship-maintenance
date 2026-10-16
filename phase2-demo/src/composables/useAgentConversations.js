@@ -6,6 +6,16 @@ let sequence = 0
 export function createConversation(title = '新对话', messages = [], updatedAt = Date.now()) {
   return { id: `conversation-${++sequence}`, title, messages, draft: '', updatedAt }
 }
+export function migrateAgentConversations(targetId,legacyIds) {
+ const sources=legacyIds.filter(id=>id!==targetId&&agents[id]).map(id=>agents[id])
+ if(!sources.length)return
+ if(!agents[targetId])agents[targetId]=sources.shift()
+ const target=agents[targetId]
+ for(const source of sources)for(const conversation of source.conversations){
+  if(!target.conversations.some(item=>item.id===conversation.id))target.conversations.push(conversation)
+ }
+ for(const id of legacyIds)if(id!==targetId)delete agents[id]
+}
 export function useAgentConversations(agentId, seeds = () => []) {
   const agent = computed(() => {
     const id = agentId.value
@@ -28,7 +38,7 @@ export function useAgentConversations(agentId, seeds = () => []) {
   return { agent, active, draft, conversations, select, newConversation, touch }
 }
 export function demoConversations(agentId) {
-  const subject = agentId === 'knowledge' ? '知识资料' : agentId.includes('maintenance-advice') ? '轴承维保建议' : agentId.includes('maintenance-arrangements') ? '已有维保安排' : agentId.includes('device') ? '主机设备' : agentId.includes('ship') ? '船舶运行' : '当前事项'
+  const subject = agentId === 'knowledge' ? '知识资料' : agentId.includes('injector-3-cleaning') ? '喷油器维保建议' : agentId.includes('maintenance-advice') ? '原轴承维保建议' : agentId.includes('maintenance-arrangements') ? '已有维保安排' : agentId.includes('device') ? '主机设备' : agentId.includes('ship') ? '船舶运行' : '当前事项'
   return [
     createConversation(`${subject}近期情况`, [
       {role:'user',text:`帮我回顾一下${subject}的近期情况。`,at:'昨天 08:00'},

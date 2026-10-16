@@ -50,6 +50,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { attentionDossier } from '@/mock/attentionDossier'
+import {businessMessage} from '@/utils/businessCopy'
 import AttentionAction from './AttentionAction.vue'
 import TaskAssignment from './TaskAssignment.vue'
 import BackButton from './BackButton.vue'
@@ -57,7 +58,7 @@ const props=defineProps({scenario:String})
 defineEmits(['back','request-inquiry'])
 const store=usePhase2DemoStore(),router=useRouter(),activeTab=ref('事项概览'),chartIndex=ref(0)
 const tabs=['事项概览','变化证据','跟踪记录']
-const dossier=computed(()=>attentionDossier(store,props.scenario)),latest=computed(()=>dossier.value?.records.at(-1))
+const dossier=computed(()=>businessMessage(attentionDossier(store,props.scenario))),latest=computed(()=>dossier.value?.records.at(-1))
 const currentChart=computed(()=>dossier.value?.charts[chartIndex.value]||dossier.value?.charts[0])
 watch(()=>props.scenario,()=>{activeTab.value='事项概览';chartIndex.value=0})
 const bounds=computed(()=>{const actual=currentChart.value?.values.filter(v=>v!==null)||[];const values=actual.length?actual:[0];const min=Math.min(...values),max=Math.max(...values),padding=Math.max((max-min)*.25,Math.abs(max)*.002,.01);return {min:min-padding,max:max+padding}})

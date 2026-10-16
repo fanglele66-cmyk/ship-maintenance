@@ -1,13 +1,9 @@
+import {maintenanceExample} from './maintenanceExample.js'
 import additionalScenarios from './additionalScenarios.json'
 // 二期演示只保留四条可讲完整的故事。数值用于产品交互模拟，不作为船舶运行判断依据。
 export const attentionItems = [
   {
-    id: 'maintenance', device: '主机 · 1#缸连杆轴承', title: '主机1#缸连杆轴承建议提前维保',
-    kind: '预测性维保', tone: 'blue', tab: 'maintenance',
-    short: '距周期检修约140运行小时；轴承振动持续上行，建议利用本航次靠港窗口先检查。',
-    evidence: ['累计运行 1,860 h；周期检修节点 2,000 h', '近7日轴承振动由 2.1 升至 3.0 mm/s；系统尚未触发振动报警', '下一靠港窗口约在48小时后，可评估是否安排检查'],
-    judgement: '目前不能直接判定必须换件。先核对实际磨损和备件条件，再决定是否提前保养。',
-    question: '需要我建立一条“提前维保检查”待办，供轮机员现场确认吗？请回复“确认建立待办”。'
+    id:'maintenance',device:maintenanceExample.device,title:maintenanceExample.title,kind:'状态维保建议',tone:'blue',tab:'maintenance',short:maintenanceExample.recommendation,evidence:maintenanceExample.snapshots.map(s=>s.reference+'；'+s.meaning),judgement:maintenanceExample.limitation,question:'审阅清洁与复校建议，接续原3号缸事件。'
   },
   {
     id: 'stable', device: '主机 · 海水冷却泵', title: '海水冷却泵出口压力轻微波动',
@@ -51,19 +47,7 @@ export const attentionItems = [
   }
 ]
 
-export const maintenancePlans = [{
-  id: 'main-engine-bearing-overhaul',
-  device: '主机 · 1#缸连杆轴承',
-  title: '1#缸连杆轴承周期检修',
-  kind: '常规维保计划',
-  currentHours: 1860,
-  dueHours: 2000,
-  remainingHours: 140,
-  window: '下一靠港窗口约48小时后',
-  basis: '按设备周期计划，累计运行达到2,000 h时安排检修。当前累计1,860 h，剩余约140 h。',
-  status: '计划内',
-  note: '这是周期计划条目。提前维保建议需经人工确认后，才会建立独立待办任务链。'
-}]
+export const maintenancePlans = [maintenanceExample.plan]
 
 export const scenarioCases = {
   maintenance: {
@@ -79,13 +63,13 @@ export const scenarioCases = {
   drift: {
     id: 'drift', cardType: '异动跟踪', initialTitle: '主机3#缸排温偏离检查', eventTitle: '主机3#缸排温异常', device: '主机 · 3#缸', priority: '关注核实',
     stages: [
-      { id: 'attention', label: '任务概览', kind: 'overview', title: '偏差扩大后的现场证据请求', summary: '系统发现排温偏差从8°C扩大到10°C，伴轻微波动；仍未达到450°C告警线。', evidence: ['同工况相对差 8 → 10°C', '当前排温 432°C；AMS告警线 450°C', '系统无法仅凭该数据确认真实异常'], judgement: '请轮机员检查异响、振动与仪表读数，确认是否需要响应。', action: '进入现场检查', reply: '请核对现场仪表读数，并补充异响与振动是否可复现。' },
+      { id: 'attention', label: '任务概览', kind: 'overview', title: '偏差扩大后的现场证据请求', summary: '系统发现排温偏差从8°C扩大到10°C，伴轻微波动；仍未达到450°C告警线。', evidence: ['同工况相对差 4.8 → 14.8°C', '当前排温 371.8°C；AMS告警线 450°C', '系统无法仅凭该数据确认真实异常'], judgement: '请轮机员检查异响、振动与仪表读数，确认是否需要响应。', action: '进入现场检查', reply: '请核对现场仪表读数，并补充异响与振动是否可复现。' },
       { id: 'check', label: '检查', kind: 'check', title: '辅助确认异动是否真实且需要响应', summary: '先确认排温偏差是否真实、是否需要响应。', evidence: ['先核对现场仪表与采集值', '再查看3#缸附近是否有可复现异响'], tasks: [{ label: '核对现场排温读数', guide: '对比现场仪表与系统采集值。' }, { label: '观察3#缸异响与振动', guide: '记录现场现象能否复现。' }], judgement: '现场仪表与系统一致，轻微异响可复现；异动真实，建议确立异常事件。', action: '确认异常并形成事件', reply: '现场读数一致且异响可复现，已确认主机3#缸排温异常需要响应。接下来结合候选原因安排排查。' },
-      { id: 'event', label: '事件概览', kind: 'overview', title: '主机3#缸排温异常已确立', summary: '由先前异动跟踪与现场检查接续形成，保留了8→10°C及异响证据。', evidence: ['来源：持续监测异动跟踪', '确立依据：现场仪表一致 + 异响可复现', '事件响应：安排针对性排查'], judgement: '喷油器雾化不良可能性较高，排气阀密封不良次之；现场仪表核对已降低测点偏差的可能性。', action: '进入排查', reply: '请先排查喷油器雾化与回油，再核对排气阀密封。' },
-      { id: 'investigate', label: '排查', kind: 'check', title: '排查导致排温异常的原因', summary: '已确认排温异常，接下来缩小根因范围。', evidence: ['作业前停机隔离与高压油管泄压', '结合异常缸与相邻缸同工况对比'], tasks: [{ label: '校验3#缸喷油器雾化', guide: '检查喷孔积炭及喷雾形态。' }, { label: '检查排气阀密封', guide: '记录密封检查结果。' }], judgement: '喷油器喷孔积炭与现象吻合，排气阀未见异常；建议检修喷油器。', action: '提交排查并进入维修', reply: '根因范围收敛到喷油器雾化不良，进入维修处理。' },
-      { id: 'repair', label: '维修', kind: 'work', title: '清洁并校验3#缸喷油器', summary: '记录维修准备、喷油器处理与复装校验结果。', evidence: ['备件：喷嘴组件一套（备用）', '作业：拆检、清洁或更换喷嘴、校验喷雾形态'], tasks: [{ label: '拆检喷油器并处理积炭', guide: '记录拆检发现和处理内容。' }, { label: '复装后校验喷雾与密封', guide: '记录复装校验结果。' }], judgement: '维修完成后仍需看同工况排温偏差和异响是否消失。', action: '提交维修并完成处理', reply: '喷油器处理与验收已记录，本轮人工任务已处理。排温差与异响的持续效果在设备态势中自动跟踪。' },
+      { id: 'event', label: '事件概览', kind: 'overview', title: '主机3#缸排温异常已确立', summary: '由先前异动跟踪与现场检查接续形成，保留了4.8→14.8°C及异响证据。', evidence: ['来源：持续监测异动跟踪', '确立依据：现场仪表一致 + 异响可复现', '事件响应：安排针对性排查'], judgement: '喷油器雾化不良可能性较高，排气阀密封不良次之；现场仪表核对已降低测点偏差的可能性。', action: '进入排查', reply: '请先排查喷油器雾化与回油，再核对排气阀密封。' },
+      { id: 'investigate', label: '排查', kind: 'check', title: '排查导致排温异常的原因', summary: '已确认排温异常，接下来缩小根因范围。', evidence: ['作业前停机隔离与高压油管泄压', '结合异常缸与相邻缸同工况对比'], tasks: [{ label: '校验3#缸喷油器雾化', guide: '检查喷孔积炭及喷雾形态。' }, { label: '检查排气阀密封', guide: '记录密封检查结果。' }], judgement: '喷油器喷孔积炭与现象吻合，其他候选原因尚未全部排除；建议检修喷油器。', action: '提交排查并进入维修', reply: '已确认喷油器部件证据支持清洁与复校评估，进入维修处理。' },
+      { id: 'repair', label: '维修', kind: 'work', title: '清洁并校验3#缸喷油器', summary: '记录维修准备、喷油器处理与复装校验结果。', evidence: ['备件：喷嘴组件一套（备用）', '作业：按批准范围清洁、复校喷油器；换件须另行确认'], tasks: [{ label: '拆检喷油器并处理积炭', guide: '记录拆检发现和处理内容。' }, { label: '复装后校验喷雾与密封', guide: '记录复装校验结果。' }], judgement: '维修完成后仍需看同工况排温偏差和异响是否消失。', action: '提交维修并完成处理', reply: '喷油器处理与验收已记录，本轮人工任务已处理。排温差与异响的持续效果在设备态势中自动跟踪。' },
       { id: 'observe', label: '效果观察', kind: 'observe', title: '维修后的24小时观察窗口', summary: '用最初的排温差与现场异响作为相同的验证口径。', evidence: ['同工况排温相对差 10 → 3°C', '3#缸异响未再复现', '24小时内排温维持稳定'], judgement: '处置效果与根因判断一致，可闭环。', action: '确认闭环归档', reply: '排温偏差和异响均已收束，事件完成观察并归档。' },
-      { id: 'closed', label: '完整闭环', kind: 'closed', title: '异动跟踪接续事件并闭环', summary: '状态关注、人工检查、事件确立、排查、维修、效果观察共用同一证据链。', evidence: ['关注：8→10°C', '检查：仪表一致、异响可复现', '排查：喷油器积炭', '维修及观察：偏差回落至3°C'], judgement: '案例材料已自动汇集并关联来源事件，待岸端审阅。' }
+      { id: 'closed', label: '完整闭环', kind: 'closed', title: '异动跟踪接续事件并闭环', summary: '状态关注、人工检查、事件确立、排查、维修、效果观察共用同一证据链。', evidence: ['关注：4.8→14.8°C', '检查：仪表一致、异响可复现', '排查：喷油器积炭', '维修及观察：偏差回落至3°C'], judgement: '案例材料已自动汇集并关联来源事件，待岸端审阅。' }
     ]
   },
   fault: {

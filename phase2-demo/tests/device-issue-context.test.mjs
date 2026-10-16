@@ -16,7 +16,7 @@ test('dispatch, observation, true event closure and ignored advice remain distin
  const {deviceIssueRows}=await server.ssrLoadModule('/src/mock/deviceIssueContext.js')
  setActivePinia(createPinia());const store=usePhase2DemoStore()
  assert.equal(deviceIssueRows(store,'main-engine-1','报警事件','待决策')[0].id,'fault')
- assert.deepEqual(deviceIssueRows(store,'main-engine-1','','待决策').map(item=>item.id),['fault','main-warning','drift','maintenance'])
+ assert.deepEqual(deviceIssueRows(store,'main-engine-1','','待决策').map(item=>item.id),['fault','main-warning','cyl5-drift','drift','maintenance'])
  assert.deepEqual(deviceIssueRows(store,'air-compressor','','待决策').map(item=>item.id),['air-delivery'])
  store.createTodo('fault');store.progress.fault=store.observationIndex('fault')
  assert.equal(deviceIssueRows(store,'main-engine-1','报警事件','已派发').length,1)
