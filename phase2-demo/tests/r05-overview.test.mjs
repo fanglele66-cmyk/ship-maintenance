@@ -4,7 +4,7 @@ import {createServer} from 'vite'
 import {createPinia,setActivePinia} from 'pinia'
 import {healthReview,healthReviewReceipt,overviewActions,deviceHealthReply} from '../src/mock/r05Overview.js'
 test('R05 overview separates current actions from the shared execution snapshot',async()=>{
- const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')

@@ -21,7 +21,7 @@ test('R02 replies differ by story and do not offer note registration on ordinary
 })
 
 test('R02 preserves three dossiers, qualitative evidence and explicit decision requirements',async()=>{
- const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try {
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {attentionDossier}=await server.ssrLoadModule('/src/mock/attentionDossier.js')
@@ -59,7 +59,7 @@ test('R02 preserves three dossiers, qualitative evidence and explicit decision r
   store.sendR02Message('drift','演示进一步检查研判')
   assert.equal(store.confirmR02Check('drift'),true)
   assert.equal(store.confirmR02Check('drift'),false)
-  assert.equal(store.visibleTodos.filter(item=>item.id==='drift').length,1)
+  assert.equal(store.visibleTodos.filter(item=>item.id==='drift').length,0)
   assert.equal(JSON.stringify(attentionDossier(store,'drift').records.slice(0,2)),before,'initial qualitative evidence remains in history after linking an event')
   store.sendR02Message('cyl2-ended','今天又出现异常声音')
   const request=store.logs['cyl2-ended'].at(-1)

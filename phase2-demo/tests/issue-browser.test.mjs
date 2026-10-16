@@ -26,9 +26,9 @@ assert.equal(issueBatch(many).length,10);assert.equal(issueBatch(many,2).length,
 assert.equal(new Set(issueBatch(many,3).map(i=>i.id)).size,25)
 })
 test('dispatch does not turn low-severity issues red; closure removes the signal',()=>{
-const store={todoCreated:{'air-delivery':true},ignoredSuggestions:{},assignments:{},cases:{},progress:{},eventStatus:{}}
-assert.equal(captainDeviceSignal(store,'air-compressor'),'warning')
+const store={todoCreated:{'aux-health':true},ignoredSuggestions:{},assignments:{},cases:{},progress:{},eventStatus:{}}
+assert.equal(captainDeviceSignal(store,'aux-engine-2'),'warning')
 assert.equal(captainDeviceSignal(store,'main-engine-1'),'danger')
-store.eventStatus['air-delivery']='closed';assert.equal(captainDeviceSignal(store,'air-compressor'),'normal')
+store.eventStatus['aux-health']='closed';assert.equal(captainDeviceSignal(store,'aux-engine-2'),'normal')
 assert.equal(captainDeviceSignal(store,'boiler'),'normal')
 })

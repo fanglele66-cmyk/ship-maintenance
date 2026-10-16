@@ -7,11 +7,11 @@
       </details>
       <template v-for="group in groups" :key="group.title"><section v-if="group.items.length"><div class="p2-list-intro"><strong>{{ group.title }}</strong><span>{{ group.items.length }} 项</span></div>
         <div class="p2-todo-grid"><button v-for="todo in group.items" :key="todo.id" class="p2-todo-card" :class="[todo.id, {'is-priority':group.title==='优先处理'}]" @click="openTodo(todo.id)">
-          <div class="p2-card-top"><span class="p2-badge" :class="closed(todo)?'blue':todo.id==='fault'||todo.id==='drift'&&store.progress.drift>=2?'red':'blue'">{{ cardType(todo) }}</span><span class="p2-card-state">{{ closed(todo)?'已处理':'未处理' }}</span></div>
+          <div class="p2-card-top"><span class="p2-badge" :class="closed(todo)?'blue':['报警事件','预警事件'].includes(cardType(todo))?'red':'blue'">{{ cardType(todo) }}</span><span class="p2-card-state">{{ closed(todo)?'已处理':'未处理' }}</span></div>
           <strong>{{ cardTitle(todo) }}</strong><p>{{ summary(todo) }}</p><p class="todo-owner">负责人：{{ store.assignments[todo.id]?.owner || todo.owner }}</p><div class="p2-card-foot"><span>{{ todo.device }}</span><span>{{ closed(todo)?'查看详情':'继续处理' }} →</span></div>
         </button></div>
       </section></template>
-      <div v-if="!groups.some(group=>group.items.length)" class="p2-empty">暂无符合条件的待办</div>
+      <div v-if="!groups.some(group=>group.items.length)" class="p2-empty">暂无符合条件的已派发任务，可从态势中心审阅事项并安排负责人。</div>
       <div class="p2-list-jump"><button class="p2-secondary" @click="router.push('/situation')">查看设备态势 →</button></div>
     </div>
     <template v-else><TodoDetail /><Phase2Assistant mode="todo" /></template>
@@ -32,7 +32,7 @@ const owners=computed(()=>[...new Set(store.taskPortfolio.map(t=>store.assignmen
 function closed(todo){return store.isTaskHandled(todo.id)}
 function cardTitle(todo){return todo.id==='drift'&&store.progress.drift>=2?todo.eventTitle:todo.initialTitle}
 function cardType(todo){return issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
-function summary(todo){return closed(todo)?'本轮检查、处置与验收已提交；持续效果在设备态势跟踪，案例材料按来源事件自动汇集。':todo.stages[store.progress[todo.id]].summary}
+function summary(todo){return store.completedTasks[todo.id]?.reason||(closed(todo)?'实际措施与现场验收已提交，持续效果与最终闭环在设备态势接续。':todo.stages[store.progress[todo.id]].summary)}
 
 const todoMarkdown=computed(()=>{
  const report=todoBrief(store,owner.value)

@@ -2,6 +2,7 @@
   <div class="p2-device-page">
     <div class="p2-device-head">
       <BackButton label="返回船舶态势" @click="$emit('back')"/><div class="device-heading"><span class="p2-eyebrow">设备态势</span><h2>{{ deviceName }}</h2></div>
+      <FormSelect v-if="deviceId==='aux-system'||deviceId.startsWith('aux-engine-')" :model-value="deviceId" :options="auxiliaryOptions" placeholder="" aria-label="选择辅机" @update:model-value="$emit('select-device',$event)"/>
       <div v-if="isMainEngine" class="p2-device-status"><span><i></i>航行中</span></div>
     </div>
     <div class="p2-tab-row" role="tablist" aria-label="设备层内容">
@@ -9,9 +10,8 @@
     </div>
     <div ref="deviceScroll" class="p2-device-scroll">
       <template v-if="activeTab === 'data'"><slot name="data" /></template>
-      <DeviceIssueBrowser v-else-if="activeTab==='related'" :device-id="deviceId" :initial-type="relatedType" :initial-state="relatedState" @overview="activeTab='overview'"/><template v-else-if="!isMainEngine">
-        <template v-if="activeTab==='overview'"><section class="p2-panel device-basic-overview"><h4>当前判断</h4><p>{{ otherOverview.conclusion }}</p><h4>依据与推断</h4><p>{{ otherOverview.basis }}</p><h4>下一步建议</h4><p>{{ otherOverview.next }}</p><button class="p2-secondary" @click="activeTab='data'">查看传感器数据</button></section></template>
-        <section v-else-if="activeTab==='history' && otherHistory.length" class="p2-panel"><h3>动态记录</h3><button v-for="task in otherHistory" :key="task.id" class="p2-attention-card human" @click="openTodo(task.id)"><strong>{{ task.initialTitle }}</strong><p>{{ store.isTaskHandled(task.id)?'本轮处理记录已提交，可回看现场反馈、执行和验收结果。':task.stages[store.progress[task.id]].summary }}</p><span>{{ store.isTaskHandled(task.id)?'已处理':'跟进中' }}</span></button></section><section v-else class="p2-panel"><h3>{{ tabs.find(t=>t.id===activeTab)?.label }}</h3><p>{{ '当前没有可回查的处置动态。检查、指派及实际处理提交后，将在这里保留相应记录。' }}</p><button class="p2-link-button" @click="activeTab='overview'">返回健康概览</button></section>
+      <DeviceIssueBrowser v-else-if="activeTab==='related'" :device-id="deviceId" :initial-type="relatedType" :initial-state="relatedState" @overview="activeTab='overview'"/><template v-else-if="activeTab==='overview'&&!isMainEngine">
+        <section class="p2-panel device-basic-overview"><MarkdownContent :content="otherMarkdown"/><div class="overview-links"><button class="p2-secondary" @click="activeTab='data'">查看传感器数据</button><button class="p2-secondary" @click="showHealthHistory">查看健康跟踪记录</button></div></section>
       </template>
       <template v-else-if="activeTab === 'overview'">
         <div class="p2-overview-layout">
@@ -19,10 +19,7 @@
           <div class="p2-section-title">设备健康研判</div>
           <div class="p2-health-meta"><span>分析完成 {{ runningAssessment.completedAt }}</span><span>数据截止 {{ runningAssessment.dataCutoff }}</span><span>{{ runningAssessment.analysisRange }}</span></div>
           <p class="p2-health-scope">{{ runningAssessment.conditions }} · {{ runningAssessment.coverage }}</p>
-          <p class="p2-health-scope">已结合当前运行工况、可比历史片段与现场反馈进行研判。</p>
-          <div class="p2-overview-analysis">
-            <p v-for="item in overviewAnalysis" :key="item.label"><span class="p2-analysis-tag" :class="item.tone">{{ item.label }}</span><span>{{ item.text }}</span></p>
-          </div>
+          <MarkdownContent :content="mainMarkdown"/>
           <details class="p2-running-details">
             <summary><span>详细研判</span><small>查看关联证据与分析过程</small></summary>
             <article class="p2-technical-report">
@@ -35,8 +32,16 @@
         </div>
       </template>
       <template v-else-if="activeTab === 'history'">
-        <SituationReport v-if="historyDetail" :title="historyDetail.title" :status="historyDetail.status" :meta="historyDetail.date + ' ' + historyDetail.time + ' · ' + historyDetail.source" tone="ai" :conclusion="historyDetail.conclusion" :recommendation="historyDetail.recommendation" :sections="historyDetail.sections" back-label="返回动态记录" @back="historyDetailId = null">
-          <template #actions><template v-if="historyDetail.type === 'maintenance' && historyDetail.target"><button type="button" class="p2-link-button" @click="openTodo(historyDetail.target)">回看来源待办 →</button><button v-if="store.isTaskHandled(historyDetail.target)" type="button" class="p2-link-button" @click="openObservation(historyDetail.target)">查看效果观察 →</button></template></template>
+        <SituationReport v-if="historyDetail" :title="historyDetail.title" :status="historyDetail.status" :meta="historyDetail.date + ' ' + historyDetail.time + ' · ' + historyDetail.source" tone="ai" :conclusion="historyDetail.conclusion" :recommendation="historyDetail.recommendation" :sections="historyDetail.sections" :timeline="historyDetail.timeline||[]" :tabbed="Boolean(historyDetail.timeline?.length)" timeline-expanded back-label="返回动态记录" @back="historyDetailId = null">
+          <template #actions>
+            <template v-if="historyDetail.type==='attention'&&historyTrack">
+              <button v-if="historyTrack.requestId&&!store.todoCreated[historyTrack.requestId]" type="button" class="p2-secondary" @click="openItem(historyTrack.requestId)">查看现场核实建议</button>
+              <button v-if="historyTrack.requestId&&store.todoCreated[historyTrack.requestId]&&!store.completedTasks[historyTrack.requestId]" type="button" class="p2-secondary" @click="openTodo(historyTrack.requestId)">查看本次核实任务</button>
+              <button v-if="historyTrack.laterNodes&&store.healthUpdates[historyTrack.id]?.taskComplete&&(store.healthUpdates[historyTrack.id]?.laterNodes?.length||0)<historyTrack.laterNodes.length" type="button" class="p2-secondary" @click="store.advanceHealthTrack(historyTrack.id)">查看后续可比节点</button>
+              <button v-if="historyTrack.recommendationId||store.healthUpdates[historyTrack.id]?.recommendationId" type="button" class="p2-secondary" @click="openMaintenanceDetail(historyTrack.recommendationId||store.healthUpdates[historyTrack.id].recommendationId)">查看关联维保建议</button>
+            </template>
+            <template v-if="historyDetail.type==='maintenance'&&historyDetail.target"><button type="button" class="p2-link-button" @click="openTodo(historyDetail.target)">回看来源待办</button><button v-if="store.isTaskHandled(historyDetail.target)" type="button" class="p2-link-button" @click="openObservation(historyDetail.target)">查看效果观察</button></template>
+          </template>
         </SituationReport>
         <template v-else>
           <section v-if="closedIssues.length" class="p2-panel"><h3>已闭环事项</h3><CaptainIssueRow v-for="item in closedIssues" :key="item.id" :item="item" :show-device="false" @open="openTodo($event.id)"/></section>
@@ -57,38 +62,46 @@ import {workbenchIssues,issueCatalog} from '@/mock/captainWorkbench'
 import profiles from '@/mock/deviceOverviewProfiles.json'
 import {deviceHistory,historyCategories} from '@/mock/phase2History'
 import {operationAssessment} from '@/mock/phase2SituationContent'
+import {healthTracks,deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
+import {matchesSituationDevice} from '@/mock/situationScope'
 import BackButton from '@/components/BackButton.vue'
 import CaptainIssueRow from '@/components/CaptainIssueRow.vue'
 import DeviceIssueBrowser from '@/components/DeviceIssueBrowser.vue'
 import FormSelect from '@/components/forms/FormSelect.vue'
 import SituationReport from '@/components/SituationReport.vue'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 const props=defineProps({deviceName:{type:String,default:'主机'},deviceId:{type:String,default:'main-engine-1'}})
-defineEmits(['select-sensor','back'])
+defineEmits(['select-sensor','select-device','back'])
 const router=useRouter(),store=usePhase2DemoStore()
 const tabs=[{id:'overview',label:'健康概览'},{id:'data',label:'传感器数据'},{id:'history',label:'动态记录'},{id:'related',label:'相关事项'}]
 const activeTab=ref('overview'),relatedType=ref(''),relatedState=ref('待决策'),deviceScroll=ref(null),historyCategory=ref('all'),historyDetailId=ref(null)
 const isMainEngine=computed(()=>props.deviceId==='main-engine-1')
+const auxiliaryOptions=[{value:'aux-system',label:'辅机整体'},{value:'aux-engine-1',label:'1号辅机'},{value:'aux-engine-2',label:'2号辅机'},{value:'aux-engine-3',label:'3号辅机'}]
 const closedIssues=computed(()=>workbenchIssues(store).filter(i=>i.deviceId===props.deviceId&&i.state==='已闭环'))
 const activeTodoCount=computed(()=>workbenchIssues(store).filter(i=>i.deviceId===props.deviceId&&i.state==='已派发').length)
-const otherHistory=computed(()=>store.visibleTodos.filter(t=>t.deviceId===props.deviceId))
-const otherOverview=computed(()=>({...profiles[props.deviceId]||{conclusion:'当前已取得部分运行指标，暂无需要决策的异动。',basis:'研判仅覆盖已采集指标，缺少连续趋势与现场核验，不据此确认所有部位正常。',next:'查看传感器数据并按巡检规程核对现场。'},...(props.deviceId==='air-compressor'&&store.todoCreated['air-delivery']?{next:'查看已派发的检查任务，了解现场反馈和当前进展，沿原任务继续处理。'}:{})}))
+const otherHistory=computed(()=>store.visibleTodos.filter(t=>matchesSituationDevice(t,props.deviceId)))
+const otherOverview=computed(()=>deviceStoryAssessment(store,props.deviceId))
 const historyRecords=computed(()=>deviceHistory(store))
-const shownHistory=computed(()=>historyRecords.value.filter(item=>(store.cases[item.target]?.deviceId||'main-engine-1')===props.deviceId&&(historyCategory.value==='all'||item.type===historyCategory.value)))
+const shownHistory=computed(()=>historyRecords.value.filter(item=>matchesSituationDevice({deviceId:item.deviceId||store.cases[item.target]?.deviceId||'main-engine-1'},props.deviceId)&&(historyCategory.value==='all'||item.type===historyCategory.value)))
 const historyDetail=computed(()=>historyRecords.value.find(item=>item.id===historyDetailId.value))
+const historyTrack=computed(()=>healthTracks.find(track=>track.id===historyDetail.value?.trackId))
 const runningAssessment=computed(()=>operationAssessment(store)),overviewAnalysis=computed(()=>runningAssessment.value.summary)
+const otherMarkdown=computed(()=>`### 当前判断\n\n${otherOverview.value.conclusion}\n\n### 分析依据\n\n${otherOverview.value.basis}\n\n### 建议\n\n${otherOverview.value.next}`)
+const mainMarkdown=computed(()=>`### 当前判断\n\n${runningAssessment.value.conclusion}\n\n### 分析依据\n\n${runningAssessment.value.basis}\n\n### 建议\n\n${runningAssessment.value.recommendation}`)
 watch(()=>props.deviceId,()=>{activeTab.value='overview';historyDetailId.value=null;relatedType.value=''})
 watch(activeTab,()=>{store.attentionInFocus=false;store.regularMaintenanceInFocus=false;store.clearObservationFocus();historyDetailId.value=null})
 onUnmounted(()=>{store.clearObservationFocus();store.regularMaintenanceInFocus=false})
 let listScroll=0
-async function openMaintenanceDetail(id='maintenance'){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/maintenance/'+encodeURIComponent(id))}
+async function openMaintenanceDetail(id='maintenance'){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/issue/'+encodeURIComponent(id))}
 async function showMaintenanceList(){await showRelated('维保建议')}
 async function showAttentionList(){await showRelated('异动跟踪')}
 async function showRelated(type='',state='待决策'){activeTab.value='related';relatedType.value=type;relatedState.value=state;store.attentionInFocus=false;await nextTick();if(deviceScroll.value)deviceScroll.value.scrollTop=listScroll}
 function openObservation(id){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/attention/'+encodeURIComponent(id))}
-function openItem(id){if(issueCatalog.some(i=>i.id===id)&&!store.todoCreated[id]){router.push('/situation/issue/'+id);return}if(['stable','vibration-trend'].includes(id)){activeTab.value='data';store.attentionInFocus=false;store.deviceDataTopic=id;store.sendR02Message('device',id==='stable'?'泵出口压力有波动，要处理吗？':'机体振动小幅变化，是设备退化吗？',id);return}if(store.isTaskHandled(id)){openObservation(id);return}if(id==='fault'){openTodo(id);return}if(id==='maintenance'){openMaintenanceDetail(id);return}openObservation(id)}
-function openTodo(id){store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
+function openItem(id){if(issueCatalog.some(item=>item.id===id)){openTodo(id);return}activeTab.value='data'}
+function openTodo(id){if(!store.todoCreated[id]){router.push({path:'/situation/issue/'+id,query:{from:'device',device:props.deviceId}});return}store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
+function showHealthHistory(){activeTab.value='history';historyCategory.value='attention'}
 function historyEntryLabel(type){return ({event:'打开关联待办',attention:'查看异动跟踪材料',recommendation:'查看维保建议',maintenance:'查看维护记录',review:'查看回顾报告'})[type]||'查看记录'}
-function openHistoryRecord(record){if(record.type==='event'&&record.target){openTodo(record.target);return}if(record.type==='attention'&&record.target){openItem(record.target);return}if(record.type==='recommendation'&&record.target){openMaintenanceDetail(record.target);return}historyDetailId.value=record.id}
+function openHistoryRecord(record){if(record.type==='event'&&record.target){openTodo(record.target);return}if(record.type==='attention'&&record.target&&!record.timeline){openItem(record.target);return}if(record.type==='recommendation'&&record.target){openMaintenanceDetail(record.target);return}historyDetailId.value=record.id}
 defineExpose({openItem,openObservation,showAttentionList,showMaintenanceList,showRelated})
 </script>
 

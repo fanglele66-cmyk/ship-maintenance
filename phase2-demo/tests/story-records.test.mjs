@@ -1,0 +1,77 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {createServer} from 'vite'
+import {createPinia,setActivePinia} from 'pinia'
+
+test('business records stay coherent across the health chain, task and analysis products',async t=>{
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ try{
+  const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
+  const {storyTimeline}=await server.ssrLoadModule('/src/mock/storyRecords.js')
+  const {storyDossier,stageReport,workflowCases}=await server.ssrLoadModule('/src/mock/fourStoryWorkflow.js')
+  const {initialIssueMessages}=await server.ssrLoadModule('/src/message-flows/issueSources.js')
+  const {deviceHistory}=await server.ssrLoadModule('/src/mock/phase2History.js')
+  const fresh=()=>{setActivePinia(createPinia());return usePhase2DemoStore()}
+  const dispatch=(store,id)=>{store.createTodo(id);store.assignTask(id,{...store.defaultAssignment(id),owner:'赵明（三管轮）'});store.selectTodo(id);store.advanceTodo(id)}
+  const feedback=(store,values,notes)=>store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:notes[i]}))
+  await t.test('long health record keeps original samples, assignment, actual feedback and task end in order',()=>{
+   const store=fresh();dispatch(store,'aux-health')
+   store.advanceTodo('aux-health',feedback(store,['现场与系统一致','条件受限，已记录限制'],['10月15日09:20，就地410°C，平台409°C；同源，未校准','负荷66%；缺燃油与维护背景']))
+   const first=JSON.stringify(store.storyJournal)
+   store.decideCheck('aux-health','finish-tracking','本次核实结束，背景限制保留')
+   store.advanceHealthTrack('aux2-health');store.advanceHealthTrack('aux2-health')
+   const timeline=storyTimeline(store,'aux2-health')
+   assert.deepEqual(timeline.slice(0,4).map(entry=>entry.at.slice(0,10)),['2026-09-20','2026-09-28','2026-10-02','2026-10-14'])
+   assert.ok(timeline.findIndex(entry=>entry.kind==='feedback')<timeline.findIndex(entry=>entry.kind==='decision'))
+   assert.ok(timeline.findIndex(entry=>entry.kind==='decision')<timeline.findIndex(entry=>entry.sampleKey?.startsWith('10-18')))
+   assert.equal(timeline.filter(entry=>entry.sampleKey?.startsWith('10-22')).length,1)
+   assert.match(timeline.find(entry=>entry.kind==='assignment').text,/赵明/)
+   assert.equal(timeline.find(entry=>entry.kind==='assignment').actor,'陈志远（轮机长）')
+   assert.equal(JSON.stringify(store.storyJournal.slice(0,2)),first,'later actions preserve earlier records')
+   const task=storyTimeline(store,'aux-health',{taskOnly:true})
+   assert.equal(task.some(entry=>entry.kind==='sample'),false)
+   assert.match(task.at(-1).text,/本次核实结束/)
+  })
+  await t.test('latest 412°C node reaches the report and a new question-answer; prior days are not rewritten',()=>{
+   const store=fresh(),old=initialIssueMessages('aux-health',store)
+   dispatch(store,'aux-health')
+   store.advanceTodo('aux-health',feedback(store,['现场与系统一致','信息已记录'],['同刻409°C，对应同源显示','负荷66%，仍缺独立检验']))
+   store.decideCheck('aux-health','finish-tracking','核实记录留存，继续原健康链')
+   const day15=JSON.stringify(deviceHistory(store).find(entry=>entry.id==='review-aux-engine-2-2026-10-15'))
+   store.advanceHealthTrack('aux2-health');store.advanceHealthTrack('aux2-health')
+   assert.match(storyDossier(store,'aux-health').overviewMarkdown,/412°C/)
+   const current=initialIssueMessages('aux-health',store)
+   assert.deepEqual(current.map(entry=>entry.role),['user','assistant'])
+   assert.notEqual(current[0].id,old[0].id)
+   assert.match(current[1].markdown,/412°C/)
+   assert.doesNotMatch(old[1].markdown,/412°C/)
+   assert.equal(JSON.stringify(deviceHistory(store).find(entry=>entry.id==='review-aux-engine-2-2026-10-15')),day15)
+   assert.equal(deviceHistory(store).filter(entry=>entry.type==='review'&&entry.deviceId==='aux-engine-2').length,3)
+  })
+  await t.test('earlier stage report does not acquire future findings; work report uses the actual independent findings',()=>{
+   const store=fresh();dispatch(store,'fault')
+   store.advanceTodo('fault',feedback(store,['发现异常','未见异常'],['滤器压差0.046 MPa，滤篮附着物，照片留存','未取得调节异常证据']))
+   const work=stageReport(store,'fault',store.currentStage)
+   assert.match(work,/0.046 MPa/)
+   assert.match(work,/未见异常/)
+   assert.match(work,/处置范围与验证目标/)
+   assert.doesNotMatch(stageReport(store,'fault',store.cases.fault.stages[0]),/0.046 MPa/)
+   assert.equal(store.currentStage.tasks.some(task=>task.label.includes('温控阀')),false)
+  })
+  await t.test('health feedback limits and maintenance execution remain on the same root without invented replacement',()=>{
+   const store=fresh();dispatch(store,'aux-health')
+   store.advanceTodo('aux-health',feedback(store,['现场与系统一致','条件受限，已记录限制'],['同源读数对应','燃油背景尚缺']))
+   assert.match(store.checkAssessments['aux-health'].message,/受限项|解释缺口/)
+   store.decideCheck('aux-health','finish-tracking','限制已记录');store.advanceHealthTrack('aux2-health');store.advanceHealthTrack('aux2-health')
+   dispatch(store,'aux-maintenance');store.advanceTodo('aux-maintenance',feedback(store,['有提前处理依据','条件具备'],['仅提前相关检查，尚未决定换件','10月24日窗口、电力与作业条件已确认']))
+   const form=store.executionInquiry('aux-maintenance')
+   assert.equal(store.confirmExecutionRecord('aux-maintenance',form.id,{task0:'已完成',task1:'已完成',equipment:'2号辅机3号缸',measures:'实际检查未见需更换问题，未换件；复装复核',executedAt:'2026-10-24T10:00',executor:'赵明（三管轮）',acceptance:'本轮检查范围验收通过，原季度剩余项目保留',completion:'completed',verification:'resolved',comparable:'available'}),true)
+   store.selectObservation('aux-maintenance');store.reviewObservation('aux-maintenance')
+   const timeline=storyTimeline(store,'aux2-health')
+   assert.match(timeline.find(entry=>entry.kind==='execution').text,/未换件/)
+   assert.match(storyDossier(store,'aux-health').overviewMarkdown,/未换件/)
+   assert.equal(timeline.filter(entry=>entry.kind==='observation').length,2)
+   assert.ok(timeline.findLast(entry=>entry.kind==='observation').at.startsWith('2026-10-25'))
+  })
+ }finally{await server.close()}
+})

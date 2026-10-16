@@ -1,4 +1,5 @@
 import additionalScenarios from './additionalScenarios.json'
+import {workflowCases, choicesFor, assessWorkflow} from './fourStoryWorkflow.js'
 // Local prototype branch configuration; not a real diagnostic model.
 export const checkFeedbackRules={
  'fault:investigate':{options:[['发现异常','未见异常','无法确认'],['发现异常','未见异常','无法确认']],expected:['发现异常','未见异常'],allowMultipleFindings:true,pending:'本轮排查反馈已保存，当前结果尚不足以选择处置方案；请补充实际发现并继续排查。'},
@@ -7,8 +8,9 @@ export const checkFeedbackRules={
  'maintenance:check':{options:[['发现轻微偏磨','未见异常','无法确认'],['间隙接近上限，备件可用','暂不具备条件','无法确认']],expected:['发现轻微偏磨','间隙接近上限，备件可用'],pending:'检查反馈已保存，当前尚不足以安排预设提前换件。保留实际结果，继续跟踪或补充作业条件。'}
 }
 for(const item of additionalScenarios)checkFeedbackRules[item.id+':investigate']={options:item.stages[1].tasks.map(()=>['发现异常','未见异常','无法确认']),pending:'现场反馈已保存。'}
-export function checkChoices(eventId,stageId,index){return checkFeedbackRules[`${eventId}:${stageId}`]?.options[index]||['发现异常','未见异常','无法确认']}
+export function checkChoices(eventId,stageId,index){const stage=workflowCases[eventId]?.stages.find(item=>item.id===stageId);return stage?choicesFor(stage,index):checkFeedbackRules[`${eventId}:${stageId}`]?.options[index]||['发现异常','未见异常','无法确认']}
 export function assessCheckFeedback(eventId,stage,feedback){
+ if(workflowCases[eventId])return assessWorkflow(eventId,stage,feedback)
  if(!Array.isArray(feedback)||feedback.length!==stage.tasks?.length||feedback.some((entry,i)=>entry.label!==stage.tasks[i].label||!checkChoices(eventId,stage.id,i).includes(entry.result)))return {valid:false,advance:false,message:'请完整填写各项实际检查结果后提交。'}
  const rule=checkFeedbackRules[`${eventId}:${stage.id}`]
  if(rule?.allowMultipleFindings&&feedback.every(entry=>entry.result==='发现异常')){

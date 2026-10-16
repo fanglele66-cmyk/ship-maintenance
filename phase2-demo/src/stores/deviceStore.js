@@ -6,7 +6,7 @@ import {useSensorStore} from '@/stores/sensorStore'
 export const useDeviceStore = defineStore('device', () => {
   const ship = ref({ ...shipInfo })
   const sensorStore=useSensorStore()
-  const devices = computed(()=>mockDevices.filter(device=>device.id!=='aux-engine-2').map(device=>{
+  const devices = computed(()=>[...mockDevices,...(mockDevices.some(device=>device.id==='aux-engine-3')?[]:[{...mockDevices.find(device=>device.id==='aux-engine-2'),id:'aux-engine-3',name:'3号辅机',status:'normal'}])].map(device=>{
     const points=sensorStore.allSensors.filter(s=>s.deviceId===device.id)
     return {...device,metrics:device.metrics.map(metric=>{
       const point=metric.label==='转速'?points.find(s=>s.unit==='rpm'):metric.label.includes('水温')?points.find(s=>s.nameCn.includes('水出口温度')):null

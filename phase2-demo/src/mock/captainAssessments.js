@@ -27,12 +27,12 @@ export function todoBrief(store,owner=''){
  const portfolio=store.taskPortfolio.filter(t=>!owner||(store.assignments[t.id]?.owner||t.owner)===owner)
  const active=portfolio.filter(t=>!store.isTaskHandled(t.id)),pending=active.filter(t=>!store.logs[t.id].some(r=>r.kind==='feedbackRecord'))
  const progressing=active.filter(t=>store.progress[t.id]>0||store.logs[t.id].some(r=>r.kind==='feedbackRecord'))
- const ordered=[...active].sort((a,b)=>['fault','main-warning','steering-heat','drift','air-delivery','maintenance'].indexOf(a.id)-['fault','main-warning','steering-heat','drift','air-delivery','maintenance'].indexOf(b.id))
+ const ordered=[...active].sort((a,b)=>['fault','main-warning','aux-health','maintenance'].indexOf(a.id)-['fault','main-warning','aux-health','maintenance'].indexOf(b.id))
  const priority=ordered[0],stage=priority?.stages[store.progress[priority.id]]
  const overview=`当前 ${active.length-progressing.length} 项待跟进，${progressing.length} 项进度推进中，${portfolio.length-active.length} 项已处理。`
  const bottleneck=pending.length?`有 ${pending.length} 项尚待现场反馈，证据未齐是主要瓶颈。`:active.length?'现有任务已取得部分反馈，当前重点是补齐剩余执行与验收结果。':'当前没有未完成的已派发任务。'
  const suggestionText=priority?`优先推进“${priority.initialTitle}”的${stage.label}环节，按当前任务要求记录现场结果；证据不足时继续核实，原因明确后再决定对应处置，沿原任务接续。`:'查看已处理任务的执行与验收记录；新的处置安排由态势中心的事项决定后派发。'
- const reason=priority?.id==='fault'?'冷却系统温升与流量下降相互印证，且已有温度报警，对推进设备的运行影响需要优先核实；其他负责人按各自已派发任务继续处理。':priority?.id==='main-warning'?'润滑供油预警由多个指标联动形成，先核对现场读数一致性，再定位异常原因，不能仅凭预警直接换件。':priority?.id==='steering-heat'?'舵机油温已有报警，涉及操舵设备的持续运行；先核对实际油温、操舵负荷与散热情况，再按现场结果处理。':priority?'当前任务用于补齐已决定检查的现场证据，不能把派发检查直接等同于确认维修。':'派发任务与运行持续稳定是两类结果，人工处理完成后仍需结合设备动态中的后续观测判断。'
+ const reason=priority?.id==='fault'?'冷却系统温升与流量下降相互印证，且已有温度报警，对推进设备的运行影响需要优先核实；其他负责人按各自已派发任务继续处理。':priority?.id==='main-warning'?'润滑供油压力下降与过滤段压损增加需要及时现场核实；压差共享原始测量，成立后继续原因排查，不能凭预警直接换件。':priority?.id==='aux-health'?'本次任务补充长期健康趋势的现场信息，核实后回到原跟踪，不把趋势记录直接升级为拆机维修。':priority?'当前任务用于补齐已决定检查的现场证据，不能把派发检查直接等同于确认维修。':'派发任务与运行持续稳定是两类结果，人工处理完成后仍需结合设备动态中的后续观测判断。'
  return {overview,bottleneck,suggestionText,reason,priority:suggestionText,next:''}
 }
 

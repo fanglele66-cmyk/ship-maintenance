@@ -1,4 +1,5 @@
 import additionalScenarios from './additionalScenarios.json'
+import {workflowCases} from './fourStoryWorkflow.js'
 // 二期演示只保留四条可讲完整的故事。数值用于产品交互模拟，不作为船舶运行判断依据。
 export const attentionItems = [
   {
@@ -101,3 +102,4 @@ export const scenarioCases = {
 }
 
 for (const scenario of additionalScenarios) scenarioCases[scenario.id] = scenario
+Object.assign(scenarioCases, workflowCases)

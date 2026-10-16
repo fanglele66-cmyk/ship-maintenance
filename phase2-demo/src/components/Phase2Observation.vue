@@ -13,7 +13,10 @@ import * as echarts from 'echarts'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {observationConfig} from '@/mock/phase2Observation'
 const props=defineProps({scenario:String,readOnly:Boolean}),store=usePhase2DemoStore()
-const config=computed(()=>observationConfig[props.scenario]),records=computed(()=>store.observationRecords[props.scenario]),last=computed(()=>records.value.at(-1)),target=computed(()=>store.observationTargets[props.scenario]),result=computed(()=>store.getObservationResult(props.scenario))
+const config=computed(()=>observationConfig[props.scenario]),records=computed(()=>store.observationRecords[props.scenario]),last=computed(()=>records.value.at(-1)),target=computed(()=>store.observationTargets[props.scenario]),result=computed(()=>{
+ const report=store.getObservationResult(props.scenario)
+ return store.eventStatus[props.scenario]==='closed'?{...report,title:'本轮效果观察已闭环',text:report.text.replace('请结合现场情况确认是否闭环，观测达标不自动代替人工确认。','人工闭环确认已记录，本轮实际措施与观测依据可在设备动态回查。')}:report
+})
 const chartEl=ref(null),colors=['#287ff0','#21a396'];let chart,observer
 function render(){if(!chart)return;const c=config.value;chart.setOption({animation:false,color:colors,tooltip:{trigger:'axis',confine:true},grid:{left:45,right:48,top:25,bottom:25},xAxis:{type:'category',data:['处理前',...records.value.map(r=>r.label)],axisTick:{show:false},axisLine:{lineStyle:{color:'#d8e2ee'}},axisLabel:{fontSize:11,color:'#78889b'}},yAxis:c.units.map((unit,i)=>({type:'value',name:unit,scale:true,position:i?'right':'left',nameTextStyle:{color:colors[i],fontSize:10},axisLabel:{fontSize:10,color:'#78889b'},splitLine:{show:!i,lineStyle:{color:'#edf1f6',type:'dashed'}}})),series:c.names.map((name,i)=>({name,type:'line',yAxisIndex:i,data:[c.before[i],...records.value.map(r=>r.values?.[i]??null)],symbolSize:6,smooth:false,lineStyle:{width:2.5}}))},true)}
 watch(records,()=>nextTick(render),{deep:true})

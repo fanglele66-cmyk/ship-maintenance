@@ -12,3 +12,9 @@
 <script setup>
 defineProps({entries:{type:Array,default:()=>[]},expanded:Boolean})
 </script>
+<style scoped>
+.p2-timeline-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px}
+.p2-timeline-heading>b{flex-basis:100%;min-width:0;overflow-wrap:break-word}
+.p2-timeline-heading time,.p2-timeline-heading>span{font-size:12px;color:#7c8797}
+.p2-attention-timeline p{white-space:pre-line;overflow-wrap:break-word}
+</style>

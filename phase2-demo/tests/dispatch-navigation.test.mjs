@@ -9,7 +9,7 @@ test('overview dispatch returns with all original filter conditions and resume c
  assert.deepEqual(dispatchReturnLocation(route),{path:'/situation/issues',query:{resume:'1',state:'待决策',device:'main-engine-1',type:'异动跟踪'}})
  assert.equal(route.query.from,'issues')
 })
-test('device-origin dispatch returns to the retained device layer; other views do not redirect',()=>{
+test('device-origin dispatch returns to situation; non-situation views retain context',()=>{
  assert.deepEqual(dispatchReturnLocation({path:'/situation/maintenance/maintenance',query:{}}),{path:'/situation'})
  assert.deepEqual(dispatchReturnLocation({path:'/event',query:{todo:'fault'}}),{path:'/event',query:{todo:'fault'}})
 })

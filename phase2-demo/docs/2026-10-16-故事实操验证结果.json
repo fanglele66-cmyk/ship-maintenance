@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-16",
+  "origin": "http://127.0.0.1:8789",
+  "method": "按操作说明通过可见入口、选择器、反馈与验收表单操作；未注入状态",
+  "results": [
+    {
+      "label": "报警：按说明的滤器单项发现完整闭环",
+      "url": "http://127.0.0.1:8789/#/situation/attention/fault",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "passed": true
+    },
+    {
+      "label": "预警：真实性核实、原因排查、对应维修、观察与闭环",
+      "url": "http://127.0.0.1:8789/#/situation/attention/main-warning",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "passed": true
+    },
+    {
+      "label": "异动：原健康链核实结束，回设备记录继续趋势并形成提前建议",
+      "url": "http://127.0.0.1:8789/#/situation",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "passed": true
+    },
+    {
+      "label": "辅机维保：不换件亦可记录、观察与人工闭环",
+      "url": "http://127.0.0.1:8789/#/situation/attention/aux-maintenance",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "passed": true
+    },
+    {
+      "label": "原健康链保留前因、人工核实、实际执行和闭环",
+      "url": "http://127.0.0.1:8789/#/situation",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "passed": true
+    },
+    {
+      "label": "主机轴承：提前必要性与条件分开，保养后观察闭环",
+      "url": "http://127.0.0.1:8789/#/situation/attention/maintenance",
+      "viewport": {
+        "width": 1536,
+        "height": 864
+      },
+      "passed": true
+    },
+    {
+      "label": "观察反复：助手反馈接续原事件；正常与未知排查结果可保存",
+      "url": "http://127.0.0.1:8789/#/event?todo=fault",
+      "viewport": {
+        "width": 1536,
+        "height": 864
+      },
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "buildVersion": "mvafzdu1",
+  "sourceBase": "f881ae4",
+  "branch": "feat/four-story-r-20261016"
+}

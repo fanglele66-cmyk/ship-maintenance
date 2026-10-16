@@ -3,7 +3,7 @@
     <h4>{{ plan.title }}</h4>
     <dl><div><dt>维护部件</dt><dd>{{ plan.device }}</dd></div><div><dt>累计运行</dt><dd>{{ plan.currentHours.toLocaleString() }} h</dd></div><div><dt>周期节点</dt><dd>{{ plan.dueHours.toLocaleString() }} h</dd></div><div><dt>距周期节点</dt><dd>约 {{ plan.remainingHours }} h</dd></div><div><dt>作业窗口</dt><dd>{{ plan.window }}</dd></div></dl>
     <div class="arrangement-period"><span>周期运行进度</span><b>{{ percent }}%</b><progress :value="plan.currentHours" :max="plan.dueHours" aria-label="周期运行进度" /></div>
-    <dl class="arrangement-source"><div><dt>数据来源</dt><dd>原型预置周期安排</dd></div><div><dt>最近同步</dt><dd>{{ syncTime }}</dd></div><div><dt>正式工单</dt><dd>{{ info.linked ? info.linked.id : '待人员确认关联' }}</dd></div><div><dt>工单来源</dt><dd>{{ info.source || '正在读取' }}</dd></div></dl>
+    <dl class="arrangement-source"><div><dt>数据来源</dt><dd>原周期计划</dd></div><div><dt>最近同步</dt><dd>{{ syncTime }}</dd></div><div><dt>正式工单</dt><dd>{{ info.linked ? info.linked.id : '待人员确认关联' }}</dd></div><div><dt>工单来源</dt><dd>{{ info.linked ? '已关联工单记录' : '尚未关联' }}</dd></div></dl>
     <div v-if="info.linked" class="arrangement-linked"><b>{{ info.linked.title }}</b><p>执行状态：{{ info.linked.status }}</p><p>作业范围：{{ info.linked.scope }}</p><p>原计划窗口：{{ info.linked.plannedWindow }}</p></div>
     <p>运行进度不代表健康程度或剩余寿命。正式工单内容及状态只读，选择确认在关联事件中进行。</p>
   </div>

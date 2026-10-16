@@ -10,14 +10,14 @@ test('all issue types share exactly the three confirmed device states',()=>{
  assert.equal(deviceIssueState({state:'已派发'}),'已派发')
 })
 test('dispatch, observation, true event closure and ignored advice remain distinct',async()=>{
- const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
  const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
  const {deviceIssueRows}=await server.ssrLoadModule('/src/mock/deviceIssueContext.js')
  setActivePinia(createPinia());const store=usePhase2DemoStore()
  assert.equal(deviceIssueRows(store,'main-engine-1','报警事件','待决策')[0].id,'fault')
- assert.deepEqual(deviceIssueRows(store,'main-engine-1','','待决策').map(item=>item.id),['fault','main-warning','drift','maintenance'])
- assert.deepEqual(deviceIssueRows(store,'air-compressor','','待决策').map(item=>item.id),['air-delivery'])
+ assert.deepEqual(deviceIssueRows(store,'main-engine-1','','待决策').map(item=>item.id),['fault','main-warning','maintenance'])
+ assert.deepEqual(deviceIssueRows(store,'aux-engine-2','','待决策').map(item=>item.id),['aux-health'])
  store.createTodo('fault');store.progress.fault=store.observationIndex('fault')
  assert.equal(deviceIssueRows(store,'main-engine-1','报警事件','已派发').length,1)
  assert.equal(deviceIssueRows(store,'main-engine-1','报警事件','已结束').length,0)
@@ -25,7 +25,7 @@ test('dispatch, observation, true event closure and ignored advice remain distin
  assert.equal(deviceIssueRows(canonical,'main-engine-1','报警事件','已结束').length,1)
  store.ignoreSuggestion('maintenance','本次暂不提前，原周期保留')
  const ended=deviceIssueRows(store,'main-engine-1','维保建议','已结束')
- assert.equal(ended[0].decisionReason,'本次暂不提前，原周期保留')
+ assert.equal(ended.find(item=>item.id==='maintenance').decisionReason,'本次暂不提前，原周期保留')
  assert.equal(store.todoCreated.maintenance,false)
  }finally{await server.close()}
 })

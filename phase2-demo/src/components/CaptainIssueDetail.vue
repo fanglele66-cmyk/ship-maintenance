@@ -3,7 +3,7 @@
   <BackButton :label="route.query.from==='issues'?'返回事项处置':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事项':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
   <header>
     <div><span class="issue-type">{{issue.type}} · {{issue.device}}</span><h2>{{issue.title}}</h2></div>
-    <span>{{store.todoCreated[issue.id]?'已派发':store.ignoredSuggestions[issue.id]?'已记录决定':'待决策'}}</span>
+    <span>{{issue.history||store.eventStatus[issue.id]==='closed'?'已结束':store.todoCreated[issue.id]?'已派发':store.ignoredSuggestions[issue.id]?'已记录决定':'待决策'}}</span>
   </header>
   <nav role="tablist">
     <button v-for="tab in tabs" :key="tab" role="tab" :aria-selected="active===tab" :class="{active:active===tab}" @click="goTab(tab)">{{tab}}</button>
@@ -11,89 +11,34 @@
   <main>
     <!-- 事项概览：结论与建议先行，关键依据摘要，推理可展开，快链与下一步 -->
     <template v-if="active==='事项概览'">
-      <section class="dossier-lead">
-        <h3>初判结论</h3>
-        <p class="lead-conclusion">{{dossier.conclusion}}</p>
-        <h3>建议</h3>
-        <p class="lead-recommendation">{{dossier.recommendation}}</p>
-      </section>
-      <section v-if="dossier.snapshots?.length" class="dossier-block">
-        <h3>关键依据摘要</h3>
-        <div class="snapshot-grid">
-          <div v-for="snap in dossier.snapshots" :key="snap.name+snap.value" class="snapshot-card">
-            <small>{{snap.name}}</small>
-            <strong>{{snap.value}}</strong>
-            <p>{{snap.reference}}</p>
-            <span>{{snap.meaning}}</span>
-            <em>来源：{{snap.source}}</em>
-          </div>
-        </div>
-        <p class="limit-note">{{issue.limit}}</p>
-      </section>
-      <details v-if="dossier.steps?.length" class="reasoning">
-        <summary>研判思路摘要（可展开）</summary>
-        <div v-for="step in dossier.steps" :key="step.title" class="reason-step">
-          <b>{{step.title}}</b>
-          <p><span>事实</span>{{step.fact}}</p>
-          <p><span>推断</span>{{step.inference}}</p>
-        </div>
-      </details>
+      <MarkdownContent :content="dossier.overviewMarkdown"/>
       <div class="quick-links" aria-label="页签快链">
-        <button type="button" @click="goTab('研判分析')">查看研判分析 →</button>
-        <button type="button" @click="goTab('证据资料')">查看证据资料 →</button>
+        <button type="button" @click="goTab('研判分析')">查看研判分析</button>
+        <button type="button" @click="goTab('证据资料')">查看证据资料</button>
       </div>
-      <section class="next-step">
-        <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警核实与排查':'评估并安排检查'"/>
+      <HealthTrackingPanel v-if="['aux-health','maintenance','aux-maintenance'].includes(issue.id)" :request-id="issue.id" detail/>
+      <section v-if="issue.history||store.eventStatus[issue.id]==='closed'" class="dossier-block"><h3>已记录的结果</h3><p>{{store.completedTasks[issue.id]?.reason||store.executionRecords[issue.id]?.at(-1)?.values.acceptance||issue.reason}}</p><p>{{issue.outcome||'来源资料、实际措施与本次确认保留，可在设备动态回查。'}}</p></section>
+      <section v-else class="next-step">
+        <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警现场核实':'评估并安排检查'"/>
         <button v-if="store.todoCreated[issue.id]" class="p2-primary" @click="openTask">查看处理任务</button>
         <template v-else-if="issue.type==='报警事件'">
-          <button class="p2-link-button" @click="falseAlarmOpen=!falseAlarmOpen">反馈可能误报</button>
+          <button class="p2-link-button" @click="falseAlarmOpen=!falseAlarmOpen">反馈误报</button>
           <InquiryMessage v-if="falseAlarmOpen||feedback" :message="falseAlarmInquiry" @submit-inquiry="reportFalseAlarm"/>
         </template>
       </section>
     </template>
     <!-- 研判分析：观察事实、推断、候选解释与未确认问题分层 -->
     <template v-else-if="active==='研判分析'">
-      <section class="dossier-block">
-        <h3>观察事实与推断</h3>
-        <div v-if="dossier.steps?.length">
-          <div v-for="step in dossier.steps" :key="step.title" class="reason-step">
-            <b>{{step.title}}</b>
-            <p><span>事实</span>{{step.fact}}</p>
-            <p><span>推断</span>{{step.inference}}</p>
-          </div>
-        </div>
-        <p v-else class="block-empty">暂无分层研判记录。</p>
-      </section>
-      <section class="dossier-block">
-        <h3>候选解释</h3>
-        <table v-if="dossier.comparisons?.length" class="candidate-table">
-          <thead><tr><th>方向</th><th>支持依据</th><th>尚缺核对</th></tr></thead>
-          <tbody>
-            <tr v-for="row in dossier.comparisons" :key="row.direction">
-              <th scope="row">{{row.direction}}</th>
-              <td>{{row.support}}</td>
-              <td>{{row.missing}}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else class="block-empty">暂无候选解释记录。</p>
-      </section>
-      <section class="dossier-block">
-        <h3>尚未确认的问题</h3>
-        <ul v-if="openQuestions.length" class="open-questions">
-          <li v-for="question in openQuestions" :key="question">{{question}}</li>
-        </ul>
-        <p v-else class="block-empty">暂无待确认问题记录。</p>
-        <p class="limit-note">以上未确认问题不作为结论；现场核对后再更新判断。</p>
-      </section>
+      <MarkdownContent :content="dossier.analysisMarkdown"/>
       <div class="quick-links" aria-label="返回概览">
-        <button type="button" @click="goTab('事项概览')">← 返回事项概览（恢复阅读位置）</button>
+        <button type="button" @click="goTab('事项概览')">返回事项概览</button>
       </div>
     </template>
     <!-- 证据资料：数据快照、观测节点趋势、证据链、计划来源、人员反馈与决定 -->
     <template v-else>
+      <MarkdownContent :content="dossier.evidenceMarkdown"/>
       <section class="dossier-block">
-        <h3>数据快照</h3>
+        <h3>发生时数据快照</h3>
         <table v-if="dossier.snapshots?.length" class="candidate-table">
           <thead><tr><th>测点/项目</th><th>数值</th><th>参考口径</th><th>说明</th><th>来源</th></tr></thead>
           <tbody>
@@ -146,13 +91,16 @@
           </tbody>
         </table>
       </section>
+      <SituationTimeline v-if="dossier.timeline?.length" :entries="dossier.timeline" expanded/>
       <section class="dossier-block">
         <h3>人员补充与已有决定</h3>
+        <p v-if="issue.history">{{issue.at}} · {{issue.actor}}：{{issue.reason}}</p>
         <p v-if="store.todoCreated[issue.id]">轮机长已派发给 {{store.assignments[issue.id]?.owner}}，当前处于{{store.cases[issue.id]?.stages[store.progress[issue.id]]?.label}}阶段。</p>
         <p v-else-if="store.ignoredSuggestions[issue.id]">本次不采纳：{{store.ignoredSuggestions[issue.id].reason}}</p>
         <p v-else>尚未派发处理任务。</p>
         <p v-for="record in store.assignmentRecords[issue.id]||[]" :key="'assign'+record.at">{{record.at}} · {{record.assignedBy}}指定{{record.owner}}：{{record.scope}}</p>
         <p v-for="record in store.dossierNotes[issue.id]||[]" :key="record.id">{{record.at}} · {{record.text}}</p>
+        <template v-for="(entry,index) in store.stageHistory[issue.id]||[]" :key="index"><p><b>{{entry.at}} · {{entry.title}}</b></p><p v-for="record in entry.records||[]" :key="record.label">{{record.label}}：{{record.result}}；{{record.note||'未附备注'}}</p></template>
       </section>
     </template>
   </main>
@@ -160,11 +108,14 @@
 <div v-else class="p2-empty">未找到该事项，请返回态势中心。</div>
 </template>
 <script setup>
+import SituationTimeline from './SituationTimeline.vue'
 import {computed,nextTick,ref} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {issueCatalog} from '@/mock/captainWorkbench'
-import issueDossiers from '@/mock/issueDossiers.json'
+import {storyDossier} from '@/mock/fourStoryWorkflow'
+import MarkdownContent from './MarkdownContent.vue'
+import HealthTrackingPanel from './HealthTrackingPanel.vue'
 import InquiryMessage from './messages/InquiryMessage.vue'
 import assignmentTemplate from '@/message-flows/task-assignment.json'
 import BackButton from './BackButton.vue'
@@ -172,8 +123,8 @@ import TaskAssignment from './TaskAssignment.vue'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
 const tabs=['事项概览','研判分析','证据资料'],active=ref(tabs[0]),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
 const rootRef=ref(null),overviewScroll=ref(0)
-const issue=computed(()=>issueCatalog.find(item=>item.id===props.scenario))
-const dossier=computed(()=>issueDossiers[props.scenario]||{})
+const issue=computed(()=>issueCatalog.find(item=>item.id===props.scenario&&(!item.latent||store.unlockedRecommendations[item.id])))
+const dossier=computed(()=>storyDossier(store,props.scenario))
 const openQuestions=computed(()=>{
   const items=(dossier.value.comparisons||[]).map(row=>row.missing).filter(Boolean)
   return [...new Set(items)]
@@ -191,8 +142,8 @@ function trendPoints(series){
   return values.map((value,index)=>({x:padLeft+step*index,y:padTop+(1-(value-min)/span)*(height-padTop-padBottom),v:value,label:series.labels[index]??''}))
 }
 function openTask(){store.selectTodo(issue.value.id);router.push({path:'/event',query:{todo:issue.value.id}})}
-const falseAlarmInquiry=computed(()=>({...assignmentTemplate.falseAlarm,id:'false-alarm-'+props.scenario,status:feedback.value?'submitted':'pending',values:{reason:falseAlarmReason.value},submitLabel:'提交误报反馈',receiptText:'原报警继续保留，尚未确认解除。'}))
-function reportFalseAlarm(payload){const reason=payload.values.reason;if(!store.registerDossierNote(issue.value.id,'可能误报反馈（待核对）：'+reason))return;falseAlarmReason.value=reason;feedback.value=true;falseAlarmOpen.value=false}
+const falseAlarmInquiry=computed(()=>({...assignmentTemplate.falseAlarm,text:'确认误报依据',hint:'记录现场核对与判断依据。本次处置将结束，原报警和快照仍保留。',id:'false-alarm-'+props.scenario,status:feedback.value?'submitted':'pending',values:{reason:falseAlarmReason.value},submitLabel:'确认误报并留档',receiptText:'本次误报决定及依据已保存，原始报警仍可回查。'}))
+function reportFalseAlarm(payload){const reason=payload.values.reason;if(!store.confirmFalseAlarm(issue.value.id,reason))return;falseAlarmReason.value=reason;feedback.value=true;falseAlarmOpen.value=false}
 async function showSection(section){if(section==='decision'){active.value='事项概览';await nextTick();rootRef.value?.querySelector('.next-step')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
 defineExpose({showSection})
 defineEmits(['back'])
@@ -207,6 +158,7 @@ defineEmits(['back'])
 .captain-detail nav .active{color:#936821;border-bottom:2px solid #b49359}
 .captain-detail main{width:100%;min-width:0;max-width:none}.captain-detail main>*{min-width:0;box-sizing:border-box}.captain-detail p,.captain-detail li,.captain-detail td,.captain-detail th{overflow-wrap:break-word;word-break:normal}
 .captain-detail h3{font-size:15px;color:#30445d;margin:20px 0 6px}
+.captain-detail :deep(.markdown-content){max-width:68em;font-size:15px;line-height:1.9}
 .captain-detail p{margin:6px 0}
 .captain-detail textarea{display:block;box-sizing:border-box;width:100%;min-height:90px;border:1px solid #dce3ec;padding:12px;font:inherit;margin:8px 0}
 .captain-detail form{margin:12px 0}
@@ -240,7 +192,7 @@ defineEmits(['back'])
 .open-questions{margin:8px 0;padding-left:20px}
 .open-questions li{margin:5px 0}
 .block-empty{font-size:13px;color:#8593a5;background:#f7f9fc;border:1px dashed #d9e3ef;border-radius:6px;padding:10px 14px}
-.series-block{border:1px solid #e4eaf1;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff}
+.series-block{border:0;border-bottom:1px solid #e4eaf1;border-radius:0;padding:12px 0;margin:10px 0;background:#fff}
 .series-block header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:0 0 6px}
 .series-block header b{color:#30445d;font-size:13px}
 .series-block header span{color:#68788e;font-size:12px}

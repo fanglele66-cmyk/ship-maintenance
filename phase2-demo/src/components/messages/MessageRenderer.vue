@@ -8,6 +8,7 @@
       <SceneMessage v-else-if="['dailyBrief','notice','report'].includes(type)" :message="message" :daily="daily" :expanded="expanded" :disabled-actions="disabledActions" @action="$emit('action',$event)" />
       <FeedbackRecordMessage v-else-if="type==='feedbackRecord'" :message="message" @confirm-record="$emit('confirm-record')" />
       <InquiryMessage v-else-if="type==='inquiry'" :message="message" @submit-inquiry="$emit('submit-inquiry',$event)" @update-inquiry="$emit('update-inquiry',$event)" />
+      <MarkdownContent v-else-if="message.role==='assistant'" :content="message.text||''"/>
       <p v-else>{{ message.text }}</p>
       <slot name="actions" />
       <small v-if="!daily">{{ message.at }}</small>
@@ -20,6 +21,7 @@ import SceneMessage from './SceneMessage.vue'
 import TaskReceiptMessage from './TaskReceiptMessage.vue'
 import FeedbackRecordMessage from './FeedbackRecordMessage.vue'
 import InquiryMessage from './InquiryMessage.vue'
+import MarkdownContent from '../MarkdownContent.vue'
 import { messageType } from '@/message-flows/resolveMessageFlow'
 const props=defineProps({message:{type:Object,required:true},expanded:Boolean,disabledActions:{type:Array,default:()=>[]}})
 defineEmits(['action','confirm-record','submit-inquiry','update-inquiry'])

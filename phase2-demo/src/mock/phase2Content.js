@@ -1,4 +1,5 @@
 import additionalScenarios from './additionalScenarios.json'
+import {workflowCases,workflowDossiers} from './fourStoryWorkflow.js'
 import { maintenanceProposalScene } from './phase2SituationContent'
 import { mockEvents } from './events'
 
@@ -45,7 +46,9 @@ const faultSensors = mockEvents[0].snapshot.sensors.map((s,i)=>{const start=s.tr
 faultSensors[2].trendData=faultSensors[0].trendData.map((p,i)=>({...p,value:Number((p.value-faultSensors[1].trendData[i].value).toFixed(2))}))
 function sensor(id,nameEn,nameCn,unit,values,normalRange){return {id,nameEn,nameCn,name:nameCn,unit,value:values.at(-1),normalRange,trendData:values.map((value,i)=>({time:`09-${String(23+Math.floor(i/4)).padStart(2,'0')} ${String(i%4*6).padStart(2,'0')}:00`,value}))}}
 for(const item of additionalScenarios){overviewReports[item.id]=item.report;causeContent[item.id]=item.cause}
+for(const item of Object.values(workflowCases)){overviewReports[item.id]=item.report;if(item.cause)causeContent[item.id]=item.cause}
 export function scenarioSensors(id, stageId='event') {
+  if(workflowCases[id])return workflowDossiers[id].series.map((series,index)=>({id:id+'-'+index,name:series.name,nameCn:series.name,nameEn:series.name,unit:series.unit,value:series.values.at(-1),normalRange:series.scope,trendData:series.values.map((value,i)=>({time:series.labels[i],value}))}))
   const extra=additionalScenarios.find(item=>item.id===id)
   if(id==='main-warning')return [{id:'warn-oil',name:'机油压力',nameCn:'机油压力',nameEn:'机油压力',value:.24,unit:'MPa',trendData:[{time:'前2班',value:.31},{time:'前1班',value:.27},{time:'本班',value:.24}]},{id:'warn-delta',name:'滤器压差',nameCn:'滤器压差',nameEn:'滤器压差',value:.07,unit:'MPa',trendData:[{time:'前2班',value:.03},{time:'前1班',value:.05},{time:'本班',value:.07}]}]
   if(id==='air-delivery')return [{id:'air-time',name:'加载时间',nameCn:'加载时间',nameEn:'加载时间',value:128,unit:'s',trendData:[{time:'前2班',value:95},{time:'前1班',value:112},{time:'本班',value:128}]},{id:'air-pressure',name:'供气压力',nameCn:'供气压力',nameEn:'供气压力',value:0.82,unit:'MPa',trendData:[{time:'前2班',value:.82},{time:'前1班',value:.82},{time:'本班',value:.82}]}]
@@ -69,6 +72,7 @@ export function attentionScene(id, monitorStep=0) {
 }
 
 export function stageScene(id, stage, observationReady=false) {
+  if(workflowCases[id])return {title:stage.title,paragraphs:[{label:'当前结论',text:stage.summary},{label:'依据与边界',text:stage.evidence?.join('；')||workflowCases[id].report.conclusion},{label:'下一步',text:stage.kind==='check'?'按各项目记录实际结果，提交后再根据证据接续。':stage.kind==='work'?'记录各项实际措施、完成情况与原异常验收，不自动认定全部解决。':workflowCases[id].report.human}]}
   const report=overviewReports[id==='drift'&&stage.id==='event'?'driftEvent':id]
   if(stage.kind==='overview')return {title:stage.label,paragraphs:[{label:'初判结论',text:report.conclusion},{label:'判断依据',text:report.basis},{label:'下一步建议',text:report.human}],question:stage.id==='event'?'要先查看数据趋势，还是结合候选原因安排排查？':id==='maintenance'?'现场是否具备检查条件？轴瓦磨损、间隙和备件信息都可以直接补充。':'现场仪表读数是否一致？有无可以复现的异响或振动？'}
   if(stage.kind==='check')return {title:`已进入${stage.label}`,paragraphs:[{label:'本轮任务',text:stage.title},{label:'操作提示',text:`先查看当前${stage.label}项的注意事项，确认后逐步记录现场结果。提交后我会整理反馈并提示下一步。`}],question:id==='drift'&&stage.id==='check'?'请重点确认读数真实性和现场现象；补充证据后再判断异常事件是否成立。':'如有补充、修改或新的现场发现，可以直接告诉我。'}

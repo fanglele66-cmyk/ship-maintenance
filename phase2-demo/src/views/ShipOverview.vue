@@ -53,7 +53,8 @@ const sceneStyle=computed(()=>{const scale=Math.max(width.value/941,height.value
 const devices=computed(()=>{
  const main=deviceStore.devices.find(d=>d.id==='main-engine-1')
  const auxiliary=deviceStore.devices.filter(d=>d.id.startsWith('aux-engine-'))
- const signal=auxiliary.some(d=>d.status==='danger')?'danger':auxiliary.some(d=>d.status==='warning')?'warning':'normal'
+ const signals=auxiliary.map(d=>captainDeviceSignal(store,d.id))
+ const signal=signals.includes('danger')?'danger':signals.includes('warning')?'warning':'normal'
  return [...(main?[{...main,signal:captainDeviceSignal(store,main.id)}]:[]),{id:'aux-system',name:'辅机',system:'辅机系统',signal}]
 })
 const markdown=computed(()=>captainAnalysis(store,situationDeviceIds)),updatedAt=ref(new Date())

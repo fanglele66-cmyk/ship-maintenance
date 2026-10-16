@@ -14,12 +14,14 @@
   </aside>
 </template>
 <script setup>
+import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
 import { initialIssueMessages, issueReply, issueContext } from '@/message-flows/issueSources'
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import sendIcon from '@/assets/figma/send.svg'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { useRouter } from 'vue-router'
 import { observationScene } from '@/mock/phase2Observation'
+import { observationMessages } from '@/message-flows/observationMessages'
 import { useAgentConversations, demoConversations } from '@/composables/useAgentConversations'
 import MessageRenderer from './messages/MessageRenderer.vue'
 import ConversationHistory from './messages/ConversationHistory.vue'
@@ -39,16 +41,16 @@ import { operationAssessment } from '@/mock/phase2SituationContent'
 import deviceProfiles from '@/mock/deviceOverviewProfiles.json'
 import { attentionInquiry } from '@/message-flows/attentionInquiry'
 import { validateInquiry } from '@/message-flows/inquiryFields'
-const props=defineProps({title:{type:String,default:'检修助手'},mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean,deviceId:String,deviceName:String,issueId:String}),emit=defineEmits(['open-device','open-todo','open-item','issue-section']),store=usePhase2DemoStore(),scrollRef=ref(null)
+const props=defineProps({title:{type:String,default:'检修助手'},mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean,planOnly:Boolean,deviceId:String,deviceName:String,issueId:String}),emit=defineEmits(['open-device','open-todo','open-item','issue-section']),store=usePhase2DemoStore(),scrollRef=ref(null)
 const router = useRouter()
 const mode=computed(()=>props.issueId?'issue':props.maintenanceDetail ? 'attention' : props.dossier ? (store.situationObservationId?'observation':'attention') : props.mode==='attention'&&store.situationObservationId?'observation':props.mode==='attention'&&!store.attentionInFocus?'device':props.mode)
 const key=computed(()=>mode.value==='observation'?store.situationObservationId:mode.value==='attention'?store.selectedAttentionId:mode.value==='todo'?store.selectedTodoId:mode.value)
 const advice=useMaintenanceAdviceStore(),workOrders=useEventWorkOrderStore()
 const genericDevice=computed(()=>Boolean(props.deviceId && props.deviceId!=='main-engine-1' && !props.dossier && !props.maintenanceDetail))
-const genericProfile=computed(()=>deviceProfiles[props.deviceId]||{conclusion:'当前没有已建立的异动跟踪，运行判断仅覆盖已采集指标。',basis:'缺少连续趋势和现场核验信息，不能确认未覆盖部位正常。',next:'先查看数据并按值班规程核对现场。'})
+const genericProfile=computed(()=>deviceStoryAssessment(store,props.deviceId))
 const genericReplies=reactive({})
 const genericConversation=computed(()=>[{role:'user',text:`查看${props.deviceName}当前运行情况和建议`},{role:'assistant',kind:'scene',title:props.deviceName+'运行概况',paragraphs:[{label:'当前判断',text:genericProfile.value.conclusion},{label:'判断依据',text:genericProfile.value.basis},{label:'下一步',text:genericProfile.value.next}]},...(genericReplies[props.deviceId]||[])])
-const agentId=computed(()=>props.issueId?'issue:'+props.issueId:genericDevice.value?'device:'+props.deviceId:props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:1'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
+const agentId=computed(()=>props.planOnly?'routine-plan:maintenance':props.issueId?'issue:'+props.issueId:genericDevice.value?'device:'+props.deviceId:props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:1'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
 const sessions=useAgentConversations(agentId,id=>props.issueId?[]:demoConversations(id))
 const draft=sessions.draft
 const inquiryDrafts=reactive({}),inquiryErrors=reactive({})
@@ -119,15 +121,10 @@ function openLinkedTodo(){store.selectTodo(key.value);router.push({path:'/event'
 const shipConversation = computed(() => [shipOverviewConversation(store), ...messages.value.filter(message => message.role === 'user' || message.shipFollowup)])
 const deviceConversation = computed(() => [
  {role:'user',text:'查看主机当前运行情况和需要关注的事项'},
- {role:'assistant',kind:'scene',title:'主机运行研判',paragraphs:operationAssessment(store).summary.filter(item=>item.label!=='分析依据').map(item=>({label:item.label,text:item.text})),actions:[...(!store.todoCreated.drift&&!store.ignoredSuggestions.drift?[{id:'item:drift',label:'了解3号缸检查依据'}]:[]),{id:'item:maintenance',label:'了解轴承提前检查建议'}]},
+ {role:'assistant',kind:'scene',title:'主机运行研判',paragraphs:operationAssessment(store).summary.filter(item=>item.label!=='分析依据').map(item=>({label:item.label,text:item.text})),actions:[...(!store.todoCreated['main-warning']&&!store.ignoredSuggestions['main-warning']?[{id:'item:main-warning',label:'了解润滑供油预警依据'}]:[]),{id:'item:maintenance',label:'了解轴承提前检查建议'}]},
  ...deviceConversationRecords(messages.value)
 ])
-const observationConversation=computed(()=>{
-  const id=key.value
-  if(mode.value!=='observation')return[]
-  const records=store.observationRecords[id],target=store.observationTargets[id]
-  return [{role:'assistant',kind:'scene',title:'人工处理完成，转入态势跟踪',demoLabel:'来源事件 · '+store.caseMaterials[id]?.sourceId,at:'处理验收后',paragraphs:[{label:'已确认措施',text:store.cases[id].stages[store.observationIndex(id)-1].title},{label:'观察目标',text:'沿用来源事件的研判依据，比对处理前后同工况数据；持续稳定后自动结束本轮观察，反复时再请求现场核实。'}],actions:[{id:'todo:'+id,label:'回看人工处理记录'}]},...records.flatMap((record,index)=>[...(['abnormal','incomplete'].includes(record.status)?[{role:'user',text:record.note,at:record.label}]:[]),{role:'assistant',kind:'scene',demoLabel:record.day?'每日效果回顾 · 第'+record.day+'日':'处理后首测',at:record.label,...observationScene(id,records.slice(0,index+1),target)}]),...messages.value.filter(message=>message.observationContext&&(!message.text||!records.some(record=>record.note===message.text)))]
-})
+const observationConversation=computed(()=>mode.value==='observation'?observationMessages(store,key.value,messages.value):[])
 const dossierMessages=computed(()=>{
   const dossier=attentionDossier(store,key.value)
   if(!dossier)return []
@@ -141,11 +138,15 @@ const dossierMessages=computed(()=>{
   return [summary,...(currentInquiry.value?[{...currentInquiry.value,submitError:inquiryErrors[currentInquiry.value.id]}]:[]),...replies ]
 })
 const maintenanceMessages=computed(()=>[...maintenanceMessageFlow(store,advice,store.regularMaintenanceInFocus,workOrders.state('maintenance')),...advice.chatMessages.filter(message=>message.conversationId===sessions.agent.value.primaryId)])
-const todoConversation=computed(()=>{const rows=messages.value;const first=rows.findIndex(row=>row.stageId);return rows.slice(Math.max(0,first-1)).filter(row=>!row.observationContext&&!row.title?.startsWith('效果观察')&&!row.text?.startsWith('本轮效果观察已自动结束'))})
-const automaticMessages=computed(()=>props.issueId?initialIssueMessages(props.issueId,store):genericDevice.value?genericConversation.value:props.maintenanceDetail?maintenanceMessages.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='observation'?observationConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?todoConversation.value:messages.value)
+const todoConversation=computed(()=>{const rows=messages.value;const first=rows.findIndex(row=>row.stageId);return rows.slice(Math.max(0,first-1)).filter(row=>!row.observationContext&&!row.title?.startsWith('效果观察')&&!row.text?.startsWith('本轮效果观察已自动结束')).map(row=>row.stageId&&row.kind==='scene'?{...row,expanded:row.stageId===store.currentStage?.id,historical:row.stageId!==store.currentStage?.id}:row)})
+const routineMessages=[{role:'user',text:'查看主机连杆轴承的常规维保计划及提前建议关系'},{role:'assistant',text:'原周期计划当前为1860／2000运行小时，尚余约140小时。提前建议是基于健康变化和窗口的独立评估，未采纳或评估后不提前都不取消原计划。实际执行是否覆盖原项目，以作业范围与现场记录核对，不自动重置全部周期。'}]
+const automaticMessages=computed(()=>props.planOnly?routineMessages:props.issueId?initialIssueMessages(props.issueId,store):genericDevice.value?genericConversation.value:props.maintenanceDetail?maintenanceMessages.value:mode.value==='observation'?observationConversation.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?todoConversation.value:messages.value)
 watch(automaticMessages, value=>{
   const primary=sessions.agent.value.conversations.find(item=>item.id===sessions.agent.value.primaryId)
-  if(props.issueId || props.maintenanceDetail)appendMessages(primary.messages,value)
+  if(props.issueId || props.maintenanceDetail){
+    if(value.some(message=>message.id&&!primary.messages.some(saved=>saved.id===message.id)))primary.messages.forEach(message=>{if(message.kind==='scene'){message.expanded=false;message.historical=true}})
+    appendMessages(primary.messages,value)
+  }
   else primary.messages=value
 }, {immediate:true,deep:true})
 const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
@@ -156,22 +157,23 @@ const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
 const displayedMessages=computed(()=>sessions.active.value.messages)
 watch(()=>sessions.active.value.id,async()=>{if(props.issueId && !sessions.active.value.messages.length){appendMessages(sessions.active.value.messages,initialIssueMessages(props.issueId,store));sessions.touch()}await nextTick();scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight})})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
-const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.device+' · '+issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
+const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
 const placeholder=computed(()=>props.issueId?'询问判断依据、缺失证据或下一步安排…':props.maintenanceDetail?'询问检查依据，或补充现场与安排信息…':props.dossier?'询问当前判断、变化证据或后续安排…':mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
 function send(){
   const text=draft.value.trim();if(!text)return
+  if(props.planOnly){sessions.active.value.messages.push({role:'user',text},{role:'assistant',text:'常规计划按原项目和周期保留。提前评估、实际执行和周期完成是不同记录；可以查看本部件提前建议及人员决定，实际执行后再核对覆盖范围。'});sessions.touch();draft.value='';return}
   if(props.issueId){askIssue(text);draft.value='';return}
   if(genericDevice.value){const rows=genericReplies[props.deviceId] ||= [];rows.push({role:'user',text},{role:'assistant',text:/依据|判断|原因/.test(text)?genericProfile.value.basis:/建议|检查|处理|怎么/.test(text)?genericProfile.value.next:genericProfile.value.conclusion+' '+genericProfile.value.next});draft.value='';return}
   if(props.maintenanceDetail){askMaintenance(text);draft.value='';return}
   const session=sessions.active.value,records=store.logs[key.value]||[],start=records.length
-  if(props.dossier){
+  if(props.dossier&&mode.value!=='observation'){
     const existing=[...displayedMessages.value].reverse().find(message=>message.noteCandidate && !message.noteCandidate.registered)
     if(existing && /^(请)?(把|将)(这|刚才|上一).*(记录|登记|记下)/.test(text)){
       registerMessageNote(existing);draft.value='';return
     }
     const dossier=attentionDossier(store,key.value)
     if(!store.sendR02Message(key.value,text))store.askDossierQuestion(key.value,text,'当前档案判断：'+dossier.conclusion+' 后续观察：'+dossier.tracking.focus+' 新增现场信息可登记到跟踪记录，供后续研判参考。')
-  }else if(mode.value==='device' && (store.deviceDataTopic || /压力|泵组|机体|X向|Y向|振动/.test(text)) && !/维保|1#|3#|4#/.test(text)){
+  }else if(mode.value==='device' && (store.deviceDataTopic || /压力|泵组|机体|X向|Y向|振动/.test(text)) && !/维保|润滑|供油|滤器|1#|3#|4#/.test(text)){
     const topic=/压力|泵组/.test(text)?'stable':/机体|X向|Y向|振动/.test(text)?'vibration-trend':store.deviceDataTopic
     store.deviceDataTopic=topic;store.sendR02Message('device',text,topic)
   }else if(mode.value==='observation')store.sendObservation(text);else if(mode.value==='attention')store.sendAttention(text);else if(mode.value==='todo')store.sendTodo(text);else store.sendSituation(text,mode.value)

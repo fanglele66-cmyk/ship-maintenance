@@ -4,7 +4,7 @@ import {createServer} from 'vite'
 import {createPinia,setActivePinia} from 'pinia'
 import {nextTick} from 'vue'
 test('one shared 30s timer, pause/resume, scenario baselines and auxiliary filtering',async()=>{
- const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  const originalSet=global.setInterval,originalClear=global.clearInterval,originalNow=Date.now
  let callback,delay,cleared=0,now=Date.UTC(2026,9,14,4),store
  try{

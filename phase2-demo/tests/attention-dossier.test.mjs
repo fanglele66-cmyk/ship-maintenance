@@ -4,7 +4,7 @@ import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
 
 test('attention dossier reuses evidence, preserves history and handles all phases',async()=>{
-  const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
   try {
     const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
     const {attentionDossier}=await server.ssrLoadModule('/src/mock/attentionDossier.js')

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
 test('maintenance JSON flow isolates topics and follows shared decisions',async()=>{
- const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try {
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {useMaintenanceAdviceStore}=await server.ssrLoadModule('/src/stores/maintenanceAdviceStore.js')

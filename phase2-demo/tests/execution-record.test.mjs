@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {createServer} from 'vite'
 import {createPinia,setActivePinia} from 'pinia'
 test('shared execution draft validates, records once and waits for comparable data',async()=>{
- const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js');setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   store.createTodo('maintenance');store.progress.maintenance=2;store.selectTodo('maintenance')

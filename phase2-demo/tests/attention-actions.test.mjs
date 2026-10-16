@@ -4,7 +4,7 @@ import { createServer } from 'vite'
 import { createPinia, setActivePinia } from 'pinia'
 
 test('R01 action completion, linked events and post-treatment requirements', async () => {
-  const server = await createServer({ server:{middlewareMode:true,hmr:false,ws:false}, appType:'custom' })
+  const server = await createServer({ optimizeDeps:{noDiscovery:true,include:[]}, server:{middlewareMode:true,hmr:false,ws:false}, appType:'custom' })
   try {
     const {usePhase2DemoStore} = await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
     setActivePinia(createPinia())
@@ -27,7 +27,7 @@ test('R01 action completion, linked events and post-treatment requirements', asy
     store.observationRecords.drift.push({status:'incomplete',day:1})
     assert.equal(store.attentionAction('drift').phase,'处理后观察')
     assert.equal(store.attentionAction('drift').linked,true,'same post-treatment item also requires human action')
-    assert.equal(store.effectObservations.filter(item=>item.id==='drift').length,1)
+    assert.equal(store.effectObservations.filter(item=>item.id==='drift').length,0)
     store.resetDemo();store.createTodo('fault')
     assert.deepEqual({...store.attentionFeedback},{})
     assert.equal(store.attentionAction('drift').required,true)

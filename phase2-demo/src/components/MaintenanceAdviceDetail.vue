@@ -1,11 +1,11 @@
 <template>
   <div class="maintenance-advice-detail" :class="{'is-standalone':standalone}">
-    <header class="maintenance-advice-heading"><BackButton label="返回维保建议" @click="$emit('back')" /><div><h2>{{ planned?'已有维保安排':item.title }}</h2><p>{{ plan.device }}</p></div><span class="p2-attention-status human">{{ planned?'只读 · 演示安排':advice.status }}</span></header>
+    <header class="maintenance-advice-heading"><BackButton label="返回维保建议" @click="$emit('back')" /><div><h2>{{ planned?'常规维保计划':item.title }}</h2><p>{{ plan.device }}</p></div><span class="p2-attention-status human">{{ planned?plan.status:advice.status }}</span></header>
     <nav v-if="!planned" class="maintenance-tabs" role="tablist" aria-label="维保建议详情内容"><button v-for="tab in tabs" :key="tab" type="button" role="tab" :aria-selected="activeTab===tab" :class="{active:activeTab===tab}" @click="activeTab=tab">{{ tab }}</button></nav>
-    <main class="maintenance-tab-body" :role="planned?undefined:'tabpanel'" :aria-label="planned?'已有维保安排':activeTab">
+    <main class="maintenance-tab-body" :role="planned?undefined:'tabpanel'" :aria-label="planned?'常规维保计划':activeTab">
     <template v-if="planned">
-      <section><h3>已有维保安排</h3><Arrangement :plan="plan" /></section>
-      <button class="p2-secondary" @click="$emit('show-advice')">查看本部件维保建议 →</button>
+      <section><h3>原周期计划</h3><Arrangement :plan="plan" /></section>
+      <button class="p2-secondary" @click="$emit('show-advice')">查看本部件提前维保建议</button>
     </template>
     <template v-else>
       <section v-show="activeTab==='建议概览'"><h3>建议摘要与当前状态</h3><p class="maintenance-summary">{{ report.recommendation }}</p><p>{{ report.conclusion }}</p><p class="maintenance-required"><b>当前需要你：</b>{{ requiredAction }}</p></section>

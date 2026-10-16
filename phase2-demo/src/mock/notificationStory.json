@@ -1,8 +1,8 @@
 {
   "delayMs": 18000,
-  "issueId": "air-delivery",
+  "issueId": "aux-health",
   "type": "异动跟踪",
-  "device": "空压机",
-  "title": "加载时间持续延长",
-  "summary": "近3班加载时间持续延长，建议查看变化依据，决定是否安排现场核实。"
+  "device": "2号辅机",
+  "title": "排温健康跟踪需补充现场信息",
+  "summary": "多个可比窗口的偏离持续存在，建议查看原跟踪记录，决定是否安排读数与工况核实。"
 }

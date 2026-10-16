@@ -25,8 +25,8 @@
     </button>
     <div ref="situationBodyRef" class="situation-body">
       <div class="situation-content">
-        <CaptainIssueDetail ref="issueDetailRef" v-if="issueId" :key="issueId" :scenario="issueId" @back="returnFromIssue"/><AirAttentionDetail v-else-if="attentionId==='air-delivery'" @back="returnToAir"/><AttentionDossier v-else-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
-        <MaintenanceAdviceDetail v-else-if="maintenanceId" standalone :planned="maintenanceId==='planned'" @back="returnToMaintenance" @show-advice="router.push('/situation/maintenance/maintenance')" @show-arrangements="router.push('/situation/maintenance/planned')" @open-event="openMaintenanceEvent" @open-observation="router.push('/situation/attention/maintenance')" />
+        <CaptainIssueDetail ref="issueDetailRef" v-if="issueId" :key="issueId" :scenario="issueId" @back="returnFromIssue"/><SituationObservation v-else-if="attentionId&&isWorkflow(attentionId)&&!demoStore.cases[attentionId]?.trackingOnly" :key="attentionId" :scenario="attentionId" @back="returnToAttention"/><AirAttentionDetail v-else-if="attentionId==='air-delivery'" @back="returnToAir"/><AttentionDossier v-else-if="attentionId" :key="attentionId" :scenario="attentionId" @back="returnToAttention" @request-inquiry="focusDossierInquiry" />
+        <MaintenanceAdviceDetail v-else-if="maintenanceId" standalone :planned="maintenanceId==='planned'" @back="returnToMaintenance" @show-advice="router.push('/situation/issue/maintenance')" @show-arrangements="router.push('/situation/maintenance/planned')" @open-event="openMaintenanceEvent" @open-observation="router.push('/situation/attention/maintenance')" />
         <!-- Layer 1: Ship Overview -->
         <div v-show="!attentionId && !maintenanceId && !issueId && currentLayer === 1" class="layer" :class="layerClass(1)">
           <ShipOverview @select-device="handleDeviceClick" @select-item="openDemoItem" />
@@ -34,7 +34,7 @@
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
         <div v-if="!attentionId && !maintenanceId && !issueId && currentLayer === 2" class="layer" :class="layerClass(2)">
-          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-sensor="handleSensorClick" @back="goToLayer(1)">
+          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @back="goToLayer(1)">
             <template #data>
               <SensorSimulationControls/>
               <div class="device-data-toolbar">
@@ -77,7 +77,7 @@
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant :title="issueId ? 'AI事项助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <Phase2Assistant :title="issueId ? 'AI事项助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :plan-only="maintenanceId==='planned'" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition></template>
     </div>
@@ -95,6 +95,8 @@
 <script setup>
 import {lazyPane} from '@/components/lazyPane'
 import {issueCatalog} from '@/mock/captainWorkbench'
+import {isWorkflow} from '@/mock/fourStoryWorkflow'
+const SituationObservation=lazyPane(()=>import('@/components/SituationObservation.vue'))
 const CaptainIssueDetail=lazyPane(()=>import('@/components/CaptainIssueDetail.vue'))
 const AirAttentionDetail=lazyPane(()=>import('@/components/AirAttentionDetail.vue'))
 import { ref, computed, reactive, provide, nextTick, watch, onActivated, onMounted, onUnmounted } from 'vue'
@@ -377,6 +379,7 @@ function goToLayer(layer) {
 }
 
 function handleDeviceClick(device) {
+  if(!device)return
   sensorSearchQuery.value = ''
   sensorView.value = 'list'
   selectedDeviceId.value = device.id
@@ -389,6 +392,7 @@ function handleDeviceClick(device) {
 }
 
 const deviceSituationRef = ref(null)
+watch(()=>route.query.device,id=>{if(id){const device=id==='aux-system'?{id:'aux-system',name:'辅机'}:deviceStore.getDeviceById(id);if(device)handleDeviceClick(device)}},{immediate:true})
 watch([attentionId,maintenanceId], async ([id, maintenance]) => {
   if(maintenance) { demoStore.clearObservationFocus();demoStore.selectAttention('maintenance');demoStore.attentionInFocus=true;demoStore.regularMaintenanceInFocus=maintenance==='planned';return }
   demoStore.regularMaintenanceInFocus=false
