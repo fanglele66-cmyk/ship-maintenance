@@ -194,6 +194,12 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       if(id==='bearing-health')unlockedRecommendations.maintenance=true
       return true
     }
+    if(cases[id]&&healthTracks.some(track=>track.requestId===id)){
+      // A retained health-track link may be opened before it enters the list.
+      // Activate only this record; future maintenance still needs its evidence.
+      unlockedRecommendations[id]=true
+      return true
+    }
     if(!realCaseFor(id)||!cases[id])return false
     unlockedRecommendations[id]=true
     return true
