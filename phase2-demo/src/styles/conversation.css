@@ -14,6 +14,7 @@
 .p2-inquiry-field.is-boolean .p2-inquiry-error { grid-column:1 / -1; }
 .p2-inquiry-field input:focus-visible,.p2-inquiry-field textarea:focus-visible,.p2-inquiry-field select:focus-visible { outline:2px solid #cbb58e; outline-offset:1px; }
 .p2-inquiry-required,.p2-inquiry .p2-inquiry-error { color:#b23b36; font-size:12px; }
+.p2-inquiry .p2-inquiry-error-summary { margin:0; padding:10px 12px; border:1px solid #efc5c2; border-radius:6px; background:#fff5f4; color:#a2322d; font-size:13px; }
 .p2-inquiry button { background:#1a1c1f; color:white; border:0; border-radius:6px; padding:10px 12px; font:inherit; cursor:pointer; }
 .p2-inquiry fieldset:disabled { opacity:.55; }
 .p2-inquiry-receipt { margin:0; }

@@ -7,7 +7,7 @@
       <div class="app-content">
         <router-view v-slot="{ Component, route }">
           <transition name="fade-slide" mode="out-in">
-            <KeepAlive>
+            <KeepAlive :key="viewRevision">
               <component :is="Component" :key="route.name" />
             </KeepAlive>
           </transition>
@@ -19,9 +19,17 @@
 </template>
 
 <script setup>
+import { ref, onBeforeUnmount } from 'vue'
 import {ElConfigProvider} from 'element-plus'
 import AppNav from '@/components/AppNav.vue'
 import AppHeader from '@/components/AppHeader.vue'
+import { installDevViewRecovery } from '@/utils/devViewRecovery'
+
+const viewRevision=ref(0)
+if(import.meta.hot){
+  const stopRecovery=installDevViewRecovery(import.meta.hot,()=>{viewRevision.value++})
+  onBeforeUnmount(stopRecovery)
+}
 </script>
 
 <style scoped>
