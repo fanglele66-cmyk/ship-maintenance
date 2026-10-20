@@ -15,6 +15,7 @@
 </template>
 <script setup>
 import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
+import {workbenchIssues} from '@/mock/captainWorkbench'
 import { initialIssueMessages, issueReply, issueContext } from '@/message-flows/issueSources'
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import sendIcon from '@/assets/figma/send.svg'
@@ -218,7 +219,7 @@ function askMaintenance(text){
 }
 function askIssue(text){const session=sessions.active.value;session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text}, {...issueReply(props.issueId,text,store),id:session.id+':reply:'+session.messages.length});sessions.touch()}
 function runDemoAction(id){
- if(props.issueId){if(id==='issue:ask:evidence')askIssue('还需核实哪些信息？');else if(id==='issue:ask:next')askIssue('下一步如何安排？');else if(id.startsWith('issue:section:'))emit('issue-section',id.slice('issue:section:'.length));else if(id==='issue:task'&&store.todoCreated[props.issueId]){store.selectTodo(props.issueId);router.push({path:'/event',query:{todo:props.issueId}})}return}
+ if(props.issueId){if(id==='issue:ask:evidence')askIssue('还需核实哪些信息？');else if(id==='issue:ask:next')askIssue('下一步如何安排？');else if(id.startsWith('issue:section:'))emit('issue-section',id.slice('issue:section:'.length));else if(id==='issue:task'){const taskId=workbenchIssues(store).find(item=>item.id===props.issueId)?.taskId||props.issueId;if(store.todoCreated[taskId]){store.selectTodo(taskId);router.push({path:'/event',query:{todo:taskId}})}}return}
 
  if(props.maintenanceDetail && id.startsWith('maintenance:')){
   if(id.startsWith('maintenance:ask:')){const topic=id.split(':').at(-1);askMaintenance({basis:'为什么建议提前检查？',evidence:'需要补齐哪些检查证据？',arrangement:'已有安排是否冲突？'}[topic]);return}

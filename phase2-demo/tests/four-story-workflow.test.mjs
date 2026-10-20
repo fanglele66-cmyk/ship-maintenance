@@ -8,12 +8,12 @@ test('four scenario journeys preserve evidence and route every valid outcome',as
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {workbenchIssues,activeWorkbenchIssues}=await server.ssrLoadModule('/src/mock/captainWorkbench.js')
-  function fresh(id){setActivePinia(createPinia());const store=usePhase2DemoStore();if(id){store.createTodo(id);store.selectTodo(id);store.advanceTodo(id)}return store}
+  function fresh(id){setActivePinia(createPinia());const store=usePhase2DemoStore();if(id){store.unlockedRecommendations[id]=true;store.createTodo(id);store.selectTodo(id);store.advanceTodo(id)}return store}
   function feedback(store,id,values){return store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:'现场记录 '+i,attachments:['记录'+i+'.png']}))}
   function execute(store,id,overrides={}){const form=store.executionInquiry(id);return store.confirmExecutionRecord(id,form.id,{...Object.fromEntries(store.currentStage.tasks.map((_,i)=>['task'+i,'已完成'])),equipment:store.cases[id].device,measures:'按现场发现完成本轮处置',executedAt:'2026-10-14T10:00',acceptance:'已记录现场复测',completion:'completed',verification:'resolved',comparable:'available',...overrides})}
   await t.test('only the four current requests are active; historical decisions are retained',()=>{
-   const store=fresh();assert.deepEqual(activeWorkbenchIssues(store).map(i=>i.type),['报警事件','预警事件','异动跟踪','维保建议']);assert.equal(store.visibleTodos.length,0)
-   assert.equal(workbenchIssues(store).filter(i=>i.history&&i.state==='已闭环').length,2)
+   const store=fresh();assert.deepEqual(activeWorkbenchIssues(store).map(i=>i.type),['报警事件','预警事件','异动跟踪','异动跟踪']);assert.equal(store.visibleTodos.length,0)
+   assert.equal(workbenchIssues(store).filter(i=>i.history&&i.state==='已闭环').length,1)
   })
   for(const values of [['发现异常','未见异常'],['未见异常','发现异常'],['发现异常','发现异常']])await t.test('cooling repair scope follows '+values.join('/'),()=>{
    const store=fresh('fault');const result=store.advanceTodo('fault',feedback(store,'fault',values));assert.equal(result.advanced,true)

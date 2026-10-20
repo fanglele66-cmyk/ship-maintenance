@@ -7,7 +7,7 @@ test('R06 event identity, sources, business timestamps and closure boundaries',a
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
+  setActivePinia(createPinia());const store=usePhase2DemoStore();for(const id of ['fault','aux-health','maintenance'])store.unlockedRecommendations[id]=true;store.createTodo('fault')
   assert.equal(relatedEvents(store).length,1);assert.equal(relatedEvents(store)[0].source,null)
   const at=store.eventUpdatedAt.fault
   store.selectTodo('fault');store.closeTodo();store.sendSituation('是不是滤器堵了？','device')
@@ -19,7 +19,7 @@ test('R06 event identity, sources, business timestamps and closure boundaries',a
   assert.equal(relatedEvents(store).find(e=>e.id==='aux-health').source.type,'异动跟踪')
   assert.notEqual(relatedEvents(store).find(e=>e.id==='aux-health').updatedAt,'更新时间未同步')
   store.createTodo('maintenance');assert.equal(relatedEvents(store).length,3)
-  assert.equal(relatedEvents(store).find(e=>e.id==='maintenance').source.type,'维保建议')
+  assert.equal(relatedEvents(store).find(e=>e.id==='bearing-health').source.type,'异动跟踪')
   store.progress.fault=store.observationIndex('fault')
   store.observationRecords.fault.push({label:'首测',day:0,status:'normal',values:[79.1,86.5]},{label:'第1日',day:1,status:'normal',values:[79.1,86.5]})
   store.completeObservation('fault')
@@ -31,7 +31,7 @@ test('R06 event identity, sources, business timestamps and closure boundaries',a
   const canonical={...store,eventStatus:{fault:'closed'}}
   assert.equal(relatedEvents(canonical).find(e=>e.id==='fault').ended,true)
   assert.equal(relatedEvents(canonical).filter(e=>!e.ended).length,2)
-  store.resetDemo();store.createTodo('fault');assert.equal(relatedEvents(store).length,1)
+  store.resetDemo();store.unlockedRecommendations.fault=true;store.createTodo('fault');assert.equal(relatedEvents(store).length,1)
   assert.ok(store.eventUpdatedAt.fault);assert.equal(store.eventUpdatedAt.drift,undefined)
  }finally{await server.close()}
 })

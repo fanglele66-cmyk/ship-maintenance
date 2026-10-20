@@ -34,7 +34,7 @@
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
         <div v-if="!attentionId && !maintenanceId && !issueId && currentLayer === 2" class="layer" :class="layerClass(2)">
-          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @back="goToLayer(1)">
+          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @open-data="sensorView='list'" @back="goToLayer(1)">
             <template #data>
               <SensorSimulationControls/>
               <div class="device-data-toolbar">
@@ -95,6 +95,7 @@
 <script setup>
 import {lazyPane} from '@/components/lazyPane'
 import {issueCatalog} from '@/mock/captainWorkbench'
+import {resolveIssueNavigation} from '@/mock/issueRelationships'
 import {isWorkflow} from '@/mock/fourStoryWorkflow'
 const SituationObservation=lazyPane(()=>import('@/components/SituationObservation.vue'))
 const CaptainIssueDetail=lazyPane(()=>import('@/components/CaptainIssueDetail.vue'))
@@ -224,6 +225,8 @@ const compactFloatStyle = computed(() => {
     const safeRight = panelWidth + 32
     if (!hasCustomCompactFloatPos.value || right < safeRight) right = safeRight
   }
+  right = Math.max(8, Math.min(right, windowWidth.value - COMPACT_FLOAT_SIZE - 8))
+  bottom = Math.max(8, Math.min(bottom, windowHeight.value - COMPACT_FLOAT_SIZE - 8))
   return { right: `${right}px`, bottom: `${bottom}px` }
 })
 
@@ -422,6 +425,8 @@ async function returnToMaintenance() {
 function openMaintenanceEvent(){demoStore.selectTodo('maintenance');router.push({path:'/event',query:{todo:'maintenance'}})}
 onActivated(async () => { const id=route.query.observation; if(id && demoStore.isTaskHandled(id)){openDemoDevice();await nextTick();deviceSituationRef.value?.openObservation(id)} })
 async function openDemoItem(id) {
+  const target=resolveIssueNavigation(id)
+  if(target.id!==id){await router.push({path:'/situation/issue/'+target.id,query:{tab:target.tab,recommendation:target.recommendationId}});return}
   if(issueCatalog.some(i=>i.id===id)&&!demoStore.todoCreated[id]){await router.push('/situation/issue/'+id);return}
   if(id==='fault'){demoStore.selectTodo(id);await router.push({path:'/event',query:{todo:id}});return}
   await router.push(id==='maintenance'?'/situation/maintenance/maintenance':'/situation/attention/'+id)

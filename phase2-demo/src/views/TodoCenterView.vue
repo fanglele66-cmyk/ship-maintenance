@@ -18,6 +18,7 @@
   </div>
 </template>
 <script setup>
+import {isMaintenanceWorkflow} from '@/mock/issueRelationships'
 import FormSelect from '@/components/forms/FormSelect.vue'
 import {issueCatalog} from '@/mock/captainWorkbench'
 import StreamingMarkdown from '@/components/StreamingMarkdown.vue'
@@ -31,7 +32,7 @@ const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),query=ref('
 const owners=computed(()=>[...new Set(store.taskPortfolio.map(t=>store.assignments[t.id]?.owner||t.owner).filter(Boolean))])
 function closed(todo){return store.isTaskHandled(todo.id)}
 function cardTitle(todo){return todo.id==='drift'&&store.progress.drift>=2?todo.eventTitle:todo.initialTitle}
-function cardType(todo){return issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
+function cardType(todo){return isMaintenanceWorkflow(todo)?'异动跟踪 · 维保评估任务':issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
 function summary(todo){return store.completedTasks[todo.id]?.reason||(closed(todo)?'实际措施与现场验收已提交，持续效果与最终闭环在设备态势接续。':todo.stages[store.progress[todo.id]].summary)}
 
 const todoMarkdown=computed(()=>{

@@ -1,19 +1,25 @@
 import fixtures from './fourStoryFixtures.json' with { type: 'json' }
-import {realWorkflowCases,realHealthTracks,assessRealCase} from './realCaseAdapter.js'
-const allCases=[...fixtures.cases.map(item=>({...item,latent:true,legacyScenario:true})),...realWorkflowCases]
+import {realWorkflowCases,assessRealCase} from './realCaseAdapter.js'
+import {healthTrackingSources,trackingContainerCases} from './healthTrackingSources.js'
+import {isMaintenanceWorkflow,parentIssueId,issueTypeNames,maintenanceRecommendations} from './issueRelationships.js'
+const allCases=[...fixtures.cases.map(item=>({...item,latent:true,legacyScenario:true})),...realWorkflowCases,...trackingContainerCases].map(item=>
+  isMaintenanceWorkflow(item)?{...item,cardType:'异动跟踪',workflowKind:'maintenance',parentIssueId:parentIssueId(item.id)}:item)
 
 import {healthStoryMarkdown,storyTimeline} from './storyRecords.js'
 
 // Fixtures describe product scenarios, not a diagnostic or maintenance rule engine.
 export const workflowCases = Object.fromEntries(allCases.map(item => [item.id, item]))
 export const workflowIds = Object.keys(workflowCases)
-export const healthTracks = [...fixtures.tracking,...realHealthTracks]
-export const historicalDecisions = fixtures.history
+export const healthTracks = healthTrackingSources
+export const historicalDecisions = fixtures.history.map(item=>item.type==='维保建议'
+  ?{...item,type:'异动跟踪',recordKind:'maintenance-decision',parentIssueId:'bearing-health'}:item)
 export const isWorkflow = id => Boolean(workflowCases[id])
-const types = ['报警事件', '预警事件', '异动跟踪', '维保建议']
-export const workflowIssues = allCases.map(item => ({
+const types = issueTypeNames
+export const workflowIssues = allCases.filter(item=>!isMaintenanceWorkflow(item)).map(item => ({
   id: item.id, deviceId: item.deviceId, device: item.device.split(' · ')[0], type: item.cardType,
   rank: types.indexOf(item.cardType), title: item.initialTitle, summary: item.report.conclusion,latent:Boolean(item.latent),
+  isTrackingContainer:Boolean(item.isTrackingContainer), sourceCaseId:item.sourceCaseId,
+  sourceEventId:item.sourceEventId, relatedIssueIds:item.relatedIssueIds||[],
   action: '查看详情', evidence: item.stages[0].evidence, limit: item.cardType==='报警事件'?'报警表明测点越限，尚不能确定唯一根因；现场读数与采集状态仍需核对。':item.cardType==='预警事件'?'综合预警需要现场印证，尚不能直接确定部件故障或维修范围。':item.trackingOnly?'长期偏离不等于当前故障或剩余寿命下降结论；本次仅补充现场信息，不要求拆机。':'提前评估不等于批准换件；原周期计划保持有效，实际处理范围待确认。',
 }))
 
@@ -47,7 +53,7 @@ export function storyDossier(store,id){
   let update=assessmentMarkdown(assessment)
   if(execution)update+=`\n\n### 实际措施与验证\n\n${execution.values.measures}\n\n${execution.values.acceptance}\n\n${execution.values.completion!=='completed'?'本次工作尚未全部完成。':execution.values.verification==='unresolved'?'作业已完成，原问题仍存在，继续原事件排查。':execution.values.verification!=='resolved'?'作业记录已保存，验收尚未确认。':execution.values.comparable!=='available'?'本次验收已提交，尚缺可比记录，不能生成持续改善结论。':'现场验收已提交，持续效果仍需后续可比记录和人工确认。'}`
   if(store.ignoredSuggestions?.[id]&&!store.todoCreated?.[id])update+=`\n\n### 本次决定\n\n${store.ignoredSuggestions[id].reason}。原来源记录与周期计划继续保留。`
-  if(decision)update+=`\n\n### 已记录的决定\n\n${decision.reason}\n\n${item?.trackingOnly?'本次核实任务结束，原健康记录继续；不代表故障或寿命结论。':item?.cardType==='维保建议'?'原周期项目保留，已做与未做的范围分别登记。':'来源、现场反馈和本次确认保留。'}`
+  if(decision)update+=`\n\n### 已记录的决定\n\n${decision.reason}\n\n${item?.trackingOnly?'本次核实任务结束，原健康记录继续；不代表故障或寿命结论。':isMaintenanceWorkflow(item)?'原周期项目保留，已做与未做的范围分别登记。':'来源、现场反馈和本次确认保留。'}`
   const overview=content.overview||`### 当前结论\n\n${base.conclusion||''}\n\n### 建议\n\n${base.recommendation||''}`
   const analysis=content.analysis||base.steps?.map(step=>`### ${step.title}\n\n${step.fact}\n\n${step.inference}`).join('\n\n')||''
   let series=base.series
@@ -56,7 +62,15 @@ export function storyDossier(store,id){
     series=base.series.map((entry,index)=>({...entry,labels:[...entry.labels,...later.map(node=>node.at)],values:[...entry.values,...later.map(node=>index===0?node.readings.temperature:node.readings.others)]}))
   }
   if(id==='aux-health'&&(store.healthUpdates?.['aux2-health']||assessment))update=healthStoryMarkdown(store,id)
-  return {...base,series,timeline:storyTimeline(store,id),overviewMarkdown:update?update+'\n\n### 起始依据\n\n'+(item?.report?.basis||base.conclusion):overview,analysisMarkdown:(update?update+'\n\n':'')+analysis,evidenceMarkdown:content.evidence||'来源资料及实际反馈按记录保留。',hasUpdate:Boolean(update),currentMarkdown:update||overview}
+  const recommendations=maintenanceRecommendations(store,id)
+  if(item?.isTrackingContainer){
+    const updates=recommendations.map(child=>{
+      const dossier=storyDossier(store,child.id)
+      return `### 观测形成的建议：${child.initialTitle}\n\n${dossier.currentMarkdown}`
+    })
+    if(updates.length)update=updates.join('\n\n')
+  }
+  return {...base,series,maintenanceRecommendations:recommendations,timeline:storyTimeline(store,id),overviewMarkdown:update?update+'\n\n### 起始依据\n\n'+(item?.report?.basis||base.conclusion):overview,analysisMarkdown:(update?update+'\n\n':'')+analysis,evidenceMarkdown:content.evidence||'来源资料及实际反馈按记录保留。',hasUpdate:Boolean(update),currentMarkdown:update||overview}
 }
 export function stageReport(store,id,stage){
   const item=store.cases?.[id]||workflowCases[id]
@@ -142,11 +156,19 @@ export function workflowReply(store,id,text) {
 }
 
 export function deviceStoryAssessment(store,deviceId){
-  const current=realWorkflowCases.filter(item=>item.deviceId===deviceId)
+  const current=allCases.filter(item=>item.realCaseId&&item.deviceId===deviceId&&!isMaintenanceWorkflow(item))
   if(current.length){
-    const active=current.filter(item=>store.eventStatus?.[item.id]!=='closed'&&!store.ignoredSuggestions?.[item.id])
-    const details=current.map(item=>item.initialTitle+'：'+(store.completedTasks?.[item.id]?.reason||store.checkAssessments?.[item.id]?.message||item.report.conclusion))
-    return {conclusion:active.length?'当前展示 0430 二缸报警、0523 控制空气预警、倒车试验跟踪及临修后维保评估，按各事项的发生窗口与本轮反馈分别判断。':'本轮事项均已有决定或闭环，来源资料与处理记录保留。',basis:details.join('\n\n'),next:'优先核对报警与预警的现场依据；倒车试验先核实操纵工况，维保建议分别评估必要性与条件。0523 预警和后续维保同源，不能重复计为两起故障。'}
+    const context={cases:store.cases||workflowCases,unlockedRecommendations:store.unlockedRecommendations,
+      todoCreated:store.todoCreated,ignoredSuggestions:store.ignoredSuggestions,completedTasks:store.completedTasks,
+      executionRecords:store.executionRecords,eventStatus:store.eventStatus,checkAssessments:store.checkAssessments}
+    const active=current.filter(item=>item.isTrackingContainer?maintenanceRecommendations(context,item.id).some(child=>['待决策','已派发'].includes(child.state)):store.eventStatus?.[item.id]!=='closed'&&!store.ignoredSuggestions?.[item.id])
+    const details=current.map(item=>{
+      const child=item.isTrackingContainer?maintenanceRecommendations(context,item.id).at(-1):null
+      const id=child?.id||item.id,execution=store.executionRecords?.[id]?.at(-1)
+      const actual=execution?`实际措施：${execution.values.measures}；验收记录：${execution.values.acceptance}；持续效果按可比观测另行判断。`:''
+      return item.initialTitle+'：'+(actual||store.completedTasks?.[id]?.reason||store.ignoredSuggestions?.[id]?.reason||store.checkAssessments?.[id]?.message||item.report.conclusion)
+    })
+    return {conclusion:active.length?'当前展示 0430 二缸报警、0523 控制空气预警、倒车试验跟踪及临修后健康趋势观测，维保建议作为跟踪内的阶段性结果，按发生窗口与本轮反馈分别判断。':'本轮事项均已有决定或闭环，来源资料与处理记录保留。',basis:details.join('\n\n'),next:'优先核对报警与预警的现场依据；倒车试验先核实操纵工况，维保建议分别评估必要性与条件。0523 预警和后续维保同源，不能重复计为两起故障。'}
   }
 
   if(deviceId==='main-engine-1'){

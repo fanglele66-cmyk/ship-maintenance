@@ -26,3 +26,36 @@ test('one shared 30s timer, pause/resume, scenario baselines and auxiliary filte
   store.configureSimulation({enabled:true,intervalSeconds:30});await nextTick();assert.equal(delay,30000)
  }finally{store?.$dispose();global.setInterval=originalSet;global.clearInterval=originalClear;Date.now=originalNow;await server.close()}
 })
+
+test('every engine topology measurement resolves through the shared store and trend API',async()=>{
+ const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
+ let store
+ try{
+  const {useSensorStore}=await server.ssrLoadModule('/src/stores/sensorStore.js')
+  const {buildCylinderMatrix,sharedSystems,sharedSystemDetail}=await server.ssrLoadModule('/src/mock/deviceComparisonTopology.js')
+  setActivePinia(createPinia());store=useSensorStore()
+  store.configureSimulation({enabled:false});await nextTick()
+  store.setDevice('main-engine-1')
+  const cells=buildCylinderMatrix(store.allSensors).flatMap(row=>row.cells)
+  assert.equal(cells.filter(cell=>cell.available).length,36)
+  const related=sharedSystems.flatMap(system=>sharedSystemDetail(system.id,store.allSensors).readings)
+  const ids=[...new Set([...cells.map(cell=>cell.sensor.id),...related.map(sensor=>sensor.id)])]
+  for(const id of ids){
+   store.selectSensor(id)
+   assert.equal(store.selectedSensor.id,id)
+   assert.ok(store.currentTrendData.length>1)
+   assert.equal(store.currentTrendData.at(-1).value,store.selectedSensor.value)
+   assert.equal(store.currentTrendData.at(-1).timestamp,store.sampledAt)
+   assert.equal(store.getSimulationTrend(id,1).at(-1).value,store.selectedSensor.value)
+  }
+  for(const tag of ['活塞冷却','喷射控制','排气驱动','伺服油系统','控制空气系统']){
+   assert.ok(store.currentSubsystemTags.includes(tag))
+   store.setSubsystem(tag)
+   assert.ok(store.filteredSensors.length>0)
+   assert.ok(store.filteredSensors.every(sensor=>sensor.subsystem===tag))
+  }
+  store.setSimulationBaselines({'main-cyl-1-icu':{value:null}})
+  assert.equal(buildCylinderMatrix(store.allSensors).find(row=>row.id==='icu').cells[0].available,false)
+  assert.ok(store.getSimulationTrend('main-cyl-1-icu',1).every(sample=>sample.value===null))
+ }finally{store?.$dispose();await server.close()}
+})

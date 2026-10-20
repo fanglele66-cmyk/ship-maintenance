@@ -5,6 +5,19 @@
  * - 设备层：主机、锅炉、舵机、空压机 等
  * - 子系统：燃油系统、排温系统、冷却系统 等（隶属于设备）
  */
+// Explicit physical bindings shared by the sensor registry and component topology.
+// Generic s-004 / s-007 readings never stand in for a numbered cylinder.
+export const mainCylinderSensorBindings = Object.fromEntries(
+  [1, 2, 3, 4, 5, 6].map(number => [number, Object.fromEntries(
+    ['exhaust', 'scavenge', 'coolant', 'piston', 'icu', 'vcu'].map(topic => [
+      topic,
+      topic === 'exhaust' && number === 2 ? 's-046'
+        : topic === 'exhaust' && number === 3 ? 's-005'
+          : `main-cyl-${number}-${topic}`,
+    ]),
+  )]),
+)
+
 export const mockSensors = [
   // ==========================
   // 主机 (main-engine-1)

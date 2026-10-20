@@ -6,7 +6,8 @@ test('issue conversations use the selected evidence and never dispatch from chat
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {initialIssueMessages,issueReply}=await server.ssrLoadModule('/src/message-flows/issueSources.js')
-  const store={todoCreated:{},ignoredSuggestions:{},assignments:{}}
+  const {workflowCases}=await server.ssrLoadModule('/src/mock/fourStoryWorkflow.js')
+  const store={todoCreated:{},ignoredSuggestions:{},assignments:{},cases:workflowCases,progress:{},unlockedRecommendations:{fault:true,'main-warning':true,'aux-health':true,maintenance:true}}
   for(const id of ['fault','main-warning','aux-health','maintenance']){
    const messages=initialIssueMessages(id,store)
    assert.deepEqual(messages.map(item=>item.role),['user','assistant'])

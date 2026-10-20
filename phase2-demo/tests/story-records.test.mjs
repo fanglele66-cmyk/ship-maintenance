@@ -11,8 +11,8 @@ test('business records stay coherent across the health chain, task and analysis 
   const {storyDossier,stageReport,workflowCases}=await server.ssrLoadModule('/src/mock/fourStoryWorkflow.js')
   const {initialIssueMessages}=await server.ssrLoadModule('/src/message-flows/issueSources.js')
   const {deviceHistory}=await server.ssrLoadModule('/src/mock/phase2History.js')
-  const fresh=()=>{setActivePinia(createPinia());return usePhase2DemoStore()}
-  const dispatch=(store,id)=>{store.createTodo(id);store.assignTask(id,{...store.defaultAssignment(id),owner:'赵明（三管轮）'});store.selectTodo(id);store.advanceTodo(id)}
+  const fresh=()=>{setActivePinia(createPinia());const store=usePhase2DemoStore();store.unlockedRecommendations['aux-health']=true;return store}
+  const dispatch=(store,id)=>{store.unlockedRecommendations[id]=true;store.createTodo(id);store.assignTask(id,{...store.defaultAssignment(id),owner:'赵明（三管轮）'});store.selectTodo(id);store.advanceTodo(id)}
   const feedback=(store,values,notes)=>store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:notes[i]}))
   await t.test('long health record keeps original samples, assignment, actual feedback and task end in order',()=>{
    const store=fresh();dispatch(store,'aux-health')

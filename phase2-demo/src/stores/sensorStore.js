@@ -45,8 +45,8 @@ export const useSensorStore = defineStore('sensor', () => {
    */
   const currentSubsystemTags = computed(() => {
     const deviceId = currentDeviceId.value
-    if(deviceId==='aux-system')return ['全部','发电系统','转速监测','排温系统','冷却系统','滑油系统']
-    if(deviceId==='main-engine-1')return ['全部',...subsystemTagsByDevice[deviceId],'负荷监测']
+    if(deviceId==='aux-system'||deviceId?.startsWith('aux-engine-'))return ['全部','发电系统','转速监测','排温系统','冷却系统','滑油系统']
+    if(deviceId==='main-engine-1')return ['全部',...new Set([...subsystemTagsByDevice[deviceId],...allSensors.value.filter(sensor=>sensor.deviceId===deviceId).map(sensor=>sensor.subsystem).filter(Boolean)])]
     if (!deviceId || !subsystemTagsByDevice[deviceId]) return ['全部']
     return ['全部', ...subsystemTagsByDevice[deviceId]]
   })

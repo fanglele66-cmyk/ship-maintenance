@@ -7,10 +7,10 @@ const rows=[
 {id:'main-warning',deviceId:'main-engine-1',rank:1,type:'预警事件',state:'待决策'},
 {id:'steering-alarm',deviceId:'steering-gear',rank:0,type:'报警事件',state:'已派发'},
 {id:'main-alarm',deviceId:'main-engine-1',rank:0,type:'报警事件',state:'待决策'},
-{id:'main-maintenance',deviceId:'main-engine-1',rank:3,type:'维保建议',state:'待决策'},
+{id:'main-health',deviceId:'main-engine-1',rank:2,type:'异动跟踪',state:'待决策'},
 {id:'air-drift',deviceId:'air-compressor',rank:2,type:'异动跟踪',state:'待决策'}]
 test('type precedes device influence; overview dispatch groups precede type',()=>{
-assert.deepEqual(sortIssues(rows).map(i=>i.id),['main-alarm','steering-alarm','main-warning','air-warning','main-drift','air-drift','main-maintenance'])
+assert.deepEqual(sortIssues(rows).map(i=>i.id),['main-alarm','steering-alarm','main-warning','air-warning','main-drift','main-health','air-drift'])
 assert.equal(sortIssues(rows,{stateFirst:true}).at(-1).id,'steering-alarm')
 assert.equal(rows[0].id,'main-drift','source order is not mutated')
 })

@@ -11,7 +11,7 @@ export function todoAssessment(store){
  if(!active.length)return `当前人工任务已处理${done?' '+done+' 项':''}，没有需要继续分派的执行环节。轮机长应把注意力转向处理效果是否持续稳定；已提交验收与运行恢复是两类证据，不宜仅凭任务完成结束全部跟进。`
  const fault=active.find(t=>t.id==='fault'),work=active.filter(t=>t.stages[store.progress[t.id]].kind==='work'),pending=active.filter(t=>!store.logs[t.id].some(r=>r.kind==='feedbackRecord'))
  const priority=fault?'优先推进冷却系统任务：温升和流量下降相互印证，其运行影响应先于尚未确诊的局部趋势核实。':'当前重点是把已发现的主机趋势变成现场结论，先补足关键证据，再决定是否进入维修。'
- const coordination=work.length?`已有 ${work.length} 项进入作业阶段，人员安排应优先核对停机隔离、备件与验收条件，避免仅完成表单而遗漏实际作业约束。`:pending.length?`有 ${pending.length} 项尚待现场反馈，当前主要瓶颈是证据未齐；建议先查看优先任务的当前阶段和最新反馈，确认当班核实条件；已有任务沿原记录推进，避免重复派单。`:'各项已有现场反馈，建议轮机长优先审阅仍无法解释的现象，确认下一阶段的排查范围与负责人。'
+ const coordination=work.length?`已有 ${work.length} 项进入作业阶段，人员安排应优先核对停机隔离、备件与验收条件，避免仅完成表单而遗漏实际作业约束。`:pending.length?`有 ${pending.length} 项尚待现场反馈，当前主要瓶颈是证据未齐；建议先查看优先任务的当前阶段和最新反馈，确认现场核实条件；已有任务沿原记录推进，避免重复派单。`:'各项已有现场反馈，建议轮机长优先审阅仍无法解释的现象，确认下一阶段的排查范围与负责人。'
  return `当前 ${active.length} 项任务推进中。${priority}${coordination}`
 }
 
@@ -19,7 +19,7 @@ export function todoBrief(store,owner=''){
  const portfolio=store.taskPortfolio.filter(t=>!owner||(store.assignments[t.id]?.owner||t.owner)===owner)
  const active=portfolio.filter(t=>!store.isTaskHandled(t.id)),pending=active.filter(t=>!store.logs[t.id].some(r=>r.kind==='feedbackRecord'))
  const progressing=active.filter(t=>store.progress[t.id]>0||store.logs[t.id].some(r=>r.kind==='feedbackRecord'))
- const ordered=[...active].sort((a,b)=>['报警事件','预警事件','异动跟踪','维保建议'].indexOf(a.cardType)-['报警事件','预警事件','异动跟踪','维保建议'].indexOf(b.cardType))
+ const ordered=[...active].sort((a,b)=>['报警事件','预警事件','异动跟踪'].indexOf(a.cardType)-['报警事件','预警事件','异动跟踪'].indexOf(b.cardType))
  const priority=ordered[0],stage=priority?.stages[store.progress[priority.id]]
  const overview=`当前 ${active.length-progressing.length} 项待跟进，${progressing.length} 项进度推进中，${portfolio.length-active.length} 项已处理。`
  const bottleneck=pending.length?`有 ${pending.length} 项尚待现场反馈，证据未齐是主要瓶颈。`:active.length?'现有任务已取得部分反馈，当前重点是补齐剩余执行与验收结果。':'当前没有未完成的已派发任务。'

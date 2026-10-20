@@ -6,8 +6,7 @@
    <SituationTimeline :entries="storyTimeline(store,track.id)"/>
    <footer><p>{{trackingNext(track)}}</p>
     <button v-if="track.requestId&&!store.todoCreated[track.requestId]&&!detail" class="p2-secondary" @click="openIssue(track.requestId)">查看现场核实建议</button>
-    <button v-if="track.recommendationId&&!detail" class="p2-secondary" @click="openIssue(track.recommendationId)">查看关联维保建议</button>
-    <button v-if="store.healthUpdates[track.id]?.recommendationId && requestId!==store.healthUpdates[track.id].recommendationId" class="p2-secondary" @click="openIssue(store.healthUpdates[track.id].recommendationId)">查看本跟踪形成的维保建议</button>
+    <button v-if="!embedded&&(track.recommendationId||store.healthUpdates[track.id]?.recommendationId)" class="p2-secondary" @click="openIssue(track.recommendationId||store.healthUpdates[track.id].recommendationId)">查看跟踪内的维保建议</button>
     <button v-if="track.laterNodes&&store.healthUpdates[track.id]?.taskComplete&&(store.healthUpdates[track.id]?.laterNodes?.length||0)<track.laterNodes.length" class="p2-secondary" @click="store.advanceHealthTrack(track.id)">查看后续可比节点</button>
    </footer>
   </article>
@@ -21,10 +20,11 @@ import {useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {healthTracks,workflowCases} from '@/mock/fourStoryWorkflow'
 import {matchesSituationDevice} from '@/mock/situationScope'
-const props=defineProps({deviceId:String,requestId:String,detail:Boolean,excludeRequestIds:{type:Array,default:()=>[]}}),store=usePhase2DemoStore(),router=useRouter()
-const tracks=computed(()=>healthTracks.filter(track=>track.realCaseId||store.unlockedRecommendations[track.requestId]||store.todoCreated[track.requestId]).filter(track=>props.requestId?track.requestId===props.requestId||track.recommendationId===props.requestId||store.healthUpdates[track.id]?.recommendationId===props.requestId:matchesSituationDevice(track,props.deviceId)&&![track.requestId,track.recommendationId,store.healthUpdates[track.id]?.recommendationId].some(id=>id&&props.excludeRequestIds.includes(id))))
-function openIssue(id){router.push({path:'/situation/issue/'+id,query:{from:'device',device:props.deviceId||workflowCases[id]?.deviceId||'main-engine-1'}})}
-function trackingNext(track){const state=store.healthUpdates[track.id];if(state?.recommendationId)return props.requestId===state.recommendationId?'原核实与本次提前建议同源保留，原季度计划未完成的项目继续有效。':'原核实已结束，当前另有相关提前检查建议；可查看来源与本次安排。';return state?.taskComplete?'本次核实结束，原健康记录继续；没有新的信息需求时不重复派单。':track.next}
+import {resolveIssueNavigation,maintenanceRecommendations} from '@/mock/issueRelationships'
+const props=defineProps({deviceId:String,requestId:String,detail:Boolean,embedded:Boolean,excludeRequestIds:{type:Array,default:()=>[]}}),store=usePhase2DemoStore(),router=useRouter()
+const tracks=computed(()=>healthTracks.filter(track=>track.realCaseId||store.unlockedRecommendations[track.requestId]||store.todoCreated[track.requestId]||maintenanceRecommendations(store,track.requestId).length).filter(track=>props.requestId?track.requestId===props.requestId||track.recommendationId===props.requestId||store.healthUpdates[track.id]?.recommendationId===props.requestId:matchesSituationDevice(track,props.deviceId)&&![track.requestId,track.recommendationId,store.healthUpdates[track.id]?.recommendationId].some(id=>id&&props.excludeRequestIds.includes(id))))
+function openIssue(id){const target=resolveIssueNavigation(id);router.push({path:'/situation/issue/'+target.id,query:{from:'device',device:props.deviceId||workflowCases[id]?.deviceId||'main-engine-1',...(target.tab?{tab:target.tab}:{}),...(target.recommendationId?{recommendation:target.recommendationId}:{})}})}
+function trackingNext(track){const state=store.healthUpdates[track.id];if(state?.recommendationId||track.recommendationId)return '本跟踪已形成阶段性维保建议，必要性、实施条件与后续结果沿同一记录接续；原周期计划未完成的项目继续保留。';return state?.taskComplete?'本次核实结束，原健康记录继续；没有新的信息需求时不重复派单。':track.next}
 function summary(track){const recommendation=track.recommendationId||store.healthUpdates[track.id]?.recommendationId;if(recommendation){const decision=store.completedTasks[recommendation],execution=store.executionRecords[recommendation]?.at(-1);if(decision)return '本次提前评估已结束：'+decision.reason+' 原计划和健康来源保留。';if(execution)return '本次实际措施已记录：'+execution.values.measures+'；验收：'+execution.values.acceptance+'。持续效果独立跟踪。';if(store.checkAssessments[recommendation]?.advance)return '本次评估已取得提前处理依据和安排条件，实际执行尚待人员提交；原健康记录继续。'}return store.healthUpdates[track.id]?.conclusion||track.conclusion}
 </script>
 <style scoped>

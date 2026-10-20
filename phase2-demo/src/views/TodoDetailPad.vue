@@ -5,6 +5,7 @@
       <div><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
       <span class="p2-badge" :class="store.isTaskHandled(todo.id)?'blue':'red'">{{ store.isTaskHandled(todo.id)?'已处理':'未处理' }}</span>
     </header>
+    <div v-if="isMaintenanceWorkflow(todo)" class="p2-parent-track"><span>维保建议来自原健康趋势观测，评估与执行结果沿同一跟踪保留。</span><button type="button" class="p2-link-button" @click="router.push({path:'/situation/issue/'+parentIssueId(todo.id),query:{tab:'健康趋势观测'}})">返回所属异动跟踪 →</button></div>
     <nav class="p2-stage-rail" :style="{'--stage-count':displayStages.length}" aria-label="处理阶段">
       <button v-for="(step,position) in displayStages" :key="step.id" class="p2-stage-card" :class="{active:step.kind==='handled'?stage.kind==='handled':store.activeStage[todo.id]===step.index,done:step.kind!=='handled'&&store.progress[todo.id]>step.index,locked:store.progress[todo.id]<step.index}" :disabled="store.progress[todo.id]<step.index" @click="store.selectStage(todo.id,step.index)">
         <span>{{ String(position+1).padStart(2,'0') }}</span><strong>{{ step.label }}</strong><small>{{ step.kind==='handled'?'处理记录':store.progress[todo.id]>step.index?'已完成':store.progress[todo.id]===step.index?'当前阶段':'待接续' }}</small>
@@ -48,7 +49,7 @@
         <MarkdownContent v-if="stage.markdown" :content="currentStageMarkdown"/><p v-else class="p2-stage-purpose">{{ stage.summary }}</p>
         <div v-for="(fact,i) in closedEvidence" :key="fact" class="p2-pad-list-row"><span>{{ String(i+1).padStart(2,'0') }}</span>{{ fact }}</div>
         <div class="p2-pad-conclusion"><b>现场操作</b><p>确认设备与作业条件，按当前任务逐项反馈。遇到条件不具备或无法确认的情况，请记录实际原因。</p></div>
-        <EventWorkOrderLink v-if="todo.cardType==='维保建议'" :event-id="todo.id" />
+        <EventWorkOrderLink v-if="isMaintenanceWorkflow(todo)" :event-id="todo.id" />
         <button class="p2-primary p2-ready-button" @click="prepared[stageKey]=true;subtab=stage.label+'步骤'">已了解，开始{{ stage.label }}</button>
       </section>
       <section v-else-if="stage.kind==='check'||stage.kind==='work'&&subtab.includes('步骤')" class="p2-panel p2-step-content">
@@ -65,7 +66,7 @@
 
       <section v-else-if="stage.kind==='work'" class="p2-panel p2-pad-single">
         <div class="p2-section-title">{{ subtab }}</div>
-        <template v-if="subtab.includes('准备')"><EventWorkOrderLink v-if="todo.cardType==='维保建议'" :event-id="todo.id" /><MarkdownContent v-if="isWorkflow(todo.id)" :content="currentStageMarkdown"/><p v-else class="p2-stage-purpose">{{ stage.title }}</p><div v-for="(text,i) in workDetails.preparation" :key="text" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ text }}</div></template>
+        <template v-if="subtab.includes('准备')"><EventWorkOrderLink v-if="isMaintenanceWorkflow(todo)" :event-id="todo.id" /><MarkdownContent v-if="isWorkflow(todo.id)" :content="currentStageMarkdown"/><p v-else class="p2-stage-purpose">{{ stage.title }}</p><div v-for="(text,i) in workDetails.preparation" :key="text" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ text }}</div></template>
         <template v-else-if="subtab==='备件清单'"><table class="p2-cause-table"><thead><tr><th>名称</th><th>数量</th><th>用途</th></tr></thead><tbody><tr v-for="part in workDetails.parts" :key="part.name"><td><strong>{{ part.name }}</strong></td><td>{{ part.amount }}</td><td>{{ part.use }}</td></tr></tbody></table></template>
         <template v-else-if="subtab==='验收确认'"><p class="p2-stage-purpose">先核对验收项目，再记录实际措施与复测。作业完成后仍异常，应继续原事件排查。</p><table class="p2-cause-table"><thead><tr><th>验收项目</th><th>验收要求</th><th>核对方法</th></tr></thead><tbody><tr v-for="row in acceptanceRows" :key="row.name"><td>{{ row.name }}</td><td>{{ row.req }}</td><td>{{ row.method }}</td></tr></tbody></table><InquiryMessage v-if="executionForm" :message="executionForm" @update-inquiry="updateExecution" @submit-inquiry="confirmExecution" /></template>
         <template v-else-if="subtab==='关联工单'"><EventWorkOrderLink :event-id="todo.id" /></template>
@@ -73,7 +74,7 @@
       <section v-else-if="subtab==='时间线'" class="p2-panel p2-pad-single"><SituationTimeline :entries="storyTimeline(store,todo.id,{taskOnly:true})" expanded/><p v-if="!storyTimeline(store,todo.id,{taskOnly:true}).length">当前尚无已提交反馈。</p></section>
       <section v-else class="p2-panel p2-pad-single p2-handled-receipt">
         <div class="p2-section-title">{{store.completedTasks[todo.id]?.title||'本轮人工处理已完成'}}</div>
-        <template v-if="store.completedTasks[todo.id]"><p>{{store.completedTasks[todo.id].reason}}</p><p>{{store.completedTasks[todo.id].actor}} · {{store.completedTasks[todo.id].at}}</p><HealthTrackingPanel v-if="todo.trackingOnly" :request-id="todo.id" detail/><p v-else-if="todo.cardType==='维保建议'">原周期维保计划保持有效。</p><button class="p2-secondary" @click="router.push({path:'/situation',query:{device:todo.deviceId}})">查看设备态势</button></template>
+        <template v-if="store.completedTasks[todo.id]"><p>{{store.completedTasks[todo.id].reason}}</p><p>{{store.completedTasks[todo.id].actor}} · {{store.completedTasks[todo.id].at}}</p><HealthTrackingPanel v-if="todo.trackingOnly" :request-id="todo.id" detail/><p v-else-if="isMaintenanceWorkflow(todo)">原周期维保计划保持有效。</p><button class="p2-secondary" @click="router.push({path:'/situation',query:{device:todo.deviceId}})">查看设备态势</button></template>
         <template v-else>
         <dl v-if="latestExecution" class="p2-execution-facts"><div><dt>实际执行人</dt><dd>{{ latestExecution.executor }}</dd></div><div><dt>实际设备与部位</dt><dd>{{ latestExecution.values.equipment }}</dd></div><div><dt>实际措施</dt><dd>{{ latestExecution.values.measures }}</dd></div><div><dt>实际执行时间</dt><dd>{{ latestExecution.values.executedAt.replace('T',' ') }}</dd></div><div><dt>验收与复测</dt><dd>{{ latestExecution.values.acceptance }}</dd></div><div><dt>来源及确认时间</dt><dd>{{ latestExecution.source }} · {{ latestExecution.confirmedAt }}</dd></div></dl>
         <p v-if="!store.executionObservationReady(todo.id)">缺少可比监测数据，效果观察待补充；当前不生成改善结论。</p>
@@ -89,6 +90,7 @@
   </div>
 </template>
 <script setup>
+import {isMaintenanceWorkflow, parentIssueId} from '@/mock/issueRelationships'
 
 import { computed, reactive, ref, watch } from 'vue'
 import ScenarioBranchPreset from '@/components/ScenarioBranchPreset.vue'
@@ -127,9 +129,9 @@ const readOnly=computed(()=>store.activeStage[todo.value?.id]<store.progress[tod
 const accepted=computed({get:()=>store.workAcceptance[stageKey.value]||[],set:value=>store.workAcceptance[stageKey.value]=value})
 const acceptanceNote=computed({get:()=>store.workAcceptanceNotes[stageKey.value]||'',set:value=>store.workAcceptanceNotes[stageKey.value]=value})
 const cardTitle=computed(()=>todo.value?.id==='drift'&&store.progress.drift>=2?todo.value.eventTitle:todo.value?.initialTitle)
-const cardType=computed(()=>todo.value?.id==='drift'&&store.progress.drift>=2?'故障/异常事件的排查与处置':todo.value?.cardType)
+const cardType=computed(()=>isMaintenanceWorkflow(todo.value)?'异动跟踪 · 维保评估任务':todo.value?.id==='drift'&&store.progress.drift>=2?'故障/异常事件的排查与处置':todo.value?.cardType)
 const source=computed(()=>todo.value?.source || (todo.value?.id==='fault'?'传感器告警':todo.value?.id==='drift'?'日常健康扫查 · 持续监测':'日常健康扫查 · 预测维保'))
-const tabs=computed(()=>{if(!stage.value)return[];if(stage.value.kind==='handled')return['摘要','时间线'];if(stage.value.kind==='check')return[stage.value.label+'准备',stage.value.label+'步骤'];if(stage.value.kind==='work'){const word=todo.value.cardType==='维保建议'?'保养':'维修';return[word+'准备','备件清单',word+'步骤','验收确认',...(todo.value.cardType==='维保建议'?['关联工单']:[])]}if(todo.value.cardType==='维保建议')return['建议速览'];return stage.value.id==='event'?['概览','数据观测','候选原因']:['概览','数据观测']})
+const tabs=computed(()=>{if(!stage.value)return[];if(stage.value.kind==='handled')return['摘要','时间线'];if(stage.value.kind==='check')return[stage.value.label+'准备',stage.value.label+'步骤'];if(stage.value.kind==='work'){const word=isMaintenanceWorkflow(todo.value)?'保养':'维修';return[word+'准备','备件清单',word+'步骤','验收确认',...(isMaintenanceWorkflow(todo.value)?['关联工单']:[])]}if(isMaintenanceWorkflow(todo.value))return['建议速览'];return stage.value.id==='event'?['概览','数据观测','候选原因']:['概览','数据观测']})
 const closedEvidence=computed(()=>{
   if(stage.value?.kind!=='handled')return stage.value?.evidence||[]
   if(latestExecution.value)return []
@@ -151,7 +153,7 @@ function nextStep(){if(!readOnly.value&&!results[taskKey(stepIndex.value)]){vali
 function advance(){
   if(readOnly.value){store.advanceTodo(todo.value.id);return}
   if(stage.value.id==='event'&&subtab.value!=='候选原因'){subtab.value='候选原因';return}
-  if(stage.value.tasks?.some((_,i)=>!results[taskKey(i)])){validation.value='请先完成各事项反馈。';subtab.value=stage.value.kind==='check'?stage.value.label+'步骤':(todo.value.cardType==='维保建议'?'保养':'维修')+'步骤';return}
+  if(stage.value.tasks?.some((_,i)=>!results[taskKey(i)])){validation.value='请先完成各事项反馈。';subtab.value=stage.value.kind==='check'?stage.value.label+'步骤':(isMaintenanceWorkflow(todo.value)?'保养':'维修')+'步骤';return}
   if(stage.value.kind==='work'&&(subtab.value!=='验收确认'||accepted.value.length<workDetails.value.acceptance.length)){subtab.value='验收确认';validation.value='请确认现场验收结果。';return}
   if(stage.value.kind==='work'&&stage.value.tasks?.some((_,i)=>['无法确认','待补充','暂不具备条件','读数不一致'].includes(results[taskKey(i)]))){validation.value='本轮作业尚未完成，请补充实际执行记录后继续。';return}
   validation.value=''
@@ -169,3 +171,5 @@ function viewObservation(){router.push('/situation/attention/'+encodeURIComponen
 .task-operator{display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:13px;color:#697487}.task-operator select{padding:7px 10px;border:1px solid #dce2eb;border-radius:6px;background:#fff;font:inherit}
 .stage-assignment-prompt{margin:12px 0;padding:18px 22px;border:1px solid #d9e5f0;border-radius:8px;background:#f6f9fc;font-size:14px}.stage-assignment-prompt p{margin:6px 0 12px}.stage-assignment-prompt label{display:flex;align-items:center;gap:12px}.stage-assignment-prompt select{padding:8px 12px;border:1px solid #ccd8e6;border-radius:6px;background:#fff;font:inherit}.stage-assignment-prompt>div{display:flex;gap:10px;margin-top:14px}
 </style>
+
+<style scoped>.p2-parent-track{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 24px;color:#7e6b4a;background:#faf8f2;font-size:13px;line-height:1.7}.p2-parent-track span{flex:1;min-width:240px}</style>

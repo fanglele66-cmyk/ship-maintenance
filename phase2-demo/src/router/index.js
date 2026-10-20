@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import {canonicalIssueRoute} from '@/mock/issueRelationships'
 
 const routes = [
   { path: '/', redirect: '/situation' },
@@ -40,5 +41,6 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes
 })
+router.beforeEach(to => canonicalIssueRoute(to) || true)
 
 export default router

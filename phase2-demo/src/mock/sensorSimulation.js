@@ -1,6 +1,7 @@
 // Engineering-style demo assumptions, NOT OEM operating limits or measured data.
 // Slow-speed reference: https://www.man-es.com/marine/products/two-stroke-engines
 import {cruiseMotion} from './cruiseMotion.js'
+import {mainCylinderSensorBindings} from './sensors.js'
 // Match like-for-like signals. Pressure uses fractional deviation because source
 // unit labels need verification; no undocumented bar-to-MPa conversion is made.
 export const cruiseMotionMapping={
@@ -25,8 +26,49 @@ export const simulationOverrides = {
  's-019':{range:'60-80',amplitude:0.3},
  's-016':{alarmDirection:'low'},'s-017':{alarmDirection:'low'},
 }
+
+// Product-prototype samples, not observations or manufacturer alarm settings.
+// Temperature scale: wiki_rt-flex50/chapters/第6章-技术参数与报警设定.md
+// lines 24 (jacket outlet), 48–49 (piston oil), 80 (scavenge).
+// Rail/control-air scale: concepts/燃油轨.md, concepts/伺服油轨.md,
+// and 第6章 lines 91–92. No source range is installed as an alarm threshold.
+// ICU/VCU mm values are explicit illustrative assumptions: the local sources
+// establish the feedback measurands, but do not supply their calibrated ranges.
+// They describe recent-cycle stroke amplitudes, never instantaneous valve
+// positions (six valves are not asserted to be open at the same instant).
+const cylinderPrototypeProfiles = [
+ {key:'exhaust',name:'排气温度',english:'Exhaust temperature',subsystem:'排温系统',unit:'°C',values:[417,420,428,419,421,418],amplitude:1.2,precision:1},
+ {key:'scavenge',name:'扫气温度',english:'Scavenge space temperature',subsystem:'扫气系统',unit:'°C',values:[40.7,41.4,42.1,41.0,40.9,41.6],amplitude:0.35,precision:1},
+ {key:'coolant',name:'冷却淡水出口温度',english:'Jacket cooling water outlet temperature',subsystem:'冷却系统',unit:'°C',values:[83.2,83.8,84.1,83.5,83.1,83.7],amplitude:0.25,precision:1},
+ {key:'piston',name:'活塞冷却油出口温度',english:'Piston cooling oil outlet temperature',subsystem:'活塞冷却',unit:'°C',values:[62.1,62.8,63.4,62.2,62.6,62.0],amplitude:0.35,precision:1},
+ {key:'icu',name:'ICU 燃油量活塞行程',english:'ICU fuel quantity piston stroke',subsystem:'喷射控制',unit:'mm',values:[18.2,18.3,18.7,18.1,18.4,18.2],amplitude:0.12,precision:2,aggregation:'recent-injection-stroke',measurementNote:'最近一次喷射的燃油量活塞行程；不是主机活塞冲程。'},
+ {key:'vcu',name:'VCU 排气阀开启行程',english:'VCU exhaust valve opening stroke',subsystem:'排气驱动',unit:'mm',values:[60.8,61.2,61.0,60.9,61.3,61.1],amplitude:0.16,precision:2,aggregation:'recent-cycle-opening-stroke',measurementNote:'最近完整工作循环的排气阀开启行程幅值；不是瞬时阀位。'},
+]
+export function buildMainEnginePrototypeSensors() {
+ const cylinders=[1,2,3,4,5,6].flatMap(number=>cylinderPrototypeProfiles.map(profile=>({
+  id:mainCylinderSensorBindings[number][profile.key],nameCn:`${number}缸${profile.name}`,
+  nameEn:`Cyl.${number} ${profile.english}`,deviceId:'main-engine-1',device:'主机',system:'主机系统',
+  subsystem:profile.subsystem,cylinderNumber:number,componentTopic:profile.key,
+  unit:profile.unit,value:profile.values[number-1],amplitude:profile.amplitude,precision:profile.precision,
+  dataOrigin:'prototype',status:'unassessed',aggregation:profile.aggregation||'hourly-point',
+  measurementNote:profile.measurementNote||'按对应气缸和介质分别记录。',
+ })))
+ const common=[
+  ['main-fuel-rail-pressure','燃油共轨压力','Fuel rail pressure','燃油系统','bar',720,2.5,1],
+  ['main-servo-rail-pressure','伺服油共轨压力','Servo oil rail pressure','伺服油系统','bar',160,0.6,1],
+  ['main-control-air-pressure','控制空气进口压力','Control air inlet pressure','控制空气系统','bar',6.5,0.025,2],
+  ['main-air-spring-pressure','排气阀空气弹簧供气压力','Exhaust valve air spring supply pressure','控制空气系统','bar',6.3,0.02,2],
+ ].map(([id,nameCn,nameEn,subsystem,unit,value,amplitude,precision])=>({
+  id,nameCn,nameEn,subsystem,unit,value,amplitude,precision,
+  deviceId:'main-engine-1',device:'主机',system:'主机系统',dataOrigin:'prototype',status:'unassessed',
+ }))
+ return [...cylinders,...common]
+}
 export function buildSimulationSensors(existing){
  const main=existing.map(s=>({...s,...simulationOverrides[s.id],...(s.id==='s-012'?{value:simulationProfiles['main-engine-1'].rpm}:{})}))
+ const existingIds=new Set(main.map(sensor=>sensor.id))
+ // Keep the established 2/3-cylinder source trends and their scenario baselines.
+ main.push(...buildMainEnginePrototypeSensors().filter(sensor=>!existingIds.has(sensor.id)))
  main.push({id:'ship-speed',nameCn:'航速',nameEn:'Ship speed',deviceId:'ship',device:'船舶',system:'航行系统',subsystem:'航行监测',unit:'kn',value:navigationSimulationProfile.speed,amplitude:navigationSimulationProfile.amplitude,timeScale:navigationSimulationProfile.timeScale,precision:1,status:'normal'})
  main.push({id:'main-load',nameCn:'主机负荷',nameEn:'Main engine load',deviceId:'main-engine-1',device:'主机',system:'主机系统',subsystem:'负荷监测',unit:'%',value:70,amplitude:1.2,precision:1,range:'0-100',status:'normal'})
  const points=[
@@ -63,7 +105,9 @@ function historicalMotion(sensor,time){
  return cruiseMotion.frames[index][column]*amplitude
 }
 export function simulationValue(sensor,time,config=simulationDefaults){
- if(!config.enabled||!sensor.unit||sensor.amplitude===0)return sensor.value
+ const baseline=typeof sensor.value==='number'||typeof sensor.value==='string'&&sensor.value.trim()?Number(sensor.value):NaN
+ if(!Number.isFinite(baseline))return null
+ if(!config.enabled||!sensor.unit||sensor.amplitude===0)return baseline
  const seconds=time/1000/(sensor.timeScale||1),seed=hash(sensor.id),deviceSeed=hash(sensor.deviceId)
  // Unmapped points use bounded, nonperiodic multi-timescale movement, not sine waves.
  const load=.50*irregularMotion(deviceSeed,seconds,180)+.25*irregularMotion(deviceSeed+31,seconds,1100)
@@ -71,16 +115,16 @@ export function simulationValue(sensor,time,config=simulationDefaults){
  const defaultAmplitude=({rpm:sensor.deviceId==='main-engine-1'?0.9:0.8,'°C':0.6,MPa:0.004,cSt:0.12,'mm/s':0.04,'%':0.4,'°':0.3,s:0.025}[sensor.unit])??Math.max(Math.abs(sensor.value)*0.007,0.015)
  const amplitude=sensor.amplitude??defaultAmplitude
  const motion=historicalMotion(sensor,time)??amplitude*(load+local)
- const value=sensor.value+Math.max(0,Math.min(3,Number(config.strength)||0))*motion
+ const value=baseline+Math.max(0,Math.min(3,Number(config.strength)||0))*motion
  const precision=sensor.precision??(sensor.unit==='MPa'?3:1)
  return Number(Math.max(sensor.unit==='°'? -35:0,value).toFixed(precision))
 }
 export function simulationSample(sensor,time,config=simulationDefaults){
  const value=simulationValue(sensor,time,config)
  const range=String(sensor.range||'').match(/^(-?[\d.]+)-(-?[\d.]+)$/)
- const outside=range&&(value<Number(range[1])||value>Number(range[2]))
- const alarm=sensor.threshold!=null&&(sensor.alarmDirection==='low'?value<sensor.threshold:value>sensor.threshold)
- return {...sensor,value,status:outside||alarm?'over':sensor.status==='warning'?'warning':'normal',sampledAt:time}
+ const outside=value!==null&&range&&(value<Number(range[1])||value>Number(range[2]))
+ const alarm=value!==null&&sensor.threshold!=null&&(sensor.alarmDirection==='low'?value<sensor.threshold:value>sensor.threshold)
+ return {...sensor,value,status:value===null?'unknown':outside||alarm?'over':sensor.dataOrigin==='prototype'?'unassessed':sensor.status==='warning'?'warning':'normal',sampledAt:time}
 }
 export function simulationTrend(sensor,start,end,config=simulationDefaults,maxPoints=900){
  const step=Math.max(config.intervalSeconds*1000,Math.ceil((end-start)/maxPoints/(config.intervalSeconds*1000))*config.intervalSeconds*1000)

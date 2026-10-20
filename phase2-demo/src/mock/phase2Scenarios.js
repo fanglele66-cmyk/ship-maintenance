@@ -68,7 +68,7 @@ export const maintenancePlans = [{
 
 export const scenarioCases = {
   maintenance: {
-    id: 'maintenance', cardType: '维保建议', initialTitle: '主机1#缸连杆轴承提前维保', device: '主机 · 1#缸连杆轴承', priority: '建议提前',
+    id: 'maintenance', cardType: '异动跟踪', workflowKind: 'maintenance', parentIssueId: 'bearing-health', initialTitle: '主机1#缸连杆轴承提前维保', device: '主机 · 1#缸连杆轴承', priority: '建议提前',
     stages: [
       { id: 'overview', label: '建议速览', kind: 'overview', title: '建议在靠港窗口前确认轴承磨损', summary: '振动缓升与剩余运行小时数共同提示提前检查价值；系统尚未触发振动报警。', evidence: ['运行 1,860 / 2,000 h', '振动 2.1 → 3.0 mm/s，近7日约上升43%', '约48小时后有靠港检修窗口'], judgement: '先检查实际磨损；若磨损可见且备件齐备，再把计划检修提前。', action: '进入提前检查', reply: '先检查轴瓦表面、间隙与润滑情况。检查结论决定是否提前保养。' },
       { id: 'check', label: '检查', kind: 'check', title: '确认是否具备提前维保依据', summary: '核实轴瓦磨损、间隙和备件状态，判断是否具备提前保养条件。', evidence: ['需在安全停机与隔离后执行', '备件清单：1#缸连杆轴承轴瓦一套'], tasks: [{ label: '查看轴瓦表面磨损', guide: '记录拉伤、剥落或偏磨情况。' }, { label: '测量轴承间隙并核对备件', guide: '记录间隙测量值与备件状态。' }], judgement: '现场见轻微偏磨，间隙接近计划检修上限，备件可用；具备提前处理依据。', action: '提交检查并安排保养', reply: '已记录轻微偏磨及备件可用。建议在本次靠港窗口提前更换轴瓦。' },

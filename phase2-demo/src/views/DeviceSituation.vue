@@ -50,6 +50,13 @@
           <div v-if="!shownHistory.length" class="p2-empty">暂无{{ historyCategories.find(category => category.id === historyCategory)?.label }}。实际维护记录在现场作业提交并确认后生成。</div>
         </template>
       </template>
+      <details v-if="activeTab==='overview'" class="device-exploration" :open="comparisonExpanded" @toggle="onComparisonToggle">
+        <summary>
+          <span class="exploration-label"><strong>健康监控</strong><small>{{isMainEngine?'共用部件 · 多缸对比 · 月度趋势':'机组对比 · 月度趋势'}}</small></span>
+          <span class="exploration-toggle">{{comparisonExpanded?'收起':'展开'}}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></span>
+        </summary>
+        <DeviceComparison v-if="comparisonMounted" :device-id="deviceId" @open-data="openSystemData" @select-sensor="openComparisonSensor" @select-device="emit('select-device',$event)" @open-item="openItem"/>
+      </details>
     </div>
   </div>
 </template>
@@ -59,7 +66,8 @@ import {computed,nextTick,onUnmounted,ref,watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {workbenchIssues,issueCatalog} from '@/mock/captainWorkbench'
-import profiles from '@/mock/deviceOverviewProfiles.json'
+import {resolveIssueNavigation} from '@/mock/issueRelationships'
+import {useSensorStore} from '@/stores/sensorStore'
 import {deviceHistory,historyCategories} from '@/mock/phase2History'
 import {operationAssessment} from '@/mock/phase2SituationContent'
 import {healthTracks,deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
@@ -67,12 +75,22 @@ import {matchesSituationDevice} from '@/mock/situationScope'
 import BackButton from '@/components/BackButton.vue'
 import CaptainIssueRow from '@/components/CaptainIssueRow.vue'
 import DeviceIssueBrowser from '@/components/DeviceIssueBrowser.vue'
+import DeviceComparison from '@/components/DeviceComparison.vue'
 import FormSelect from '@/components/forms/FormSelect.vue'
 import SituationReport from '@/components/SituationReport.vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
 const props=defineProps({deviceName:{type:String,default:'主机'},deviceId:{type:String,default:'main-engine-1'}})
-defineEmits(['select-sensor','select-device','back'])
-const router=useRouter(),store=usePhase2DemoStore()
+const emit=defineEmits(['select-sensor','select-device','open-data','back'])
+const router=useRouter(),store=usePhase2DemoStore(),sensorStore=useSensorStore()
+const comparisonExpanded=ref(false),comparisonMounted=ref(false)
+async function onComparisonToggle(event){
+  const panel=event.target
+  comparisonExpanded.value=panel.open
+  if(!panel.open)return
+  comparisonMounted.value=true
+  await nextTick()
+  if(panel.isConnected&&panel.open)panel.scrollIntoView({block:'start'})
+}
 const tabs=[{id:'overview',label:'健康概览'},{id:'data',label:'传感器数据'},{id:'history',label:'动态记录'},{id:'related',label:'相关事项'}]
 const activeTab=ref('overview'),relatedType=ref(''),relatedState=ref('待决策'),deviceScroll=ref(null),historyCategory=ref('all'),historyDetailId=ref(null)
 const isMainEngine=computed(()=>props.deviceId==='main-engine-1')
@@ -86,20 +104,23 @@ const shownHistory=computed(()=>historyRecords.value.filter(item=>matchesSituati
 const historyDetail=computed(()=>historyRecords.value.find(item=>item.id===historyDetailId.value))
 const historyTrack=computed(()=>healthTracks.find(track=>track.id===historyDetail.value?.trackId))
 const runningAssessment=computed(()=>operationAssessment(store)),overviewAnalysis=computed(()=>runningAssessment.value.summary)
-const otherMarkdown=computed(()=>`### 当前判断\n\n${otherOverview.value.conclusion}\n\n### 分析依据\n\n${otherOverview.value.basis}\n\n### 建议\n\n${otherOverview.value.next}`)
+const otherMarkdown=computed(()=>overviewCopy(`### 当前判断\n\n${otherOverview.value.conclusion}\n\n### 分析依据\n\n${otherOverview.value.basis}\n\n### 建议\n\n${otherOverview.value.next}`))
 const mainMarkdown=computed(()=>`### 当前判断\n\n${runningAssessment.value.conclusion}\n\n### 分析依据\n\n${runningAssessment.value.basis}\n\n### 建议\n\n${runningAssessment.value.recommendation}`)
-watch(()=>props.deviceId,()=>{activeTab.value='overview';historyDetailId.value=null;relatedType.value=''})
+watch(()=>props.deviceId,()=>{activeTab.value='overview';historyDetailId.value=null;relatedType.value='';comparisonExpanded.value=false;comparisonMounted.value=false})
 watch(activeTab,()=>{store.attentionInFocus=false;store.regularMaintenanceInFocus=false;store.clearObservationFocus();historyDetailId.value=null})
 onUnmounted(()=>{store.clearObservationFocus();store.regularMaintenanceInFocus=false})
 let listScroll=0
 async function openMaintenanceDetail(id='maintenance'){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/issue/'+encodeURIComponent(id))}
-async function showMaintenanceList(){await showRelated('维保建议')}
+async function showMaintenanceList(){await showRelated('异动跟踪')}
 async function showAttentionList(){await showRelated('异动跟踪')}
 async function showRelated(type='',state='待决策'){activeTab.value='related';relatedType.value=type;relatedState.value=state;store.attentionInFocus=false;await nextTick();if(deviceScroll.value)deviceScroll.value.scrollTop=listScroll}
 function openObservation(id){listScroll=deviceScroll.value?.scrollTop||0;router.push('/situation/attention/'+encodeURIComponent(id))}
-function openItem(id){if(issueCatalog.some(item=>item.id===id)){openTodo(id);return}activeTab.value='data'}
+function openItem(id){const target=resolveIssueNavigation(id);if(target.id!==id){openMaintenanceDetail(id);return}if(issueCatalog.some(item=>item.id===id)){openTodo(id);return}activeTab.value='data'}
 function openTodo(id){if(!store.todoCreated[id]){router.push({path:'/situation/issue/'+id,query:{from:'device',device:props.deviceId}});return}store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 function showHealthHistory(){activeTab.value='history';historyCategory.value='attention'}
+function openSystemData(subsystem){sensorStore.setSubsystem(subsystem);activeTab.value='data';emit('open-data')}
+function openComparisonSensor(sensor){activeTab.value='data';emit('select-sensor',sensor)}
+function overviewCopy(text){return String(text||'').replace(/本班/g,'当前运行片段').replace(/当班人员/g,'现场人员').replace(/当班记录/g,'运行记录').replace(/当班/g,'当前').replace(/班次/g,'运行时段').replace(/交接班|交班|交接/g,'运行记录').replace(/值班/g,'日常检查')}
 function historyEntryLabel(type){return ({event:'打开关联待办',attention:'查看异动跟踪材料',recommendation:'查看维保建议',maintenance:'查看维护记录',review:'查看回顾报告'})[type]||'查看记录'}
 function openHistoryRecord(record){if(record.type==='event'&&record.target){openTodo(record.target);return}if(record.type==='attention'&&record.target&&!record.timeline){openItem(record.target);return}if(record.type==='recommendation'&&record.target){openMaintenanceDetail(record.target);return}historyDetailId.value=record.id}
 defineExpose({openItem,openObservation,showAttentionList,showMaintenanceList,showRelated})
@@ -122,3 +143,15 @@ defineExpose({openItem,openObservation,showAttentionList,showMaintenanceList,sho
 </style>
 
 <style scoped>.device-heading{flex:1;min-width:0}.p2-device-head{justify-content:flex-start}.p2-device-head h2{margin:0}.p2-device-scroll{min-width:0}.p2-health-meta{row-gap:6px}.p2-health-scope{overflow-wrap:break-word}</style>
+
+<style scoped>
+.device-exploration{margin-top:18px;background:#fff;border:1px solid #e5e9ef;border-radius:10px;min-width:0;overflow:hidden}
+.device-exploration>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 22px;cursor:pointer;background:linear-gradient(100deg,#fafbfc,#fff);color:#344054}
+.device-exploration>summary::-webkit-details-marker{display:none}
+.device-exploration>summary:focus-visible{outline:2px solid #a68b61;outline-offset:-3px}
+.exploration-label{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px 20px}.exploration-label strong{font-size:16px;font-weight:600}.exploration-label small{font-size:12px;color:#85909f;font-weight:400}
+.exploration-toggle{display:flex;align-items:center;gap:7px;flex:none;font-size:12px;color:#8b7959}.exploration-toggle svg{height:18px;width:18px;stroke:currentColor;stroke-width:1.6;transition:transform .18s}.device-exploration[open] .exploration-toggle svg{transform:rotate(180deg)}
+.device-exploration[open]>summary{border-bottom:1px solid #e9edf2}.device-exploration :deep(.device-comparison){margin-top:0;padding:20px 22px;border:0;border-radius:0}
+@media(max-width:600px){.device-exploration>summary{padding:16px}.device-exploration :deep(.device-comparison){padding:16px 12px}.exploration-label{gap:5px}.exploration-label small{font-size:11px}.exploration-label strong{font-size:15px}}
+@media(prefers-reduced-motion:reduce){.exploration-toggle svg{transition:none}}
+</style>

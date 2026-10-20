@@ -39,7 +39,7 @@ watch([state,device,type],()=>{batch.value=1;savedScroll=0;if(scrollRef.value)sc
 function clearFilters(){state.value='';device.value='';type.value=''}
 onActivated(async()=>{if(route.query.resume!=='1'){clearFilters();batch.value=1;savedScroll=0}await nextTick();if(scrollRef.value)scrollRef.value.scrollTop=savedScroll})
 onDeactivated(()=>{if(scrollRef.value)savedScroll=scrollRef.value.scrollTop})
-function open(item){savedScroll=scrollRef.value?.scrollTop||0;const context={from:'issues',state:state.value,device:device.value,type:type.value};if(item.state==='已派发'){store.selectTodo(item.id);router.push({path:'/event',query:{...context,todo:item.id}})}else router.push({path:'/situation/issue/'+item.id,query:context})}
+function open(item){savedScroll=scrollRef.value?.scrollTop||0;const context={from:'issues',state:state.value,device:device.value,type:type.value};if(item.state==='已派发'&&item.type!=='异动跟踪'){store.selectTodo(item.id);router.push({path:'/event',query:{...context,todo:item.id}})}else router.push({path:'/situation/issue/'+item.id,query:context})}
 </script>
 <style scoped>
 .issues-page{height:100%;width:100%;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;padding:16px;background:#f3f5f8;box-sizing:border-box;overflow:hidden}

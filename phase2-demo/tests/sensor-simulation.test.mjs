@@ -54,3 +54,33 @@ test('trend samples are reproducible and endpoint matches the current value',()=
  assert.equal(a[3].value,b.find(p=>p.timestamp===a[3].timestamp).value)
  assert.ok(simulationTrend(point,at-168*3600000,at).length<=902)
 })
+
+test('additional engine samples have reproducible small changes without manufactured alarm rules',()=>{
+ const added=sensors.filter(sensor=>sensor.dataOrigin==='prototype')
+ assert.equal(added.length,38,'34 missing cylinder measurements plus four common pressure measurements')
+ assert.equal(new Set(sensors.map(sensor=>sensor.id)).size,sensors.length)
+ for(const point of added){
+  assert.equal(point.threshold,undefined)
+  assert.equal(point.range,undefined)
+  const samples=Array.from({length:24},(_,index)=>simulationSample(point,at+index*3600000))
+  assert.ok(samples.every(sample=>sample.status==='unassessed'))
+  assert.ok(samples.every(sample=>Number.isFinite(sample.value)&&sample.value>0))
+  const values=samples.map(sample=>sample.value)
+  assert.ok(Math.max(...values)-Math.min(...values)<=2*point.amplitude+.11)
+  const trend=simulationTrend(point,at-3600000,at)
+  assert.equal(trend.at(-1).value,simulationSample(point,at).value)
+ }
+ assert.equal(sensors.find(sensor=>sensor.id==='s-046').value,mockSensors.find(sensor=>sensor.id==='s-046').value)
+ assert.equal(sensors.find(sensor=>sensor.id==='s-005').value,mockSensors.find(sensor=>sensor.id==='s-005').value)
+})
+
+test('missing baselines remain missing in current values and every trend sample',()=>{
+ const original=sensors.find(sensor=>sensor.id==='main-cyl-1-icu')
+ for(const value of [null,undefined,'',' ',false,NaN]){
+  const sensor={...original,value}
+  assert.equal(simulationValue(sensor,at),null)
+  assert.equal(simulationSample(sensor,at).status,'unknown')
+  assert.ok(simulationTrend(sensor,at-3600000,at).every(sample=>sample.value===null))
+ }
+ assert.equal(simulationValue({...original,value:0,amplitude:0},at),0)
+})
