@@ -32,9 +32,10 @@ export const maintenanceProposalScene = {
 
 export function maintenanceAssessment(store, planned = false) {
   if(store.checkAssessments){
-    const item=workflowCases.maintenance,assessment=store.checkAssessments.maintenance,execution=store.executionRecords?.maintenance?.at(-1),decision=store.completedTasks?.maintenance
-    const conclusion=decision?decision.reason:execution?`已有实际措施：${execution.values.measures}；验收：${execution.values.acceptance}。持续效果另由可比记录评价。`:assessment?.message||item.report.conclusion
-    return {conclusion:planned?'原2000运行小时计划保留；当前1860 h。本次提前建议与原计划分别核对，已做和未做项目不能混同。':conclusion,recommendation:decision?'原计划继续有效，来源与本次决定保留。':item.report.human,sections:[{title:'趋势与原计划',paragraphs:[item.report.basis,'这些资料支持提前评估，不能直接确认轴瓦磨损、实际间隙或必须换件。']},{title:'本次实际反馈',paragraphs:assessment?assessment.records.map(record=>record.label+'：'+record.result+'；'+(record.note||'未附现场读数或检查说明')):['尚未提交本次现场反馈。']},{title:'实际措施与后续',paragraphs:execution?[execution.values.measures,execution.values.acceptance,execution.values.verification==='unresolved'?'原问题仍存在，继续原任务检查。':'工作完成与持续改善分别确认；原周期未覆盖项目保留。']:[decision?.reason||'尚无已提交的实际措施，不依据阶段位置生成磨损或换件事实。']}]}
+    const id='real-maintenance-0523',item=workflowCases[id],assessment=store.checkAssessments[id],execution=store.executionRecords?.[id]?.at(-1),decision=store.completedTasks?.[id]
+    const conclusion=decision?decision.reason:execution?`已有演示措施：${execution.values.measures}；验收：${execution.values.acceptance}。持续效果另行评价。`:assessment?.message||item.report.conclusion
+    return {conclusion:planned?'0523 临修后的减压阀定期检查、交替使用与备件需求保留；具体周期和工单以原计划核对，不预设永久更换已完成。':conclusion,recommendation:decision?'核对本次实际覆盖范围，原计划未完成项目继续保留。':item.report.human,sections:[{title:'原计划与后续检查',paragraphs:[item.report.basis,'关联工单仅用于演示计划关联；实际备件到船、永久更换和执行范围需分别确认。']},{title:'本次反馈',paragraphs:assessment?assessment.records.map(record=>record.label+'：'+record.result+'；'+(record.note||'尚无补充说明')):['尚未提交本次检查反馈。']},{title:'措施与后续',paragraphs:execution?[execution.values.measures,execution.values.acceptance,'本轮作业、原周期覆盖与持续效果分别核对。']:[decision?.reason||'尚无本轮执行记录，原计划继续有效。']}]}
+
   }
   const handled = store.isTaskHandled('maintenance'), checked = store.progress.maintenance >= 2, created = store.todoCreated.maintenance
   const values = latestValues(store, 'maintenance', [2.2,64]), result = store.getObservationResult('maintenance')

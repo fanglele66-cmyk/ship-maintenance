@@ -16,6 +16,6 @@ export const useEventWorkOrderStore=defineStore('event-work-orders',()=>{
   core.logs[id].push({role:'user',text:`确认关联工单 ${order.id} · ${order.title}`,at},{role:'assistant',text:`已将船管工单 ${order.id} 关联到本事件${previousId?'，替换此前关联 '+previousId:''}。原工单内容、计划及执行状态未修改，后续检查与实际执行在本事件接续。`,at})
   return true
  }
- watch(()=>core.logs.maintenance.length,length=>{if(length===0)delete events.maintenance},{flush:'sync'})
+ watch(()=>Object.fromEntries(Object.entries(core.todoCreated)),created=>{for(const id of Object.keys(events))if(!created[id])delete events[id]},{flush:'sync'})
  return {events,state,load,choose,confirm}
 })

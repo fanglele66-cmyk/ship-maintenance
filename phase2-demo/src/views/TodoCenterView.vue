@@ -40,7 +40,7 @@ const todoMarkdown=computed(()=>{
 })
 function openTodo(id){store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 watch(()=>route.query.todo,id=>{if(id&&store.todoCreated[id])store.selectTodo(id);else store.closeTodo()},{immediate:true})
-const groups=computed(()=>{const items=store.taskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim())&&(filter.value==='all'||(filter.value==='closed')===closed(todo)));return[{title:'优先处理',items:items.filter(todo=>todo.id==='fault'&&!closed(todo))},{title:'待办',items:items.filter(todo=>todo.id!=='fault'&&!closed(todo))},{title:'已处理',items:items.filter(closed)}]})
+const groups=computed(()=>{const items=store.taskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim())&&(filter.value==='all'||(filter.value==='closed')===closed(todo)));return[{title:'优先处理',items:items.filter(todo=>['报警事件','预警事件'].includes(todo.cardType)&&!closed(todo))},{title:'待办',items:items.filter(todo=>!['报警事件','预警事件'].includes(todo.cardType)&&!closed(todo))},{title:'已处理',items:items.filter(closed)}]})
 const updatedAt=ref(new Date())
 const updateLabel=computed(()=>updatedAt.value.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Shanghai'}))
 watch(todoMarkdown,()=>{updatedAt.value=new Date()})

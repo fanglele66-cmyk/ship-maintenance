@@ -7,6 +7,7 @@
   </section>
 </template>
 <script setup>
+import {decisionPreset} from '@/mock/realScenarioPresets'
 import {computed,ref,watch} from 'vue'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import InquiryMessage from './messages/InquiryMessage.vue'
@@ -14,7 +15,7 @@ import MarkdownContent from './MarkdownContent.vue'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),chosen=ref(''),error=ref('')
 const assessment=computed(()=>store.checkAssessments[props.scenario])
 const labels=computed(()=>({'retry':'继续补充本轮核实','supplement':'记录新线索','end-warning':assessment.value?.records?.[1]?.result==='工况变化可以解释'?'确认本次预警不成立':'结束本次核实并留档','finish-tracking':'结束本次核实，继续跟踪','end-maintenance':'不提前处理，保留原计划'}))
-const form=computed(()=>({id:'assessment-decision-'+props.scenario,status:'pending',text:labels.value[chosen.value],hint:chosen.value==='end-warning'?'资料不足或读数不符不能直接声明预警误报。请记录已核对的依据、仍缺的信息及后续安排。':'填写实际依据或检查限制，原反馈与来源材料继续保留。',submitError:error.value,fields:[{key:'reason',label:'依据与后续说明',type:'textarea',required:true}],values:{reason:chosen.value==='finish-tracking'?'已保存本轮核实结果及未确认范围，本次人工核实结束，原健康记录继续。':''},submitLabel:'确认并保存记录'}))
+const form=computed(()=>({id:'assessment-decision-'+props.scenario,status:'pending',text:labels.value[chosen.value],hint:chosen.value==='end-warning'?'资料不足或读数不符不能直接声明预警误报。请记录已核对的依据、仍缺的信息及后续安排。':'填写实际依据或检查限制，原反馈与来源材料继续保留。',submitError:error.value,fields:[{key:'reason',label:'依据与后续说明',type:'textarea',required:true}],values:{reason:store.cases[props.scenario]?.realCaseId?decisionPreset(store.cases[props.scenario],chosen.value,assessment.value):chosen.value==='finish-tracking'?'已保存本轮核实结果及未确认范围，本次人工核实结束，原健康记录继续。':''},submitLabel:'确认并保存记录'}))
 function choose(action){error.value='';if(action==='retry'){store.decideCheck(props.scenario,action);chosen.value=''}else chosen.value=action}
 function submit(payload){if(store.decideCheck(props.scenario,chosen.value,payload.values.reason)){chosen.value=''}else error.value='当前状态已变化或依据未填写，请核对后提交。'}
 watch(()=>props.scenario,()=>{chosen.value='';error.value=''})

@@ -16,13 +16,14 @@
         <button type="button" @click="goTab('研判分析')">查看研判分析</button>
         <button type="button" @click="goTab('证据资料')">查看证据资料</button>
       </div>
-      <HealthTrackingPanel v-if="['aux-health','maintenance','aux-maintenance'].includes(issue.id)" :request-id="issue.id" detail/>
+      <HealthTrackingPanel v-if="store.cases[issue.id]?.trackingOnly" :request-id="issue.id" detail/>
       <section v-if="issue.history||store.eventStatus[issue.id]==='closed'" class="dossier-block"><h3>已记录的结果</h3><p>{{store.completedTasks[issue.id]?.reason||store.executionRecords[issue.id]?.at(-1)?.values.acceptance||issue.reason}}</p><p>{{issue.outcome||'来源资料、实际措施与本次确认保留，可在设备动态回查。'}}</p></section>
       <section v-else class="next-step">
         <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警现场核实':'评估并安排检查'"/>
         <button v-if="store.todoCreated[issue.id]" class="p2-primary" @click="openTask">查看处理任务</button>
         <template v-else-if="issue.type==='报警事件'">
           <button class="p2-link-button" @click="falseAlarmOpen=!falseAlarmOpen">反馈误报</button>
+          <button v-if="falseAlarmOpen&&!feedback&&store.cases[issue.id]?.realCaseId" class="p2-secondary" @click="falseAlarmReason=decisionPreset(store.cases[issue.id],'false-alarm')">填写误报核实依据</button>
           <InquiryMessage v-if="falseAlarmOpen||feedback" :message="falseAlarmInquiry" @submit-inquiry="reportFalseAlarm"/>
         </template>
       </section>
@@ -58,14 +59,7 @@
         <template v-if="dossier.series?.length">
           <div v-for="series in dossier.series" :key="series.name" class="series-block">
             <header><b>{{series.name}}</b><span v-if="series.unit">（{{series.unit}}）</span><small>{{series.scope}}</small></header>
-            <svg class="series-svg" viewBox="0 0 640 150" role="img" :aria-label="series.name+'观测节点比较'">
-              <polyline :points="trendPoints(series).map(point=>point.x+','+point.y).join(' ')" fill="none" stroke="#936821" stroke-width="2" stroke-linejoin="round"/>
-              <g v-for="(point,index) in trendPoints(series)" :key="index">
-                <circle :cx="point.x" :cy="point.y" r="4" fill="#fff" stroke="#936821" stroke-width="2"/>
-                <text :x="point.x" :y="point.y-10" text-anchor="middle" class="series-value">{{point.v}}</text>
-                <text :x="point.x" y="146" text-anchor="middle" class="series-label">{{point.label}}</text>
-              </g>
-            </svg>
+            <ObservationTrend :series="series"/>
           </div>
           <p class="limit-note">节点折线仅连接已有观测记录，节点口径见各图说明；未补时间点。</p>
         </template>
@@ -108,8 +102,10 @@
 <div v-else class="p2-empty">未找到该事项，请返回态势中心。</div>
 </template>
 <script setup>
+import {decisionPreset} from '@/mock/realScenarioPresets'
 import SituationTimeline from './SituationTimeline.vue'
-import {computed,nextTick,ref} from 'vue'
+import {computed,nextTick,ref,watch} from 'vue'
+import ObservationTrend from './ObservationTrend.vue'
 import {useRoute,useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {issueCatalog} from '@/mock/captainWorkbench'
@@ -121,7 +117,10 @@ import assignmentTemplate from '@/message-flows/task-assignment.json'
 import BackButton from './BackButton.vue'
 import TaskAssignment from './TaskAssignment.vue'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
+watch(()=>props.scenario,id=>store.openRealCase(id),{immediate:true})
 const tabs=['事项概览','研判分析','证据资料'],active=ref(tabs[0]),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
+watch(()=>[props.scenario,store.eventStatus[props.scenario]],()=>{if(store.eventStatus[props.scenario]==='pending'){falseAlarmOpen.value=false;falseAlarmReason.value='';feedback.value=false;active.value=tabs[0]}})
+watch(()=>[props.scenario,route.query.tab],()=>{active.value=tabs.includes(route.query.tab)?route.query.tab:tabs[0]},{immediate:true})
 const rootRef=ref(null),overviewScroll=ref(0)
 const issue=computed(()=>issueCatalog.find(item=>item.id===props.scenario&&(!item.latent||store.unlockedRecommendations[item.id])))
 const dossier=computed(()=>storyDossier(store,props.scenario))
@@ -133,13 +132,6 @@ function goTab(tab){
   if(active.value==='事项概览'&&tab!=='事项概览')overviewScroll.value=rootRef.value?.scrollTop||0
   active.value=tab
   if(tab==='事项概览')nextTick(()=>{if(rootRef.value)rootRef.value.scrollTop=overviewScroll.value})
-}
-// Node-to-node line from existing observation records only; no fabricated time axis.
-function trendPoints(series){
-  const values=series.values,min=Math.min(...values),span=Math.max(...values)-min||1
-  const width=640,height=150,padLeft=46,padRight=16,padTop=20,padBottom=34
-  const step=values.length>1?(width-padLeft-padRight)/(values.length-1):0
-  return values.map((value,index)=>({x:padLeft+step*index,y:padTop+(1-(value-min)/span)*(height-padTop-padBottom),v:value,label:series.labels[index]??''}))
 }
 function openTask(){store.selectTodo(issue.value.id);router.push({path:'/event',query:{todo:issue.value.id}})}
 const falseAlarmInquiry=computed(()=>({...assignmentTemplate.falseAlarm,text:'确认误报依据',hint:'记录现场核对与判断依据。本次处置将结束，原报警和快照仍保留。',id:'false-alarm-'+props.scenario,status:feedback.value?'submitted':'pending',values:{reason:falseAlarmReason.value},submitLabel:'确认误报并留档',receiptText:'本次误报决定及依据已保存，原始报警仍可回查。'}))
@@ -197,9 +189,6 @@ defineEmits(['back'])
 .series-block header b{color:#30445d;font-size:13px}
 .series-block header span{color:#68788e;font-size:12px}
 .series-block header small{margin-left:auto;color:#8a94a5;font-size:11px}
-.series-svg{display:block;width:100%;height:auto}
-.series-value{font-size:12px;fill:#54677f;font-variant-numeric:tabular-nums}
-.series-label{font-size:11px;fill:#8a94a5}
 .evidence-list{margin:8px 0;padding-left:20px}
 .evidence-list li{margin:5px 0}
 

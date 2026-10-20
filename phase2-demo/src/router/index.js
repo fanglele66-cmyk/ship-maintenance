@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
   { path: '/', redirect: '/situation' },
+  {path:'/real-cases',redirect:'/situation'},
   {path:'/situation/issues',name:'SituationIssues',component:()=>import('@/views/CaptainIssuesView.vue'),meta:{title:'态势中心'}},
   {
     path: '/event',

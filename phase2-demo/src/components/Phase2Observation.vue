@@ -1,6 +1,6 @@
 <template>
   <section class="p2-observation">
-    <header><strong>处理后观测趋势</strong><span>第 {{ store.observationRounds[scenario] }} 轮 · {{ last?.day*24||0 }} / {{ target*24 }} 小时</span></header>
+    <header><strong>{{store.cases[scenario]?.realCaseId?'本轮观察记录':'处理后观测趋势'}}</strong><span v-if="store.cases[scenario]?.realCaseId">{{records.filter(record=>record.values).length}} 条观察记录</span><span v-else>第 {{ store.observationRounds[scenario] }} 轮 · {{ last?.day*24||0 }} / {{ target*24 }} 小时</span></header>
     <div class="observation-metrics"><span v-for="(name,i) in config.names" :key="name"><i :style="{background:colors[i]}"></i>{{ name }} <b>{{ last?.values?.[i] ?? '—' }}</b> {{ config.units[i] }}</span></div>
     <div ref="chartEl" class="observation-chart" role="img" :aria-label="config.names.join('与')+'处理前后每日观测趋势'"></div>
     <div class="observation-update"><span>{{ last?.label }} · 本日观测已更新</span></div>

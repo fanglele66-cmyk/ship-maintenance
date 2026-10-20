@@ -1,11 +1,13 @@
 import fixtures from './fourStoryFixtures.json' with {type:'json'}
+import {realHealthTracks,realCaseFor} from './realCaseAdapter.js'
 
 // Original samples and user actions are separate immutable sources. Project them
 // into a single chronology; never rewrite an earlier sample with today's answer.
 export function sourceTrack(id,store){
- return fixtures.tracking.find(track=>track.id===id||track.requestId===id||track.recommendationId===id||store?.healthUpdates?.[track.id]?.recommendationId===id)
+ return [...fixtures.tracking,...realHealthTracks].find(track=>track.id===id||track.requestId===id||track.recommendationId===id||store?.healthUpdates?.[track.id]?.recommendationId===id)
 }
 export function storyDate(id,store){
+ const real=realCaseFor(id);if(real)return new Date().toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'})
  const track=sourceTrack(id,store),latest=track&&store.healthUpdates?.[track.id]?.laterNodes?.at(-1)
  const item=fixtures.cases.find(item=>item.id===id)
  if(id==='aux-maintenance')return '2026-10-24 09:00'
@@ -13,6 +15,12 @@ export function storyDate(id,store){
  return latest?.at||'2026-10-15 09:20'
 }
 export function storyTimeline(store,id,{taskOnly=false}={}){
+ const realTrack=sourceTrack(id,store),realId=realTrack?.realCaseId?realTrack.requestId:id,real=realCaseFor(realId)
+ if(real){
+  const entries=(store.storyJournal||[]).filter(entry=>entry.taskId===realId).map(entry=>({...entry,label:entry.title,at:entry.storyAt||'来源未记录具体时刻',done:true}))
+  const first=real.steps?.[0]
+  return [...(!taskOnly&&first?[{id:realId+':initial-source',kind:'source',label:first.title,at:first.time||'来源未记录具体时刻',text:first.summary,assessment:first.result||'',actor:'原始采样／来源文献',isSimulation:false,done:true}]:[]),...entries]
+ }
  const track=sourceTrack(id,store),root=track?.id||id
  const original=!taskOnly&&track?track.nodes.map((node,index)=>({id:`${root}:origin:${index}`,kind:'sample',label:node.label,at:node.at||originalDate(node.label),text:node.values+'；'+node.context,assessment:node.judgement,actor:'AI设备健康分析',order:index-100,done:true})):[]
  const actions=(store.storyJournal||[]).filter(entry=>taskOnly?entry.taskId===id&&!['sample','recommendation'].includes(entry.kind):entry.rootId===root||entry.taskId===id).map(entry=>({...entry,label:entry.title,at:entry.storyAt,done:true}))

@@ -13,3 +13,9 @@ test('device-origin dispatch returns to situation; non-situation views retain co
  assert.deepEqual(dispatchReturnLocation({path:'/situation/maintenance/maintenance',query:{}}),{path:'/situation'})
  assert.deepEqual(dispatchReturnLocation({path:'/event',query:{todo:'fault'}}),{path:'/event',query:{todo:'fault'}})
 })
+test('real matters use the same dispatch return as other situation matters',()=>{
+ const scenario='real-alarm-0430'
+ assert.deepEqual(dispatchReturnLocation({path:'/situation/issue/'+scenario,query:{from:'workbench'}},scenario),{path:'/situation'})
+ assert.deepEqual(dispatchReturnLocation({path:'/situation/issue/'+scenario,query:{from:'issues',type:'报警事件'}},scenario),{path:'/situation/issues',query:{resume:'1',state:'',device:'',type:'报警事件'}})
+ assert.deepEqual(dispatchReturnLocation({path:'/situation/issue/fault',query:{}},'fault'),{path:'/situation'})
+})

@@ -12,6 +12,16 @@ for(const item of Object.values(workflowCases))observationConfig[item.id]=item.o
 
 export function observationResult(id, records, targetDays) {
   const config=observationConfig[id], last=records.at(-1)
+  if(workflowCases[id]?.realCaseId){
+    if(records.some(record=>record.status==='abnormal'))return {type:'reinspect',title:'现场反馈有异常，待复查',text:'人员已记录异常现象；沿同一事项继续核查。补录值不能替代实际检验，历史档案的结论保持不变。'}
+    if(last?.status==='incomplete')return {type:'extend',title:'资料不足，继续补充',text:'已保存缺项或不可比条件，可以延长跟踪安排并补充资料；延长安排不等于已经取得新的可比采样。'}
+    const presetRecords=records.filter(record=>record.preset&&record.isSimulation&&record.status==='normal')
+    if(last?.preset&&last.status==='normal'){
+      const covered=presetRecords.length>=2&&presetRecords[0].day===0&&last.day>=targetDays
+      return covered?{type:'archive',title:'效果稳定，待人工确认闭环',text:'观察记录已覆盖本轮观察窗口，未记录原异常反复。请结合现场情况确认是否闭环，观测达标不自动代替人工确认。'}:{type:'continue',title:'已有改善，继续观察',text:'当前观察记录尚未覆盖目标窗口，继续补充后续同工况观测，核对改善是否持续。'}
+    }
+    return {type:'continue',title:last?'记录已保存，待人工判读':'等待处理后可比资料',text:'补充记录已保存，仍需核对测量工况、观察时长及现场结果。单点恢复不足以确认持续稳定，请补齐可比资料并记录效果判断。'}
+  }
   if(!last) return {type:'continue',title:'等待处理后首测',text:'完成现场验收后开始本轮效果观察。'}
   if(records.some(r=>r.status==='abnormal')) return {type:'reinspect',title:'效果出现反复，建议'+(id==='maintenance'?'返回检查':'重新排查'),text:'后续监测补充了新的异常证据，本轮观察暂不满足收束条件。保留已有记录，核实复发原因后重新处置。'}
   if(last.status==='incomplete') return {type:'extend',title:'证据不足，建议延长观察',text:'本日缺少完整的同工况数据，暂不能判断处理效果是否持续稳定。建议延长24小时，补充可比记录。'}

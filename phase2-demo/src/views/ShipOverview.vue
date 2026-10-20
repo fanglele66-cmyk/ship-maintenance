@@ -1,7 +1,7 @@
 <template>
  <div class="captain-workbench">
   <section class="captain-twin">
-   <header><strong>远洋6号</strong><span>主机 · 辅机态势</span></header>
+   <header><strong>长航碧玉</strong><span>主机 · 辅机态势</span></header>
    <div ref="twinRef" class="twin-viewport">
     <div class="twin-scene" :style="sceneStyle">
      <img src="/ship-situation-engines.png" alt="船舶俯视态势图，设备入口位置为示意" decoding="async" fetchpriority="high" width="941" height="1672"/>

@@ -12,9 +12,9 @@
 
     <div class="header-right">
       <div class="vessel-status-group">
-        <el-popover trigger="click" placement="bottom-end" :width="220" :content="shipInfo.name">
+        <el-popover trigger="click" placement="bottom-end" :width="220" :content="displayShipName">
           <template #reference>
-            <button class="header-ship-name" type="button" :title="shipInfo.name">{{ shipInfo.name }}</button>
+            <button class="header-ship-name" type="button" :title="displayShipName">{{ displayShipName }}</button>
           </template>
         </el-popover>
         <span class="ship-status" :class="'status-' + statusTone">
@@ -44,6 +44,7 @@ import { useRoute, useRouter } from 'vue-router'
 const eventStore = useEventStore()
 const route = useRoute()
 const router = useRouter()
+const displayShipName=computed(()=>route.path.startsWith('/situation')||route.path==='/event'?'长航碧玉':shipInfo.name)
 const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
 const sectionTitle = computed(() => route.meta.title || '船舶设备检修助手')
 const detailTitle = computed(() => {

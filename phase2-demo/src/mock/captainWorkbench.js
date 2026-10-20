@@ -17,13 +17,10 @@ export function captainDeviceSignal(store,deviceId){
  return rows.some(i=>i.rank<=1)?'danger':rows.length?'warning':'normal'
 }
 export function captainAnalysis(store,deviceIds){
- const scoped=workbenchIssues(store).filter(i=>!deviceIds||deviceIds.includes(i.deviceId))
- const pending=scoped.filter(i=>i.state==='待决策'),assigned=scoped.filter(i=>i.state==='已派发')
- const cooling=pending.some(i=>i.id==='fault'),warning=pending.some(i=>i.id==='main-warning')
- const conclusion=cooling||warning?(deviceIds?'当前展示的主机与辅机中，待决策风险主要集中在主机；已有报警或多指标预警需要优先决策，辅机按自身证据分别评估。':'全船运行风险主要集中在主机，已有报警或多指标预警需要优先决策；其他设备按各自证据和处理进展分别评估。'):'主机的高优先级事项已作出决定，当前重点转为核对已派发任务的现场结果，并评估尚未安排的异动与维保建议。'
- const basis='结合各事项的发生时间与已提交反馈评价。主机直接关系推进能力，冷却温升伴海水供流下降，润滑供油压力下降伴过滤段压损增加，两项当前运行问题分别需要核实，不能归为同一个根因。2号辅机的长期排温变化用于评价健康趋势，本次只请求补充现场信息；轴承提前建议结合既有计划和振动变化评估，不直接决定换件。'
- const next=cooling?'优先查看主机冷却报警并决定排查安排，同时了解润滑供油预警的核实需求；随后评估2号辅机现场反馈与轴承提前建议。已派发任务沿原记录跟进，不重复安排。':warning?'优先了解主机润滑供油预警，决定是否派发现场核实，再查看辅机健康变化和提前维保的依据。':pending.length?'查看仍待决策事项的依据并指定本次任务负责人；已派发事项继续回看原任务。':'当前需要决策的请求均已安排或留有决定，可查看已派发任务结果及设备的持续跟踪。'
- return `### 健康态势分析\n\n${conclusion}\n\n${basis}\n\n### 建议\n\n${next}`
+ const rows=workbenchIssues(store).filter(item=>!item.history&&(!deviceIds||deviceIds.includes(item.deviceId)))
+ const pending=rows.filter(item=>item.state==='待决策'),assigned=rows.filter(item=>item.state==='已派发')
+ const brief=rows.map(item=>'- **'+item.title+'**：'+item.state+(item.stage?' · '+item.stage:'')).join('\n')
+ return `### 健康态势分析\n\n当前有 ${pending.length} 项待决策、${assigned.length} 项已派发。0430 二缸报警、0523 控制空气预警、倒车试验核实与临修后维保按各自证据推进。\n\n${brief}\n\n### 建议\n\n优先核对报警和低压预警的现场依据；倒车试验需结合操纵背景解释，减压阀维保分别评估必要性与条件。已有任务沿原事项跟进。\n\n0523 预警与后续维保关联同一设备问题，核实结果与检修安排沿原记录接续。`
 }
 
 // Completion of hands-on work is distinct from closure after observation.

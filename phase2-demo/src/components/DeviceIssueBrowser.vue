@@ -5,7 +5,7 @@
    <label>事项状态<FormSelect v-model="state" :options="stateOptions" placeholder="" /></label>
   </IssueFilterToolbar>
   <div class="device-issue-content">
-   <div v-if="deviceId==='main-engine-1' && (!type || type==='维保建议')" class="plan-entry"><strong>常规维保计划</strong><button class="p2-secondary" @click="router.push('/situation/maintenance/planned')">查看计划</button></div>
+   <div v-if="deviceId==='main-engine-1' && (!type || type==='维保建议')" class="plan-entry"><strong>常规维保计划与后续检查</strong><button class="p2-secondary" @click="router.push({path:'/situation/issue/real-maintenance-0523',query:{from:'device',device:deviceId,tab:'证据资料'}})">查看计划</button></div>
    <CaptainIssueRow v-for="item in rows" :key="item.id" :item="item" :show-device="false" @open="open" />
 
    <div v-if="!rows.length" class="empty"><strong>当前没有{{state}}的{{type || '事项'}}</strong><p>可切换事项类型或状态查看其他记录。</p><button class="p2-secondary" @click="$emit('overview')">查看健康概览</button></div>

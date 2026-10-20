@@ -1,28 +1,30 @@
 import fixtures from './fourStoryFixtures.json' with { type: 'json' }
+import {realWorkflowCases,realHealthTracks,assessRealCase} from './realCaseAdapter.js'
+const allCases=[...fixtures.cases.map(item=>({...item,latent:true,legacyScenario:true})),...realWorkflowCases]
 
 import {healthStoryMarkdown,storyTimeline} from './storyRecords.js'
 
 // Fixtures describe product scenarios, not a diagnostic or maintenance rule engine.
-export const workflowCases = Object.fromEntries(fixtures.cases.map(item => [item.id, item]))
+export const workflowCases = Object.fromEntries(allCases.map(item => [item.id, item]))
 export const workflowIds = Object.keys(workflowCases)
-export const healthTracks = fixtures.tracking
+export const healthTracks = [...fixtures.tracking,...realHealthTracks]
 export const historicalDecisions = fixtures.history
 export const isWorkflow = id => Boolean(workflowCases[id])
 const types = ['报警事件', '预警事件', '异动跟踪', '维保建议']
-export const workflowIssues = fixtures.cases.map(item => ({
+export const workflowIssues = allCases.map(item => ({
   id: item.id, deviceId: item.deviceId, device: item.device.split(' · ')[0], type: item.cardType,
   rank: types.indexOf(item.cardType), title: item.initialTitle, summary: item.report.conclusion,latent:Boolean(item.latent),
   action: '查看详情', evidence: item.stages[0].evidence, limit: item.cardType==='报警事件'?'报警表明测点越限，尚不能确定唯一根因；现场读数与采集状态仍需核对。':item.cardType==='预警事件'?'综合预警需要现场印证，尚不能直接确定部件故障或维修范围。':item.trackingOnly?'长期偏离不等于当前故障或剩余寿命下降结论；本次仅补充现场信息，不要求拆机。':'提前评估不等于批准换件；原周期计划保持有效，实际处理范围待确认。',
 }))
 
-export const workflowDossiers = Object.fromEntries(fixtures.cases.map(item => [item.id, {
+export const workflowDossiers = Object.fromEntries(allCases.map(item => [item.id, {
   conclusion: item.report.conclusion, recommendation: item.report.human,
   snapshots: (item.snapshots||[]).map(([name,value,reference,meaning]) => ({name,value,reference,meaning,source:item.source+' · 发生时记录'})),
   series: item.series||[],
   steps: [
     {title:'已有事实',fact:item.report.basis,inference:item.report.conclusion},
     {title:'当前判断边界',fact:'尚未提交的现场结果不属于已确认事实。',inference:item.report.human},
-    ...(item.trackingOnly?[{title:'长期跟踪与本次核实',fact:'首次、重复、持续三个节点保留在同一健康记录。',inference:'核实任务结束后原健康跟踪继续，不直接转入拆机维修。'}]:[]),
+    ...(item.trackingOnly?[{title:'长期跟踪与本次核实',fact:item.realCaseId?'倒车时段原始采样、操纵背景与本轮核实保留在同一记录。':'首次、重复、持续三个节点保留在同一健康记录。',inference:'核实任务结束后原健康跟踪继续，不直接转入拆机维修。'}]:[]),
   ],
   comparisons: item.cause?.rows.map(row=>({direction:row.name,support:row.cause+'；'+row.effect,missing:row.check+'尚需实际反馈'})) || [
     {direction:item.trackingOnly?'工况或测量因素':'提前处理的必要性',support:item.report.basis,missing:item.report.human},
@@ -89,6 +91,7 @@ export function assessWorkflow(id,stage,feedback) {
   if(invalid)return {valid:false,advance:false,message:'请完整记录本轮各项目的实际结果。'}
   const values=feedback.map(entry=>entry.result)
   const common={valid:true,records:feedback.map(entry=>({...entry,attachments:[...(entry.attachments||[])]}))}
+  if(workflowCases[id]?.realCaseId)return assessRealCase(workflowCases[id],stage,feedback)
   if(stage.id==='investigate') {
     const packages=stage.tasks.filter((_,i)=>values[i]==='发现异常').map(task=>task.package)
     const unknown=stage.tasks.filter((_,i)=>values[i]==='无法确认').map(task=>task.label)
@@ -130,6 +133,7 @@ export function composeRepair(caseData,keys) {
 
 export function workflowReply(store,id,text) {
   const item=store.cases[id],stage=item.stages[store.activeStage[id]],result=store.checkAssessments[id]
+  if(item.realCaseId)return (result?assessmentMarkdown(result)+'\n\n':'')+stageReport(store,id,stage)
   if(/原计划|周期|取消/.test(text)&&['maintenance','aux-maintenance'].includes(id))return '### 原计划与本次建议\n\n本次只决定是否提前开展相关项目，不取消原周期计划。实际执行后按部位与完成范围登记，未做的项目继续保留，不自动重置整个周期。'
   if(result&&/核实|结束|后续|跟踪|依据|结果|为什么|发现|下一步/.test(text))return assessmentMarkdown(result)
   if(/核实|结束|后续|跟踪/.test(text)&&id==='aux-health')return '### 本次核实与长期变化\n\n核实用于补齐测点、时间、实际读数与运行背景，不要求先确认某个部件损坏。完成后可结束本次待办，原健康链继续。\n\n### 后续判断\n\n同源显示一致不等于校准；偏移稳定也不等于恢复。后续发展结合实际反馈、相关计划与窗口评估，没有新需求时不重复派单。'
@@ -138,11 +142,19 @@ export function workflowReply(store,id,text) {
 }
 
 export function deviceStoryAssessment(store,deviceId){
+  const current=realWorkflowCases.filter(item=>item.deviceId===deviceId)
+  if(current.length){
+    const active=current.filter(item=>store.eventStatus?.[item.id]!=='closed'&&!store.ignoredSuggestions?.[item.id])
+    const details=current.map(item=>item.initialTitle+'：'+(store.completedTasks?.[item.id]?.reason||store.checkAssessments?.[item.id]?.message||item.report.conclusion))
+    return {conclusion:active.length?'当前展示 0430 二缸报警、0523 控制空气预警、倒车试验跟踪及临修后维保评估，按各事项的发生窗口与本轮反馈分别判断。':'本轮事项均已有决定或闭环，来源资料与处理记录保留。',basis:details.join('\n\n'),next:'优先核对报警与预警的现场依据；倒车试验先核实操纵工况，维保建议分别评估必要性与条件。0523 预警和后续维保同源，不能重复计为两起故障。'}
+  }
+
   if(deviceId==='main-engine-1'){
     const cooling=store.completedTasks?.fault?'冷却报警已有结束决定，依据仍可回查。':store.isTaskHandled('fault')?'冷却处置已提交，仍需验证后续效果。':'冷却温升与流量下降共同支持优先核实冷却能力。'
     const warning=store.completedTasks?.['main-warning']?'润滑预警已有本次结束决定，依据保留。':store.todoCreated['main-warning']?'润滑供油预警已派发，查看核实结果及当前原因排查。':'润滑供油压力下降伴过滤段压损增加，需及时核实当前供油变化。'
     return {conclusion:`主机的当前运行问题应与长期健康线索分开理解。${cooling}${warning}目前没有证据把两项变化归为共同根因；原3号缸排温仅保留为健康线索。`,basis:'冷却资料记录淡水出口92.4°C与海水支路68.2 m³/h，是跨回路关联；润滑资料记录滤后0.31→0.24 MPa、上游0.34→0.31 MPa，压差0.03→0.07 MPa由同刻压力计算，不能重复视为独立证明。各记录按自身发生时间与已提交现场反馈解读；温度、趋势或作业完成都不能直接证明具体部件损坏或持续恢复。',next:store.todoCreated.fault?'查看原冷却任务的实际发现与验证，同时跟进润滑预警的现场核实；已有事项不重复派发。轴承提前评估与主机3号缸健康记录分别保留。':'先了解冷却报警的当前影响及排查范围，并安排润滑预警的及时核实；两项都需要按实际现场情况决定处置，不能等一种问题完成后才了解另一种。'}
   }
+  if(['aux-system','aux-engine-1','aux-engine-2','aux-engine-3'].includes(deviceId))return {conclusion:'本设备暂无本轮待处理事项。',basis:'可查看设备测点、运行资料与既有处理记录。',next:'按实际设备资料和原计划查看运行状态。'}
   if(deviceId==='aux-system')return {conclusion:'辅机侧的主要变化集中在2号机，现有记录未显示为三台机组的共同问题。1、2号运行，3号备用；运行评价与备用可用性不能共用一段结论。',basis:'1号已覆盖的运行片段没有持续扩大变化；2号3号缸在负荷65%—67%、约750 rpm下从404升至409°C，其他缸约399—400°C。3号最近只有约30%负荷、30分钟试运行记录，不能代表更高负荷或更长运行能力。',next:'先查看2号机的长期变化及当前核实进展，再按各机资料了解情况。1号维持原记录，3号按备用分工核对试运行资料。'}
   if(deviceId==='aux-engine-2'){
     const state=store.healthUpdates?.['aux2-health'],later=state?.laterNodes?.at(-1),assessment=store.checkAssessments?.['aux-health']
