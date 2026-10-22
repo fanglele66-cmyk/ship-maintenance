@@ -15,7 +15,7 @@ export function workbenchIssues(store){
  const rows=issueCatalog.filter(item=>!item.latent||store.unlockedRecommendations?.[item.id]||store.todoCreated?.[item.id]||store.ignoredSuggestions?.[item.id]||maintenanceRecommendations(store,item.id).length).map(item=>{
   const state=item.history?{state:'已闭环',taskId:null,decisionId:null}:issueState(store,item.id)
   const contextId=state.taskId||state.decisionId||maintenanceChildIds(item.id).find(id=>store.completedTasks?.[id]||store.ignoredSuggestions?.[id])||item.id
-  return {...item,...state,maintenanceRecommendations:maintenanceRecommendations(store,item.id),updatedAt:store.eventUpdatedAt?.[contextId]||item.at,decisionReason:store.ignoredSuggestions?.[contextId]?.reason,owner:store.assignments?.[contextId]?.owner||item.actor,stage:store.completedTasks?.[contextId]?.title||store.cases?.[contextId]?.stages[store.progress?.[contextId]]?.label}
+  return {...item,...state,maintenanceRecommendations:maintenanceRecommendations(store,item.id),updatedAt:store.eventUpdatedAt?.[contextId]||item.at,decisionReason:store.ignoredSuggestions?.[contextId]?.reason,owner:store.assignments?.[contextId]?.owner||item.actor,stage:store.completedTasks?.[contextId]?.title||(store.todoCreated?.[contextId]?store.cases?.[contextId]?.stages[store.progress?.[contextId]]?.label:undefined)}
  })
  return sortIssues(rows)
 }

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mockSensors } from '../src/mock/sensors.js'
 import { buildSimulationSensors } from '../src/mock/sensorSimulation.js'
-import { buildSensorLayout, filterSensorReadings, formatSensorValue } from '../src/mock/sensorLayout.js'
+import { buildSensorLayout, filterSensorReadings, formatSensorValue, overviewSensorReadings } from '../src/mock/sensorLayout.js'
 
 const readings = buildSimulationSensors(mockSensors)
 const groupSensors = groups => groups.flatMap(group => group.sections.flatMap(section => section.sensors))
@@ -90,4 +90,24 @@ test('missing, blank and non-finite numbers display a dash, while precision and 
   assert.equal(formatSensorValue({ value: 0 }), '0')
   assert.equal(formatSensorValue({ value: 0, precision: 2 }), '0.00')
   assert.equal(formatSensorValue({ value: 0.4, precision: 2 }), '0.40')
+})
+
+test('overview selects 38 main-engine readings without losing any cylinder or hiding detailed points from the full board', () => {
+  const main = readings.filter(sensor => sensor.deviceId === 'main-engine-1')
+  const preview = overviewSensorReadings(main)
+  assert.equal(main.length, 59)
+  assert.equal(preview.length, 38)
+  assert.ok(preview.every(sensor => main.includes(sensor)))
+  const layout = buildSensorLayout(preview)
+  assert.deepEqual(layout.main.matrix.map(row => row.id), ['exhaust', 'scavenge', 'coolant', 'piston'])
+  assert.ok(layout.main.matrix.every(row => row.cells.every(cell => cell.sensor)))
+  assert.equal(groupSensors(layout.main.columns.flat()).length, 12)
+  assert.deepEqual(groupSensors(layout.main.operatingGroups).map(sensor => sensor.id), ['s-012', 'main-load'])
+  assert.ok(preview.some(sensor => sensor.id === 'main-control-air-pressure'))
+  assert.equal(layoutSensors(buildSensorLayout(main)).length, 59)
+})
+
+test('other equipment keeps every available point in the overview', () => {
+  const other = readings.filter(sensor => sensor.deviceId !== 'main-engine-1')
+  assert.deepEqual(overviewSensorReadings(other), other)
 })

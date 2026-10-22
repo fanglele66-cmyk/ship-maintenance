@@ -7,7 +7,7 @@
         <span class="header-chevron" aria-hidden="true">›</span>
         <strong :key="detailTitle" class="header-page-title">{{ detailTitle }}</strong>
       </template>
-      <strong v-else class="header-section-title">{{ route.meta.title || '船舶设备检修助手' }}</strong>
+      <strong v-else class="header-section-title">{{ sectionTitle }}</strong>
     </div>
 
     <div class="header-right">
@@ -44,9 +44,9 @@ import { useRoute, useRouter } from 'vue-router'
 const eventStore = useEventStore()
 const route = useRoute()
 const router = useRouter()
-const displayShipName=computed(()=>route.path.startsWith('/situation')||route.path==='/event'?'长航碧玉':shipInfo.name)
+const displayShipName=computed(()=>route.path.startsWith('/situation')||['/issues','/event'].includes(route.path)?'长航碧玉':shipInfo.name)
 const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
-const sectionTitle = computed(() => route.meta.title || '船舶设备检修助手')
+const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')&&route.query.from==='issues'?'事件中心':route.meta.title || '船舶设备检修助手')
 const detailTitle = computed(() => {
   if (selectedEvent.value) return selectedEvent.value.title
   if (route.path.startsWith('/inspection')) {

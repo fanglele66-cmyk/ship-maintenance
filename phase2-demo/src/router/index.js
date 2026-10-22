@@ -4,7 +4,8 @@ import {canonicalIssueRoute} from '@/mock/issueRelationships'
 const routes = [
   { path: '/', redirect: '/situation' },
   {path:'/real-cases',redirect:'/situation'},
-  {path:'/situation/issues',name:'SituationIssues',component:()=>import('@/views/CaptainIssuesView.vue'),meta:{title:'态势中心'}},
+  {path:'/issues',name:'SituationIssues',component:()=>import('@/views/CaptainIssuesView.vue'),meta:{title:'事件中心'}},
+  {path:'/situation/issues',redirect:to=>({path:'/issues',query:to.query,hash:to.hash})},
   {
     path: '/event',
     name: 'EventCenter',

@@ -34,10 +34,10 @@
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
         <div v-if="!attentionId && !maintenanceId && !issueId && currentLayer === 2" class="layer" :class="layerClass(2)">
-          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @open-data="sensorView='list'" @back="goToLayer(1)">
+          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @open-data="sensorView='list';sensorSearchQuery=''" @back="goToLayer(1)">
             <template #data>
-              <SensorSimulationControls/>
               <div class="device-data-toolbar">
+                <SensorSimulationControls/>
                 <label class="layer-header-search">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
                   <input v-model="sensorSearchQuery" type="search" placeholder="搜索传感器" aria-label="搜索传感器" />
@@ -96,6 +96,7 @@
 import {lazyPane} from '@/components/lazyPane'
 import {issueCatalog} from '@/mock/captainWorkbench'
 import {resolveIssueNavigation} from '@/mock/issueRelationships'
+import {issueDirectoryLocation} from '@/mock/dispatchNavigation'
 import {isWorkflow} from '@/mock/fourStoryWorkflow'
 const SituationObservation=lazyPane(()=>import('@/components/SituationObservation.vue'))
 const CaptainIssueDetail=lazyPane(()=>import('@/components/CaptainIssueDetail.vue'))
@@ -408,7 +409,7 @@ watch([attentionId,maintenanceId], async ([id, maintenance]) => {
   } else { demoStore.clearObservationFocus(); demoStore.attentionInFocus=false }
 }, {immediate:true,flush:'post'})
 onMounted(()=>{if(maintenanceId.value){demoStore.selectAttention('maintenance');demoStore.attentionInFocus=true;demoStore.regularMaintenanceInFocus=maintenanceId.value==='planned'}})
-async function returnFromIssue(deviceId){if(route.query.from==='device'){const type=route.query.type,state=route.query.state;await router.push('/situation');if(currentLayer.value!==2||selectedDeviceId.value!==deviceId)handleDeviceClick(deviceStore.getDeviceById(deviceId));await nextTick();deviceSituationRef.value?.showRelated(type,state);return}if(route.query.from==='workbench'){demoStore.showCaptainWorkbench();await router.push('/situation');return}if(route.query.from==='issues'){await router.push({path:'/situation/issues',query:{resume:'1',state:route.query.state,device:route.query.device,type:route.query.type}});return}await router.push('/situation');handleDeviceClick(deviceStore.getDeviceById(deviceId))}
+async function returnFromIssue(deviceId){if(route.query.from==='device'){const type=route.query.type,state=route.query.state;await router.push('/situation');if(currentLayer.value!==2||selectedDeviceId.value!==deviceId)handleDeviceClick(deviceStore.getDeviceById(deviceId));await nextTick();deviceSituationRef.value?.showRelated(type,state);return}if(route.query.from==='workbench'){demoStore.showCaptainWorkbench();await router.push('/situation');return}if(route.query.from==='issues'){await router.push(issueDirectoryLocation(route.query,{resume:true}));return}await router.push('/situation');handleDeviceClick(deviceStore.getDeviceById(deviceId))}
 async function returnToAir(){await router.push('/situation');handleDeviceClick(deviceStore.getDeviceById('air-compressor'))}
 async function returnToAttention() {
   await router.push('/situation')
@@ -615,6 +616,8 @@ situationContext.action = currentLayer.value === 1 ? 'enter_layer' : 'restore_la
   gap: 8px;
   margin: 3px 0 10px;
 }
+.device-data-toolbar :deep(.simulation-controls) { padding: 0; margin-right: auto; gap: 10px; font-size: 10px; }
+.device-data-toolbar :deep(.simulation-controls form) { left: 0; right: auto; }
 .layer-header-search {
   width: clamp(160px, 32%, 240px);
   height: 32px;
@@ -804,6 +807,9 @@ situationContext.action = currentLayer.value === 1 ? 'enter_layer' : 'restore_la
 @media (max-width: 760px) {
   .layer-header { gap: 6px; padding: 0 12px; }
   .layer-header-tools { flex: 1 1 auto; }
+  .device-data-toolbar { flex-wrap: wrap; }
+  .device-data-toolbar :deep(.simulation-controls) { width: 100%; justify-content: space-between; }
+  .device-data-toolbar :deep(.simulation-controls form) { max-width: calc(100vw - 80px); }
   .device-data-toolbar .layer-header-search { min-width: 0; flex: 1 1 144px; width: auto; }
   .layer-header-search { min-width: 0; flex: 1 1 144px; width: auto; }
   .sensor-view-switch button { padding: 0 8px; }

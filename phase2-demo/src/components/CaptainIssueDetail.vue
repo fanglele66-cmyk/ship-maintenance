@@ -1,6 +1,6 @@
 <template>
 <article v-if="issue" ref="rootRef" class="captain-detail">
-  <BackButton :label="route.query.from==='issues'?'返回事项处置':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事项':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
+  <BackButton :label="route.query.from==='issues'?'返回事件目录':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事项':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
   <header>
     <div><span class="issue-type">{{issue.type}} · {{issue.device}}</span><h2>{{issue.title}}</h2></div>
     <span>{{issue.state==='已闭环'?'已结束':issue.state}}</span>

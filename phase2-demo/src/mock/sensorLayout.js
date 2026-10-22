@@ -134,3 +134,16 @@ export function filterSensorReadings(readings, query = '') {
   return readings.filter(sensor => [sensor.nameCn, sensor.nameEn]
     .some(name => String(name || '').toLocaleLowerCase().includes(normalized)))
 }
+
+// The overview keeps operating context and the four comparable cylinder
+// temperatures. Detailed actuator feedback and secondary points stay in data.
+export function overviewSensorReadings(readings = []) {
+  const mainIds = new Set([
+    'main-fuel-rail-pressure', 's-002', 's-009', 's-010', 's-011',
+    'main-control-air-pressure', 'main-air-spring-pressure', 'main-servo-rail-pressure',
+    's-006', 's-007', 's-008', 's-017', 's-012', 'main-load',
+    ...sensorCylinderNumbers.flatMap(number => ['exhaust', 'scavenge', 'coolant', 'piston']
+      .map(topic => mainCylinderSensorBindings[number][topic])),
+  ])
+  return readings.filter(sensor => sensor.deviceId !== 'main-engine-1' || mainIds.has(sensor.id))
+}

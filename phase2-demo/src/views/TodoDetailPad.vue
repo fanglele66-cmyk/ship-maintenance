@@ -1,7 +1,7 @@
 <template>
   <div v-if="todo && stage" class="p2-detail p2-pad-detail">
     <header class="p2-detail-head">
-      <BackButton :label="route.query.from==='issues'?'返回事项处置':'返回待办中心'" @click="returnToList" />
+      <BackButton :label="route.query.from==='issues'?'返回事件目录':'返回待办中心'" @click="returnToList" />
       <div><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
       <span class="p2-badge" :class="store.isTaskHandled(todo.id)?'blue':'red'">{{ store.isTaskHandled(todo.id)?'已处理':'未处理' }}</span>
     </header>
@@ -91,6 +91,7 @@
 </template>
 <script setup>
 import {isMaintenanceWorkflow, parentIssueId} from '@/mock/issueRelationships'
+import {issueDirectoryLocation} from '@/mock/dispatchNavigation'
 
 import { computed, reactive, ref, watch } from 'vue'
 import ScenarioBranchPreset from '@/components/ScenarioBranchPreset.vue'
@@ -109,7 +110,7 @@ import HealthTrackingPanel from '@/components/HealthTrackingPanel.vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import {isWorkflow,stageReport} from '@/mock/fourStoryWorkflow'
 import { overviewReports, causeContent } from '@/mock/phase2Content'
-function returnToList(){store.closeTodo();router.replace(route.query.from==='issues'?{path:'/situation/issues',query:{resume:'1',state:route.query.state,device:route.query.device,type:route.query.type}}:'/event')}
+function returnToList(){store.closeTodo();router.replace(route.query.from==='issues'?issueDirectoryLocation(route.query,{resume:true}):'/event')}
 const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),todo=computed(()=>store.selectedTodo),stage=computed(()=>store.currentStage)
 const subtab=computed({get:()=>store.detailTab,set:value=>store.detailTab=value})
 const assessmentPending=computed(()=>!store.isTaskHandled(todo.value?.id)&&store.checkAssessments[todo.value?.id]?.stageId===stage.value?.id)

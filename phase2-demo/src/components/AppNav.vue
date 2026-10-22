@@ -44,6 +44,9 @@ const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.total
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {
+  const issueDetail = route.path.startsWith('/situation/issue/') && route.query.from === 'issues'
+  if (path === '/issues') return route.path === '/issues' || issueDetail
+  if (path === '/situation' && issueDetail) return false
   return route.path === path || route.path.startsWith(path + '/')
 }
 
@@ -63,8 +66,8 @@ onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
 
 const navItems = [
   { path: '/situation', label: '态势', icon: '/nav-icons/situation.svg' },
-  { path: '/event', label: '待办', icon: '/nav-icons/event.svg' },
-  { path: '/inspection', label: '日志', icon: '/nav-icons/inspection.svg' },
+  { path: '/issues', label: '事件', icon: '/nav-icons/event.svg' },
+  { path: '/event', label: '待办', icon: '/nav-icons/inspection.svg' },
   { path: '/knowledge', label: '知识', icon: '/nav-icons/knowledge.svg' }
 ]
 </script>
