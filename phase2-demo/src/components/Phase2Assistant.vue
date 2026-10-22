@@ -1,7 +1,9 @@
 <template>
   <aside class="p2-assistant p2-restored-assistant">
     <div class="p2-assistant-head"><span class="p2-ai-mark">✦</span><div><strong>{{props.title}}</strong><small>{{ contextLabel }}</small></div><ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="sessions.select" @new-conversation="sessions.newConversation" /></div>
-    <div ref="scrollRef" class="p2-messages" aria-live="polite">
+    <nav v-if="props.issueId" class="issue-assistant-tabs" aria-label="事件助手内容"><button type="button" :class="{active:issueView==='process'}" @click="issueView='process'">处置过程</button><button type="button" :class="{active:issueView==='chat'}" @click="issueView='chat'">事件问答</button></nav>
+    <IssueProcessPanel v-if="props.issueId&&issueView==='process'" :issue-id="props.issueId" @ask="issueView='chat'"/>
+    <div v-else ref="scrollRef" class="p2-messages" aria-live="polite">
       <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" :disabled-actions="maintenanceDisabledActions" @action="runDemoAction" @confirm-record="store.confirmQuickRecord(key)" @submit-inquiry="submitInquiry" @update-inquiry="updateInquiry">
         <template #actions>
           <div v-if="props.dossier && message.noteCandidate" class="p2-demo-actions"><button v-if="!message.noteCandidate.registered" type="button" @click="registerMessageNote(message)">将这条补充登记为留言</button><small v-else>这条补充已登记到跟踪记录</small></div>
@@ -10,11 +12,12 @@
         </template>
       </MessageRenderer>
     </div>
-    <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><span></span><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
+    <form v-if="!props.issueId||issueView==='chat'" class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><span></span><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
   </aside>
 </template>
 <script setup>
 import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
+import IssueProcessPanel from './IssueProcessPanel.vue'
 import {workbenchIssues} from '@/mock/captainWorkbench'
 import { initialIssueMessages, issueReply, issueContext } from '@/message-flows/issueSources'
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
@@ -44,6 +47,7 @@ import { attentionInquiry } from '@/message-flows/attentionInquiry'
 import { validateInquiry } from '@/message-flows/inquiryFields'
 const props=defineProps({title:{type:String,default:'检修助手'},mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean,planOnly:Boolean,deviceId:String,deviceName:String,issueId:String}),emit=defineEmits(['open-device','open-todo','open-item','issue-section']),store=usePhase2DemoStore(),scrollRef=ref(null)
 const router = useRouter()
+const issueView=ref('process')
 const mode=computed(()=>props.issueId?'issue':props.maintenanceDetail ? 'attention' : props.dossier ? (store.situationObservationId?'observation':'attention') : props.mode==='attention'&&store.situationObservationId?'observation':props.mode==='attention'&&!store.attentionInFocus?'device':props.mode)
 const key=computed(()=>mode.value==='observation'?store.situationObservationId:mode.value==='attention'?store.selectedAttentionId:mode.value==='todo'?store.selectedTodoId:mode.value)
 const advice=useMaintenanceAdviceStore(),workOrders=useEventWorkOrderStore()
@@ -258,4 +262,8 @@ onUnmounted(clearMonitorTimer)
 .p2-restored-assistant{width:350px;min-width:320px}.p2-restored-assistant .p2-messages{padding:16px 14px}.p2-restored-assistant .p2-message{margin-top:18px;gap:8px}.p2-restored-assistant .p2-message:first-child{margin-top:0}.p2-restored-assistant .p2-bubble{font-size:13px;line-height:1.7;min-width:0;flex:1;white-space:normal}.p2-restored-assistant .assistant .p2-bubble{background:transparent;padding:0;box-shadow:none}.p2-restored-assistant .user .p2-bubble{flex:initial;max-width:90%;background:#edf4ff;padding:9px 12px;border-radius:8px}.p2-bubble h3{font-size:14px;color:#24334a;margin:0 0 10px;font-weight:650}.p2-dialog-paragraph{margin:11px 0}.p2-dialog-paragraph b{font-size:12px;color:#52627b}.p2-dialog-paragraph p{margin-top:3px;color:#34465e}.p2-dialog-question{margin-top:13px;color:#34465e}.p2-feedback-record{border:1px solid #dce5f0;border-radius:8px;background:#fff;padding:12px}.p2-record-meta{font-size:11px;color:#7e8da1;padding-bottom:8px;border-bottom:1px solid #e7edf5}.p2-record-row{padding:9px 0;border-bottom:1px solid #edf1f6}.p2-record-row b{font-size:12px;color:#334b6e}.p2-record-row p{font-size:12px;margin-top:3px;color:#61718a}.p2-feedback-record .p2-secondary{margin-top:10px;font-size:12px;padding:7px 10px}.p2-restored-assistant .p2-compose textarea{font-size:13px;line-height:1.6}.p2-restored-assistant .p2-compose-foot button{font-size:12px;padding:7px 14px}
 .p2-restored-assistant .p2-assistant-head{gap:9px}.p2-demo-label{display:inline-flex;align-items:center;margin-bottom:6px;border-radius:10px;background:#eff6ff;color:#3874bd;padding:2px 8px;font-size:10px;font-weight:600;line-height:1.5}.p2-restored-assistant .user .p2-demo-label{display:block;width:max-content;margin-left:auto}.p2-demo-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.p2-demo-actions button{border:1px solid #d8e5f4;border-radius:6px;background:#fff;color:#3475c7;padding:7px 9px;font-size:11px;cursor:pointer}.p2-demo-actions button:hover{background:#f1f6fc}.p2-demo-label.is-change{background:#fff3de;color:#a37125}.p2-restored-assistant .p2-message[data-demo="true"] + .p2-message{padding-top:14px;border-top:1px solid #e9eef4}
 @media(max-width:1200px){.p2-restored-assistant{width:320px;min-width:300px}}
+</style>
+
+<style scoped>
+.issue-assistant-tabs{display:flex;gap:22px;padding:0 16px;border-bottom:1px solid #dfe6f0;background:white;flex-shrink:0}.issue-assistant-tabs button{border:0;background:none;color:#7b8a9d;font:inherit;font-size:13px;padding:12px 0;cursor:pointer}.issue-assistant-tabs button.active{color:#2d68a4;border-bottom:2px solid #2d68a4}
 </style>

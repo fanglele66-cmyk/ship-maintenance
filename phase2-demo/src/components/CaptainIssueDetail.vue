@@ -1,24 +1,25 @@
 <template>
 <article v-if="issue" ref="rootRef" class="captain-detail">
-  <BackButton :label="route.query.from==='issues'?'返回事件目录':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事项':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
+  <BackButton :label="route.query.from==='issues'?'返回事件目录':route.query.from==='workbench'?'返回船舶态势':route.query.from==='device'?'返回'+issue.device+'相关事件':'返回'+issue.device+'概览'" @click="$emit('back',issue.deviceId)"/>
   <header>
     <div><span class="issue-type">{{issue.type}} · {{issue.device}}</span><h2>{{issue.title}}</h2></div>
-    <span>{{issue.state==='已闭环'?'已结束':issue.state}}</span>
+    <span>{{issue.eventState}}</span>
   </header>
   <nav role="tablist">
     <button v-for="tab in tabs" :key="tab" role="tab" :aria-selected="active===tab" :class="{active:active===tab}" @click="goTab(tab)">{{tab}}</button>
   </nav>
   <main>
-    <!-- 事项概览：结论与建议先行，关键依据摘要，推理可展开，快链与下一步 -->
-    <template v-if="active==='事项概览'">
+    <p v-if="dossier.reference" class="limit-note"><strong>{{dossier.reference.label}}</strong> · {{dossier.reference.boundary}}</p>
+    <!-- 事件概览：结论与建议先行，关键依据摘要，推理可展开，快链与下一步 -->
+    <template v-if="active==='事件概览'">
       <MarkdownContent :content="dossier.overviewMarkdown"/>
       <div class="quick-links" aria-label="页签快链">
         <button type="button" @click="goTab('研判分析')">查看研判分析</button>
         <button type="button" @click="goTab('证据资料')">查看证据资料</button>
       </div>
       <button v-if="issue.type==='异动跟踪'" type="button" class="tracking-entry" @click="goTab('健康趋势观测')"><span><strong>健康趋势观测</strong><small>持续变化、现场核实与阶段性维保建议</small></span><span aria-hidden="true">查看跟踪 →</span></button>
-      <section v-if="issue.history||store.eventStatus[issue.id]==='closed'" class="dossier-block"><h3>已记录的结果</h3><p>{{store.completedTasks[issue.id]?.reason||store.executionRecords[issue.id]?.at(-1)?.values.acceptance||issue.reason}}</p><p>{{issue.outcome||'来源资料、实际措施与本次确认保留，可在设备动态回查。'}}</p></section>
-      <section v-else-if="!issue.isTrackingContainer" class="next-step">
+      <section v-if="issue.history||issue.eventState==='已闭环'" class="dossier-block"><h3>已记录的结果</h3><p>{{store.completedTasks[issue.id]?.reason||store.executionRecords[issue.id]?.at(-1)?.values.acceptance||issue.reason}}</p><p>{{issue.outcome||'来源资料、实际措施与本次确认保留，可在本事件处置记录回查。'}}</p></section>
+      <section v-else-if="!issue.isTrackingContainer&&!store.isTaskHandled(issue.id)" class="next-step">
         <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警现场核实':'评估并安排检查'"/>
         <button v-if="store.todoCreated[issue.id]" class="p2-primary" @click="openTask">查看处理任务</button>
         <template v-else-if="issue.type==='报警事件'">
@@ -29,11 +30,26 @@
       </section>
     </template>
     <HealthTrendObservation v-else-if="active==='健康趋势观测'" :scenario="issue.id" />
+    <template v-else-if="active==='处置记录'">
+      <h3>{{issue.eventState==='已闭环'?'闭环结果与处置过程':'已提交的处置过程'}}</h3>
+      <p>{{dossier.reference?.result || store.completedTasks[issue.id]?.reason || dossier.conclusion}}</p>
+      <div v-if="dossier.reference" class="reference-results" aria-label="参考案例处置结果">
+        <section class="dossier-block"><h3>关联核实任务</h3><p>{{dossier.reference.task.at}} · {{dossier.reference.task.assignedBy}}派发给{{dossier.reference.task.owner}}</p><p>{{dossier.reference.task.scope}}</p><p>{{dossier.reference.task.result}}</p></section>
+        <section class="dossier-block"><h3>执行反馈与实际措施</h3><p>{{dossier.reference.feedback.at}} · {{dossier.reference.feedback.finding}}</p><p>{{dossier.reference.feedback.measure}}</p></section>
+        <section class="dossier-block"><h3>验收依据与结果</h3><p>{{dossier.reference.acceptance.at}} · {{dossier.reference.acceptance.actor}}</p><p>{{dossier.reference.acceptance.basis}}</p><p>{{dossier.reference.acceptance.result}}</p></section>
+        <section class="dossier-block"><h3>闭环确认与后续安排</h3><p>{{dossier.reference.closure.at}} · {{dossier.reference.closure.actor}}：{{dossier.reference.closure.result}}</p><p>{{dossier.reference.closure.followup}}</p></section>
+      </div>
+      <div class="quick-links"><button v-if="observationTaskIds.length" type="button" @click="goTab('效果观察')">接续效果观察与闭环确认</button><button type="button" @click="goTab('证据资料')">查看原始依据与执行材料</button></div>
+      <SituationTimeline v-if="dossier.timeline?.length" :entries="dossier.timeline" expanded/>
+      <p v-else class="block-empty">尚未提交派发或执行记录。起始发现与研判见右侧处置过程。</p>
+      <section v-for="recordId in recordIds.filter(id=>store.executionRecords[id]?.length)" :key="recordId" class="dossier-block"><h3>实际执行与验收</h3><div v-for="(record,index) in store.executionRecords[recordId]" :key="index"><p>{{record.values.executedAt}} · {{record.executor || record.values.executor}}</p><p>{{record.values.measures}}</p><p>{{record.values.acceptance}}</p></div></section>
+    </template>
+    <template v-else-if="active==='效果观察'"><SituationObservation v-for="taskId in observationTaskIds" :key="taskId" :scenario="taskId" @back="goTab('处置记录')"/></template>
     <!-- 研判分析：观察事实、推断、候选解释与未确认问题分层 -->
     <template v-else-if="active==='研判分析'">
       <MarkdownContent :content="dossier.analysisMarkdown"/>
       <div class="quick-links" aria-label="返回概览">
-        <button type="button" @click="goTab('事项概览')">返回事项概览</button>
+        <button type="button" @click="goTab('事件概览')">返回事件概览</button>
       </div>
     </template>
     <!-- 证据资料：数据快照、观测节点趋势、证据链、计划来源、人员反馈与决定 -->
@@ -64,7 +80,7 @@
           </div>
           <p class="limit-note">节点折线仅连接已有观测记录，节点口径见各图说明；未补时间点。</p>
         </template>
-        <p v-else class="block-empty">该事项暂无连续观测节点记录，仅保留上方数据快照；不拼凑连续趋势。</p>
+        <p v-else class="block-empty">该事件暂无连续观测节点记录，仅保留上方数据快照；不拼凑连续趋势。</p>
       </section>
       <section class="dossier-block">
         <h3>关联证据与判断范围</h3>
@@ -104,11 +120,12 @@
     </template>
   </main>
 </article>
-<div v-else class="p2-empty">未找到该事项，请返回态势中心。</div>
+<div v-else class="p2-empty">未找到该事件，请返回态势中心。</div>
 </template>
 <script setup>
 import {decisionPreset} from '@/mock/realScenarioPresets'
 import SituationTimeline from './SituationTimeline.vue'
+import SituationObservation from './SituationObservation.vue'
 import {computed,nextTick,ref,watch} from 'vue'
 import ObservationTrend from './ObservationTrend.vue'
 import {useRoute,useRouter} from 'vue-router'
@@ -123,10 +140,12 @@ import BackButton from './BackButton.vue'
 import TaskAssignment from './TaskAssignment.vue'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
 watch(()=>props.scenario,id=>store.openRealCase(id),{immediate:true})
-const tabs=computed(()=>['事项概览',...(issue.value?.type==='异动跟踪'?['健康趋势观测']:[]),'研判分析','证据资料']),active=ref('事项概览'),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
+const tabs=computed(()=>['事件概览',...(issue.value?.type==='异动跟踪'?['健康趋势观测']:[]),'研判分析','处置记录',...(observationTaskIds.value.length?['效果观察']:[]),'证据资料']),active=ref('事件概览'),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
 const rootRef=ref(null),overviewScroll=ref(0)
 const issue=computed(()=>workbenchIssues(store).find(item=>item.id===props.scenario))
 const recordIds=computed(()=>[...new Set([...(issue.value?.isTrackingContainer?[]:[props.scenario]),...(issue.value?.maintenanceRecommendations||[]).map(item=>item.id)])])
+const observationTaskIds=computed(()=>recordIds.value.filter(id=>store.executionRecords[id]?.length&&store.isTaskHandled(id)&&!store.completedTasks[id]&&store.eventStatus[id]!=='closed'))
+watch(tabs,value=>{if(!value.includes(active.value))active.value='处置记录'})
 watch(()=>[props.scenario,store.eventStatus[props.scenario]],()=>{if(store.eventStatus[props.scenario]==='pending'){falseAlarmOpen.value=false;falseAlarmReason.value='';feedback.value=false;active.value=tabs.value[0]}})
 watch(()=>[props.scenario,route.query.tab],()=>{active.value=tabs.value.includes(route.query.tab)?route.query.tab:tabs.value[0]},{immediate:true})
 const dossier=computed(()=>storyDossier(store,props.scenario))
@@ -135,14 +154,14 @@ const openQuestions=computed(()=>{
   return [...new Set(items)]
 })
 function goTab(tab){
-  if(active.value==='事项概览'&&tab!=='事项概览')overviewScroll.value=rootRef.value?.scrollTop||0
+  if(active.value==='事件概览'&&tab!=='事件概览')overviewScroll.value=rootRef.value?.scrollTop||0
   active.value=tab
-  if(tab==='事项概览')nextTick(()=>{if(rootRef.value)rootRef.value.scrollTop=overviewScroll.value})
+  if(tab==='事件概览')nextTick(()=>{if(rootRef.value)rootRef.value.scrollTop=overviewScroll.value})
 }
-function openTask(){const id=issue.value.taskId||issue.value.id;store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
+function openTask(){const id=issue.value.taskId||issue.value.id;if(!store.activeTaskPortfolio.some(item=>item.id===id)){goTab('处置记录');return}store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 const falseAlarmInquiry=computed(()=>({...assignmentTemplate.falseAlarm,text:'确认误报依据',hint:'记录现场核对与判断依据。本次处置将结束，原报警和快照仍保留。',id:'false-alarm-'+props.scenario,status:feedback.value?'submitted':'pending',values:{reason:falseAlarmReason.value},submitLabel:'确认误报并留档',receiptText:'本次误报决定及依据已保存，原始报警仍可回查。'}))
 function reportFalseAlarm(payload){const reason=payload.values.reason;if(!store.confirmFalseAlarm(issue.value.id,reason))return;falseAlarmReason.value=reason;feedback.value=true;falseAlarmOpen.value=false}
-async function showSection(section){if(section==='decision'){active.value=issue.value?.isTrackingContainer?'健康趋势观测':'事项概览';await nextTick();rootRef.value?.querySelector('.task-assignment')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.value.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
+async function showSection(section){if(section==='decision'){active.value=issue.value?.isTrackingContainer?'健康趋势观测':'事件概览';await nextTick();rootRef.value?.querySelector('.task-assignment')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.value.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
 defineExpose({showSection})
 defineEmits(['back'])
 </script>
@@ -165,6 +184,7 @@ defineEmits(['back'])
 .lead-conclusion{font-weight:600;color:#33415a;margin:4px 0 10px}
 .lead-recommendation{color:#4c5f78}
 .dossier-block{margin-top:18px}
+.reference-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:12px;margin:16px 0}.reference-results .dossier-block{margin:0;border:1px solid #e4eaf1;border-radius:7px;padding:12px 15px;background:#fbfcfe}.reference-results h3{margin:0 0 8px}
 .snapshot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px;margin:10px 0}
 .snapshot-card{border:1px solid #e4eaf1;border-radius:8px;padding:12px 14px;background:#fbfcfe;display:flex;flex-direction:column;gap:4px}
 .snapshot-card small{color:#7a8595;font-size:12px}

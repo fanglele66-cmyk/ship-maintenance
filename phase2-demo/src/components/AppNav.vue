@@ -40,7 +40,7 @@ const route = useRoute()
 const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
-const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:demoStore.visibleTodos.filter(todo=>demoStore.progress[todo.id]===0).length)
+const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:demoStore.activeTaskPortfolio.filter(todo=>demoStore.progress[todo.id]===0).length)
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {

@@ -1,24 +1,24 @@
 <template>
   <div class="p2-todo-center">
     <div v-if="!store.selectedTodoId" class="p2-todo-list">
-      <div class="p2-todo-list-head"><h2>待办中心</h2><div class="p2-todo-tools"><input v-model="query" type="search" placeholder="搜索待办 / 设备" aria-label="搜索待办或设备" /><FormSelect v-model="owner" :options="[{value:'',label:'全部负责人'},...owners.map(name=>({value:name,label:name}))]" placeholder="" aria-label="按负责人查看任务"/><FormSelect v-model="filter" :options="[{value:'all',label:'全部状态'},{value:'active',label:'未处理'},{value:'closed',label:'已处理'}]" placeholder="" aria-label="筛选处理状态"/></div></div>
+      <div class="p2-todo-list-head"><h2>待办中心</h2><div class="p2-todo-tools"><input v-model="query" type="search" placeholder="搜索待办 / 设备" aria-label="搜索待办或设备" /><FormSelect v-model="owner" :options="[{value:'',label:'全部负责人'},...owners.map(name=>({value:name,label:name}))]" placeholder="" aria-label="按负责人查看任务"/></div></div>
       <details open class="todo-ai-summary"><summary><strong>AI待办建议</strong><time :datetime="updatedAt.toISOString()">更新于 {{ updateLabel }}</time><span class="summary-chevron" aria-hidden="true"></span></summary>
         <StreamingMarkdown :content="todoMarkdown" :highlights="['证据未齐','冷却系统','保持稳定','主机'].map(text=>({text,tone:'warning'}))" />
       </details>
       <template v-for="group in groups" :key="group.title"><section v-if="group.items.length"><div class="p2-list-intro"><strong>{{ group.title }}</strong><span>{{ group.items.length }} 项</span></div>
         <div class="p2-todo-grid"><button v-for="todo in group.items" :key="todo.id" class="p2-todo-card" :class="[todo.id, {'is-priority':group.title==='优先处理'}]" @click="openTodo(todo.id)">
-          <div class="p2-card-top"><span class="p2-badge" :class="closed(todo)?'blue':['报警事件','预警事件'].includes(cardType(todo))?'red':'blue'">{{ cardType(todo) }}</span><span class="p2-card-state">{{ closed(todo)?'已处理':'未处理' }}</span></div>
+          <div class="p2-card-top"><span class="p2-badge" :class="['报警事件','预警事件'].includes(cardType(todo))?'red':'blue'">{{ cardType(todo) }}</span><span class="p2-card-state">处置中</span></div>
           <strong>{{ cardTitle(todo) }}</strong><p>{{ summary(todo) }}</p><p class="todo-owner">负责人：{{ store.assignments[todo.id]?.owner || todo.owner }}</p><div class="p2-card-foot"><span>{{ todo.device }}</span><span>{{ closed(todo)?'查看详情':'继续处理' }} →</span></div>
         </button></div>
       </section></template>
-      <div v-if="!groups.some(group=>group.items.length)" class="p2-empty">暂无符合条件的已派发任务，可从态势中心审阅事项并安排负责人。</div>
-      <div class="p2-list-jump"><button class="p2-secondary" @click="router.push('/situation')">查看设备态势 →</button></div>
+      <div v-if="!groups.some(group=>group.items.length)" class="p2-empty">暂无符合条件的处置中任务。已完成的核实、执行和闭环记录可在事件中回查。</div>
+      <div class="p2-list-jump"><button class="p2-secondary" @click="router.push('/issues')">查看事件与处置记录 →</button></div>
     </div>
     <template v-else><TodoDetail /><Phase2Assistant mode="todo" /></template>
   </div>
 </template>
 <script setup>
-import {isMaintenanceWorkflow} from '@/mock/issueRelationships'
+import {isMaintenanceWorkflow,parentIssueId} from '@/mock/issueRelationships'
 import FormSelect from '@/components/forms/FormSelect.vue'
 import {issueCatalog} from '@/mock/captainWorkbench'
 import StreamingMarkdown from '@/components/StreamingMarkdown.vue'
@@ -28,8 +28,8 @@ import { useRouter,useRoute } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import TodoDetail from './TodoDetailPad.vue'
 import Phase2Assistant from '@/components/Phase2Assistant.vue'
-const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),query=ref(''),filter=ref('all'),owner=ref('')
-const owners=computed(()=>[...new Set(store.taskPortfolio.map(t=>store.assignments[t.id]?.owner||t.owner).filter(Boolean))])
+const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),query=ref(''),owner=ref('')
+const owners=computed(()=>[...new Set(store.activeTaskPortfolio.map(t=>store.assignments[t.id]?.owner||t.owner).filter(Boolean))])
 function closed(todo){return store.isTaskHandled(todo.id)}
 function cardTitle(todo){return todo.id==='drift'&&store.progress.drift>=2?todo.eventTitle:todo.initialTitle}
 function cardType(todo){return isMaintenanceWorkflow(todo)?'异动跟踪 · 维保评估任务':issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
@@ -40,8 +40,8 @@ const todoMarkdown=computed(()=>{
  return `### 概况\n\n${report.overview}\n\n${report.bottleneck}\n\n### 建议\n\n${report.suggestionText}\n\n### 原因\n\n${report.reason}`
 })
 function openTodo(id){store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
-watch(()=>route.query.todo,id=>{if(id&&store.todoCreated[id])store.selectTodo(id);else store.closeTodo()},{immediate:true})
-const groups=computed(()=>{const items=store.taskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim())&&(filter.value==='all'||(filter.value==='closed')===closed(todo)));return[{title:'优先处理',items:items.filter(todo=>['报警事件','预警事件'].includes(todo.cardType)&&!closed(todo))},{title:'待办',items:items.filter(todo=>!['报警事件','预警事件'].includes(todo.cardType)&&!closed(todo))},{title:'已处理',items:items.filter(closed)}]})
+watch(()=>[route.path,route.query.todo,store.activeTaskPortfolio.map(item=>item.id).join('|')],()=>{if(route.path!=='/event')return;const id=route.query.todo;if(id&&store.activeTaskPortfolio.some(item=>item.id===id))store.selectTodo(id);else {store.closeTodo();if(id&&store.todoCreated[id])router.replace({path:'/situation/issue/'+parentIssueId(id),query:{...route.query,todo:undefined,from:'issues',tab:'处置记录'}})}},{immediate:true})
+const groups=computed(()=>{const items=store.activeTaskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim()));return[{title:'优先处理',items:items.filter(todo=>['报警事件','预警事件'].includes(todo.cardType))},{title:'处置中',items:items.filter(todo=>!['报警事件','预警事件'].includes(todo.cardType))}]})
 const updatedAt=ref(new Date())
 const updateLabel=computed(()=>updatedAt.value.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Shanghai'}))
 watch(todoMarkdown,()=>{updatedAt.value=new Date()})

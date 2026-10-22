@@ -7,7 +7,7 @@ test('event directory retains every lifecycle while execution remains a separate
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try {
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
-  const {eventDirectoryRows,filterEventDirectory,eventDirectoryDeviceOptions}=await server.ssrLoadModule('/src/mock/eventDirectory.js')
+  const {eventDirectoryRows,filterEventDirectory,eventDirectoryDeviceOptions,eventStatusOptions}=await server.ssrLoadModule('/src/mock/eventDirectory.js')
   const {workbenchIssues}=await server.ssrLoadModule('/src/mock/captainWorkbench.js')
   const fresh=()=>{setActivePinia(createPinia());return usePhase2DemoStore()}
   const rowFor=(store,id)=>eventDirectoryRows(store).find(row=>row.id===id)
@@ -21,6 +21,7 @@ test('event directory retains every lifecycle while execution remains a separate
 
   await t.test('initial pending events and historical closed records coexist without maintenance children',()=>{
    const store=fresh(),rows=eventDirectoryRows(store)
+   assert.deepEqual(eventStatusOptions.map(item=>item.value),['','待决策','处置中','已闭环'])
    assert.equal(rows.filter(row=>row.executionProgress==='待决策').length,4)
    assert.ok(rows.some(row=>row.history&&row.eventState==='已闭环'))
    assert.deepEqual([...new Set(rows.map(row=>row.type))].sort(),['报警事件','异动跟踪','预警事件'].sort())
@@ -47,6 +48,7 @@ test('event directory retains every lifecycle while execution remains a separate
    assert.equal(rowFor(store,id).executionProgress,'进行中')
    assert.equal(rowFor(store,id).eventState,'处置中')
    assert.equal(store.taskPortfolio.length,1,'the task portfolio is not changed by listing events')
+   assert.equal(store.activeTaskPortfolio.length,1)
   })
 
   await t.test('completed hands-on task remains an open event until observation closure is confirmed',()=>{
@@ -54,9 +56,10 @@ test('event directory retains every lifecycle while execution remains a separate
    // Persisted observation state represents work already completed, not event closure.
    store.progress[id]=store.observationIndex(id);store.eventStatus[id]='observing'
    let row=rowFor(store,id)
-   assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'效果观察')
+   assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'处置中');assert.equal(row.processingState,'效果观察')
    assert.equal(row.taskId,id);assert.match(row.continuation,/闭环仍待确认/)
-   assert.ok(filterEventDirectory(eventDirectoryRows(store),{state:'已完成',status:'效果观察'}).some(row=>row.id===id))
+   assert.equal(row.actionTaskId,null);assert.equal(store.activeTaskPortfolio.length,0)
+   assert.ok(filterEventDirectory(eventDirectoryRows(store),{status:'处置中'}).some(row=>row.id===id))
    store.eventStatus[id]='closed'
    row=rowFor(store,id)
    assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'已闭环')
@@ -67,10 +70,11 @@ test('event directory retains every lifecycle while execution remains a separate
    const store=fresh(),id='real-tracking-0816';finishTracking(store,id)
    const row=rowFor(store,id)
    assert.equal(store.eventStatus[id],'closed','the child workflow receipt alone does not determine event closure')
-   assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'持续跟踪')
+   assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'处置中');assert.equal(row.processingState,'持续跟踪')
    assert.equal(row.completedTaskCount,1);assert.match(row.continuation,/健康趋势观测继续/)
-   assert.equal(filterEventDirectory(eventDirectoryRows(store),{state:'已完成',status:'持续跟踪'})[0].id,id)
+   assert.equal(filterEventDirectory(eventDirectoryRows(store),{status:'处置中'})[0].id,id)
    assert.equal(store.taskPortfolio[0].id,id,'completed tasks stay in the task portfolio')
+   assert.equal(store.activeTaskPortfolio.length,0,'completed human verification is absent from Todos')
   })
 
   await t.test('maintenance assessment executes under one parent event and keeps the child task link',()=>{
@@ -83,7 +87,7 @@ test('event directory retains every lifecycle while execution remains a separate
    store.advanceTodo(child,store.currentStage.tasks.map((task,index)=>({label:task.label,result:index?'条件暂不具备':'暂无提前处理必要',note:'记录当前依据与条件，不推定设备恢复'})))
    assert.equal(store.decideCheck(child,'end-maintenance','保留原后续检查安排'),true)
    row=rowFor(store,parent)
-   assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'持续跟踪')
+   assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'处置中');assert.equal(row.processingState,'持续跟踪')
    assert.equal(row.taskId,child);assert.equal(eventDirectoryRows(store).length,rows.length)
   })
 
@@ -99,6 +103,7 @@ test('event directory retains every lifecycle while execution remains a separate
    assert.deepEqual(row.taskIds,['aux-health','aux-maintenance']);assert.equal(row.completedTaskCount,1)
    assert.equal(eventDirectoryRows(store).filter(row=>row.id==='aux-health').length,1)
    assert.equal(store.taskPortfolio.length,2,'both dispatched tasks remain available')
+   assert.deepEqual(store.activeTaskPortfolio.map(item=>item.id),['aux-maintenance'])
   })
 
   await t.test('a false alarm decision closes an event without inventing a completed execution task',()=>{
@@ -115,8 +120,8 @@ test('event directory retains every lifecycle while execution remains a separate
    const store=fresh();store.unlockedRecommendations['aux-health']=true
    finishTracking(store,'aux-health')
    const rows=eventDirectoryRows(store)
-   assert.deepEqual(filterEventDirectory(rows,{device:'aux-system',type:'异动跟踪',state:'已完成',status:'持续跟踪'}).map(row=>row.id),['aux-health'])
-   assert.equal(filterEventDirectory(rows,{device:'main-engine-1',state:'已完成'}).length,0)
+   assert.deepEqual(filterEventDirectory(rows,{device:'aux-system',type:'异动跟踪',status:'处置中'}).map(row=>row.id),['aux-health'])
+   assert.equal(filterEventDirectory(rows,{device:'main-engine-1',status:'处置中'}).length,0)
    assert.equal(filterEventDirectory(rows,{device:'aux-engine-3',status:'已闭环'}).length,0)
    assert.equal(filterEventDirectory(rows).length,rows.length)
    assert.ok(eventDirectoryDeviceOptions(rows).some(option=>option.value==='aux-system'))

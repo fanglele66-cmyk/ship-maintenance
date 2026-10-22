@@ -1,14 +1,11 @@
 import {workbenchIssues, issueDevices} from './captainWorkbench.js'
 import {isTrackingContainer, maintenanceChildIds} from './issueRelationships.js'
 import {matchesSituationDevice} from './situationScope.js'
+import {closedEventReference} from './closedEventReferences.js'
 
-export const executionProgressOptions = [
-  {value:'', label:'全部执行进度'},
-  ...['待决策','待派发','已派发','进行中','已完成','无人工任务'].map(value => ({value, label:value})),
-]
 export const eventStatusOptions = [
   {value:'', label:'全部事件状态'},
-  ...['待决策','处置中','效果观察','持续跟踪','已记录决定','已闭环'].map(value => ({value, label:value})),
+  ...['待决策','处置中','已闭环'].map(value => ({value, label:value})),
 ]
 
 function taskProgress(store, id) {
@@ -37,7 +34,7 @@ export function eventDirectoryRows(store) {
       : activeTasks.length ? '已派发' : tasks.length ? '已完成' : '无人工任务'
     const taskId = activeTasks.find(task => task.id === row.taskId)?.id || activeTasks[0]?.id || tasks.at(-1)?.id || null
     const tracking = store.cases?.[row.id]?.trackingOnly || row.state === '跟踪中'
-    const eventState = row.state === '已闭环' ? '已闭环'
+    const processingState = row.state === '已闭环' ? '已闭环'
       : pendingDecision ? '待决策' : activeTasks.length ? '处置中'
       : tracking ? '持续跟踪' : completedTaskCount ? '效果观察'
       : row.state === '已记录决定' ? '已记录决定' : row.state
@@ -50,12 +47,14 @@ export function eventDirectoryRows(store) {
       ? `${completedTaskCount} 项任务已完成，新增建议等待决定`
       : tasks.length ? `${tasks.length} 项关联任务 · ${completedTaskCount} 项已完成`
       : row.history ? '历史决定已保留，无关联执行任务' : '尚未建立人工执行任务'
-    return {...row, taskId, taskIds, tasks, completedTaskCount, executionProgress, eventState,
+    return {...row, taskId, taskIds, tasks, completedTaskCount, executionProgress,eventState:row.eventState,processingState,
+      actionTaskId:row.eventState==='已闭环'?null:activeTasks.find(task=>task.id===taskId)?.id||activeTasks[0]?.id||null,
+      reference:closedEventReference(row.id),
       taskOwner, stage, progressNote,
       firstObserved:store.cases?.[row.id]?.firstObserved || row.at || '',
-      continuation:eventState === '持续跟踪' && completedTaskCount
+      continuation:processingState === '持续跟踪' && completedTaskCount
         ? '本次人工任务已结束，健康趋势观测继续。'
-        : eventState === '效果观察' ? '人工任务已完成，持续效果与事件闭环仍待确认。' : '',
+        : processingState === '效果观察' ? '人工任务已完成，持续效果与事件闭环仍待确认。' : '',
     }
   })
 }
@@ -67,8 +66,8 @@ export function eventDirectoryDeviceOptions(rows) {
     ...[...devices].map(([value,label]) => ({value,label}))]
 }
 
-export function filterEventDirectory(rows, {device='', type='', state='', status=''} = {}) {
+export function filterEventDirectory(rows, {device='', type='', status=''} = {}) {
   return rows.filter(row => matchesSituationDevice(row, device)
-    && (!type || row.type === type) && (!state || row.executionProgress === state)
+    && (!type || row.type === type)
     && (!status || row.eventState === status))
 }

@@ -2,6 +2,7 @@ import {realCaseFor} from './realCaseAdapter.js'
 import fixtures from './fourStoryFixtures.json' with {type:'json'}
 import {healthTrackingSources} from './healthTrackingSources.js'
 import {parentIssueId,maintenanceChildIds} from './issueRelationships.js'
+import {closedEventReference} from './closedEventReferences.js'
 
 // Original samples and user actions are separate immutable sources. Project them
 // into a single chronology; never rewrite an earlier sample with today's answer.
@@ -17,6 +18,8 @@ export function storyDate(id,store){
  return latest?.at||'2026-10-15 09:20'
 }
 export function storyTimeline(store,id,{taskOnly=false}={}){
+ const reference=closedEventReference(id)
+ if(reference)return reference.records.map(item=>({...item,label:item.title,done:true,source:reference.label,isSimulation:true,dataOrigin:reference.dataOrigin}))
  const realTrack=sourceTrack(id,store),realId=realTrack?.realCaseId?(realTrack.sourceCaseId||realTrack.requestId):id,real=realCaseFor(realId)
  if(real){
   const entries=(store.storyJournal||[]).filter(entry=>taskOnly?entry.taskId===id:entry.taskId===realId||entry.rootId===realTrack?.id).map(entry=>({...entry,label:entry.title,at:entry.storyAt||'来源未记录具体时刻',done:true}))

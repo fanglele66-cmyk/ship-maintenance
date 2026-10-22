@@ -24,12 +24,12 @@ export const useSensorStore = defineStore('sensor', () => {
     timer?.unref?.() // SSR/unit tests should not be kept alive by the browser simulator.
   },{immediate:true})
   onScopeDispose(()=>{if(timer)clearInterval(timer)})
-  function getSimulationTrend(id,hours=24,start=null,end=null){
+  function getSimulationTrend(id,hours=24,start=null,end=null,maxPoints=900){
     const sensor=simulationSensors.find(s=>s.id===id)
     if(!sensor)return []
     const cutoff=Math.min(end??sampledAt.value,sampledAt.value)
     const from=start??cutoff-hours*3600000
-    const data=from>cutoff?[]:simulationTrend(sensor,from,cutoff,{...simulationConfig,enabled:true})
+    const data=from>cutoff?[]:simulationTrend(sensor,from,cutoff,{...simulationConfig,enabled:true},maxPoints)
     const latest=allSensors.value.find(s=>s.id===id)
     if(data.length&&cutoff===sampledAt.value&&latest)data[data.length-1].value=latest.value
     return data

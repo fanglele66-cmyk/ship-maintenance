@@ -2,6 +2,7 @@ import fixtures from './fourStoryFixtures.json' with { type: 'json' }
 import {realWorkflowCases,assessRealCase} from './realCaseAdapter.js'
 import {healthTrackingSources,trackingContainerCases} from './healthTrackingSources.js'
 import {isMaintenanceWorkflow,parentIssueId,issueTypeNames,maintenanceRecommendations} from './issueRelationships.js'
+import {closedEventReference} from './closedEventReferences.js'
 const allCases=[...fixtures.cases.map(item=>({...item,latent:true,legacyScenario:true})),...realWorkflowCases,...trackingContainerCases].map(item=>
   isMaintenanceWorkflow(item)?{...item,cardType:'异动跟踪',workflowKind:'maintenance',parentIssueId:parentIssueId(item.id)}:item)
 
@@ -48,6 +49,13 @@ export function assessmentMarkdown(assessment) {
 }
 export function storyDossier(store,id){
   const item=workflowCases[id],base=workflowDossiers[id]||{},content=item?.pageContent||{}
+  const reference=closedEventReference(id)
+  if(reference){
+    const overviewMarkdown=`### 闭环结果\n\n${reference.result}\n\n### 本次处置范围\n\n${reference.scope}\n\n核实采集时间与负荷工况、修正比较口径、完成现场反馈和人工签认。未拆检或更换部件。\n\n### 记录来源\n\n${reference.boundary}`
+    return {...base,reference,timeline:storyTimeline(store,id),overviewMarkdown,currentMarkdown:overviewMarkdown,
+      analysisMarkdown:`### 起始问题\n\n原排温比较存在偏离，但工况与采集时刻尚未对齐。\n\n### 现场核实后的判断\n\n${base.conclusion}\n\n### 为什么可以结束本次处置\n\n本轮核实要求完成，原判断的可比性问题已有说明，人工确认本次预警不成立。该结论不要求先做维修，也不代表整机全面健康。\n\n### 参考回放边界\n\n${reference.boundary}`,
+      evidenceMarkdown:`### 原已留存记录\n\n${base.steps?.map(step=>'- '+step.fact).join('\n')}\n\n### 补全过程的来源\n\n${reference.label}：${reference.boundary}\n\n未改写真实案例的采样、时间线、维修结论或正式关闭证据。`,hasUpdate:false}
+  }
   const assessment=store.checkAssessments?.[id],decision=store.completedTasks?.[id]
   const execution=store.executionRecords?.[id]?.at(-1)
   let update=assessmentMarkdown(assessment)

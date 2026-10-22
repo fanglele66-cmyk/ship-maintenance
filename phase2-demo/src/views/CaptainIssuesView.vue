@@ -8,28 +8,26 @@
    <IssueFilterToolbar>
     <label>设备<FormSelect v-model="device" :options="deviceOptions" placeholder="" aria-label="事件设备"/></label>
     <label>事件类型<FormSelect v-model="type" :options="typeOptions" placeholder="" aria-label="事件类型"/></label>
-    <label>执行进度<FormSelect v-model="state" :options="executionProgressOptions" placeholder="" aria-label="执行进度"/></label>
     <label>事件状态<FormSelect v-model="status" :options="eventStatusOptions" placeholder="" aria-label="事件状态"/></label>
     <button v-if="hasFilters" class="clear-filters" @click="clearFilters">清除筛选</button>
    </IssueFilterToolbar>
    <div ref="scrollRef" class="issues-scroll">
-    <p class="result-count">共 {{ filtered.length }} 项<span>任务完成后，事件仍可能处于效果观察或持续跟踪中。</span></p>
+    <p class="result-count">共 {{ filtered.length }} 项<span>已闭环事件及完整处置记录保留在这里。</span></p>
     <div class="event-cards">
      <article v-for="item in visible" :key="item.id" class="event-card" :data-event-id="item.id">
-      <div class="card-meta"><span class="event-type" :class="'rank-'+item.rank">{{item.type}}</span><span class="event-device">{{item.device}}</span><span v-if="item.history" class="history-mark">历史记录</span></div>
+      <div class="card-meta"><span class="event-type" :class="'rank-'+item.rank">{{item.type}}</span><span class="event-device">{{item.device}}</span><span v-if="item.history" class="history-mark">{{item.reference?'参考回放':'历史记录'}}</span></div>
       <button class="card-title" @click="open(item)">{{item.title}}<span aria-hidden="true">›</span></button>
       <p class="card-summary">{{item.summary}}</p>
       <dl class="event-progress">
        <div><dt>事件状态</dt><dd :class="{closed:item.eventState==='已闭环'}">{{item.eventState}}</dd></div>
-       <div><dt>执行进度</dt><dd>{{item.executionProgress}}</dd></div>
        <div v-if="item.stage"><dt>当前记录</dt><dd>{{item.stage}}</dd></div>
        <div v-if="item.taskOwner"><dt>负责人</dt><dd>{{item.taskOwner}}</dd></div>
       </dl>
-      <p class="progress-note">{{item.progressNote}}</p>
+      <p class="progress-note">{{item.reference?'核实、复核与闭环签认过程可回查':item.progressNote}}</p>
       <p v-if="item.continuation" class="continuation">{{item.continuation}}</p>
       <footer class="card-footer">
        <span class="event-time">{{item.firstObserved || '保留原事件记录'}}</span>
-       <div><button v-if="item.taskId" class="task-link" @click="openTask(item)">查看待办</button><button class="detail-link" @click="open(item)">查看事件<span aria-hidden="true"> ›</span></button></div>
+       <div><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看待办</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'回看处置记录':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
       </footer>
      </article>
     </div>
@@ -45,35 +43,35 @@ import {computed,ref,watch,onActivated,onDeactivated,nextTick} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {issueTypes,issueBatch} from '@/mock/captainWorkbench'
-import {eventDirectoryRows,eventDirectoryDeviceOptions,filterEventDirectory,executionProgressOptions,eventStatusOptions} from '@/mock/eventDirectory'
+import {eventDirectoryRows,eventDirectoryDeviceOptions,filterEventDirectory,eventStatusOptions} from '@/mock/eventDirectory'
 import {inSituationScope} from '@/mock/situationScope'
 import FormSelect from '@/components/forms/FormSelect.vue'
 import IssueFilterToolbar from '@/components/IssueFilterToolbar.vue'
 
 const route=useRoute(),router=useRouter(),store=usePhase2DemoStore()
-const state=ref(''),device=ref(''),type=ref(''),status=ref(''),batch=ref(1),scrollRef=ref(null)
+const device=ref(''),type=ref(''),status=ref(''),batch=ref(1),scrollRef=ref(null)
 let savedScroll=0
 const rows=computed(()=>eventDirectoryRows(store).filter(item=>route.query.scope!=='engines'||inSituationScope(item)))
 const deviceOptions=computed(()=>eventDirectoryDeviceOptions(rows.value))
 const typeOptions=[{value:'',label:'全部类型'},...issueTypes.map(value=>({value,label:value}))]
-const filtered=computed(()=>filterEventDirectory(rows.value,{device:device.value,type:type.value,state:state.value,status:status.value}))
+const filtered=computed(()=>filterEventDirectory(rows.value,{device:device.value,type:type.value,status:status.value}))
 const visible=computed(()=>issueBatch(filtered.value,batch.value))
 const closedCount=computed(()=>rows.value.filter(item=>item.eventState==='已闭环').length)
-const hasFilters=computed(()=>Boolean(device.value||type.value||state.value||status.value))
-watch([state,device,type,status],()=>{batch.value=1;savedScroll=0;if(scrollRef.value)scrollRef.value.scrollTop=0})
-function clearFilters(){state.value='';device.value='';type.value='';status.value=''}
+const hasFilters=computed(()=>Boolean(device.value||type.value||status.value))
+watch([device,type,status],()=>{batch.value=1;savedScroll=0;if(scrollRef.value)scrollRef.value.scrollTop=0})
+function clearFilters(){device.value='';type.value='';status.value=''}
 function readFilters(){
- state.value=typeof route.query.state==='string'?route.query.state:''
  device.value=typeof route.query.device==='string'?route.query.device:''
  type.value=typeof route.query.type==='string'?route.query.type:''
- status.value=typeof route.query.status==='string'?route.query.status:''
+ const legacy=route.query.state==='待决策'?'待决策':route.query.state==='已闭环'?'已闭环':route.query.state?'处置中':''
+ status.value=eventStatusOptions.some(option=>option.value===route.query.status)?route.query.status:legacy
 }
 watch(()=>route.fullPath,()=>{if(route.path==='/issues')readFilters()})
 onActivated(async()=>{readFilters();if(route.query.resume!=='1'){batch.value=1;savedScroll=0}await nextTick();if(scrollRef.value)scrollRef.value.scrollTop=savedScroll})
 onDeactivated(()=>{if(scrollRef.value)savedScroll=scrollRef.value.scrollTop})
-function context(){return {from:'issues',state:state.value,device:device.value,type:type.value,status:status.value,...(route.query.scope?{scope:route.query.scope}:{})}}
-function open(item){savedScroll=scrollRef.value?.scrollTop||0;router.push({path:'/situation/issue/'+item.id,query:context()})}
-function openTask(item){if(!item.taskId)return;savedScroll=scrollRef.value?.scrollTop||0;store.selectTodo(item.taskId);router.push({path:'/event',query:{...context(),todo:item.taskId}})}
+function context(){return {from:'issues',device:device.value,type:type.value,status:status.value,...(route.query.scope?{scope:route.query.scope}:{})}}
+function open(item){savedScroll=scrollRef.value?.scrollTop||0;router.push({path:'/situation/issue/'+item.id,query:{...context(),...(item.eventState==='已闭环'?{tab:'处置记录'}:{})}})}
+function openTask(item){if(!item.actionTaskId)return;savedScroll=scrollRef.value?.scrollTop||0;store.selectTodo(item.actionTaskId);router.push({path:'/event',query:{...context(),todo:item.actionTaskId}})}
 </script>
 <style scoped>
 .issues-page{height:100%;width:100%;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;padding:22px 24px 16px;background:#f3f5f8;box-sizing:border-box;overflow:hidden}

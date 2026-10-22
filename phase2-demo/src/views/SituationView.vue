@@ -77,7 +77,7 @@
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant :title="issueId ? 'AI事项助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :plan-only="maintenanceId==='planned'" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <Phase2Assistant :title="issueId ? '事件处置助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :plan-only="maintenanceId==='planned'" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition></template>
     </div>

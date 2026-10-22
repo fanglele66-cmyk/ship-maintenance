@@ -21,13 +21,20 @@ const evidenceFields = [
   'series', 'timeline', 'sources', 'evidence', 'facts', 'coverage', 'aggregates',
   'statisticsHighlights', 'sourceConflicts', 'limits', 'sourceEventId', 'timeRange',
 ]
+function present(value, key = '') {
+  if (evidenceFields.includes(key) || key === 'path') return structuredClone(value)
+  if (typeof value === 'string') return model.graph.nodeAliases?.[value] ?? value.replaceAll('事项', '事件')
+  if (Array.isArray(value)) return value.map((entry) => present(entry))
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, present(entry, name)]))
+  return value
+}
 const cases = model.casePresentation.entries.map(({ sourceId, overrides = {} }) => {
   const source = sourceCases.get(sourceId)
   assert(source, `Unknown shared case: ${sourceId}`)
   for (const key of evidenceFields) {
     assert(!Object.hasOwn(overrides, key), `Presentation cannot override historical evidence: ${sourceId}.${key}`)
   }
-  const item = { ...structuredClone(source), ...structuredClone(overrides) }
+  const item = present({ ...structuredClone(source), ...structuredClone(overrides) })
   // This resolves beside information-map.html both locally and under a hosted
   // path prefix. A published map must never send users to the author's localhost.
   item.shipUrl = `./#/situation/issue/${encodeURIComponent(item.id)}`
@@ -48,20 +55,25 @@ assert.deepEqual(data.informationLayers.map((layer) => layer.id), layers)
 const taskTypes = { 'task-alarm': 'alarm', 'task-warning': 'warning', 'task-tracking': 'tracking', 'task-maintenance': 'tracking' }
 for (const [id, type] of Object.entries(taskTypes)) {
   assert.equal(nodes.get(id).sourceEventType, type, `Wrong source event for ${id}`)
-  assert.equal(nodes.get(id).creationGate, 'dispatch', `${id} needs confirmed dispatch`)
-  assert.deepEqual(nodes.get(id).sources, ['dispatch'], `${id} bypasses confirmed dispatch`)
+  assert.equal(nodes.get(id).creationGate, 'triage-dispatch', `${id} needs confirmed dispatch`)
+  assert.deepEqual(nodes.get(id).sources, ['triage-dispatch'], `${id} bypasses confirmed dispatch`)
 }
-assert(nodes.get('dispatch').sources.includes('triage-dispatch'))
-assert.deepEqual(nodes.get('triage-dispatch').outputs, ['dispatch'])
+assert.deepEqual(nodes.get('triage-dispatch').outputs, Object.keys(taskTypes))
+assert(nodes.get('task-progress').fields.some((field) => field.name === '创建门槛'))
+assert.deepEqual(nodes.get('state-issue-decision').fields.map((field) => field.name), ['待决策', '处置中', '已闭环'])
+for (const [removed, merged] of Object.entries(data.nodeAliases)) {
+  assert(!nodes.has(removed), `Merged node still exists: ${removed}`)
+  assert(nodes.has(merged), `Missing canonical merged node: ${merged}`)
+}
 for (const id of ['step-alarm-find', 'step-warning-find']) {
   assert.equal(nodes.get(id).layer, 'event', `Pre-dispatch event formation cannot be a task: ${id}`)
 }
 // No measurement-backed scene can bypass the standardized mapped-point result.
 function hasUnmappedSensorPath(id, seen = new Set()) {
   if (id === 'sample') return true
-  if (['mapped-samples', 'alarm-mapping'].includes(id) || seen.has(id)) return false
-  const nextSeen = new Set([...seen, id])
-  return (nodes.get(id)?.sources ?? []).some((source) => hasUnmappedSensorPath(source, nextSeen))
+  if (id === 'mapped-samples' || seen.has(id)) return false
+  seen.add(id)
+  return (nodes.get(id)?.sources ?? []).some((source) => hasUnmappedSensorPath(source, seen))
 }
 const oldPageContainers = new Set(['ship-page', 'device-page', 'device-health', 'ship-assessment', 'todo-board', 'knowledge-view', 'health-track', 'plan-relation'])
 for (const node of nodes.values()) {
@@ -88,13 +100,29 @@ for (const view of views.values()) {
   const reaches = (from, target, seen = new Set()) => {
     if (from === target) return true
     if (seen.has(from)) return false
-    const nextSeen = new Set([...seen, from])
-    return (view.edges ?? []).filter((edge) => edge.from === from).some((edge) => reaches(edge.to, target, nextSeen))
+    seen.add(from)
+    return (view.edges ?? []).filter((edge) => edge.from === from).some((edge) => reaches(edge.to, target, seen))
   }
   if (['overview', 'ship', 'device', 'states'].includes(view.id)) {
     for (const type of ['alarm', 'warning', 'tracking']) assert(reaches(type, 'triage'), `${view.id}: visible ${type} -> triage path is broken`)
   }
   if (['alarm', 'warning'].includes(view.id)) assert(reaches(view.id, `step-${view.id}-decision`), `${view.id}: visible decision path is broken`)
+  assert(reaches('sample', 'mapped-samples'), `${view.id}: raw input bypasses preprocessing`)
+  assert(reaches('mapped-samples', 'sample-quality'), `${view.id}: preprocessing to quality path is broken`)
+  assert(reaches('sample-quality', 'time-features'), `${view.id}: quality to statistics path is broken`)
+  const types = ['alarm', 'warning', 'tracking'].includes(view.id) ? [view.id] : ['alarm', 'warning', 'tracking']
+  for (const type of types) {
+    const gate = types.length === 1 ? `branch-${type}-dispatch` : 'triage-dispatch'
+    assert(reaches(type, gate), `${view.id}: ${type} cannot reach a dispatch confirmation`)
+    assert(reaches(gate, `task-${type}`), `${view.id}: confirmed dispatch cannot create ${type} task`)
+    assert(reaches(`task-${type}`, 'task-progress'), `${view.id}: task cannot reach merged progress record`)
+    assert(reaches(`task-${type}`, `result-${type}`), `${view.id}: task result is disconnected`)
+  }
+  if (view.id === 'tracking') {
+    assert(reaches('tracking', 'branch-maintenance-dispatch'))
+    assert(reaches('branch-maintenance-dispatch', 'task-maintenance'))
+    assert(reaches('task-maintenance', 'result-maintenance'))
+  }
 }
 for (const flow of data.branchFlows) {
   const view = views.get(flow.id)
@@ -114,6 +142,7 @@ for (const item of cases) {
   for (const step of item.steps) {
     assert(nodes.has(step.stageId), `Unknown case stage ${step.stageId}`)
     if (step.selectedBranchId) assert(nodes.has(step.selectedBranchId), `Unknown case branch ${step.selectedBranchId}`)
+    for (const id of step.productIds ?? []) assert(nodes.has(id), `Unknown case product after node merge: ${id}`)
   }
 }
 assert.equal(template.split('__MAP_DATA__').length, 2, 'Template must contain one data placeholder')
