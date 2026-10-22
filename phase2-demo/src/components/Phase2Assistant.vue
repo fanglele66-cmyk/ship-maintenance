@@ -1,9 +1,7 @@
 <template>
   <aside class="p2-assistant p2-restored-assistant">
     <div class="p2-assistant-head"><span class="p2-ai-mark">✦</span><div><strong>{{props.title}}</strong><small>{{ contextLabel }}</small></div><ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="sessions.select" @new-conversation="sessions.newConversation" /></div>
-    <nav v-if="props.issueId" class="issue-assistant-tabs" aria-label="事件助手内容"><button type="button" :class="{active:issueView==='process'}" @click="issueView='process'">处置过程</button><button type="button" :class="{active:issueView==='chat'}" @click="issueView='chat'">事件问答</button></nav>
-    <IssueProcessPanel v-if="props.issueId&&issueView==='process'" :issue-id="props.issueId" @ask="issueView='chat'"/>
-    <div v-else ref="scrollRef" class="p2-messages" aria-live="polite">
+    <div ref="scrollRef" class="p2-messages" aria-live="polite">
       <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" :disabled-actions="maintenanceDisabledActions" @action="runDemoAction" @confirm-record="store.confirmQuickRecord(key)" @submit-inquiry="submitInquiry" @update-inquiry="updateInquiry">
         <template #actions>
           <div v-if="props.dossier && message.noteCandidate" class="p2-demo-actions"><button v-if="!message.noteCandidate.registered" type="button" @click="registerMessageNote(message)">将这条补充登记为留言</button><small v-else>这条补充已登记到跟踪记录</small></div>
@@ -12,14 +10,13 @@
         </template>
       </MessageRenderer>
     </div>
-    <form v-if="!props.issueId||issueView==='chat'" class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><span></span><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
+    <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><span></span><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
   </aside>
 </template>
 <script setup>
 import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
-import IssueProcessPanel from './IssueProcessPanel.vue'
 import {workbenchIssues} from '@/mock/captainWorkbench'
-import { initialIssueMessages, issueReply, issueContext } from '@/message-flows/issueSources'
+import { issueConversationMessages, mergeIssueConversation, issueReply, issueContext } from '@/message-flows/issueSources'
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import sendIcon from '@/assets/figma/send.svg'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
@@ -47,7 +44,6 @@ import { attentionInquiry } from '@/message-flows/attentionInquiry'
 import { validateInquiry } from '@/message-flows/inquiryFields'
 const props=defineProps({title:{type:String,default:'检修助手'},mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean,planOnly:Boolean,deviceId:String,deviceName:String,issueId:String}),emit=defineEmits(['open-device','open-todo','open-item','issue-section']),store=usePhase2DemoStore(),scrollRef=ref(null)
 const router = useRouter()
-const issueView=ref('process')
 const mode=computed(()=>props.issueId?'issue':props.maintenanceDetail ? 'attention' : props.dossier ? (store.situationObservationId?'observation':'attention') : props.mode==='attention'&&store.situationObservationId?'observation':props.mode==='attention'&&!store.attentionInFocus?'device':props.mode)
 const key=computed(()=>mode.value==='observation'?store.situationObservationId:mode.value==='attention'?store.selectedAttentionId:mode.value==='todo'?store.selectedTodoId:mode.value)
 const advice=useMaintenanceAdviceStore(),workOrders=useEventWorkOrderStore()
@@ -145,10 +141,11 @@ const dossierMessages=computed(()=>{
 const maintenanceMessages=computed(()=>[...maintenanceMessageFlow(store,advice,store.regularMaintenanceInFocus,workOrders.state('maintenance')),...advice.chatMessages.filter(message=>message.conversationId===sessions.agent.value.primaryId)])
 const todoConversation=computed(()=>{const rows=messages.value;const first=rows.findIndex(row=>row.stageId);return rows.slice(Math.max(0,first-1)).filter(row=>!row.observationContext&&!row.title?.startsWith('效果观察')&&!row.text?.startsWith('本轮效果观察已自动结束')).map(row=>row.stageId&&row.kind==='scene'?{...row,expanded:row.stageId===store.currentStage?.id,historical:row.stageId!==store.currentStage?.id}:row)})
 const routineMessages=[{role:'user',text:'查看主机连杆轴承的常规维保计划及提前建议关系'},{role:'assistant',text:'原周期计划当前为1860／2000运行小时，尚余约140小时。提前建议是基于健康变化和窗口的独立评估，未采纳或评估后不提前都不取消原计划。实际执行是否覆盖原项目，以作业范围与现场记录核对，不自动重置全部周期。'}]
-const automaticMessages=computed(()=>props.planOnly?routineMessages:props.issueId?initialIssueMessages(props.issueId,store):genericDevice.value?genericConversation.value:props.maintenanceDetail?maintenanceMessages.value:mode.value==='observation'?observationConversation.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?todoConversation.value:messages.value)
+const automaticMessages=computed(()=>props.planOnly?routineMessages:props.issueId?issueConversationMessages(props.issueId,store):genericDevice.value?genericConversation.value:props.maintenanceDetail?maintenanceMessages.value:mode.value==='observation'?observationConversation.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?todoConversation.value:messages.value)
 watch(automaticMessages, value=>{
   const primary=sessions.agent.value.conversations.find(item=>item.id===sessions.agent.value.primaryId)
-  if(props.issueId || props.maintenanceDetail){
+  if(props.issueId)sessions.agent.value.conversations.forEach(conversation=>mergeIssueConversation(conversation.messages,value))
+  else if(props.maintenanceDetail){
     if(value.some(message=>message.id&&!primary.messages.some(saved=>saved.id===message.id)))primary.messages.forEach(message=>{if(message.kind==='scene'){message.expanded=false;message.historical=true}})
     appendMessages(primary.messages,value)
   }
@@ -160,7 +157,7 @@ const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
  ...(!advice.sufficient || advice.decision==='defer' || store.isTaskHandled('maintenance')?['maintenance:defer']:[])
 ]:[])
 const displayedMessages=computed(()=>sessions.active.value.messages)
-watch(()=>sessions.active.value.id,async()=>{if(props.issueId && !sessions.active.value.messages.length){appendMessages(sessions.active.value.messages,initialIssueMessages(props.issueId,store));sessions.touch()}await nextTick();scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight})})
+watch(()=>sessions.active.value.id,async()=>{if(props.issueId)mergeIssueConversation(sessions.active.value.messages,automaticMessages.value);await nextTick();scrollRef.value?.scrollTo({top:props.issueId?0:scrollRef.value.scrollHeight})})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
 const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
 const placeholder=computed(()=>props.issueId?'询问判断依据、缺失证据或下一步安排…':props.maintenanceDetail?'询问检查依据，或补充现场与安排信息…':props.dossier?'询问当前判断、变化证据或后续安排…':mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
@@ -221,7 +218,7 @@ function askMaintenance(text){
  if(id!==sessions.agent.value.primaryId)sessions.active.value.messages.push(...added)
  sessions.touch()
 }
-function askIssue(text){const session=sessions.active.value;session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text}, {...issueReply(props.issueId,text,store),id:session.id+':reply:'+session.messages.length});sessions.touch()}
+function askIssue(text){const session=sessions.active.value,afterEventRecordId=automaticMessages.value.findLast(message=>message.eventProcess)?.eventRecordId,at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text,at,afterEventRecordId}, {...issueReply(props.issueId,text,store),id:session.id+':reply:'+session.messages.length,at,afterEventRecordId});sessions.touch()}
 function runDemoAction(id){
  if(props.issueId){if(id==='issue:ask:evidence')askIssue('还需核实哪些信息？');else if(id==='issue:ask:next')askIssue('下一步如何安排？');else if(id.startsWith('issue:section:'))emit('issue-section',id.slice('issue:section:'.length));else if(id==='issue:task'){const taskId=workbenchIssues(store).find(item=>item.id===props.issueId)?.taskId||props.issueId;if(store.todoCreated[taskId]){store.selectTodo(taskId);router.push({path:'/event',query:{todo:taskId}})}}return}
 
@@ -253,7 +250,7 @@ watch([mode,key],()=>{
   else if(['device','sensor'].includes(mode.value))store.enterSituation(mode.value)
 },{immediate:true})
 watch([mode,key,()=>store.monitorStep.stable,()=>store.monitorStep.drift,()=>store.todoCreated.drift],()=>{clearMonitorTimer();if(mode.value!=='attention')return;const id=key.value;if(id==='drift'&&store.monitorStep.drift<1&&!store.todoCreated.drift)monitorTimer=setTimeout(()=>store.nextMonitor('drift'),4800)},{immediate:true})
-watch(()=>[key.value,displayedMessages.value.length],async()=>{await nextTick();scrollRef.value?.scrollTo({top:props.issueId&&displayedMessages.value.length===2?0:(mode.value==='ship'||props.maintenanceDetail)&&displayedMessages.value.length===1?0:scrollRef.value.scrollHeight,behavior:'smooth'})},{immediate:true})
+watch(()=>[agentId.value,displayedMessages.value.length],async(value,previous)=>{await nextTick();scrollRef.value?.scrollTo({top:props.issueId&&value[0]!==previous?.[0]?0:(mode.value==='ship'||props.maintenanceDetail)&&displayedMessages.value.length===1?0:scrollRef.value.scrollHeight,behavior:'smooth'})},{immediate:true})
 watch(()=>store.currentStage?.id,async id=>{if(mode.value!=='todo'||!id||store.activeStage[key.value]>=store.progress[key.value])return;await nextTick();const container=scrollRef.value,element=container?.querySelector('[data-stage-id="'+id+'"]');if(element)container.scrollTo({top:element.getBoundingClientRect().top-container.getBoundingClientRect().top+container.scrollTop-12,behavior:'smooth'})})
 watch(() => [store.progress.fault, store.progress.drift, store.progress.maintenance, store.monitorStep.stable, store.todoCreated.maintenance, store.todoCreated.drift], () => { if (mode.value === 'device') store.enterSituation('device') })
 onUnmounted(clearMonitorTimer)
@@ -262,8 +259,4 @@ onUnmounted(clearMonitorTimer)
 .p2-restored-assistant{width:350px;min-width:320px}.p2-restored-assistant .p2-messages{padding:16px 14px}.p2-restored-assistant .p2-message{margin-top:18px;gap:8px}.p2-restored-assistant .p2-message:first-child{margin-top:0}.p2-restored-assistant .p2-bubble{font-size:13px;line-height:1.7;min-width:0;flex:1;white-space:normal}.p2-restored-assistant .assistant .p2-bubble{background:transparent;padding:0;box-shadow:none}.p2-restored-assistant .user .p2-bubble{flex:initial;max-width:90%;background:#edf4ff;padding:9px 12px;border-radius:8px}.p2-bubble h3{font-size:14px;color:#24334a;margin:0 0 10px;font-weight:650}.p2-dialog-paragraph{margin:11px 0}.p2-dialog-paragraph b{font-size:12px;color:#52627b}.p2-dialog-paragraph p{margin-top:3px;color:#34465e}.p2-dialog-question{margin-top:13px;color:#34465e}.p2-feedback-record{border:1px solid #dce5f0;border-radius:8px;background:#fff;padding:12px}.p2-record-meta{font-size:11px;color:#7e8da1;padding-bottom:8px;border-bottom:1px solid #e7edf5}.p2-record-row{padding:9px 0;border-bottom:1px solid #edf1f6}.p2-record-row b{font-size:12px;color:#334b6e}.p2-record-row p{font-size:12px;margin-top:3px;color:#61718a}.p2-feedback-record .p2-secondary{margin-top:10px;font-size:12px;padding:7px 10px}.p2-restored-assistant .p2-compose textarea{font-size:13px;line-height:1.6}.p2-restored-assistant .p2-compose-foot button{font-size:12px;padding:7px 14px}
 .p2-restored-assistant .p2-assistant-head{gap:9px}.p2-demo-label{display:inline-flex;align-items:center;margin-bottom:6px;border-radius:10px;background:#eff6ff;color:#3874bd;padding:2px 8px;font-size:10px;font-weight:600;line-height:1.5}.p2-restored-assistant .user .p2-demo-label{display:block;width:max-content;margin-left:auto}.p2-demo-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.p2-demo-actions button{border:1px solid #d8e5f4;border-radius:6px;background:#fff;color:#3475c7;padding:7px 9px;font-size:11px;cursor:pointer}.p2-demo-actions button:hover{background:#f1f6fc}.p2-demo-label.is-change{background:#fff3de;color:#a37125}.p2-restored-assistant .p2-message[data-demo="true"] + .p2-message{padding-top:14px;border-top:1px solid #e9eef4}
 @media(max-width:1200px){.p2-restored-assistant{width:320px;min-width:300px}}
-</style>
-
-<style scoped>
-.issue-assistant-tabs{display:flex;gap:22px;padding:0 16px;border-bottom:1px solid #dfe6f0;background:white;flex-shrink:0}.issue-assistant-tabs button{border:0;background:none;color:#7b8a9d;font:inherit;font-size:13px;padding:12px 0;cursor:pointer}.issue-assistant-tabs button.active{color:#2d68a4;border-bottom:2px solid #2d68a4}
 </style>

@@ -3,15 +3,13 @@ import assert from 'node:assert/strict'
 import {overviewAnalysisWindow} from '../src/mock/overviewAnalysisWindow.js'
 import {periodReadings,shipDailyReports} from '../src/mock/shipDailyReports.js'
 
-test('assessment uses a bounded 12/24h window rather than historic event dates',()=>{
+test('assessment always uses the latest 12h rather than historic event dates',()=>{
  const end=Date.parse('2026-10-22T15:30:45+08:00')
- for(const hours of [12,24]){
-  const window=overviewAnalysisWindow(end,hours)
-  assert.equal(window.end-window.start,hours*3600000)
-  assert.ok(window.end<=end)
-  assert.match(window.label,/2026\/10\/2[12]/)
- }
- assert.equal(overviewAnalysisWindow(end,72).hours,24)
+ const window=overviewAnalysisWindow(end)
+ assert.equal(window.end-window.start,12*3600000)
+ assert.equal(window.hours,12)
+ assert.ok(window.end<=end)
+ assert.match(window.label,/2026\/10\/22/)
  assert.equal(overviewAnalysisWindow(NaN),null)
 })
 

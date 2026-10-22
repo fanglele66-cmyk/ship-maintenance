@@ -2,6 +2,7 @@ import {storyDossier} from '@/mock/fourStoryWorkflow'
 import {storyRevision,healthStoryMarkdown} from '@/mock/storyRecords'
 import {workbenchIssues} from '@/mock/captainWorkbench'
 import {parentIssueId,isTrackingContainer,maintenanceChildIds} from '@/mock/issueRelationships'
+import {eventProcessRecords} from '@/mock/eventProcessRecords'
 
 export function issueContext(id,store){
  id=parentIssueId(id)
@@ -22,11 +23,56 @@ export function initialIssueMessages(id,store){
  const question=questions[node?.kind]||`查看${issue.device}“${issue.title}”的当前进展和处理依据`
  return [{id:'issue-start-user:'+id+':'+revision,role:'user',text:question},{id:'issue-start-answer:'+id+':'+revision,role:'assistant',kind:'scene',expanded:true,title:'当前判断与安排',markdown:current,paragraphs:[{label:'初判',text:current},{label:'关键依据',text:issue.evidence.join('；')},{label:'判断边界',text:issue.limit},{label:'下一步',text:next}],actions:[{id:'issue:ask:evidence',label:'还需核实哪些信息？'},{id:'issue:ask:next',label:'下一步如何安排？'}]}]
 }
+// Project the immutable event journal into the same message stream as new questions.
+export function issueConversationMessages(id,store){
+ const process=eventProcessRecords(store,parentIssueId(id))
+ const messages=process.records.flatMap(record=>{
+  const meta={eventProcess:true,eventRecordId:record.id,eventKind:record.kind,eventPhase:record.phase,eventBaseline:Boolean(process.reference)||record.kind==='source'||record.id===parentIssueId(id)+':analysis'||record.id.includes(':origin:'),at:[record.actor,record.at].filter(Boolean).join(' · ')}
+  const message={...meta,id:'issue-process:'+id+':'+record.id,role:record.role,expanded:true,
+   ...(record.role==='assistant'?{kind:'scene',title:record.title,markdown:[record.text,record.assessment].filter(Boolean).join('\n\n')}:{text:record.text})}
+  return [message,...(record.role==='user'&&record.assessment?[{...meta,id:message.id+':reply',role:'assistant',kind:'scene',title:'本次反馈后的判断',markdown:record.assessment,expanded:true,at:['智能机舱研判',record.at].filter(Boolean).join(' · ')}]:[])]
+ })
+ const summary=initialIssueMessages(id,store).at(-1)
+ if(summary)messages.push({...summary,issueSummary:true,issueRevision:storyRevision(store,id),afterEventRecordId:process.records.at(-1)?.id})
+ return messages
+}
+
+// Reconcile automatic records by their stable IDs, retaining user questions next to
+// the event revision they concerned. This also upgrades an already-open old session.
+export function mergeIssueConversation(existing,incoming){
+ const records=incoming.filter(message=>message.eventProcess),summary=incoming.find(message=>message.issueSummary)
+ const recordIds=new Set(records.map(message=>message.eventRecordId)),lastId=records.at(-1)?.eventRecordId
+ const initialId=records.findLast(message=>message.eventBaseline)?.eventRecordId||records[0]?.eventRecordId||lastId
+ let anchor=initialId
+ const groups=new Map(),seen=new Set()
+ for(const message of existing){
+  if(message.eventProcess){anchor=message.eventRecordId;continue}
+  if(message.issueSummary||message.id?.startsWith('issue-start-')){
+   const revision=message.issueRevision||message.id.split(':').at(-1)
+   anchor=revision==='origin'?initialId:recordIds.has(revision)?revision:lastId
+   continue
+  }
+  if(message.id&&seen.has(message.id))continue
+  if(message.id)seen.add(message.id)
+  const target=recordIds.has(message.afterEventRecordId)?message.afterEventRecordId:recordIds.has(anchor)?anchor:lastId
+  const rows=groups.get(target)||[];rows.push({...message,afterEventRecordId:target});groups.set(target,rows)
+ }
+ const result=[]
+ records.forEach((message,index)=>{
+  result.push(message)
+  if(records[index+1]?.eventRecordId===message.eventRecordId)return
+  if(message.eventRecordId===lastId&&summary)result.push(summary)
+  result.push(...(groups.get(message.eventRecordId)||[]))
+ })
+ if(!records.length)result.push(...(summary?[summary]:[]),...(groups.get(lastId)||[]))
+ existing.splice(0,existing.length,...result)
+ return existing
+}
 export function issueReply(id,text,store){
  const context=issueContext(id,store);if(!context)return {role:'assistant',text:'当前事件材料未找到，请返回态势中心核对。'}
  const {issue,dossier,next,assigned}=context
  const handledTaskId=[issue.taskId,issue.id,...maintenanceChildIds(issue.id)].find(id=>id&&store.todoCreated?.[id]&&store.isTaskHandled?.(id))
- if(issue.history||issue.eventState==='已闭环')return {role:'assistant',kind:'scene',expanded:true,title:'本事件闭环依据与记录',markdown:`### 闭环结果\n\n${dossier.reference?.result||next||dossier.conclusion}\n\n### 如何回查\n\n右侧处置过程保留发现、研判、派发、执行反馈与人工确认；左侧处置记录及证据资料保留来源和结果。已闭环事件不会再次进入待办。${dossier.reference?'\n\n### 来源范围\n\n'+dossier.reference.boundary:''}`,actions:[{id:'issue:section:处置记录',label:'查看处置记录'},{id:'issue:section:证据资料',label:'查看证据资料'}]}
+ if(issue.history||issue.eventState==='已闭环')return {role:'assistant',kind:'scene',expanded:true,title:'本事件闭环依据与记录',markdown:`### 闭环结果\n\n${dossier.reference?.result||next||dossier.conclusion}\n\n### 如何回查\n\n本对话保留发现、研判、派发、执行反馈与人工确认；左侧处置记录及证据资料保留来源和结果。已闭环事件不会再次进入待办。`,actions:[{id:'issue:section:处置记录',label:'查看处置记录'},{id:'issue:section:证据资料',label:'查看证据资料'}]}
  if(handledTaskId&&!assigned)return {role:'assistant',kind:'scene',expanded:true,title:'人工任务结果与事件后续',markdown:`### 已提交的人工结果\n\n${dossier.currentMarkdown||next}\n\n### 后续安排\n\n本次人工任务已结束，已提交的反馈与判断保留在事件处置记录。${store.cases?.[issue.id]?.trackingOnly?'原健康趋势继续观察，新的现场核实需要重新明确范围。':'在本事件接续效果观察，依据可比记录和人工确认决定是否闭环。'}`,actions:[{id:'issue:section:处置记录',label:'查看处置记录'},{id:store.cases?.[issue.id]?.trackingOnly?'issue:section:健康趋势观测':'issue:section:效果观察',label:store.cases?.[issue.id]?.trackingOnly?'查看健康趋势观测':'接续效果观察'}]}
  if(id==='aux-health'&&store.healthUpdates?.['aux2-health'])return {role:'assistant',kind:'scene',expanded:true,title:'原健康记录与当前进展',markdown:healthStoryMarkdown(store,id),actions:[{id:'issue:section:证据资料',label:'查看原始数据与记录'}]}
  const evidence=/依据|证据|原因|核实|数据|为什么/.test(text)

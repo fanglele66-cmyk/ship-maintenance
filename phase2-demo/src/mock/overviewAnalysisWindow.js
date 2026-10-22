@@ -2,10 +2,10 @@ const dateFormatter = new Intl.DateTimeFormat('zh-CN', {timeZone:'Asia/Shanghai'
 export const formatAnalysisTime = value => dateFormatter.format(new Date(value))
 
 // A rolling assessment window, independent of the original dates of open events.
-export function overviewAnalysisWindow(referenceTime, hours = 24) {
+export function overviewAnalysisWindow(referenceTime) {
   const requestedEnd = Number(referenceTime)
   if (!Number.isFinite(requestedEnd)) return null
-  const durationHours = hours === 12 ? 12 : 24
+  const durationHours = 12
   const end = Math.floor(requestedEnd / 60000) * 60000
   const start = end - durationHours * 3600000
   return {start, end, hours:durationHours, label:`${formatAnalysisTime(start)} — ${formatAnalysisTime(end)}`}

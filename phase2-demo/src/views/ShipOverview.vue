@@ -23,7 +23,7 @@
   </section>
   <div class="captain-right">
    <section class="captain-analysis">
-    <ModuleHeader title="健康态势分析"><div class="analysis-period"><span class="analysis-window">分析时间窗 {{analysisWindow.label}}</span><div class="analysis-hours" aria-label="分析时长"><button v-for="hours in [12,24]" :key="hours" type="button" :aria-pressed="analysisHours===hours" :class="{active:analysisHours===hours}" @click="analysisHours=hours">{{hours}}小时</button></div></div></ModuleHeader>
+    <ModuleHeader title="健康态势分析"><span class="analysis-window">分析时间窗 {{analysisWindow.label}}</span></ModuleHeader>
     <div class="captain-analysis-body"><StreamingMarkdown :content="markdown" :highlights="['证据未齐','冷却系统','主机'].map(text=>({text,tone:'warning'}))"/></div>
    </section>
    <CaptainIssueList :device-ids="situationDeviceIds" :device-options="situationDeviceOptions"/>
@@ -49,7 +49,7 @@ import CaptainIssueList from '@/components/CaptainIssueList.vue'
 import ShipDailyReportDrawer from '@/components/ShipDailyReportDrawer.vue'
 const emit=defineEmits(['selectDevice','selectItem']),store=usePhase2DemoStore(),deviceStore=useDeviceStore(),twinRef=ref(null)
 const sensorStore=useSensorStore()
-const router=useRouter(),analysisHours=ref(24),reportsOpen=ref(false),dailyReports=ref([])
+const router=useRouter(),reportsOpen=ref(false),dailyReports=ref([])
 function openReports(){dailyReports.value=shipDailyReports(sensorStore,sensorStore.sampledAt);reportsOpen.value=true}
 function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return point?Number(point.value).toFixed(1):'—'}
 const auxiliaryRpmPoints=computed(()=>sensorStore.allSensors.filter(s=>s.deviceId.startsWith('aux-engine-')&&s.unit==='rpm'))
@@ -65,7 +65,7 @@ const devices=computed(()=>{
  const signal=signals.includes('danger')?'danger':signals.includes('warning')?'warning':'normal'
  return [...(main?[{...main,signal:captainDeviceSignal(store,main.id)}]:[]),{id:'aux-system',name:'辅机',system:'辅机系统',signal}]
 })
-const analysisWindow=computed(()=>overviewAnalysisWindow(Math.floor(sensorStore.sampledAt/1800000)*1800000,analysisHours.value))
+const analysisWindow=computed(()=>overviewAnalysisWindow(Math.floor(sensorStore.sampledAt/1800000)*1800000))
 const markdown=computed(()=>{
  const range=analysisWindow.value,readings=periodReadings(sensorStore,range.start,range.end)
  const rpm=readings.find(item=>item.id==='s-012'),load=readings.find(item=>item.id==='main-load')
@@ -115,5 +115,5 @@ const markdown=computed(()=>{
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.twin-running{background:#123348}}
 </style>
 <style scoped>
-.captain-twin header{gap:10px;flex-wrap:wrap}.captain-twin header strong{white-space:nowrap}.captain-twin .ship-scope{font-size:11px}.daily-report-entry{margin-left:auto;display:flex;align-items:center;gap:5px;border:1px solid #5d859a70;border-radius:5px;background:#193e52a6;color:#d3e5ef;font:inherit;font-size:11px;white-space:nowrap;padding:6px 8px;cursor:pointer}.daily-report-entry svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}.daily-report-entry:hover{background:#2b5269}.daily-report-entry:focus-visible{outline:2px solid #9ad6ee;outline-offset:3px}.analysis-period{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap}.analysis-hours{display:flex;border:1px solid #e3e7ed;border-radius:5px;overflow:hidden;flex:none}.analysis-hours button{padding:4px 9px;font:inherit;font-size:11px;border:0;background:#fff;color:#8591a1;cursor:pointer}.analysis-hours button.active{background:#f6f1e8;color:#92723a}.analysis-hours button:focus-visible{outline:2px solid #b29360;outline-offset:-2px}@media(max-width:1600px) and (min-width:761px){.captain-twin .ship-scope{display:none}}@media(max-width:760px){.analysis-period{justify-content:flex-start;gap:6px}.captain-twin header{padding:16px}.daily-report-entry{font-size:12px}}
+.captain-twin header{gap:10px;flex-wrap:wrap}.captain-twin header strong{white-space:nowrap}.captain-twin .ship-scope{font-size:11px}.daily-report-entry{margin-left:auto;display:flex;align-items:center;gap:5px;border:1px solid #5d859a70;border-radius:5px;background:#193e52a6;color:#d3e5ef;font:inherit;font-size:11px;white-space:nowrap;padding:6px 8px;cursor:pointer}.daily-report-entry svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}.daily-report-entry:hover{background:#2b5269}.daily-report-entry:focus-visible{outline:2px solid #9ad6ee;outline-offset:3px}@media(max-width:1600px) and (min-width:761px){.captain-twin .ship-scope{display:none}}@media(max-width:760px){.captain-twin header{padding:16px}.daily-report-entry{font-size:12px}}
 </style>

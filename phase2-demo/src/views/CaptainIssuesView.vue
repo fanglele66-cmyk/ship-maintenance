@@ -15,7 +15,7 @@
     <p class="result-count">共 {{ filtered.length }} 项<span>已闭环事件及完整处置记录保留在这里。</span></p>
     <div class="event-cards">
      <article v-for="item in visible" :key="item.id" class="event-card" :data-event-id="item.id">
-      <div class="card-meta"><span class="event-type" :class="'rank-'+item.rank">{{item.type}}</span><span class="event-device">{{item.device}}</span><span v-if="item.history" class="history-mark">{{item.reference?'参考回放':'历史记录'}}</span></div>
+      <div class="card-meta"><span class="event-type" :class="'rank-'+item.rank">{{item.type}}</span><span class="event-device">{{item.device}}</span></div>
       <button class="card-title" @click="open(item)">{{item.title}}<span aria-hidden="true">›</span></button>
       <p class="card-summary">{{item.summary}}</p>
       <dl class="event-progress">

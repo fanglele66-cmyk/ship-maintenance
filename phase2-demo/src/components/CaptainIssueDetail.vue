@@ -9,7 +9,6 @@
     <button v-for="tab in tabs" :key="tab" role="tab" :aria-selected="active===tab" :class="{active:active===tab}" @click="goTab(tab)">{{tab}}</button>
   </nav>
   <main>
-    <p v-if="dossier.reference" class="limit-note"><strong>{{dossier.reference.label}}</strong> · {{dossier.reference.boundary}}</p>
     <!-- 事件概览：结论与建议先行，关键依据摘要，推理可展开，快链与下一步 -->
     <template v-if="active==='事件概览'">
       <MarkdownContent :content="dossier.overviewMarkdown"/>
@@ -33,7 +32,7 @@
     <template v-else-if="active==='处置记录'">
       <h3>{{issue.eventState==='已闭环'?'闭环结果与处置过程':'已提交的处置过程'}}</h3>
       <p>{{dossier.reference?.result || store.completedTasks[issue.id]?.reason || dossier.conclusion}}</p>
-      <div v-if="dossier.reference" class="reference-results" aria-label="参考案例处置结果">
+      <div v-if="dossier.reference" class="reference-results" aria-label="事件处置结果">
         <section class="dossier-block"><h3>关联核实任务</h3><p>{{dossier.reference.task.at}} · {{dossier.reference.task.assignedBy}}派发给{{dossier.reference.task.owner}}</p><p>{{dossier.reference.task.scope}}</p><p>{{dossier.reference.task.result}}</p></section>
         <section class="dossier-block"><h3>执行反馈与实际措施</h3><p>{{dossier.reference.feedback.at}} · {{dossier.reference.feedback.finding}}</p><p>{{dossier.reference.feedback.measure}}</p></section>
         <section class="dossier-block"><h3>验收依据与结果</h3><p>{{dossier.reference.acceptance.at}} · {{dossier.reference.acceptance.actor}}</p><p>{{dossier.reference.acceptance.basis}}</p><p>{{dossier.reference.acceptance.result}}</p></section>

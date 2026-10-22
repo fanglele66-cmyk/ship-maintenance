@@ -48,6 +48,7 @@ const data = {
 const nodes = new Map(data.nodes.map((node) => [node.id, node]))
 const views = new Map(data.views.map((view) => [view.id, view]))
 assert.equal(nodes.size, data.nodes.length, 'Duplicate map node IDs')
+assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'states'], 'Map must contain the five supported views')
 assert.deepEqual(data.branchFlows.map((flow) => flow.id), ['alarm', 'warning', 'tracking'])
 assert(!views.has('maintenance'), 'Maintenance must remain inside tracking')
 const layers = ['raw', 'processing', 'scenario', 'event', 'task', 'result']
@@ -103,7 +104,7 @@ for (const view of views.values()) {
     seen.add(from)
     return (view.edges ?? []).filter((edge) => edge.from === from).some((edge) => reaches(edge.to, target, seen))
   }
-  if (['overview', 'ship', 'device', 'states'].includes(view.id)) {
+  if (['overview', 'states'].includes(view.id)) {
     for (const type of ['alarm', 'warning', 'tracking']) assert(reaches(type, 'triage'), `${view.id}: visible ${type} -> triage path is broken`)
   }
   if (['alarm', 'warning'].includes(view.id)) assert(reaches(view.id, `step-${view.id}-decision`), `${view.id}: visible decision path is broken`)
