@@ -1,8 +1,8 @@
 {
   "delayMs": 18000,
-  "issueId": "real-tracking-0816",
+  "issueId": "real-tracking-exhaust-baseline",
   "type": "异动跟踪",
   "device": "主机",
-  "title": "倒车试验时段需要补充工况核实",
-  "summary": "核对正负转速、燃油指令与操纵记录，沿原跟踪事项补充现场背景。"
+  "title": "一缸排温基线变化需要核实",
+  "summary": "核对一缸月度工况、测温校验与历史调整，补充基线变化原因。"
 }

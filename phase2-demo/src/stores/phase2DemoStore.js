@@ -17,6 +17,7 @@ import { validateInquiry } from '@/message-flows/inquiryFields'
 import { assessCheckFeedback } from '@/mock/eventFeedbackRules'
 import {workflowCases,workflowIds,isWorkflow,composeRepair,workflowReply,healthTracks,deviceStoryAssessment,stageReport} from '@/mock/fourStoryWorkflow'
 import {realCaseFor} from '@/mock/realCaseAdapter'
+import {observationReviewOptions,parseObservationReview} from '@/mock/observationReview'
 
 export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const attention = attentionItems
@@ -51,7 +52,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const assignmentRecords=reactive({})
   const ignoredSuggestions=reactive({})
   const suggestionDecisions=reactive([])
-  function defaultAssignment(id){return {owner:cases[id]?.owner||'李建国（大管轮）',collaborator:'',type:['maintenance','fault'].includes(id)?'检测排查':'现场核实',due:'尽快完成首轮核实',scope:cases[id]?.report?.human||'核对现场读数与工况，记录实际检查结果。',assignedBy:'陈志远（轮机长）'}}
+  function defaultAssignment(id){return {owner:cases[id]?.owner||'李建国（大管轮）',collaborator:'',type:['maintenance','fault'].includes(id)?'检测排查':'现场核实',due:'尽快完成首轮核实',scope:cases[id]?.taskScope||cases[id]?.report?.human||'核对现场读数与工况，记录实际检查结果。',assignedBy:'陈志远（轮机长）'}}
   assignments.fault=defaultAssignment('fault')
   const stageAssignments=reactive({})
   function assignStage(id,index,owner){
@@ -369,10 +370,14 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(stage.kind!=='work')return null
     const existing=executionInquiry(id);if(existing)return existing
     const previous=executionRecords[id]?.findLast(record=>!isWorkflow(id)||record.round===workflowRounds[id])
-    const fields=stage.tasks.flatMap((task,i)=>[{key:'task'+i,label:task.label,type:'select',required:true,options:[{value:'已完成',label:'已完成'},{value:'待补充',label:'待补充'}]},{key:'note'+i,label:task.label+'备注',type:'textarea'}])
+    const fields=stage.tasks.flatMap((task,i)=>[{key:'task'+i,label:task.label,type:'select',required:true,options:[{value:'已完成',label:'已完成'},{value:'待补充',label:'待补充'}]},{key:'note'+i,label:task.label+'记录',type:'textarea',placeholder:task.recordHint||'记录现场发现、实际措施与受限项目'}])
     const values={...(previous?.values||{}),equipment:previous?.values.equipment||cases[id].device,executor:taskActors[id]||assignments[id]?.owner}
     stage.tasks.forEach((task,i)=>{values['task'+i]=taskResults[id+':'+stage.id+':'+i]||values['task'+i]||'';values['note'+i]=taskNotes[id+':'+stage.id+':'+i]||values['note'+i]||''})
     const recordFields=JSON.parse(JSON.stringify(executionRecordTemplate.fields))
+    if(cases[id].realCaseId){
+      const hints={measures:'填写实际处理部位、清洁或换件措施、使用材料和未完成项目。',acceptance:(cases[id].workDetails?.acceptanceRows||[]).map(row=>row.name).join('；')+'。填写各项结果、复测时刻和工况；未通过项目单列。'}
+      for(const field of recordFields)if(hints[field.key])field.placeholder=hints[field.key]
+    }
     if(isWorkflow(id)){
       recordFields.find(field=>field.key==='completion').options[0].label='本轮作业已完成'
       if(isMaintenanceWorkflow(cases[id])){
@@ -616,6 +621,25 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     delete recordDrafts[id]
   }
 
+  function submitObservationReview(id,key,values={}){
+    const execution=executionRecords[id]?.at(-1),config=observationConfig[id]
+    if(!config||!isTaskHandled(id)||eventStatus[id]==='closed'||!execution||execution.values.completion!=='completed'||execution.values.verification!=='resolved')return false
+    const records=observationRecords[id],parsed=parseObservationReview(config,key,values,records.at(-1)?.day||0)
+    if(!parsed||key==='stable'&&records.some(record=>record.status==='abnormal'))return false
+    const label=observationReviewOptions.find(option=>option.key===key).label
+    const record={...parsed,label,status:key==='continue'?'improving':key==='stable'?'stable-confirmed':key,reviewChoice:key,source:'人员观察记录',recordedAt:new Date().toISOString(),actor:taskActors[id]}
+    if(key==='incomplete'){
+      observationTargets[id]=Math.max(observationTargets[id],parsed.day)+1
+      record.targetDays=observationTargets[id]
+    }
+    if(key==='continue')execution.values.comparable='available'
+    if(!record.note)record.note=key==='abnormal'?'已确认原异常反复，返回原任务复查；本轮措施与观察记录保留。':'已确认本轮运行持续稳定，提交闭环确认；已有验收与观察记录保留。'
+    records.push(record)
+    observationReady[id]=getObservationResult(id).type==='archive'
+    const readings=record.values?.map((value,i)=>value==null?null:config.names[i]+' '+value+' '+config.units[i]).filter(Boolean).join('；')
+    recordStory(id,'observation',label,[readings,record.note].filter(Boolean).join('；'),getObservationResult(id).text)
+    return true
+  }
   function applyObservationPreset(id,key){
     if(!cases[id]?.realCaseId||!['continue','stable','incomplete','abnormal'].includes(key)||eventStatus[id]==='closed'||!isTaskHandled(id))return false
     const execution=executionRecords[id]?.at(-1),config=observationConfig[id]
@@ -776,5 +800,5 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   captureHealthSnapshot()
   selectAttention('maintenance')
   // Action completion is explicit and independent from chat and event progress.
-  return {activeTaskPortfolio,eventPortfolio,applyObservationPreset,resetRealScenario,openRealCase,storyJournal,dailyHealthReports,unlockedRecommendations,recordObservationEvidence,confirmFalseAlarm,checkAssessments,completedTasks,eventStatus,healthUpdates,stageHistory,workflowRounds,decideCheck,advanceHealthTrack,supplementObservation, captainEntry,showCaptainWorkbench,taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodo, selectedTodoId, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
+  return {submitObservationReview,activeTaskPortfolio,eventPortfolio,applyObservationPreset,resetRealScenario,openRealCase,storyJournal,dailyHealthReports,unlockedRecommendations,recordObservationEvidence,confirmFalseAlarm,checkAssessments,completedTasks,eventStatus,healthUpdates,stageHistory,workflowRounds,decideCheck,advanceHealthTrack,supplementObservation, captainEntry,showCaptainWorkbench,taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodo, selectedTodoId, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
 })

@@ -11,13 +11,15 @@
   <main>
     <!-- 事件概览：结论与建议先行，关键依据摘要，推理可展开，快链与下一步 -->
     <template v-if="active==='事件概览'">
-      <MarkdownContent :content="dossier.overviewMarkdown"/>
+      <EventDecisionBrief v-if="briefing" :brief="briefing" :event-type="issue.type"/>
+      <MarkdownContent v-else :content="dossier.overviewMarkdown"/>
+      <section v-if="briefing&&hasCurrentUpdate" class="dossier-block current-event-update"><h3>当前处置状态</h3><p>{{dossier.overviewSummary}}</p><button class="p2-link-button" type="button" @click="goTab('处置记录')">查看完整处置记录 →</button></section>
       <div class="quick-links" aria-label="页签快链">
         <button type="button" @click="goTab('研判分析')">查看研判分析</button>
         <button type="button" @click="goTab('证据资料')">查看证据资料</button>
       </div>
       <button v-if="issue.type==='异动跟踪'" type="button" class="tracking-entry" @click="goTab('健康趋势观测')"><span><strong>健康趋势观测</strong><small>持续变化、现场核实与阶段性维保建议</small></span><span aria-hidden="true">查看跟踪 →</span></button>
-      <section v-if="issue.history||issue.eventState==='已闭环'" class="dossier-block"><h3>已记录的结果</h3><p>{{store.completedTasks[issue.id]?.reason||store.executionRecords[issue.id]?.at(-1)?.values.acceptance||issue.reason}}</p><p>{{issue.outcome||'来源资料、实际措施与本次确认保留，可在本事件处置记录回查。'}}</p></section>
+      <section v-if="(issue.history||issue.eventState==='已闭环')&&!hasCurrentUpdate" class="dossier-block"><h3>处置结果</h3><p>{{dossier.reference?.result||store.completedTasks[issue.id]?.reason||issue.reason}}</p><button class="p2-link-button" type="button" @click="goTab('处置记录')">查看完整处置记录 →</button></section>
       <section v-else-if="!issue.isTrackingContainer&&!store.isTaskHandled(issue.id)" class="next-step">
         <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警现场核实':'评估并安排检查'"/>
         <button v-if="store.todoCreated[issue.id]" class="p2-primary" @click="openTask">查看处理任务</button>
@@ -31,7 +33,7 @@
     <HealthTrendObservation v-else-if="active==='健康趋势观测'" :scenario="issue.id" />
     <template v-else-if="active==='处置记录'">
       <h3>{{issue.eventState==='已闭环'?'闭环结果与处置过程':'已提交的处置过程'}}</h3>
-      <p>{{dossier.reference?.result || store.completedTasks[issue.id]?.reason || dossier.conclusion}}</p>
+      <p>{{dossier.overviewSummary||'按时间查看本事件的派发、现场反馈、执行与确认记录。'}}</p>
       <div v-if="dossier.reference" class="reference-results" aria-label="事件处置结果">
         <section class="dossier-block"><h3>关联核实任务</h3><p>{{dossier.reference.task.at}} · {{dossier.reference.task.assignedBy}}派发给{{dossier.reference.task.owner}}</p><p>{{dossier.reference.task.scope}}</p><p>{{dossier.reference.task.result}}</p></section>
         <section class="dossier-block"><h3>执行反馈与实际措施</h3><p>{{dossier.reference.feedback.at}} · {{dossier.reference.feedback.finding}}</p><p>{{dossier.reference.feedback.measure}}</p></section>
@@ -39,70 +41,10 @@
         <section class="dossier-block"><h3>闭环确认与后续安排</h3><p>{{dossier.reference.closure.at}} · {{dossier.reference.closure.actor}}：{{dossier.reference.closure.result}}</p><p>{{dossier.reference.closure.followup}}</p></section>
       </div>
       <div class="quick-links"><button v-if="observationTaskIds.length" type="button" @click="goTab('效果观察')">接续效果观察与闭环确认</button><button type="button" @click="goTab('证据资料')">查看原始依据与执行材料</button></div>
-      <SituationTimeline v-if="dossier.timeline?.length" :entries="dossier.timeline" expanded/>
-      <p v-else class="block-empty">尚未提交派发或执行记录。起始发现与研判见右侧处置过程。</p>
-      <section v-for="recordId in recordIds.filter(id=>store.executionRecords[id]?.length)" :key="recordId" class="dossier-block"><h3>实际执行与验收</h3><div v-for="(record,index) in store.executionRecords[recordId]" :key="index"><p>{{record.values.executedAt}} · {{record.executor || record.values.executor}}</p><p>{{record.values.measures}}</p><p>{{record.values.acceptance}}</p></div></section>
-    </template>
-    <template v-else-if="active==='效果观察'"><SituationObservation v-for="taskId in observationTaskIds" :key="taskId" :scenario="taskId" @back="goTab('处置记录')"/></template>
-    <!-- 研判分析：观察事实、推断、候选解释与未确认问题分层 -->
-    <template v-else-if="active==='研判分析'">
-      <MarkdownContent :content="dossier.analysisMarkdown"/>
-      <div class="quick-links" aria-label="返回概览">
-        <button type="button" @click="goTab('事件概览')">返回事件概览</button>
-      </div>
-    </template>
-    <!-- 证据资料：数据快照、观测节点趋势、证据链、计划来源、人员反馈与决定 -->
-    <template v-else>
-      <MarkdownContent :content="dossier.evidenceMarkdown"/>
-      <section class="dossier-block">
-        <h3>发生时数据快照</h3>
-        <table v-if="dossier.snapshots?.length" class="candidate-table">
-          <thead><tr><th>测点/项目</th><th>数值</th><th>参考口径</th><th>说明</th><th>来源</th></tr></thead>
-          <tbody>
-            <tr v-for="snap in dossier.snapshots" :key="snap.name+snap.value">
-              <th scope="row">{{snap.name}}</th>
-              <td>{{snap.value}}</td>
-              <td>{{snap.reference}}</td>
-              <td>{{snap.meaning}}</td>
-              <td>{{snap.source}}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else class="block-empty">暂无数据快照。</p>
-      </section>
-      <section class="dossier-block">
-        <h3>已有观测节点</h3>
-        <template v-if="dossier.series?.length">
-          <div v-for="series in dossier.series" :key="series.name" class="series-block">
-            <header><b>{{series.name}}</b><span v-if="series.unit">（{{series.unit}}）</span><small>{{series.scope}}</small></header>
-            <ObservationTrend :series="series"/>
-          </div>
-          <p class="limit-note">节点折线仅连接已有观测记录，节点口径见各图说明；未补时间点。</p>
-        </template>
-        <p v-else class="block-empty">该事件暂无连续观测节点记录，仅保留上方数据快照；不拼凑连续趋势。</p>
-      </section>
-      <section class="dossier-block">
-        <h3>关联证据与判断范围</h3>
-        <ul class="evidence-list">
-          <li v-for="text in issue.evidence" :key="text">{{text}}</li>
-        </ul>
-        <p class="limit-note">{{issue.limit}}</p>
-      </section>
-      <section v-if="dossier.plan?.length" class="dossier-block">
-        <h3>计划与安排来源</h3>
-        <table class="candidate-table">
-          <thead><tr><th>项目</th><th>内容</th><th>状态</th></tr></thead>
-          <tbody>
-            <tr v-for="row in dossier.plan" :key="row.label">
-              <th scope="row">{{row.label}}</th>
-              <td>{{row.value}}</td>
-              <td>{{row.status}}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-      <SituationTimeline v-if="dossier.timeline?.length" :entries="dossier.timeline" expanded/>
-      <section class="dossier-block">
+      <SituationTimeline v-if="!dossier.reference&&dossier.timeline?.length" :entries="dossier.timeline" expanded/>
+      <p v-else-if="!dossier.reference" class="block-empty">尚未提交派发或执行记录。起始发现与研判见右侧处置过程。</p>
+      <section v-for="recordId in recordIds.filter(id=>!hasJournalRecords&&store.executionRecords[id]?.length)" :key="recordId" class="dossier-block"><h3>实际执行与验收</h3><div v-for="(record,index) in store.executionRecords[recordId]" :key="index"><p>{{record.values.executedAt}} · {{record.executor || record.values.executor}}</p><p>{{record.values.measures}}</p><p v-if="record.values.acceptance!==record.values.measures">{{record.values.acceptance}}</p></div></section>
+      <section v-if="!hasJournalRecords&&!dossier.reference" class="dossier-block">
         <h3>人员补充与已有决定</h3>
         <p v-if="issue.history">{{issue.at}} · {{issue.actor}}：{{issue.reason}}</p>
         <div v-for="recordId in recordIds" :key="recordId" class="task-provenance-record">
@@ -116,6 +58,72 @@
           <template v-for="(entry,index) in store.stageHistory[recordId]||[]" :key="index"><p><b>{{entry.at}} · {{entry.title}}</b></p><p v-for="record in entry.records||[]" :key="record.label">{{record.label}}：{{record.result}}；{{record.note||'未附备注'}}</p></template>
         </div>
       </section>
+      <section v-if="hasJournalRecords&&unloggedNotes.length" class="dossier-block"><h3>人员补充</h3><p v-for="note in unloggedNotes" :key="note.id">{{note.at}} · {{note.text}}</p></section>
+    </template>
+    <template v-else-if="active==='效果观察'"><SituationObservation v-for="taskId in observationTaskIds" :key="taskId" :scenario="taskId" @back="goTab('处置记录')"/></template>
+    <!-- 研判分析：观察事实、推断、候选解释与未确认问题分层 -->
+    <template v-else-if="active==='研判分析'">
+      <BaselineTrend :scenario="issue.id"/><MarkdownContent :content="dossier.analysisMarkdown"/>
+      <section v-if="!briefing" class="dossier-block">
+        <h3>关联证据与判断范围</h3>
+        <ul class="evidence-list">
+          <li v-for="text in issue.evidence" :key="text">{{text}}</li>
+        </ul>
+        <p class="limit-note">{{briefing?.boundary||issue.limit}}</p>
+      </section>
+      <section v-if="dossier.plan?.length" class="dossier-block">
+        <h3>计划与安排来源</h3>
+        <table class="candidate-table">
+          <thead><tr><th>项目</th><th>内容</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr v-for="row in dossier.plan" :key="row.label||row.name">
+              <th scope="row">{{row.label||row.name}}</th>
+              <td>{{row.value}}</td>
+              <td>{{row.status||row.meaning}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <div class="quick-links" aria-label="返回概览">
+        <button type="button" @click="goTab('事件概览')">返回事件概览</button>
+      </div>
+    </template>
+    <!-- 证据资料：来源记录、原始采样与曲线；解释和处置进展由对应页签承载 -->
+    <template v-else>
+      <EventEvidenceSources v-if="briefing" :brief="briefing"/>
+      <MarkdownContent v-else :content="dossier.evidenceMarkdown"/>
+      <section class="dossier-block">
+        <h3>{{briefing?.temporalScope==='post-repair-followup'?'原低压事件采样记录':'测点采样记录'}}</h3>
+        <div v-if="briefing&&rawSnapshots.length" class="source-facts-scroll" tabindex="0" aria-label="测点采样记录"><table class="candidate-table source-facts-table"><thead><tr><th>测点</th><th>记录数值</th><th>采样时间</th></tr></thead><tbody><tr v-for="sample in rawSnapshots" :key="sample.name"><th scope="row">{{sample.name}}</th><td>{{sample.value}} {{sample.unit}}</td><td>{{sample.at}}</td></tr></tbody></table></div>
+        <table v-else-if="dossier.snapshots?.length" class="candidate-table">
+          <thead><tr><th>测点/项目</th><th>数值</th><th>记录时间</th><th>来源</th></tr></thead>
+          <tbody>
+            <tr v-for="snap in dossier.snapshots" :key="snap.name+snap.value">
+              <th scope="row">{{snap.name}}</th>
+              <td>{{snap.value}}</td>
+              <td>{{snap.reference}}</td>
+              <td>{{snap.source}}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="block-empty">暂无数据快照。</p>
+      </section>
+      <section class="dossier-block">
+        <h3>原始观测趋势 <small v-if="dossier.series?.length">{{dossier.series.length}} 组测点 · 展开查看</small></h3>
+        <template v-if="dossier.series?.length">
+          <details v-for="(series,index) in dossier.series" :key="scenario+':'+index" class="source-series" @toggle="toggleSeries(index,$event)">
+            <summary><strong>{{series.name}}<small v-if="series.unit">（{{series.unit}}）</small></strong><time>{{series.labels?.[0]}} — {{series.labels?.at(-1)}}</time></summary>
+            <div v-if="openedSeries.has(index)" class="source-series-chart">
+              <p v-if="!briefing">{{series.scope}}</p><ObservationTrend :series="series"/>
+              <details class="sample-records"><summary>采样明细 · {{series.labels.length}} 条</summary><div class="sample-records-table" tabindex="0" :aria-label="series.name+'采样明细'"><table class="candidate-table"><thead><tr><th>采样时间</th><th>数值</th><th>单位</th></tr></thead><tbody><tr v-for="(at,pointIndex) in series.labels" :key="pointIndex"><td>{{at}}</td><td>{{Number.isFinite(series.values[pointIndex])?series.values[pointIndex]:'—'}}</td><td>{{series.unit}}</td></tr></tbody></table></div></details>
+            </div>
+          </details>
+        </template>
+        <p v-else class="block-empty">暂无连续采样记录。</p>
+      </section>
+
+
+
     </template>
   </main>
 </article>
@@ -123,6 +131,7 @@
 </template>
 <script setup>
 import {decisionPreset} from '@/mock/realScenarioPresets'
+import BaselineTrend from './BaselineTrend.vue'
 import SituationTimeline from './SituationTimeline.vue'
 import SituationObservation from './SituationObservation.vue'
 import {computed,nextTick,ref,watch} from 'vue'
@@ -137,21 +146,31 @@ import InquiryMessage from './messages/InquiryMessage.vue'
 import assignmentTemplate from '@/message-flows/task-assignment.json'
 import BackButton from './BackButton.vue'
 import TaskAssignment from './TaskAssignment.vue'
+import EventDecisionBrief from './EventDecisionBrief.vue'
+import EventEvidenceSources from './EventEvidenceSources.vue'
+import {eventBriefingFor} from '@/mock/eventBriefings'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
 watch(()=>props.scenario,id=>store.openRealCase(id),{immediate:true})
 const tabs=computed(()=>['事件概览',...(issue.value?.type==='异动跟踪'?['健康趋势观测']:[]),'研判分析','处置记录',...(observationTaskIds.value.length?['效果观察']:[]),'证据资料']),active=ref('事件概览'),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
 const rootRef=ref(null),overviewScroll=ref(0)
 const issue=computed(()=>workbenchIssues(store).find(item=>item.id===props.scenario))
 const recordIds=computed(()=>[...new Set([...(issue.value?.isTrackingContainer?[]:[props.scenario]),...(issue.value?.maintenanceRecommendations||[]).map(item=>item.id)])])
+const hasJournalRecords=computed(()=>store.storyJournal.some(record=>recordIds.value.includes(record.taskId)))
+const unloggedNotes=computed(()=>recordIds.value.flatMap(id=>store.dossierNotes[id]||[]).filter(note=>!dossier.value.timeline.some(entry=>entry.text===note.text||note.text==='忽略本次建议：'+entry.text)))
 const observationTaskIds=computed(()=>recordIds.value.filter(id=>store.executionRecords[id]?.length&&store.isTaskHandled(id)&&!store.completedTasks[id]&&store.eventStatus[id]!=='closed'))
 watch(tabs,value=>{if(!value.includes(active.value))active.value='处置记录'})
 watch(()=>[props.scenario,store.eventStatus[props.scenario]],()=>{if(store.eventStatus[props.scenario]==='pending'){falseAlarmOpen.value=false;falseAlarmReason.value='';feedback.value=false;active.value=tabs.value[0]}})
 watch(()=>[props.scenario,route.query.tab],()=>{active.value=tabs.value.includes(route.query.tab)?route.query.tab:tabs.value[0]},{immediate:true})
 const dossier=computed(()=>storyDossier(store,props.scenario))
-const openQuestions=computed(()=>{
-  const items=(dossier.value.comparisons||[]).map(row=>row.missing).filter(Boolean)
-  return [...new Set(items)]
-})
+const briefing=computed(()=>eventBriefingFor(props.scenario))
+const rawSnapshots=computed(()=>(dossier.value.series||[]).flatMap(series=>{
+  const index=series.values.findLastIndex(value=>Number.isFinite(value))
+  return index<0?[]:[{name:series.name,value:series.values[index],unit:series.unit,at:series.labels[index]}]
+}))
+const hasCurrentUpdate=computed(()=>dossier.value.hasUpdate&&recordIds.value.some(id=>store.checkAssessments[id]||store.executionRecords[id]?.length||store.completedTasks[id]||store.ignoredSuggestions[id]))
+const openedSeries=ref(new Set())
+watch(()=>props.scenario,()=>{openedSeries.value=new Set()})
+function toggleSeries(index,event){if(event.target.open)openedSeries.value.add(index);else openedSeries.value.delete(index)}
 function goTab(tab){
   if(active.value==='事件概览'&&tab!=='事件概览')overviewScroll.value=rootRef.value?.scrollTop||0
   active.value=tab
@@ -215,9 +234,13 @@ defineEmits(['back'])
 .series-block header b{color:#30445d;font-size:13px}
 .series-block header span{color:#68788e;font-size:12px}
 .series-block header small{margin-left:auto;color:#8a94a5;font-size:11px}
+.dossier-block>h3>small{font-weight:400;font-size:11px;color:#8b99aa;margin-left:12px}
+.source-facts-scroll{max-width:100%;overflow-x:auto}.source-facts-scroll:focus-visible{outline:2px solid #b29360;outline-offset:2px}.source-facts-table{min-width:480px}
+.source-series{border-bottom:1px solid #e4eaf1;min-width:0}.source-series>summary{display:flex;align-items:baseline;justify-content:space-between;gap:5px 18px;flex-wrap:wrap;cursor:pointer;padding:12px 4px;list-style:none;font-size:13px;color:#526a85}.source-series>summary:before{content:'›';color:#a58b60}.source-series[open]>summary:before{content:'⌄'}.source-series>summary strong{font-size:13px;font-weight:500;flex:1}.source-series>summary small{font-size:11px;color:#8694a6;font-weight:400}.source-series>summary time{font-size:11px;color:#8b98a8;font-variant-numeric:tabular-nums}.source-series>summary::-webkit-details-marker{display:none}.source-series>summary:focus-visible{outline:2px solid #b29360;outline-offset:2px}.source-series-chart{padding:0 10px 10px}.source-series-chart>p{font-size:12px;color:#7e8c9f}.current-event-content{padding:0 16px 12px}.source-facts-table td:nth-child(2){font-variant-numeric:tabular-nums;color:#344e6b}.source-facts-table th:first-child{width:50%}.source-facts-table th:nth-child(2){width:18%}.source-facts-table th:nth-child(3){width:32%}
 .evidence-list{margin:8px 0;padding-left:20px}
 .evidence-list li{margin:5px 0}
 
 @media(max-width:1200px){.captain-detail{padding:20px}.captain-detail h2{font-size:20px}}
 @media(max-width:600px){.captain-detail{padding:16px}.captain-detail header{gap:12px;flex-wrap:wrap}.captain-detail nav{gap:18px}.candidate-table th,.candidate-table td{padding:7px 5px;font-size:12px}}
+.sample-records{margin-top:10px}.sample-records>summary{cursor:pointer;font-size:12px;color:#8b682d;padding:8px 0}.sample-records-table{max-height:280px;overflow:auto}.sample-records-table table{margin-top:0;font-variant-numeric:tabular-nums}.sample-records-table th{position:sticky;top:0;background:#f7f8fa}
 </style>

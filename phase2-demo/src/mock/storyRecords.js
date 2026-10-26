@@ -3,6 +3,7 @@ import fixtures from './fourStoryFixtures.json' with {type:'json'}
 import {healthTrackingSources} from './healthTrackingSources.js'
 import {parentIssueId,maintenanceChildIds} from './issueRelationships.js'
 import {closedEventReference} from './closedEventReferences.js'
+import {eventBriefingFor} from './eventBriefings.js'
 
 // Original samples and user actions are separate immutable sources. Project them
 // into a single chronology; never rewrite an earlier sample with today's answer.
@@ -52,8 +53,9 @@ export function healthStoryMarkdown(store,id){
  const readings=observation?.values?.map((value,index)=>`${metrics?.names?.[index]||'指标'+(index+1)} ${value}${metrics?.units?.[index]||''}`).join('、')
  const current=work?`${work.values.executedAt.replace('T',' ')}，实际措施：${work.values.measures}。验收：${work.values.acceptance}。${work.values.completion!=='completed'?'本轮作业未完成，原范围继续。':work.values.verification==='unresolved'?'原问题仍存在，接续原任务评估。':work.values.verification!=='resolved'?'本轮验收尚未完成。':observation?.values?`最新可比节点${readings}；结合本次范围评价持续效果，原健康链保留。`:'现场验收已记录，持续效果待可比数据。'}`:latest?`${latest.at}，${latest.values}。${latest.judgement}`:assessment?.message||track.conclusion
  const task=state.taskComplete?`**任务状态：本次人工核实已结束**。原健康链继续，不代表设备已恢复。\n\n人员记录：${state.decision}`:track.requestId&&store.todoCreated?.[track.requestId]?`已派发给${store.assignments?.[track.requestId]?.owner||'原负责人'}，等待或补充现场核实；不重复派单。`:track.next
- const next=state.recommendationId?'结合累积趋势查看相关提前维保评估。原季度项目仍有效；检查决定本次实际范围，不预定换件。':state.taskComplete?'继续按相同测点、可比负荷比较；稳定偏移不等于恢复。出现新的信息需求时再安排现场补充。':track.next
- return `### 当前健康判断\n\n${current}\n\n### 已取得的现场信息\n\n${feedback.length?feedback.map(entry=>`- **${entry.label}：${entry.result}**。${entry.note||'未附补充说明，不能扩大解释。'}`).join('\n'):'尚未提交现场核实记录，现有读数只作为趋势资料。'}\n\n### 本次人工任务与后续\n\n${task}\n\n${next}\n\n### 解释边界\n\n温度与相对偏移共享原始测量；同源显示一致不等于校准。人员原文保留，未取得的燃油、负荷或维护背景仍为缺项。趋势发展不直接证明某部件损坏或剩余寿命。`
+ const brief=eventBriefingFor(parentIssueId(id))
+ const next=brief?state.taskComplete?'保留已确认的工况与未完成核实项，继续关联原始数据。再次出现无法由已确认工况解释的变化时，补充核实或重新评估。':track.next:state.recommendationId?'结合累积趋势查看相关提前维保评估。原季度项目仍有效；检查决定本次实际范围，不预定换件。':state.taskComplete?'继续按相同测点、可比负荷比较；稳定偏移不等于恢复。出现新的信息需求时再安排现场补充。':track.next
+ return `### 当前健康判断\n\n${current}\n\n### 已取得的现场信息\n\n${feedback.length?feedback.map(entry=>`- **${entry.label}：${entry.result}**。${entry.note||'未附补充说明，不能扩大解释。'}`).join('\n'):'尚未提交现场核实记录，现有读数只作为趋势资料。'}\n\n### 本次人工任务与后续\n\n${task}\n\n${next}\n\n### 解释边界\n\n${brief?.boundary||'温度与相对偏移共享原始测量；同源显示一致不等于校准。人员原文保留，未取得的燃油、负荷或维护背景仍为缺项。趋势发展不直接证明某部件损坏或剩余寿命。'}`
 }
 export function storyRevision(store,id){
  const track=sourceTrack(id,store)

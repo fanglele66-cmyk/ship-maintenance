@@ -15,18 +15,18 @@ test('maintenance assessments stay within their health tracking and preserve exe
   const {issueContext,issueReply}=await server.ssrLoadModule('/src/message-flows/issueSources.js')
   const {realCaseRecords}=await server.ssrLoadModule('/src/mock/realCaseAdapter.js')
   const fresh=()=>{setActivePinia(createPinia());return usePhase2DemoStore()}
-  const child='real-maintenance-0523',parent='real-health-0523'
-  await t.test('three event types and four initial matters retain three source problems without exposing child events',()=>{
+  const child='real-maintenance-c4-baseline',parent='real-health-c4-baseline'
+  await t.test('three event types and four initial matters retain separate source problems without exposing child events',()=>{
    const store=fresh(),rows=activeWorkbenchIssues(store)
    assert.deepEqual(issueTypes,['报警事件','预警事件','异动跟踪'])
-   assert.deepEqual(rows.map(row=>row.id),['real-alarm-0430','real-warning-0523','real-tracking-0816',parent])
-   assert.equal(new Set(rows.map(row=>row.sourceEventId)).size,3)
+   assert.deepEqual(rows.map(row=>row.id),['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline',parent])
+   assert.equal(new Set(rows.map(row=>row.sourceEventId)).size,4)
    assert.equal(rows.some(row=>row.id===child),false)
    assert.equal(rows.find(row=>row.id===parent).decisionId,child)
    assert.equal(rows.find(row=>row.id===parent).maintenanceRecommendations[0].id,child)
    assert.equal(store.cases[child].workflowKind,'maintenance')
    assert.equal(store.cases[child].cardType,'异动跟踪')
-   assert.deepEqual(store.cases[parent].relatedIssueIds,['real-warning-0523'])
+   assert.deepEqual(store.cases[parent].relatedIssueIds,[])
    assert.equal(store.createTodo(parent),false)
    assert.equal(store.selectTodo(parent),false)
    assert.equal(store.visibleTodos.length,0)
@@ -76,12 +76,12 @@ test('maintenance assessments stay within their health tracking and preserve exe
    assert.ok(inquiry)
    assert.equal(store.confirmExecutionRecord(child,inquiry.id,{
     ...Object.fromEntries(store.currentStage.tasks.map((_,index)=>['task'+index,'已完成'])),
-    equipment:'控制空气减压阀',measures:'完成批准范围检查，未更换减压阀',executedAt:'2026-10-20T10:00',executor:'李建国（大管轮）',
-    acceptance:'本轮检查范围已记录；永久更换仍待实际安排',completion:'completed',verification:'resolved',comparable:'missing',
+    equipment:'四缸排温通道',measures:'完成批准范围校验与检查，未更换探头',executedAt:'2026-10-20T10:00',executor:'李建国（大管轮）',
+    acceptance:'本轮校验范围已记录；未解释偏差继续月度观察',completion:'completed',verification:'resolved',comparable:'missing',
    }),true)
-   assert.match(storyDossier(store,parent).currentMarkdown,/未更换减压阀/)
+   assert.match(storyDossier(store,parent).currentMarkdown,/未更换探头/)
    assert.match(storyDossier(store,parent).currentMarkdown,/缺可比记录/)
-   assert.match(deviceStoryAssessment(store,'main-engine-1').basis,/未更换减压阀/)
+   assert.match(deviceStoryAssessment(store,'main-engine-1').basis,/未更换探头/)
    assert.ok(storyTimeline(store,parent).some(row=>row.kind==='execution'))
    assert.equal(isIssueClosed(store,parent),false)
    assert.equal(JSON.stringify(realCaseRecords),raw,'raw historical evidence remains immutable')

@@ -2,7 +2,7 @@ import {deviceStoryAssessment} from './fourStoryWorkflow.js'
 // Scenario assessments: conclusions change with task evidence and actual progress.
 export function fleetAssessment(store){
  const report=deviceStoryAssessment(store,'main-engine-1')
- const context='结合二缸报警、控制空气低压、倒车试验及减压阀后续检修情况，按事件进度跟进处置。0523 预警与后续维保关联同一设备问题。'
+ const context='结合二缸报警、控制空气低压，以及一缸基线抬升、四缸相对基线下移，按各自证据和事件进度跟进。维保建议保留在对应健康跟踪内。'
  return {conclusion:report.conclusion,basis:report.basis,recommendation:report.next,operationOverview:context,healthConclusion:report.conclusion,healthAnalysis:report.basis,suggestion:report.next,suggestionReason:context,suggestionText:report.next}
 }
 

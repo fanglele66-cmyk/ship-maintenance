@@ -14,7 +14,7 @@ test('real incidents replace situation examples and support every preset branch'
   const {feedbackPresets,executionPreset,executionPresetOptions,decisionPreset}=await server.ssrLoadModule('/src/mock/realScenarioPresets.js')
   const {useEventWorkOrderStore}=await server.ssrLoadModule('/src/stores/eventWorkOrderStore.js')
   const fresh=()=>{setActivePinia(createPinia());return usePhase2DemoStore()}
-  const ids=realCaseRecords.map(c=>c.id),alarm='real-alarm-0430',warning='real-warning-0523',tracking='real-tracking-0816',maintenance='real-maintenance-0523'
+  const ids=realCaseRecords.map(c=>c.id),alarm='real-alarm-0430',warning='real-warning-0523',tracking='real-tracking-exhaust-baseline',maintenance='real-maintenance-c4-baseline'
   const start=(store,id)=>{assert.equal(store.createTodo(id),true);store.selectTodo(id);store.advanceTodo(id)}
   const feedback=(store,id,values)=>store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:'【预设演示】测试该处理分支',attachments:[]}))
   const toWork=(store,id)=>{
@@ -33,7 +33,7 @@ test('real incidents replace situation examples and support every preset branch'
    assert.equal(store.confirmExecutionRecord(id,form.id,submitted),true,form.submitError)
   }
   await t.test('only four active initial matters; source measurements and cutoff remain intact',()=>{
-   const store=fresh();assert.deepEqual(activeWorkbenchIssues(store).map(r=>r.id),ids.map(id=>id===maintenance?'real-health-0523':id))
+   const store=fresh();assert.deepEqual(activeWorkbenchIssues(store).map(r=>r.id),ids.map(id=>id===maintenance?'real-health-c4-baseline':id))
    for(const record of realCaseRecords){
     const item=store.cases[record.id];assert.equal(store.todoCreated[item.id],false);assert.equal(store.eventStatus[item.id],'pending');assert.equal(store.executionRecords[item.id],undefined)
     assert.equal(item.report.basis,record.steps[0].summary)
@@ -66,7 +66,7 @@ test('real incidents replace situation examples and support every preset branch'
    for(const values of [['发现异常','未见异常'],['未见异常','发现异常'],['发现异常','发现异常'],['无法确认','未见异常']]){
     const store=fresh();start(store,alarm);const result=store.advanceTodo(alarm,feedback(store,alarm,values))
     assert.equal(result.advanced,values.includes('发现异常'))
-    if(result.advanced){assert.equal(store.currentStage.tasks.length,values.filter(v=>v==='发现异常').length*2);assert.doesNotMatch(store.currentStage.title,/温控阀|冷却滤器/)}
+    if(result.advanced){assert.deepEqual(store.currentStage.tasks.map(task=>task.label),store.cases[alarm].stages.find(stage=>stage.id==='investigate').tasks.filter((_,i)=>values[i]==='发现异常').flatMap(task=>store.cases[alarm].packages[task.package].tasks.map(step=>step.label)));assert.doesNotMatch(store.currentStage.title,/温控阀|冷却滤器/)}
     else {assert.equal(store.currentStage.id,'investigate');assert.equal(store.decideCheck(alarm,'supplement','预设新线索待核实'),true);assert.equal(store.decideCheck(alarm,'retry'),true)}
    }
   })
@@ -111,7 +111,7 @@ test('real incidents replace situation examples and support every preset branch'
   })
   await t.test('reset clears only current case including work-order association',async()=>{
    const store=fresh();start(store,maintenance);const links=useEventWorkOrderStore();await links.load(maintenance);assert.equal(links.confirm(maintenance),true)
-   assert.match(links.state(maintenance).linked.title,/减压阀/)
+   assert.match(links.state(maintenance).linked.title,/四缸测温/)
    start(store,tracking);store.taskNotes[tracking+':check:0']='keep my note'
    store.resetRealScenario(maintenance);assert.equal(links.events[maintenance],undefined)
    assert.equal(store.taskNotes[tracking+':check:0'],'keep my note');assert.equal(store.todoCreated[tracking],true)

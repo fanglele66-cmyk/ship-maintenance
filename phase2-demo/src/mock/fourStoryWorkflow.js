@@ -21,17 +21,17 @@ export const workflowIssues = allCases.filter(item=>!isMaintenanceWorkflow(item)
   rank: types.indexOf(item.cardType), title: item.initialTitle, summary: item.report.conclusion,latent:Boolean(item.latent),
   isTrackingContainer:Boolean(item.isTrackingContainer), sourceCaseId:item.sourceCaseId,
   sourceEventId:item.sourceEventId, relatedIssueIds:item.relatedIssueIds||[],
-  action: '查看详情', evidence: item.stages[0].evidence, limit: item.cardType==='报警事件'?'报警表明测点越限，尚不能确定唯一根因；现场读数与采集状态仍需核对。':item.cardType==='预警事件'?'综合预警需要现场印证，尚不能直接确定部件故障或维修范围。':item.trackingOnly?'长期偏离不等于当前故障或剩余寿命下降结论；本次仅补充现场信息，不要求拆机。':'提前评估不等于批准换件；原周期计划保持有效，实际处理范围待确认。',
+  action: '查看详情', evidence: item.stages[0].evidence, limit: item.decisionLimit||(item.cardType==='报警事件'?'报警表明测点越限，尚不能确定唯一根因；现场读数与采集状态仍需核对。':item.cardType==='预警事件'?'综合预警需要现场印证，尚不能直接确定部件故障或维修范围。':item.trackingOnly?'长期偏离不等于当前故障或剩余寿命下降结论；本次仅补充现场信息，不要求拆机。':'提前评估不等于批准换件；原周期计划保持有效，实际处理范围待确认。'),
 }))
 
 export const workflowDossiers = Object.fromEntries(allCases.map(item => [item.id, {
-  conclusion: item.report.conclusion, recommendation: item.report.human,
+  conclusion: item.report.conclusion, recommendation: item.report.human, discovery:item.discovery, evidenceSources:item.evidenceSources||[],
   snapshots: (item.snapshots||[]).map(([name,value,reference,meaning]) => ({name,value,reference,meaning,source:item.source+' · 发生时记录'})),
   series: item.series||[],
   steps: [
     {title:'已有事实',fact:item.report.basis,inference:item.report.conclusion},
     {title:'当前判断边界',fact:'尚未提交的现场结果不属于已确认事实。',inference:item.report.human},
-    ...(item.trackingOnly?[{title:'长期跟踪与本次核实',fact:item.realCaseId?'倒车时段原始采样、操纵背景与本轮核实保留在同一记录。':'首次、重复、持续三个节点保留在同一健康记录。',inference:'核实任务结束后原健康跟踪继续，不直接转入拆机维修。'}]:[]),
+    ...(item.trackingOnly?[{title:'长期跟踪与本次核实',fact:item.realCaseId?'月度配对采样、历史调整与本轮基线核实保留在同一记录。':'首次、重复、持续三个节点保留在同一健康记录。',inference:'核实任务结束后原健康跟踪继续，不直接转入拆机维修。'}]:[]),
   ],
   comparisons: item.cause?.rows.map(row=>({direction:row.name,support:row.cause+'；'+row.effect,missing:row.check+'尚需实际反馈'})) || [
     {direction:item.trackingOnly?'工况或测量因素':'提前处理的必要性',support:item.report.basis,missing:item.report.human},
@@ -47,19 +47,26 @@ export function assessmentMarkdown(assessment) {
   const records=(assessment.records||[]).map(record=>`- **${record.label}：${record.result}**${record.note?'。'+record.note:'。尚无补充读数或现象，不能扩大结论。'}`).join('\n')
   return `### ${assessment.round?'第'+assessment.round+'轮已提交判断':'本轮判断'}\n\n${assessment.message}\n\n### 已提交的现场信息\n\n${records}`
 }
+function executionSummary(execution){
+  if(!execution)return ''
+  const values=execution.values
+  return values.completion!=='completed'?'本轮处置尚未完成，继续落实剩余工作。':values.verification==='unresolved'?'作业已完成，原异常仍存在，需沿原任务复查。':values.verification!=='resolved'?'执行记录已保存，验收结果尚待确认。':values.comparable!=='available'?'现场验收已提交，尚缺可比记录，需补齐处理后观察资料。':'现场验收已提交，进入修复观察，持续效果待确认。'
+}
 export function storyDossier(store,id){
   const item=workflowCases[id],base=workflowDossiers[id]||{},content=item?.pageContent||{}
   const reference=closedEventReference(id)
   if(reference){
     const overviewMarkdown=`### 闭环结果\n\n${reference.result}\n\n### 本次处置范围\n\n${reference.scope}\n\n核实采集时间与负荷工况、修正比较口径、完成现场反馈和人工签认。未拆检或更换部件。`
     return {...base,reference,timeline:storyTimeline(store,id),overviewMarkdown,currentMarkdown:overviewMarkdown,
-      analysisMarkdown:`### 起始问题\n\n原排温比较存在偏离，但工况与采集时刻尚未对齐。\n\n### 现场核实后的判断\n\n${base.conclusion}\n\n### 为什么可以结束本次处置\n\n本轮核实要求完成，原判断的可比性问题已有说明，人工确认本次预警不成立。该结论不要求先做维修，也不代表整机全面健康。`,
+      analysisMarkdown:`### 起始问题\n\n原排温比较存在偏离，但工况与采集时刻尚未对齐。\n\n### 现场核实后的判断\n\n${base.conclusion}\n\n### 处置结束依据\n\n本轮核实要求完成，原判断的可比性问题已有说明，人工确认本次预警不成立。该结论不要求先做维修，也不代表整机全面健康。`,
       evidenceMarkdown:`### 已留存记录\n\n${base.steps?.map(step=>'- '+step.fact).join('\n')}\n\n### 核实与签认材料\n\n${reference.acceptance.basis}\n\n${reference.closure.followup}`,hasUpdate:false}
   }
   const assessment=store.checkAssessments?.[id],decision=store.completedTasks?.[id]
   const execution=store.executionRecords?.[id]?.at(-1)
+  const observation=store.observationRecords?.[id]?.length?store.getObservationResult?.(id):null
+  const executionState=store.eventStatus?.[id]==='closed'?'本轮已人工确认结束，执行与观察记录已归档。':observation?.title||executionSummary(execution)
   let update=assessmentMarkdown(assessment)
-  if(execution)update+=`\n\n### 实际措施与验证\n\n${execution.values.measures}\n\n${execution.values.acceptance}\n\n${execution.values.completion!=='completed'?'本次工作尚未全部完成。':execution.values.verification==='unresolved'?'作业已完成，原问题仍存在，继续原事件排查。':execution.values.verification!=='resolved'?'作业记录已保存，验收尚未确认。':execution.values.comparable!=='available'?'本次验收已提交，尚缺可比记录，不能生成持续改善结论。':'现场验收已提交，持续效果仍需后续可比记录和人工确认。'}`
+  if(execution)update+=`\n\n### 实际措施与验证\n\n${[...new Set([execution.values.measures,execution.values.acceptance].filter(Boolean))].join('\n\n')}\n\n${executionState}`
   if(store.ignoredSuggestions?.[id]&&!store.todoCreated?.[id])update+=`\n\n### 本次决定\n\n${store.ignoredSuggestions[id].reason}。原来源记录与周期计划继续保留。`
   if(decision)update+=`\n\n### 已记录的决定\n\n${decision.reason}\n\n${item?.trackingOnly?'本次核实任务结束，原健康记录继续；不代表故障或寿命结论。':isMaintenanceWorkflow(item)?'原周期项目保留，已做与未做的范围分别登记。':'来源、现场反馈和本次确认保留。'}`
   const overview=content.overview||`### 当前结论\n\n${base.conclusion||''}\n\n### 建议\n\n${base.recommendation||''}`
@@ -78,7 +85,12 @@ export function storyDossier(store,id){
     })
     if(updates.length)update=updates.join('\n\n')
   }
-  return {...base,series,maintenanceRecommendations:recommendations,timeline:storyTimeline(store,id),overviewMarkdown:update?update+'\n\n### 起始依据\n\n'+(item?.report?.basis||base.conclusion):overview,analysisMarkdown:(update?update+'\n\n':'')+analysis,evidenceMarkdown:content.evidence||'来源资料及实际反馈按记录保留。',hasUpdate:Boolean(update),currentMarkdown:update||overview}
+  // The overview summarizes state; analysis interprets evidence; the timeline owns raw receipts.
+  const summaries=item?.isTrackingContainer?recommendations.map(child=>storyDossier(store,child.id).overviewSummary).filter(Boolean):[]
+  const overviewSummary=summaries.join('；')||(store.eventStatus?.[id]==='closed'?'本轮已确认结束，处置结果与签认记录已归档。':execution?observation?.title||executionSummary(execution):decision?'本轮核实已结束，后续安排已记录。':assessment?'现场反馈已提交，最新研判与后续安排已更新。':store.ignoredSuggestions?.[id]?'本次建议已登记决定，原健康跟踪继续保留。':'')
+  const judgement=assessment?.message?`### 现场反馈后的研判\n\n${assessment.message}`:''
+  const childAnalysis=item?.isTrackingContainer?recommendations.map(child=>{const childAssessment=store.checkAssessments?.[child.id];return childAssessment?`### ${child.initialTitle}\n\n${childAssessment.message}`:''}).filter(Boolean).join('\n\n'):''
+  return {...base,series,overviewSummary,maintenanceRecommendations:recommendations,timeline:storyTimeline(store,id),overviewMarkdown:item?.realCaseId?(overviewSummary?`### 当前处置状态\n\n${overviewSummary}`:overview):update?update+'\n\n### 起始依据\n\n'+(item?.report?.basis||base.conclusion):overview,analysisMarkdown:[judgement,childAnalysis,analysis].filter(Boolean).join('\n\n'),evidenceMarkdown:content.evidence||'来源资料及实际反馈按记录保留。',hasUpdate:Boolean(update),currentMarkdown:update||overview}
 }
 export function stageReport(store,id,stage){
   const item=store.cases?.[id]||workflowCases[id]
@@ -149,8 +161,15 @@ export function assessWorkflow(id,stage,feedback) {
 
 export function composeRepair(caseData,keys) {
   const packages=keys.map(key=>caseData.packages[key]).filter(Boolean)
-  return {title:packages.map(item=>item.title).join('及'),tasks:packages.flatMap(item=>item.tasks),evidence:packages.map(item=>'已确认处置范围：'+item.title),
-    workDetails:{preparation:packages.flatMap(item=>item.preparation),parts:packages.flatMap(item=>item.parts),acceptance:packages.flatMap(item=>item.acceptance)}}
+  const title=packages.map(item=>item.title).join('及')
+  const tasks=packages.flatMap(item=>item.tasks)
+  const detail={preparation:packages.flatMap(item=>item.preparation),parts:packages.flatMap(item=>item.parts),acceptance:packages.flatMap(item=>item.acceptance)}
+  // Older workflows keep their own acceptance fallback; real tasks carry methods
+  // and named checkpoints through every selected package combination.
+  if(packages.every(item=>item.acceptanceRows?.length))detail.acceptanceRows=packages.flatMap(item=>item.acceptanceRows.map(row=>({...row,name:packages.length>1?item.title+' · '+row.name:row.name})))
+  return {title,tasks,evidence:packages.map(item=>'已确认处置范围：'+item.title),workDetails:detail,
+    ...(caseData.realCaseId?{markdown:`### 执行目标\n\n${title}。按本轮检查发现及获批范围实施，分别登记实际措施与用料。\n\n### 作业安排\n\n${tasks.map(task=>'- **'+task.label+'**：'+task.guide).join('\n')}\n\n### 提交成果\n\n提交隔离与复装工卡、实际领用及旧新件记录、现场测试和未完成项目。`}:{}),
+  }
 }
 
 export function workflowReply(store,id,text) {
@@ -176,7 +195,7 @@ export function deviceStoryAssessment(store,deviceId){
       const actual=execution?`实际措施：${execution.values.measures}；验收记录：${execution.values.acceptance}；持续效果按可比观测另行判断。`:''
       return item.initialTitle+'：'+(actual||store.completedTasks?.[id]?.reason||store.ignoredSuggestions?.[id]?.reason||store.checkAssessments?.[id]?.message||item.report.conclusion)
     })
-    return {conclusion:active.length?'当前展示 0430 二缸报警、0523 控制空气预警、倒车试验跟踪及临修后健康趋势观测，维保建议作为跟踪内的阶段性结果，按发生窗口与本轮反馈分别判断。':'本轮事项均已有决定或闭环，来源资料与处理记录保留。',basis:details.join('\n\n'),next:'优先核对报警与预警的现场依据；倒车试验先核实操纵工况，维保建议分别评估必要性与条件。0523 预警和后续维保同源，不能重复计为两起故障。'}
+    return {conclusion:active.length?'当前展示 二缸报警、控制空气预警、一缸长期基线抬升及四缸相对基线下移，维保建议作为跟踪内的阶段性结果，按发生窗口与本轮反馈分别判断。':'本轮事项均已有决定或闭环，来源资料与处理记录保留。',basis:details.join('\n\n'),next:'优先核对报警与预警的现场依据；长期基线先核实工况与测温，维保建议分别评估必要性与条件。四缸专项检查作为原健康跟踪的阶段结果。'}
   }
 
   if(deviceId==='main-engine-1'){

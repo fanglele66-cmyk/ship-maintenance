@@ -3,9 +3,9 @@
 export const maintenanceParents = Object.freeze({
   maintenance: 'bearing-health',
   'aux-maintenance': 'aux-health',
-  'real-maintenance-0523': 'real-health-0523',
+  'real-maintenance-c4-baseline': 'real-health-c4-baseline',
 })
-export const trackingContainerIds = Object.freeze(['bearing-health', 'real-health-0523'])
+export const trackingContainerIds = Object.freeze(['bearing-health', 'real-health-c4-baseline'])
 export const historicalIssueParents = Object.freeze({'maintenance-history': 'bearing-health'})
 export const issueTypeNames = Object.freeze(['报警事件', '预警事件', '异动跟踪'])
 export function parentIssueId(id) { return maintenanceParents[id] || historicalIssueParents[id] || id }

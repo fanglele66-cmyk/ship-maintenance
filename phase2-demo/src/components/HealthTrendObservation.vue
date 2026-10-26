@@ -1,5 +1,6 @@
 <template>
   <section class="health-observation" aria-label="健康趋势观测">
+    <BaselineTrend :scenario="scenario"/>
     <div class="observation-intro">
       <div><span class="observation-kicker">持续观测 · 同一跟踪记录</span><h3>从健康变化到维保安排</h3></div>
       <span class="observation-state">{{ currentStage }}</span>
@@ -26,7 +27,8 @@
         <div v-for="series in storyDossier(store, recommendation.id).series || []" :key="series.name" class="recommendation-series">
           <h4>{{ series.name }} <small>{{ series.unit }}</small></h4><ObservationTrend :series="series" />
         </div>
-        <MarkdownContent :content="storyDossier(store, recommendation.id).evidenceMarkdown" />
+        <EventEvidenceSources v-if="eventBriefingFor(recommendation.id)" :brief="eventBriefingFor(recommendation.id)" />
+        <MarkdownContent v-else :content="storyDossier(store, recommendation.id).evidenceMarkdown" />
       </details>
       <div v-if="store.completedTasks[recommendation.id]" class="recommendation-result">
         <strong>本轮评估结果已回写</strong><p>{{ store.completedTasks[recommendation.id].reason }}</p><p>原健康跟踪和未完成的周期项目继续保留。</p>
@@ -38,6 +40,7 @@
 </template>
 
 <script setup>
+import BaselineTrend from './BaselineTrend.vue'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
@@ -47,6 +50,8 @@ import HealthTrackingPanel from './HealthTrackingPanel.vue'
 import TaskAssignment from './TaskAssignment.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import ObservationTrend from './ObservationTrend.vue'
+import EventEvidenceSources from './EventEvidenceSources.vue'
+import {eventBriefingFor} from '@/mock/eventBriefings'
 
 const props = defineProps({ scenario: { type: String, required: true } })
 const store = usePhase2DemoStore(), router = useRouter()

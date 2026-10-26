@@ -56,7 +56,7 @@ export const sharedSystems = [
     relationship: '共用轴承油系统还向活塞冷却及其他润滑部位分配供油。',
     path: '轴承油供给 → 各缸伸缩管与活塞冷却通道 → 回油',
     coverage: '共用滑油压力、温度与各缸活塞冷却油出口分别统计；油侧冷却与缸套淡水冷却分开理解。' },
-  { id: 'control-air', name: '控制空气与空气弹簧', shortName: '控制空气', sensorIds: ['main-control-air-pressure', 'main-air-spring-pressure'], issueIds: ['real-warning-0523', 'real-maintenance-0523'],
+  { id: 'control-air', name: '控制空气与空气弹簧', shortName: '控制空气', sensorIds: ['main-control-air-pressure', 'main-air-spring-pressure'], issueIds: ['real-warning-0523'],
     relationship: '控制空气经供给及过滤向气动控制和各缸排气阀空气弹簧分配。',
     path: '控制空气供给 → 减压与过滤 → 气动控制 / 各缸排气阀空气弹簧',
     coverage: '控制空气进口与空气弹簧供气分别统计；0523 低压核实与后续检查资料按原事项查看。' },
@@ -84,7 +84,7 @@ export function buildCylinderMatrix(readings = []) {
         address: topic.addressStart ? topic.addressStart + number - 1 : null,
         sensor: sensor || null, value, unit: sensor?.unit || topic.unit,
         available: value !== null, coverage: value === null ? '暂无数据' : '查看统计',
-        issueIds: number === 2 && ['exhaust', 'icu'].includes(topic.id) ? ['real-alarm-0430'] : [],
+        issueIds: number === 2 && ['exhaust', 'icu'].includes(topic.id) ? ['real-alarm-0430'] : topic.id === 'exhaust' && number === 1 ? ['real-tracking-exhaust-baseline'] : topic.id === 'exhaust' && number === 4 ? ['real-health-c4-baseline'] : [],
       }
     }),
   }))

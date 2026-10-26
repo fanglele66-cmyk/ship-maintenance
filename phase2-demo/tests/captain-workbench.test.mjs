@@ -17,15 +17,15 @@ test('captain decides origins before dispatch; assignment is unique, traceable a
  assert.equal(store.registerDossierNote('real-alarm-0430','可能误报反馈：现场仪表与采集读数不一致，待核对'),true)
  assert.equal(store.todoCreated['real-alarm-0430'],false)
  assert.equal(workbenchIssues(store).find(i=>i.id==='real-alarm-0430').state,'待决策')
- for(const id of ['real-alarm-0430','real-warning-0523','real-tracking-0816']){
+ for(const id of ['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline']){
  assert.equal(store.createTodo(id),true);assert.equal(store.createTodo(id),false)
  store.assignTask(id,{owner:'王海涛（二管轮）',type:'检测排查',scope:'核对现场指标与原分析依据，记录实际发现',due:'尽快核实'})
  assert.equal(workbenchIssues(store).find(i=>i.id===id).state,'已派发')
  assert.equal(store.visibleTodos.filter(t=>t.id===id).length,1)
  assert.equal(store.assignmentRecords[id].length,1)
  }
- assert.equal(store.ignoreSuggestion('real-maintenance-0523','暂不提前，按周期计划执行'),true)
- assert.equal(workbenchIssues(store).find(i=>i.id==='real-health-0523').state,'已记录决定')
+ assert.equal(store.ignoreSuggestion('real-maintenance-c4-baseline','暂不提前，按周期计划执行'),true)
+ assert.equal(workbenchIssues(store).find(i=>i.id==='real-health-c4-baseline').state,'已记录决定')
  assert.doesNotMatch(captainAnalysis(store),/优先了解主机冷却水报警并派发/)
  store.progress['real-alarm-0430']=store.cases['real-alarm-0430'].stages.findIndex(s=>s.kind==='observe')
  assert.equal(workbenchIssues(store).find(i=>i.id==='real-alarm-0430').state,'已派发','observation remains visible until closed')
@@ -34,7 +34,7 @@ test('captain decides origins before dispatch; assignment is unique, traceable a
  const canonical={...store,eventStatus:{'real-alarm-0430':'closed'}}
  assert.equal(workbenchIssues(canonical).find(i=>i.id==='real-alarm-0430').state,'已闭环')
  assert.equal(activeWorkbenchIssues(canonical).some(i=>i.id==='real-alarm-0430'),false,'closed item is retained only in device lookup')
- assert.equal(activeWorkbenchIssues(store).some(i=>i.id==='real-health-0523'),false,'recorded ignore decision is not a pending item')
+ assert.equal(activeWorkbenchIssues(store).some(i=>i.id==='real-health-c4-baseline'),false,'recorded ignore decision is not a pending item')
  for(const item of activeWorkbenchIssues(store).filter(i=>i.state==='待决策'))store.createTodo(item.decisionId||item.id)
  assert.equal(activeWorkbenchIssues(store).filter(i=>i.state==='待决策').length,0,'all-dispatched empty state has no pending rows')
  assert.ok(activeWorkbenchIssues(store).filter(i=>i.state==='已派发').length>0)

@@ -122,7 +122,7 @@ function openLinkedTodo(){store.selectTodo(key.value);router.push({path:'/event'
 const shipConversation = computed(() => [shipOverviewConversation(store), ...messages.value.filter(message => message.role === 'user' || message.shipFollowup)])
 const deviceConversation = computed(() => [
  {role:'user',text:'查看主机当前运行情况和需要关注的事项'},
- {role:'assistant',kind:'scene',title:'主机运行研判',paragraphs:operationAssessment(store).summary.filter(item=>item.label!=='分析依据').map(item=>({label:item.label,text:item.text})),actions:[...(!store.todoCreated['real-warning-0523']&&!store.ignoredSuggestions['real-warning-0523']?[{id:'item:real-warning-0523',label:'了解控制空气低压依据'}]:[]),{id:'item:real-maintenance-0523',label:'了解减压阀后续维保建议'}]},
+ {role:'assistant',kind:'scene',title:'主机运行研判',paragraphs:operationAssessment(store).summary.filter(item=>item.label!=='分析依据').map(item=>({label:item.label,text:item.text})),actions:[...(!store.todoCreated['real-warning-0523']&&!store.ignoredSuggestions['real-warning-0523']?[{id:'item:real-warning-0523',label:'了解控制空气低压依据'}]:[]),{id:'item:real-maintenance-c4-baseline',label:'了解四缸专项检查建议'}]},
  ...deviceConversationRecords(messages.value)
 ])
 const observationConversation=computed(()=>mode.value==='observation'?observationMessages(store,key.value,messages.value):[])

@@ -1,5 +1,8 @@
+import {baselineTaskSets,baselineDirections} from './baselineTaskContent.js'
 import data from './realCases.json' with {type:'json'}
-import {observationPresets} from './realScenarioPresets.js'
+import {observationPresets,realAssessmentContent} from './realScenarioPresets.js'
+import {eventBriefingFor} from './eventBriefings.js'
+import {taskPackages, maintenanceWork, assigneeBriefs, assigneeStageMarkdown} from './realTaskContent.js'
 
 // Real measurements/document conclusions stay in the supplied dataset. This adapter
 // supplies the local workflow fixtures; source measurements remain unchanged.
@@ -26,33 +29,65 @@ const findings=['发现异常','未见异常','无法确认']
 const readings=['现场与系统一致','读数不一致','无法确认']
 const task=(label,guide,options,packageKey)=>({label,guide,...(options?{options}:{}),...(packageKey?{package:packageKey}:{})})
 function taskSet(type){
- if(type==='alarm')return [task('核查 C2 ICU 液压机构与反馈','对照0430原始时序、控制指令与反馈，分别核查 ICV 控制和 ICU 液压执行机构；保存本轮取得的现场或检验记录，不由信号单独推定卡阻。',findings,'icv'),task('核查燃油供给与瞬态工况','记录同刻压力、其他缸响应及工况变化，说明已排除和仍未确认的方向。',findings,'supply')]
- if(type==='warning')return [task('核对压力测点及时间对应','对照0523压力、控制空气与人员记录；注明采样来源与时刻，NF参考不作为独立确诊。',readings),task('核对工况及临时恢复解释','对照运行负荷、控制空气压力和操作记录，核对供气不足与工况切换的不同解释；不能由恢复片段倒推已修复。',['工况可比，偏离仍存在','工况变化可以解释','无法确认'])]
- if(type==='tracking')return [task('核对倒车试验同刻读数','对应0816倒车指令、转速和原采样时刻；同源显示一致不等于独立校准。',readings),task('记录倒车工况与可比范围','明确倒车、换向、低负荷片段及持续时间；不能直接用稳定航行基线判定部件故障。',['信息已记录','条件受限，已记录限制','无法确认'])]
- return [task('评估减压阀后续检查必要性','结合0523临时恢复、永久更换证据缺口及后续检查需求；不把临时恢复当永久修复。',['有提前处理依据','暂无提前处理必要','无法确认']),task('核对备件、隔离与作业窗口','记录减压阀规格、备件、隔离、人员和窗口；现有资料未确认的项目保持未知。',['条件具备','条件暂不具备','无法确认'])]
+ if(type==='alarm')return [task('核查 C2 ICU 液压机构与反馈','对照报警原始时序、控制指令与反馈，分别核查 ICV 控制和 ICU 液压执行机构；保存本轮取得的现场或检验记录，不由信号单独推定卡阻。',findings,'icv'),task('核查燃油供给与瞬态工况','记录同刻压力、其他缸响应及工况变化，说明已排除和仍未确认的方向。',findings,'supply')]
+ if(type==='warning')return [task('核对压力测点及时间对应','对照低压窗口的主、安全测点及就地压力记录；注明采样来源与时刻，NF参考不作为独立确诊。',readings),task('核对工况及临时恢复解释','对照运行负荷、控制空气压力和操作记录，核对供气不足与工况切换的不同解释；不能由恢复片段倒推已修复。',['工况可比，偏离仍存在','工况变化可以解释','无法确认'])]
+ return clone(baselineTaskSets[type])
 }
-function packageFor(key,label){return {title:label,preparation:['按本机适用资料确认范围、隔离与许可。'],parts:[{name:label+'相关备件',amount:'按实际核实',use:'尚未核实规格及数量，不预设已领用或已更换'}],tasks:[task('记录'+label+'实际措施','填写实际范围、依据和未完成项。'),task('复核'+label+'与原指标','记录适用复测、工况和限制；不由当前恢复倒推唯一根因。')],acceptance:['本轮范围及实际措施有依据','原始指标与可比工况复核，长期效果另行观察']}}
+function applyBriefing(item){
+ const brief=eventBriefingFor(item.id)
+ if(!brief)return item
+ const facts=brief.facts.map(f=>`${f.label}：${f.value}${f.unit?' '+f.unit:''}。${f.meaning}`)
+ item.baselineCylinder=brief.baselineCylinder
+ item.source=brief.discovery.label
+ item.discovery=brief.discovery
+ item.decisionLimit=brief.boundary
+ item.evidenceSources=brief.sources
+ item.taskScope=brief.tasks.map(t=>t.title+'：'+t.detail).join('；')
+ item.report={...item.report,conclusion:brief.conclusion,human:brief.captainDecision+' '+brief.dispatchReason,system:brief.discovery.text}
+ item.cause.mechanism=brief.conclusion
+ const directions={
+  alarm:[['二缸喷射控制与液压执行','二缸排温80.4°C，与其余五缸明显分离，并有流量活塞报警。','控制指令、反馈链路或执行异常都可能使喷射响应偏离，尚不能仅凭排温确定失效件。','核对ICV指令、ICU连接、流量活塞反馈及液压执行检查记录。'],['共同燃油供给与运行切换','同刻其余五缸排温316.9–352.2°C，主机处于重新启动后的运行段。','共同供给与操纵变化应一并排查；其他缸响应不等于供给全通路已排除。','对齐燃油轨压力、各缸响应、启停与供给操作时刻。']],
+  warning:[['减压环节调压异常','主、安全测点同步下降0.10 MPa，连续低压时为0.57/0.54 MPa。','可能影响控制空气出口压力的建立与稳定；须用入口/出口及现场检查区分具体原因。','记录减压阀两侧压力、调节状态及两组阀使用情况。'],['用气变化、供气与管路泄漏','同期转速102.0–104.4 RPM，但杂用空气操作尚需核对。','供气负荷变化或泄漏也可能造成双路低压，不能只看主机负荷排除用气因素。','核对操作时间、供气条件及已检查的管路接头范围。']],
+  ...baselineDirections,
+ }
+ item.cause.rows=(directions[item.realType]||[]).map(([name,cause,effect,check])=>({name,level:'待核实',cause,effect,check}))
+ item.snapshots=brief.facts.map(f=>[f.label,[f.value,f.unit].filter(Boolean).join(' '),f.at,f.meaning])
+ item.pageContent={
+  overview:`### 当前研判\n\n${brief.conclusion}\n\n### 决策要点\n\n${brief.captainDecision}\n\n### 派发依据\n\n${brief.dispatchReason}`,
+  analysis:`### 发现过程\n\n${brief.discovery.text}\n\n### 关键数据与含义\n\n${facts.map(f=>'- '+f).join('\n')}\n\n### 现场核实范围\n\n${brief.tasks.map(t=>`- **${t.title}**：${t.detail}`).join('\n')}\n\n### 尚待确认\n\n${brief.boundary}`,
+  evidence:`### 关联资料\n\n${brief.sources.map(s=>`- **${s.title}** · ${s.kind} · ${s.date}\n  ${s.summary}`).join('\n\n')}\n\n### 数据时间范围\n\n${brief.evidenceCutoff?'截至 '+brief.evidenceCutoff:'临修后跟踪资料，日期以各份记录为准'}；各测点按原采集时刻对照。`,
+ }
+ const execution=assigneeBriefs[item.realType]
+ for(const stage of item.stages){
+  if(stage.kind==='observe')stage.title=item.trackingOnly?'核实结果与后续跟踪':'处理后运行效果观察'
+  stage.evidence=facts.slice(0,4)
+  stage.summary=stage.kind==='intro'?execution.objective:stage.kind==='observe'?execution.observation:execution.check
+  stage.markdown=assigneeStageMarkdown(item.realType,stage,brief.conclusion)
+ }
+ if(item.realType==='alarm')item.observation.basis='报警末点用于呈现当时缸间差异。处理后须在可比转速、负荷与喷射条件下比较各缸响应，并核对原报警是否反复；不能只凭绝对温差认定恢复。'
+ return item
+}
 function buildCase(record){
  const replay=true
  const type=realCaseType(record),id=record.id,facts=evidenceText(record),limits=record.limits||record.notes||[]
  const source='传感器采样、船端报告与现场反馈'
  const stage=(id,label,kind,title,tasks=[])=>({id,label,kind,title,summary:title,evidence:facts.slice(0,4),tasks,action:kind==='check'?'提交本轮反馈':kind==='work'?'提交执行与验收':'查看下一阶段',markdown:`### ${title}\n\n${record.summary}\n\n### 记录边界\n\n${simulationNotice}\n\n${limits.map(x=>'- '+text(x)).join('\n')}`})
  const intro=stage('intro','任务概览','intro',record.title)
- const packages=type==='alarm'?{icv:packageFor('icv','C2 ICU 核查后确认的范围'),supply:packageFor('supply','燃油供给核查后确认的范围')}:{regulator:packageFor('regulator','空气减压阀核查后确认的范围'),air:packageFor('air','控制空气供给核查后确认的范围')}
+ const packages=taskPackages(type),service=maintenanceWork()
  let stages
  if(type==='alarm')stages=[intro,stage('investigate','原因排查','check','分别核实 C2 ICU 与供给方向',taskSet(type)),stage('repair','对应处置','work','只处理实际发现支持的范围')]
- else if(type==='warning')stages=[intro,stage('check','真实性核实','check','核对压力事实与发生工况',taskSet(type)),stage('event','异常研判','event','区分减压阀故障、临时恢复与未完成事项'),stage('investigate','原因排查','check','分别核查减压阀与控制空气供给',[task('核查空气减压阀状态','对照原文结论和适用检查，区分临时调整与永久更换。',findings,'regulator'),task('核查控制空气供给及工况','保留上下游压力、负荷和供给条件，不以一个部件结论代替全部通路检查。',findings,'air')]),stage('repair','对应处置','work','记录核实后确认的范围')]
- else if(type==='tracking')stages=[intro,stage('check','工况核实','check','核实倒车试验读数及可比范围',taskSet(type))]
- else stages=[intro,stage('check','提前评估','check','分别判断后续检查必要性与作业条件',taskSet(type)),stage('service','检查与维护','work','按真实检查决定维护及未完成项',[task('完成批准范围的减压阀检查','仅填写实际取得的检验资料；未见问题可以记录，无需臆造更换。'),task('记录实际维护与复查','未发生永久更换时明确未更换；备件、窗口和后续安排分别留存。')])]
- stages.push(stage('observe',type==='tracking'?'核实结束':'效果观察','observe',type==='tracking'?'本次核实结束，倒车工况记录继续':'补充处理后可比资料，禁止复用历史采样冒充修后数据'),stage('closed','本轮结束','closed','本轮处理记录已保留，可回查处置与观察依据'))
+ else if(type==='warning')stages=[intro,stage('check','真实性核实','check','核对压力事实与发生工况',taskSet(type)),stage('event','异常研判','event','区分减压阀故障、临时恢复与未完成事项'),stage('investigate','原因排查','check','分别核查减压阀与控制空气供给',[task('核查空气减压阀状态','记录两组阀的使用状态与阀前后压力；在获准隔离条件下检查阀芯密封和调压动作，区分临时恢复与正式更换需求。',findings,'regulator'),task('核查控制空气供给及工况','保留上下游压力、负荷和供给条件，不以一个部件结论代替全部通路检查。',findings,'air')]),stage('repair','对应处置','work','记录核实后确认的范围')]
+ else if(type==='tracking')stages=[intro,stage('check','基线核实','check','核实一缸月度工况与测温基线',taskSet(type))]
+ else stages=[intro,stage('check','提前评估','check','分别判断后续检查必要性与作业条件',taskSet(type)),stage('service','检查与维护','work',service.title,service.tasks)]
+ stages.push(stage('observe',type==='tracking'?'核实结束':'效果观察','observe',type==='tracking'?'本次核实结束，月度健康跟踪继续':'补充处理后可比资料，禁止复用历史采样冒充修后数据'),stage('closed','本轮结束','closed','本轮处理记录已保留，可回查处置与观察依据'))
  const series=realSeries(record),metricSeries=series.filter(s=>s.values.some(v=>Number.isFinite(v))).slice(0,2)
  const observation={days:1,names:metricSeries.map(s=>s.name),units:metricSeries.map(s=>s.unit),before:metricSeries.map(s=>s.values.find(v=>Number.isFinite(v))),samples:[],abnormal:metricSeries.map(s=>s.values.findLast(v=>Number.isFinite(v))),basis:'对比处理前后同工况记录，跟踪原异常是否恢复及持续稳定。'}
- const plan=type==='maintenance'?[{name:'原计划与后续检查',value:'0523永久更换及后续安排尚缺实际完成证据',meaning:'评估相关检查、备件和窗口；未执行部分继续保留。'}]:[]
- const result={id,realCaseId:record.id,realType:type,realReplay:true,scenarioPreset:true,latent:false,deviceId:record.deviceId||'main-engine-1',device:record.device||'主机',cardType:type==='maintenance'?'异动跟踪':typeNames[type],workflowKind:type==='maintenance'?'maintenance':type,sourceEventId:record.sourceEventId,initialTitle:record.title,eventTitle:record.title,eventId:record.id,firstObserved:record.occurredAt||record.timeRange?.start,source,owner:'李建国（大管轮）',trackingOnly:type==='tracking',stages,packages,observation,plan,series,snapshots:(record.facts||[]).map(f=>[f.label,[f.value,f.unit].filter(v=>v!==undefined).join(' '),f.time||'原资料记录',f.context||'按来源解释，不扩大结论']),report:{conclusion:record.conclusion||record.summary,basis:facts.join('；'),human:type==='tracking'?'补齐倒车工况和读数；可以带限制结束核实，原记录继续。':'先核实现场情况，再按批准范围处理，记录实际措施与验收结果。',system:'保留原采样、原文结论及来源',operation:'按适用船舶规程确认'},cause:{mechanism:record.conclusion||record.summary,rows:(type==='alarm'?['C2 ICU 控制与反馈','燃油供给及瞬态工况']:type==='tracking'?['倒车／换向及起动工况','采样与指令时序']:type==='maintenance'?['减压阀永久检修需求','备件与作业条件']:['空气减压阀','控制空气供给与运行工况']).map(name=>({name,level:'待核实',cause:'依据当前案例资料与适用检查核对',effect:'解释原指标变化，不能替代其他方向结论',check:'按实际范围记录'}))},workDetails:{preparation:['核对本轮批准范围、适用资料、隔离和窗口'],parts:[],acceptance:['记录实际完成范围及未完成项','另外补充处理后可比数据，不复用历史片段']},pageContent:{overview:`### 真实资料结论\n\n${record.conclusion||record.summary}\n\n### 来源与演示边界\n\n${record.provenanceSummary||simulationNotice}\n\n${simulationNotice}`,analysis:`### 资料依据\n\n${facts.map(x=>'- '+x).join('\n')}\n\n### 判断限制\n\n${limits.map(x=>'- '+text(x)).join('\n')}`,evidence:`### 来源\n\n${(record.evidence||[]).map(e=>'- '+e.path+(e.line?':'+e.line:'')+' · '+(e.note||'')).join('\n')}\n\n### 边界\n\n${simulationNotice}`}}
+ const plan=type==='maintenance'?[{name:'原计划与后续检查',value:'四缸测温与燃烧平衡检查按原计划和本轮必要性评估安排',meaning:'评估相关检查、备件和窗口；未执行部分继续保留。'}]:[]
+ const result={id,realCaseId:record.id,realType:type,realReplay:true,scenarioPreset:true,latent:false,deviceId:record.deviceId||'main-engine-1',device:record.device||'主机',cardType:type==='maintenance'?'异动跟踪':typeNames[type],workflowKind:type==='maintenance'?'maintenance':type,sourceEventId:record.sourceEventId,initialTitle:record.title,eventTitle:record.title,eventId:record.id,firstObserved:record.occurredAt||record.timeRange?.start,source,owner:'李建国（大管轮）',trackingOnly:type==='tracking',stages,packages,observation,plan,series,snapshots:(record.facts||[]).map(f=>[f.label,[f.value,f.unit].filter(v=>v!==undefined).join(' '),f.time||'原资料记录',f.context||'按来源解释，不扩大结论']),report:{conclusion:record.conclusion||record.summary,basis:facts.join('；'),human:type==='tracking'?'补齐月度工况、测温与调整记录，保留已核实范围和未确认项。':'先核实现场情况，再按批准范围处理，记录实际措施与验收结果。',system:'保留原采样、原文结论及来源',operation:'按适用船舶规程确认'},cause:{mechanism:record.conclusion||record.summary,rows:(type==='alarm'?['C2 ICU 控制与反馈','燃油供给及瞬态工况']:type==='tracking'?['月度运行与热平衡','测温基线与采样对应']:type==='maintenance'?['四缸测温与燃烧检查需求','校验、备料与作业条件']:['空气减压阀','控制空气供给与运行工况']).map(name=>({name,level:'待核实',cause:'依据当前案例资料与适用检查核对',effect:'解释原指标变化，不能替代其他方向结论',check:'按实际范围记录'}))},workDetails:type==='maintenance'?service:{preparation:[],parts:[],acceptance:[]},pageContent:{overview:`### 真实资料结论\n\n${record.conclusion||record.summary}\n\n### 来源与演示边界\n\n${record.provenanceSummary||simulationNotice}\n\n${simulationNotice}`,analysis:`### 资料依据\n\n${facts.map(x=>'- '+x).join('\n')}\n\n### 判断限制\n\n${limits.map(x=>'- '+text(x)).join('\n')}`,evidence:`### 来源\n\n${(record.evidence||[]).map(e=>'- '+e.path+(e.line?':'+e.line:'')+' · '+(e.note||'')).join('\n')}\n\n### 边界\n\n${simulationNotice}`}}
  if(replay){
   const first=record.steps?.[0]||{},initial=first.summary||'起始事实待资料确认'
-  const boundary=type==='alarm'?'此时只确认报警与二缸变化，具体根因和处理结果尚待本轮核实。':type==='warning'?'此时只确认双测点低压和规则触发，根因、临时恢复与永久措施尚待核实。':type==='tracking'?'负转与燃烧响应是已见信号；方向指令和操纵意图仍须人员核实。':'临时修复后的备件与检修需求已知；是否提前、作业条件及永久完成仍待评估。'
-  const initialTitle=type==='alarm'?'0430｜二缸报警与喷射控制核实':type==='warning'?'0523｜控制空气双测点低压核实':type==='tracking'?'0816｜倒车时段负转与燃烧响应核实':'0523后续｜减压阀备件与检查条件评估'
+  const boundary=type==='alarm'?'此时只确认报警与二缸变化，具体根因和处理结果尚待本轮核实。':type==='warning'?'此时只确认双测点低压和规则触发，根因、临时恢复与永久措施尚待核实。':type==='tracking'?'月度相对基线变化已见，热平衡和测温原因仍须核实。':'四缸相对基线持续下移；是否提前检查和实施条件仍待评估。'
+  const initialTitle=type==='alarm'?'二缸报警与喷射控制核实':type==='warning'?'控制空气双测点低压核实':type==='tracking'?'一缸排温长期基线抬升跟踪':'四缸测温与燃烧平衡检查评估'
   result.initialTitle=initialTitle;result.eventTitle=initialTitle
   result.report={...result.report,conclusion:initial+' '+boundary,basis:initial}
   result.cause.mechanism=initial+' '+boundary
@@ -65,12 +100,15 @@ function buildCase(record){
  }
  if(observationPresets[id])result.observation={...observationPresets[id],basis:'对比处理前后的同工况指标，结合观察窗口与现场反馈判断效果；异常反复时沿原事项复查，持续稳定后确认闭环。'}
  result.deviceId='main-engine-1';result.device='主机';result.firstObserved=record.steps?.[0]?.time||record.timeRange?.start
- return result
+ return applyBriefing(result)
 }
 export const realWorkflowCases=realCaseRecords.map(record=>buildCase(record))
-export const realHealthTracks=realWorkflowCases.filter(c=>c.trackingOnly).map(c=>({id:c.id+'-track',requestId:c.id,deviceId:c.deviceId,device:c.device,title:'倒车试验同源跟踪记录',status:'待核实工况与读数',conclusion:c.report.conclusion,next:c.report.human,realCaseId:c.realCaseId,nodes:(realCaseFor(c.id).steps||[]).filter(s=>!s.isSimulation&&(!c.realReplay||s.id===realCaseFor(c.id).steps?.[0]?.id)).map(s=>({label:s.title,at:s.time||realCaseFor(c.id).timeRange?.start,values:s.summary,context:'发生时的采样与工况记录',judgement:s.result||''})),laterNodes:[]}))
+export const realHealthTracks=realWorkflowCases.filter(c=>c.trackingOnly).map(c=>({id:c.id+'-track',requestId:c.id,deviceId:c.deviceId,device:c.device,title:'一缸排温长期基线抬升跟踪',status:'待核实月度基线',conclusion:c.report.conclusion,next:c.report.human,realCaseId:c.realCaseId,nodes:(realCaseFor(c.id).steps||[]).filter(s=>!s.isSimulation&&(!c.realReplay||s.id===realCaseFor(c.id).steps?.[0]?.id)).map(s=>({label:s.title,at:s.time||realCaseFor(c.id).timeRange?.start,values:s.summary,context:'跨月同刻配对采样与工况筛选',judgement:s.result||''})),laterNodes:[]}))
 
 export function assessRealCase(item,stage,feedback){
+ return {...assessRealCaseFlow(item,stage,feedback),...realAssessmentContent(item,stage,feedback)}
+}
+function assessRealCaseFlow(item,stage,feedback){
  const values=feedback.map(entry=>entry.result),common={valid:true,records:clone(feedback)}
  if(stage.id==='investigate'){
   const packages=stage.tasks.filter((_,i)=>values[i]==='发现异常').map(t=>t.package),unknown=stage.tasks.filter((_,i)=>values[i]==='无法确认').map(t=>t.label)
@@ -80,7 +118,7 @@ export function assessRealCase(item,stage,feedback){
   const advance=values[0]==='现场与系统一致'&&values[1]==='工况可比，偏离仍存在'
   return {...common,advance,title:advance?'当前反馈支持接续排查':'当前预警依据仍需核对',message:advance?'沿原事项分别核查空气减压阀及控制空气供给；实际措施、是否临时恢复及永久完成情况必须由本轮提交的依据说明。':values[1]==='工况变化可以解释'?'核对解释是否覆盖发生窗口；当前恢复不能倒推过去误报。结束本轮需明确依据及仍未完成事项。':'读数差异或资料不足不证明误报；核对测点、同刻时序与工况，NF参考不作独立确认。',actions:advance?[]:['retry','end-warning']}
  }
- if(item.trackingOnly)return {...common,advance:false,title:'倒车工况信息已纳入原记录',message:'保留实际读数、倒车/换向工况和未确认范围。与稳定航行不可比时不作部件故障推断；同源显示一致不等于校准。可继续补充，或记录限制后结束本轮核实，原记录继续。',actions:['retry','finish-tracking']}
+ if(item.trackingOnly)return {...common,advance:false,title:'月度基线核实已纳入原记录',message:'保留月度可比范围、历史调整与通道核验；不能将温差直接等同部件故障。可继续补充，或记录限制后结束本轮核实，原健康跟踪继续。',actions:['retry','finish-tracking']}
  const advance=values[0]==='有提前处理依据'&&values[1]==='条件具备'
  return {...common,advance,title:advance?'必要性与作业条件已分别确认':'提前评估尚未满足推进条件',message:advance?'接续批准范围的检查；实际检查决定是否维护或换件。永久完成仍须有真实记录。':values[0]==='有提前处理依据'?'有检查依据但条件不足，保持待安排；不能写成无需维修或已执行。':'保存缺项或暂无提前必要的依据；可以继续补充或结束本次评估，原后续检查需求和未完成安排继续保留。',actions:advance?[]:['retry','end-maintenance']}
 }

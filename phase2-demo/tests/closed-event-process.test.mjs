@@ -56,7 +56,7 @@ test('closed event reference and live event processes keep evidence and task his
    assert.equal(existing.some(message=>message.id?.startsWith('issue-start-user:')),false)
   })
   await t.test('questions stay beside their event revision across dispatch, completion and fresh sessions',()=>{
-   const store=fresh(),id='real-tracking-0816',existing=[]
+   const store=fresh(),id='real-tracking-exhaust-baseline',existing=[]
    mergeIssueConversation(existing,issueConversationMessages(id,store))
    const originalIds=existing.filter(message=>message.eventProcess).map(message=>message.id)
    const anchor=existing.findLast(message=>message.eventProcess).eventRecordId
@@ -79,7 +79,7 @@ test('closed event reference and live event processes keep evidence and task his
    assert.equal(store.activeTaskPortfolio.length,0)
   })
   await t.test('live event process only grows after actual actions, then preserves completed verification',()=>{
-   const store=fresh(),id='real-tracking-0816'
+   const store=fresh(),id='real-tracking-exhaust-baseline'
    let process=eventProcessRecords(store,id)
    assert.equal(process.reference,null)
    assert.equal(process.records.some(item=>['assignment','execution','closure'].includes(item.kind)),false)

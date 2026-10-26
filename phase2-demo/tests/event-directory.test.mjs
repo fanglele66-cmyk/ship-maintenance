@@ -25,7 +25,7 @@ test('event directory retains every lifecycle while execution remains a separate
    assert.equal(rows.filter(row=>row.executionProgress==='待决策').length,4)
    assert.ok(rows.some(row=>row.history&&row.eventState==='已闭环'))
    assert.deepEqual([...new Set(rows.map(row=>row.type))].sort(),['报警事件','异动跟踪','预警事件'].sort())
-   assert.equal(rows.some(row=>['maintenance','aux-maintenance','real-maintenance-0523','maintenance-history'].includes(row.id)),false)
+   assert.equal(rows.some(row=>['maintenance','aux-maintenance','real-maintenance-c4-baseline','maintenance-history'].includes(row.id)),false)
    for(const row of rows.filter(row=>!row.history)){
     assert.equal(row.taskId,null);assert.equal(row.stage,'');assert.equal(row.taskOwner,'')
     assert.equal(workbenchIssues(store).find(item=>item.id===row.id).stage,undefined,'uncreated tasks do not give events a task stage')
@@ -67,7 +67,7 @@ test('event directory retains every lifecycle while execution remains a separate
   })
 
   await t.test('finishing tracking verification completes its task while the event remains visible and tracking',()=>{
-   const store=fresh(),id='real-tracking-0816';finishTracking(store,id)
+   const store=fresh(),id='real-tracking-exhaust-baseline';finishTracking(store,id)
    const row=rowFor(store,id)
    assert.equal(store.eventStatus[id],'closed','the child workflow receipt alone does not determine event closure')
    assert.equal(row.executionProgress,'已完成');assert.equal(row.eventState,'处置中');assert.equal(row.processingState,'持续跟踪')
@@ -78,7 +78,7 @@ test('event directory retains every lifecycle while execution remains a separate
   })
 
   await t.test('maintenance assessment executes under one parent event and keeps the child task link',()=>{
-   const store=fresh(),child='real-maintenance-0523',parent='real-health-0523'
+   const store=fresh(),child='real-maintenance-c4-baseline',parent='real-health-c4-baseline'
    dispatch(store,child)
    let rows=eventDirectoryRows(store),row=rows.find(row=>row.id===parent)
    assert.equal(row.taskId,child);assert.deepEqual(row.taskIds,[child]);assert.equal(row.executionProgress,'已派发')

@@ -53,12 +53,14 @@
         <button class="p2-primary p2-ready-button" @click="prepared[stageKey]=true;subtab=stage.label+'步骤'">已了解，开始{{ stage.label }}</button>
       </section>
       <section v-else-if="stage.kind==='check'||stage.kind==='work'&&subtab.includes('步骤')" class="p2-panel p2-step-content">
-        <nav class="p2-check-stepper" :aria-label="stage.label+'步骤'"><button v-for="(task,i) in stage.tasks" :key="task.label" :class="{active:stepIndex===i,done:results[taskKey(i)]}" @click="stepIndex=i"><span>{{ i+1 }}</span>{{ stage.label }}步骤{{ i+1 }}</button></nav>
+        <nav class="p2-check-stepper" :aria-label="stage.label+'步骤'"><button v-for="(task,i) in stage.tasks" :key="task.label" :class="{active:stepIndex===i,done:results[taskKey(i)]}" @click="stepIndex=i"><span>{{ i+1 }}</span>{{ task.shortLabel || task.label }}</button></nav>
         <article class="p2-current-task">
           <h3>{{ currentTask.label }}</h3><p>{{ currentTask.guide }}</p>
+          <ol v-if="currentTask.checks?.length" class="task-checkpoints"><li v-for="point in currentTask.checks" :key="point">{{ point }}</li></ol>
+          <p v-if="currentTask.recordHint" class="task-record-requirement"><strong>提交记录</strong>{{ currentTask.recordHint }}</p>
           <p v-if="readOnly" class="p2-pad-conclusion">已提交：{{ currentResult||'现场反馈已记录于右侧对话' }}</p>
           <fieldset v-else class="p2-check-options"><legend>{{ stage.kind==='work'?'作业反馈':'检查结果' }}</legend><label v-for="choice in taskChoices" :key="choice"><input type="radio" :name="taskKey(stepIndex)" :value="choice" v-model="currentResult" />{{ choice }}</label></fieldset>
-          <label class="p2-step-note">备注<textarea v-model="currentNote" :readonly="readOnly" rows="3" placeholder="记录实际读数、现场发现或处理结果"></textarea></label>
+          <label class="p2-step-note">备注<textarea v-model="currentNote" :readonly="readOnly" rows="3" :placeholder="currentTask.recordHint || '记录实际读数、现场发现或处理结果'"></textarea></label>
           <div class="p2-attachment-row"><label v-if="!readOnly">＋ 添加图片<input type="file" accept="image/*" multiple @change="attachFiles" /></label><span>{{ (attachments[taskKey(stepIndex)]||[]).join('、')||'未添加附件' }}</span></div>
         </article>
         <div class="p2-step-controls"><button class="p2-secondary" :disabled="stepIndex===0" @click="stepIndex--">上一步</button><span>{{ stepIndex+1 }} / {{ stage.tasks.length }}</span><button class="p2-primary" @click="nextStep">{{ stepIndex<stage.tasks.length-1?'下一步':readOnly?'查看下一阶段':stage.kind==='work'?'前往验收确认':'提交本轮反馈' }}</button></div>
@@ -67,7 +69,7 @@
       <section v-else-if="stage.kind==='work'" class="p2-panel p2-pad-single">
         <div class="p2-section-title">{{ subtab }}</div>
         <template v-if="subtab.includes('准备')"><EventWorkOrderLink v-if="isMaintenanceWorkflow(todo)" :event-id="todo.id" /><MarkdownContent v-if="isWorkflow(todo.id)" :content="currentStageMarkdown"/><p v-else class="p2-stage-purpose">{{ stage.title }}</p><div v-for="(text,i) in workDetails.preparation" :key="text" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ text }}</div></template>
-        <template v-else-if="subtab==='备件清单'"><table class="p2-cause-table"><thead><tr><th>名称</th><th>数量</th><th>用途</th></tr></thead><tbody><tr v-for="part in workDetails.parts" :key="part.name"><td><strong>{{ part.name }}</strong></td><td>{{ part.amount }}</td><td>{{ part.use }}</td></tr></tbody></table></template>
+        <template v-else-if="subtab==='备件清单'"><table class="p2-cause-table"><thead><tr><th>备件 / 耗材</th><th>备料数量</th><th>使用条件与用途</th></tr></thead><tbody><tr v-for="part in workDetails.parts" :key="part.name"><td><strong>{{ part.name }}</strong><small v-if="part.specification" class="task-part-spec">{{ part.specification }}</small></td><td>{{ part.amount }}</td><td>{{ part.use }}</td></tr></tbody></table></template>
         <template v-else-if="subtab==='验收确认'"><p class="p2-stage-purpose">先核对验收项目，再记录实际措施与复测。作业完成后仍异常，应继续原事件排查。</p><table class="p2-cause-table"><thead><tr><th>验收项目</th><th>验收要求</th><th>核对方法</th></tr></thead><tbody><tr v-for="row in acceptanceRows" :key="row.name"><td>{{ row.name }}</td><td>{{ row.req }}</td><td>{{ row.method }}</td></tr></tbody></table><InquiryMessage v-if="executionForm" :message="executionForm" @update-inquiry="updateExecution" @submit-inquiry="confirmExecution" /></template>
         <template v-else-if="subtab==='关联工单'"><EventWorkOrderLink :event-id="todo.id" /></template>
       </section>
@@ -132,7 +134,7 @@ const acceptanceNote=computed({get:()=>store.workAcceptanceNotes[stageKey.value]
 const cardTitle=computed(()=>todo.value?.id==='drift'&&store.progress.drift>=2?todo.value.eventTitle:todo.value?.initialTitle)
 const cardType=computed(()=>isMaintenanceWorkflow(todo.value)?'异动跟踪 · 维保评估任务':todo.value?.id==='drift'&&store.progress.drift>=2?'故障/异常事件的排查与处置':todo.value?.cardType)
 const source=computed(()=>todo.value?.source || (todo.value?.id==='fault'?'传感器告警':todo.value?.id==='drift'?'日常健康扫查 · 持续监测':'日常健康扫查 · 预测维保'))
-const tabs=computed(()=>{if(!stage.value)return[];if(stage.value.kind==='handled')return['摘要','时间线'];if(stage.value.kind==='check')return[stage.value.label+'准备',stage.value.label+'步骤'];if(stage.value.kind==='work'){const word=isMaintenanceWorkflow(todo.value)?'保养':'维修';return[word+'准备','备件清单',word+'步骤','验收确认',...(isMaintenanceWorkflow(todo.value)?['关联工单']:[])]}if(isMaintenanceWorkflow(todo.value))return['建议速览'];return stage.value.id==='event'?['概览','数据观测','候选原因']:['概览','数据观测']})
+const tabs=computed(()=>{if(!stage.value)return[];if(stage.value.kind==='handled')return['摘要','时间线'];if(stage.value.kind==='check')return[stage.value.label+'准备',stage.value.label+'步骤'];if(stage.value.kind==='work'){const word=isMaintenanceWorkflow(todo.value)?'保养':'维修';return[word+'准备','备件清单',word+'步骤','验收确认',...(isMaintenanceWorkflow(todo.value)?['关联工单']:[])]}if(isMaintenanceWorkflow(todo.value))return['建议速览','数据观测'];return stage.value.id==='event'?['概览','数据观测','候选原因']:['概览','数据观测']})
 const closedEvidence=computed(()=>{
   if(stage.value?.kind!=='handled')return stage.value?.evidence||[]
   if(latestExecution.value)return []
@@ -174,3 +176,16 @@ function viewObservation(){router.push('/situation/attention/'+encodeURIComponen
 </style>
 
 <style scoped>.p2-parent-track{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 24px;color:#7e6b4a;background:#faf8f2;font-size:13px;line-height:1.7}.p2-parent-track span{flex:1;min-width:240px}</style>
+
+<style scoped>
+.p2-overview-analysis>.markdown-content{grid-column:1 / -1}
+.p2-check-stepper{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px}
+.p2-check-stepper button{text-align:left;min-width:0;line-height:1.5}
+.p2-check-stepper button>span{flex:none}
+.task-checkpoints{padding-left:24px;margin:16px 0;color:#455770;line-height:1.85;font-size:14px}
+.task-checkpoints li{padding-left:4px;margin-bottom:10px}
+.task-record-requirement{padding:12px 16px;border-left:3px solid #b99555;background:#faf8f3;line-height:1.8}
+.task-record-requirement strong{display:block;color:#74603f;margin-bottom:4px}
+.task-part-spec{display:block;margin-top:7px;color:#778498;font-size:12px;line-height:1.65;font-weight:400}
+@media(max-width:600px){.p2-check-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.task-checkpoints{font-size:13px}.p2-cause-table{table-layout:fixed;overflow-wrap:anywhere}.p2-cause-table th:nth-child(2){width:64px}}
+</style>

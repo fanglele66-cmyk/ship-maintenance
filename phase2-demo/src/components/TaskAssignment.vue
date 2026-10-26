@@ -1,7 +1,48 @@
-<template><section class="task-assignment" :class="{'is-compact':compact}"><template v-if="compact&&store.todoCreated[scenario]"><div class="assignment-inline"><label>负责人<FormSelect :model-value="assignment.owner" :options="crewOptions" @update:model-value="changeOwner"/></label><span>{{assignment.type}}</span><span>{{assignment.due}}</span></div><details><summary>任务要求与指派记录</summary><p>{{assignment.scope}}</p><small>指派人：{{assignment.assignedBy}}</small><p v-for="(record,i) in store.assignmentRecords[scenario]||[]" :key="i">{{record.at}} · {{record.assignedBy}}指定{{record.owner}}</p></details></template><template v-else><template v-if="store.todoCreated[scenario]&&!editing"><div class="assignment-head"><strong>任务安排</strong><button type="button" class="p2-link-button" @click="openAssignment">调整指派</button></div><p>{{assignment.owner}} · {{assignment.type}}</p><p>{{assignment.scope}}</p><small>计划：{{assignment.due}} · 指派：{{assignment.assignedBy}}</small><details v-if="store.assignmentRecords[scenario]?.length"><summary>指派记录</summary><p v-for="(record,i) in store.assignmentRecords[scenario]" :key="i">{{record.at}} · {{record.assignedBy}}指定{{record.owner}} · {{record.scope}}</p></details></template><template v-else-if="!store.ignoredSuggestions[scenario]||editing"><strong>{{store.todoCreated[scenario]?'调整任务安排':actionTitle||'评估并安排检查'}}</strong><p v-if="!editing">采纳后指定本次任务负责人，安排与证据沿同一事件保留。</p><button v-if="!editing&&!ignoring" type="button" class="p2-primary" @click="openAssignment">采纳建议并指派</button><template v-if="editing"><InquiryMessage :message="inquiry" @update-inquiry="updateDraft" @submit-inquiry="submit"/><div class="assignment-actions"><button type="button" class="p2-link-button" @click="expanded=!expanded">{{expanded?'收起补充安排':'补充安排（可选）'}}</button><button type="button" class="p2-secondary" @click="cancelAssignment">取消</button></div></template><div v-if="allowIgnore&&!store.todoCreated[scenario]&&!editing" class="assignment-ignore"><button type="button" class="p2-link-button" @click="toggleIgnore">{{ignoring?'取消忽略':'忽略本次建议'}}</button><InquiryMessage v-if="ignoring" :message="ignoreInquiry" @submit-inquiry="ignore"/></div></template><template v-else><strong>已记录不采纳决定</strong><p>{{store.ignoredSuggestions[scenario].reason}}</p><button type="button" class="p2-link-button" @click="openAssignment">重新安排</button></template></template></section></template>
+<template>
+  <section class="task-assignment" :class="{'is-compact':compact}">
+    <template v-if="compact&&store.todoCreated[scenario]">
+      <div class="assignment-inline"><label>负责人<FormSelect :model-value="assignment.owner" :options="crewOptions" @update:model-value="changeOwner"/></label><span>{{assignment.type}}</span><span>{{assignment.due}}</span></div>
+      <details><summary>任务要求与指派记录</summary><p>{{assignment.scope}}</p><small>指派人：{{assignment.assignedBy}}</small><p v-for="(record,i) in store.assignmentRecords[scenario]||[]" :key="i">{{record.at}} · {{record.assignedBy}}指定{{record.owner}}</p></details>
+    </template>
+    <template v-else>
+      <div class="assignment-head">
+        <strong>{{assignmentTitle}}</strong>
+        <button v-if="store.todoCreated[scenario]&&!editing" type="button" class="p2-link-button" @click="openAssignment">调整指派</button>
+      </div>
+      <dl v-if="dispatchBrief&&!compact" class="assignment-summary" aria-label="派发目标与反馈要求">
+        <div><dt>任务目标</dt><dd>{{dispatchBrief.goal}}</dd></div>
+        <div><dt>预期反馈</dt><dd>{{dispatchBrief.expectedFeedback}}</dd></div>
+      </dl>
+      <template v-if="store.todoCreated[scenario]&&!editing">
+        <p>{{assignment.owner}} · {{assignment.type}}</p>
+        <p v-if="!dispatchBrief">{{assignment.scope}}</p>
+        <small>计划：{{assignment.due}} · 指派：{{assignment.assignedBy}}</small>
+        <details v-if="dispatchBrief||store.assignmentRecords[scenario]?.length">
+          <summary>{{dispatchBrief?'任务要求与指派记录':'指派记录'}}</summary>
+          <p v-if="dispatchBrief">{{assignment.scope}}</p>
+          <p v-for="(record,i) in store.assignmentRecords[scenario]" :key="i">{{record.at}} · {{record.assignedBy}}指定{{record.owner}} · {{record.scope}}</p>
+        </details>
+      </template>
+      <template v-else-if="!store.ignoredSuggestions[scenario]||editing">
+        <p v-if="!editing&&!dispatchBrief">采纳后指定本次任务负责人，安排与证据沿同一事件保留。</p>
+        <button v-if="!editing&&!ignoring" type="button" class="p2-primary" @click="openAssignment">采纳建议并指派</button>
+        <template v-if="editing">
+          <InquiryMessage :message="inquiry" @update-inquiry="updateDraft" @submit-inquiry="submit"/>
+          <div class="assignment-actions"><button type="button" class="p2-link-button" @click="expanded=!expanded">{{expanded?'收起补充安排':'补充安排（可选）'}}</button><button type="button" class="p2-secondary" @click="cancelAssignment">取消</button></div>
+        </template>
+        <div v-if="allowIgnore&&!store.todoCreated[scenario]&&!editing" class="assignment-ignore">
+          <button type="button" class="p2-link-button" @click="toggleIgnore">{{ignoring?'取消忽略':'忽略本次建议'}}</button>
+          <InquiryMessage v-if="ignoring" :message="ignoreInquiry" @submit-inquiry="ignore"/>
+        </div>
+      </template>
+      <template v-else><p>{{store.ignoredSuggestions[scenario].reason}}</p><button type="button" class="p2-link-button" @click="openAssignment">重新安排</button></template>
+    </template>
+  </section>
+</template>
 <script setup>
 import {ElMessage} from 'element-plus'
 import {decisionPreset} from '@/mock/realScenarioPresets'
+import {eventBriefingFor} from '@/mock/eventBriefings'
 import {dispatchReturnLocation} from '@/mock/dispatchNavigation'
 import {computed,reactive,ref,watch} from 'vue'
 import {useRouter,useRoute} from 'vue-router'
@@ -12,8 +53,10 @@ import crew from '@/mock/crew.json'
 import template from '@/message-flows/task-assignment.json'
 const props=defineProps({scenario:String,compact:Boolean,allowIgnore:{type:Boolean,default:true},actionTitle:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
 const assignment=computed(()=>store.assignments[props.scenario]||store.defaultAssignment(props.scenario)),draft=reactive({...assignment.value}),editing=ref(false),ignoring=ref(false),expanded=ref(false),error=ref('')
+const dispatchBrief=computed(()=>eventBriefingFor(props.scenario)?.dispatchBrief)
+const assignmentTitle=computed(()=>store.todoCreated[props.scenario]?(editing.value?'调整任务安排':'任务安排'):store.ignoredSuggestions[props.scenario]&&!editing.value?'已记录不采纳决定':props.actionTitle||'评估并安排检查')
 const crewOptions=crew.map(p=>({value:p.name+'（'+p.role+'）',label:p.name+'（'+p.role+'）'}))
-const inquiry=computed(()=>({id:'assignment-'+props.scenario,status:'pending',text:template.text,hint:draft.scope,submitLabel:store.todoCreated[props.scenario]?'保存指派':'确认派发任务',submitError:error.value,values:{...draft,collaborator:draft.collaborator||'none'},fields:[...template.fields,...(expanded.value?template.optionalFields:[])].map(f=>({...f,options:f.key==='owner'?crewOptions:f.key==='collaborator'?[{value:'none',label:'无需协作'},...crewOptions.filter(o=>o.value!==draft.owner)]:f.key==='type'?(store.todoCreated[props.scenario]?['现场核实','检测排查','维修','保养']:['现场核实','检测排查']).map(value=>({value,label:value})):f.options}))}))
+const inquiry=computed(()=>({id:'assignment-'+props.scenario,status:'pending',text:template.text,hint:dispatchBrief.value?undefined:draft.scope,submitLabel:store.todoCreated[props.scenario]?'保存指派':'确认派发任务',submitError:error.value,values:{...draft,collaborator:draft.collaborator||'none'},fields:[...template.fields,...(expanded.value?template.optionalFields:[])].map(f=>({...f,options:f.key==='owner'?crewOptions:f.key==='collaborator'?[{value:'none',label:'无需协作'},...crewOptions.filter(o=>o.value!==draft.owner)]:f.key==='type'?(store.todoCreated[props.scenario]?['现场核实','检测排查','维修','保养']:['现场核实','检测排查']).map(value=>({value,label:value})):f.options}))}))
 const ignoreInquiry=computed(()=>({...template.ignore,id:'ignore-'+props.scenario,status:'pending',values:store.cases[props.scenario]?.realCaseId?{reason:decisionPreset(store.cases[props.scenario],'ignore')}:template.ignore.values,submitLabel:'确认忽略'}))
 watch(()=>store.assignmentRequest,id=>{if(id===props.scenario){openAssignment();store.assignmentRequest=null}},{immediate:true})
 function openAssignment(){Object.assign(draft,assignment.value);editing.value=true;ignoring.value=false;error.value=''}
@@ -24,4 +67,4 @@ function updateDraft(payload){Object.assign(draft,payload.values);if(draft.colla
 async function submit(payload){updateDraft(payload);error.value='';if(!draft.scope?.trim()||!draft.due?.trim()||!draft.owner){error.value='请补齐负责人、计划时间与处理要求。';return}const existed=store.todoCreated[props.scenario];if(!existed&&!store.createTodo(props.scenario)){error.value='当前事件暂不能派发，请返回核对最新状态。';return}if(!store.assignTask(props.scenario,{...draft,collaborator:draft.collaborator==='none'?'':draft.collaborator})){error.value='指派尚未保存，请重试。';return}editing.value=false;if(!existed){store.closeTodo();const target=dispatchReturnLocation(route,props.scenario);if(target.path==='/situation')store.showCaptainWorkbench();await router.push(target);ElMessage.success('已派发给'+draft.owner+'，可继续处理其他事件。')}}
 function ignore(payload){if(store.ignoreSuggestion(props.scenario,payload.values.reason)){ignoring.value=false}}
 </script>
-<style scoped>.task-assignment{padding:18px;background:#f7f9fc;border:1px solid #dce4ee;border-radius:8px;margin:14px 0;font-size:14px;line-height:1.7}.assignment-head,.assignment-inline,.assignment-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.task-assignment p{margin:8px 0}.task-assignment small{color:#738093}.task-assignment details{margin-top:10px}.task-assignment summary{cursor:pointer}.assignment-actions{justify-content:flex-start;margin-top:10px}.assignment-ignore{margin-top:12px}.assignment-inline label{display:flex;align-items:center;gap:8px}.is-compact{padding:10px 16px;background:#fff}.task-assignment :deep(.p2-inquiry){margin:12px 0 0;padding:0;background:transparent;border:0}.task-assignment :deep(fieldset){min-width:0}.task-assignment :deep(.p2-inquiry-field){max-width:100%}</style>
+<style scoped>.task-assignment{padding:18px;background:#f7f9fc;border:1px solid #dce4ee;border-radius:8px;margin:14px 0;font-size:14px;line-height:1.7}.assignment-head,.assignment-inline,.assignment-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.task-assignment p{margin:8px 0}.task-assignment small{color:#738093}.task-assignment details{margin-top:10px}.task-assignment summary{cursor:pointer}.assignment-actions{justify-content:flex-start;margin-top:10px}.assignment-ignore{margin-top:12px}.assignment-inline label{display:flex;align-items:center;gap:8px}.is-compact{padding:10px 16px;background:#fff}.task-assignment :deep(.p2-inquiry){margin:12px 0 0;padding:0;background:transparent;border:0}.task-assignment :deep(fieldset){min-width:0}.task-assignment :deep(.p2-inquiry-field){max-width:100%}.assignment-summary{display:grid;gap:10px;margin:12px 0 16px}.assignment-summary>div{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px}.assignment-summary dt{color:#738093;font-size:13px}.assignment-summary dd{margin:0;color:#33465f;overflow-wrap:anywhere}@media(max-width:600px){.assignment-summary>div{grid-template-columns:1fr;gap:2px}}</style>
