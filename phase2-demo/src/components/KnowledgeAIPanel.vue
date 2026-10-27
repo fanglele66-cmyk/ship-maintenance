@@ -52,7 +52,7 @@
       </div>
 
       <!-- 消息区 -->
-      <div class="kap-msgs" ref="msgsRef" @click="handleDocRefClick">
+      <div class="kap-msgs" ref="msgsRef">
         <div v-if="searchQuery || hasFilter" class="knowledge-scope-title">
           <span></span>
           <em>{{ contextBarText }} · {{ filteredDocCount }}篇文档</em>
@@ -129,7 +129,7 @@ const props = defineProps({
   filteredDocs: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['open-doc', 'open-change'])
+const emit = defineEmits(['open-change'])
 
 // ============ 响应式断点 ============
 const isMobile = ref(window.innerWidth < 768)
@@ -345,7 +345,7 @@ function generateSearchSummary() {
   const deviceSummary = Object.entries(deviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join('、')
   const typeSummary = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join('、')
   const docLinks = top.map(d => `<div class="km-ref" data-doc-id="${d.id}">📄 <b>${d.title}</b><span class="km-ref-meta">${d.device} · ${d.docType} · ${d.id}</span></div>`).join('')
-  return `根据搜索"<b>${props.searchQuery}</b>"共找到 <b>${docs.length}</b> 篇相关文档，涉及 ${deviceSummary}，涵盖 ${typeSummary}。<br><br><div class="km-section-title">推荐阅读</div>${docLinks}<br>💡 点击文档标题可直接跳转阅读。`
+  return `根据搜索"<b>${props.searchQuery}</b>"共找到 <b>${docs.length}</b> 篇相关文档，涉及 ${deviceSummary}，涵盖 ${typeSummary}。<br><br><div class="km-section-title">推荐阅读</div>${docLinks}<br>💡 可在左侧资料列表按文档名称查阅原文。`
 }
 
 function generateFilterSummary() {
@@ -394,7 +394,7 @@ function buildSearchResultHtml(matches, keyword) {
   const devStr = Object.entries(deviceStats).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join('、')
   const typeStr = Object.entries(typeStats).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join('、')
 
-  return `找到 <b>${matches.length}</b> 篇与"<b>${keyword}</b>"相关的文档：<br>涉及 ${devStr}，涵盖 ${typeStr}<br><br>${docLinks}${matches.length > 5 ? `<br>…还有 ${matches.length - 5} 篇` : ''}<br><br>💡 点击文档标题可直接跳转阅读。`
+  return `找到 <b>${matches.length}</b> 篇与"<b>${keyword}</b>"相关的文档：<br>涉及 ${devStr}，涵盖 ${typeStr}<br><br>${docLinks}${matches.length > 5 ? `<br>…还有 ${matches.length - 5} 篇` : ''}<br><br>💡 可在左侧资料列表按文档名称查阅原文。`
 }
 
 // ============ AI 回复生成（含搜索） ============
@@ -418,7 +418,7 @@ function generateFollowUp(text) {
     const docs = knowledgeDocs.filter(d => d.docType === '故障案例')
     if (docs.length > 0) {
       const d = docs[0]
-      return `根据《<b>${d.title}</b>》等 ${docs.length} 篇故障案例，常见原因包括：<br><br>• 密封件老化或损坏<br>• 运动部件磨损超标<br>• 内部通道杂质堵塞<br>• 润滑油路不畅<br><br>📄 <div class="km-ref" data-doc-id="${d.id}">点击查看完整案例 → ${d.title}</div>`
+      return `根据《<b>${d.title}</b>》等 ${docs.length} 篇故障案例，常见原因包括：<br><br>• 密封件老化或损坏<br>• 运动部件磨损超标<br>• 内部通道杂质堵塞<br>• 润滑油路不畅<br><br>📄 <div class="km-ref" data-doc-id="${d.id}">相关案例：${d.title}</div>`
     }
     return '建议在搜索框中输入具体故障现象。'
   }
@@ -434,7 +434,7 @@ function generateFollowUp(text) {
     const docs = knowledgeDocs.filter(d => d.docType === '设备手册')
     if (docs.length > 0) {
       const list = docs.slice(0, 3).map(d => `<div class="km-ref" data-doc-id="${d.id}">📄 ${d.title}</div>`).join('')
-      return `以下是相关的设备手册：<br>${list}<br><br>备件信息通常在"备件清单"章节中，点击文档查看。`
+      return `以下是相关的设备手册：<br>${list}<br><br>备件信息通常在"备件清单"章节中，可在左侧资料列表查阅原文。`
     }
     return '建议搜索对应设备的手册文档。'
   }
@@ -450,7 +450,7 @@ function generateFollowUp(text) {
     const docs = knowledgeDocs.filter(d => d.docType === '设备手册')
     if (docs.length > 0) {
       const d = docs[0]
-      return `建议查看《<b>${d.title}</b>》。以增压器为例：<br>• 转速：18,500 rpm<br>• 压比：3.2<br>• 效率：≥72%<br><br>📄 <div class="km-ref" data-doc-id="${d.id}">查看完整参数</div>`
+      return `建议查看《<b>${d.title}</b>》。以增压器为例：<br>• 转速：18,500 rpm<br>• 压比：3.2<br>• 效率：≥72%<br><br>📄 <div class="km-ref" data-doc-id="${d.id}">参数来源：${d.title}</div>`
     }
     return '建议搜索"技术参数+设备名"。'
   }
@@ -532,18 +532,6 @@ function getMsgContent(m) {
 function hasKnowledgeCards(message) {
   const content = message.raw || message.streamed || message.content || ''
   return content.includes('class="km-ref"')
-}
-
-function handleDocRefClick(e) {
-  const ref = e.target.closest('.km-ref')
-  if (ref) {
-    e.preventDefault(); e.stopPropagation()
-    const docId = ref.dataset.docId
-    if (docId) {
-      emit('open-doc', docId)
-      if (window.innerWidth <= 1024) closePanel()
-    }
-  }
 }
 
 // ============ 语音输入 ============
@@ -775,7 +763,7 @@ onBeforeUnmount(() => {
   91.667% { transform: rotate(1320deg) scale(1); opacity: 1; }
   100% { transform: rotate(1440deg) scale(0); opacity: 0; }
 }
-.kap-title { font-size: 14px; line-height: 24px; font-weight: 500; color: #19213D; }
+.kap-panel .kap-title { font-size:calc(var(--wb-body) + 2px); line-height: 1.5; font-weight: 500; color: #19213D; }
 .kap-header-right { display: flex; align-items: center; gap: 8px; }
 .kap-close-btn {
   width: 28px; height: 28px; border-radius: 50%;
@@ -793,13 +781,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   color: #9195A2;
-  font-size: 12px;
-  line-height: 20px;
+  font-size:var(--wb-label);
+  line-height: 1.5;
 }
 .knowledge-scope-title span { height: 1px; background: #E4E7ED; }
 .knowledge-scope-title em { overflow: hidden; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .kap-suggestions { display: flex; flex-direction: column; gap: 8px; }
-.kap-suggestions-title { color: #9195A2; font-size: 14px; line-height: 24px; font-weight: 600; }
+.kap-suggestions-title { color: #9195A2; font-size:var(--wb-body); line-height: 1.6; font-weight: 600; }
 .kap-suggestions-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .kap-suggestion-chip {
   min-height: 32px;
@@ -809,17 +797,21 @@ onBeforeUnmount(() => {
   background: var(--bg-surface);
   color: var(--text-secondary);
   font: inherit;
-  font-size: var(--font-sm);
-  white-space: nowrap;
+  font-size: var(--wb-body);
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .kap-suggestion-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
-.km { display: flex; width: 100%; max-width: 100%; margin: 0; font-size: 14px; }
+.km { display: flex; width: 100%; max-width: 100%; margin: 0; font-size:var(--wb-body); }
 .km-ai { justify-content: flex-start; }
 .km-user { justify-content: flex-end; }
 .km-bubble {
-  max-width: 100%; font-size: 14px; line-height: 24px;
+  max-width: 100%; font-size:var(--wb-body); line-height: 1.75; overflow-wrap: anywhere;
   color: #19213D; border: 0; border-radius: 0;
   padding: 0; background: transparent; box-shadow: none;
 }
@@ -850,32 +842,17 @@ onBeforeUnmount(() => {
 .kap-msgs :deep(.km-ref) {
   display: block; padding: 10px 12px; margin: 8px 0; border-radius: 8px;
   background: var(--bg-hover); border: 1px solid var(--border-secondary);
-  color: var(--text-primary); cursor: pointer; transition: all 0.18s;
+  color: var(--text-primary); cursor: default;
   line-height: 1.5; position: relative;
 }
-.kap-msgs :deep(.km-ref::after) {
-  content: '→'; position: absolute; right: 12px; top: 50%;
-  transform: translateY(-50%); font-size: 16px;
-  color: var(--accent); opacity: 0; transition: opacity 0.18s; font-weight: 500;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .kap-msgs :deep(.km-ref:hover) {
-    background: var(--accent-bg);
-    border-color: var(--accent);
-    box-shadow: 0 1px 6px rgba(22,119,255,0.08);
-    padding-right: 36px;
-  }
-  .kap-msgs :deep(.km-ref:hover::after) { opacity: 1; }
-}
 .kap-msgs :deep(.km-ref-meta) {
-  display: block; font-size: var(--font-xs); color: var(--text-muted); margin-top: 2px;
+  display: block; font-size: var(--wb-label); color: var(--text-muted); margin-top: 2px;
 }
 .kap-msgs :deep(.km-section-title) {
   margin-bottom: 8px;
   color: #9195A2;
-  font-size: 14px;
-  line-height: 24px;
+  font-size:var(--wb-body);
+  line-height: 1.6;
   font-weight: 600;
 }
 
@@ -899,7 +876,7 @@ onBeforeUnmount(() => {
 .kap-input-wrapper:focus-within { border-color: #C8D8FF; box-shadow: 0 0 0 2px rgba(16,107,255,0.08); }
 .kap-input-field {
   flex: 1; background: transparent; border: none; outline: none;
-  height: 24px; color: #19213D; font-size: 14px; line-height: 24px; padding: 0; font-family: inherit;
+  height: 1.75em; color: #19213D; font-size:var(--wb-body); line-height: 1.75; padding: 0; font-family: inherit;
   min-width: 0;
 }
 .kap-input-field::placeholder { color: var(--text-muted); }

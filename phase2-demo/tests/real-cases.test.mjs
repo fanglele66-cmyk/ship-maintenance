@@ -8,6 +8,7 @@ test('real incidents replace situation examples and support every preset branch'
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {realCaseRecords,realSeries}=await server.ssrLoadModule('/src/mock/realCaseAdapter.js')
+  const {eventBriefingFor}=await server.ssrLoadModule('/src/mock/eventBriefings.js')
   const {activeWorkbenchIssues}=await server.ssrLoadModule('/src/mock/captainWorkbench.js')
   const {storyTimeline}=await server.ssrLoadModule('/src/mock/storyRecords.js')
   const {assessWorkflow}=await server.ssrLoadModule('/src/mock/fourStoryWorkflow.js')
@@ -36,7 +37,13 @@ test('real incidents replace situation examples and support every preset branch'
    const store=fresh();assert.deepEqual(new Set(activeWorkbenchIssues(store).map(r=>r.id)),new Set(ids.map(id=>id===maintenance?'real-health-c4-baseline':id)))
    for(const record of realCaseRecords){
     const item=store.cases[record.id];assert.equal(store.todoCreated[item.id],false);assert.equal(store.eventStatus[item.id],'pending');assert.equal(store.executionRecords[item.id],undefined)
-    assert.equal(item.report.basis,record.steps[0].summary)
+    const briefing=eventBriefingFor(record.id)
+    assert.ok(briefing.facts.length,'initial basis must retain traceable source facts')
+    for(const fact of briefing.facts){
+     assert.ok(item.report.basis.includes(fact.label+'：'+fact.value),'initial basis must retain the named source value: '+fact.label)
+     assert.ok(fact.at&&fact.sourceIds.every(id=>briefing.sources.some(source=>source.id===id)),'each fact retains its sampling time and resolvable source')
+    }
+    assert.ok(item.stages[0].evidence.some(entry=>entry.includes(briefing.facts[0].label)&&entry.includes(String(briefing.facts[0].value))),'task evidence retains the same named initial source value')
     assert.doesNotMatch(JSON.stringify([item.source,item.report,item.pageContent,item.stages,item.observation.basis]),/演示|改编|回放/)
     for(const series of item.series)if(item.realEvidenceCutoff)assert.ok(series.labels.every(time=>time.replace('T',' ')<=item.realEvidenceCutoff))
     for(const [i,series] of realSeries(record).entries()){assert.deepEqual(series.values,record.series[i].points.map(p=>p.value));assert.deepEqual(series.labels,record.series[i].points.map(p=>p.time))}

@@ -24,6 +24,7 @@
           <div><dt>触发来源</dt><dd>{{ source }}</dd></div>
           <div><dt>当前阶段</dt><dd>{{ stage.label }}</dd></div>
           <div><dt>待办负责人</dt><dd>{{store.assignments[todo.id]?.owner||todo.owner}}</dd></div>
+          <div v-if="store.assignments[todo.id]?.due"><dt>要求完成时间</dt><dd>{{store.assignments[todo.id].due.replace('T',' ')}}</dd></div>
           <div><dt>本次要求</dt><dd>{{store.assignments[todo.id]?.scope}}</dd></div>
         </dl></section>
         <section class="p2-panel p2-overview-analysis">
@@ -49,28 +50,29 @@
         <div class="p2-section-title">{{ stage.label }}前注意事项</div>
         <div v-for="(point,i) in checkPreparation(todo,stage)" :key="point" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ point }}</div>
         <EventWorkOrderLink v-if="isMaintenanceWorkflow(todo)" :event-id="todo.id" />
-        <button class="p2-primary p2-ready-button" @click="prepared[stageKey]=true;subtab=stage.label+'步骤'">已了解，开始{{ stage.label }}</button>
+        <button class="p2-primary p2-ready-button" @click="prepared[stageKey]=true;subtab=stage.label+'步骤'">查看{{ stage.label }}步骤</button>
       </section>
       <section v-else-if="stage.kind==='check'||stage.kind==='work'&&subtab.includes('步骤')" class="p2-panel p2-step-content">
         <nav class="p2-check-stepper" :aria-label="stage.label+'步骤'"><button v-for="(task,i) in stage.tasks" :key="task.label" :class="{active:stepIndex===i,done:results[taskKey(i)]}" @click="stepIndex=i"><span>{{ i+1 }}</span>{{ task.shortLabel || task.label }}</button></nav>
+        <button v-if="stage.kind==='work'&&store.workStepRecords[stageKey]&&!readOnly" class="p2-secondary" type="button" @click="store.reviseWorkStepFeedback(todo.id)">补充维修步骤</button>
         <article class="p2-current-task">
           <h3>{{ currentTask.label }}</h3><p>{{ currentTask.guide }}</p>
           <ol v-if="currentTask.checks?.length" class="task-checkpoints"><li v-for="point in currentTask.checks" :key="point">{{ point }}</li></ol>
           <p v-if="stage.kind==='check'&&currentTask.recordHint" class="task-record-requirement"><strong>提交记录</strong>{{ currentTask.recordHint }}</p>
-          <p v-if="stage.kind==='check'&&readOnly" class="p2-pad-conclusion">已提交：{{ currentResult||'现场反馈已记录于右侧对话' }}</p>
-          <fieldset v-else-if="stage.kind==='check'" class="p2-check-options"><legend>{{ stage.kind==='work'?'作业反馈':'检查结果' }}</legend><label v-for="choice in taskChoices" :key="choice"><input type="radio" :name="taskKey(stepIndex)" :value="choice" v-model="currentResult" />{{ choice }}</label></fieldset>
-          <label v-if="stage.kind==='check'" class="p2-step-note">备注<textarea v-model="currentNote" :readonly="readOnly" rows="3" :placeholder="currentTask.recordHint || '记录实际读数、现场发现或处理结果'"></textarea></label>
+          <p v-if="['check','work'].includes(stage.kind)&&stepReadOnly" class="p2-pad-conclusion">已提交：{{ currentResult||'现场反馈已记录于右侧对话' }}</p>
+          <fieldset v-else-if="['check','work'].includes(stage.kind)" class="p2-check-options"><legend>{{ stage.kind==='work'?'作业反馈':'检查结果' }}</legend><label v-for="choice in taskChoices" :key="choice"><input type="radio" :name="taskKey(stepIndex)" :value="choice" v-model="currentResult" />{{ choice }}</label></fieldset>
+          <label v-if="['check','work'].includes(stage.kind)" class="p2-step-note">备注（选填）<textarea v-model="currentNote" :readonly="stepReadOnly" rows="3" :placeholder="currentTask.recordHint || '记录实际读数、现场发现或处理结果'"></textarea></label>
           <div v-if="stage.kind==='check'" class="p2-attachment-row"><label v-if="!readOnly">＋ 添加图片<input type="file" accept="image/*" multiple @change="attachFiles" /></label><span>{{ (attachments[taskKey(stepIndex)]||[]).join('、')||'未添加附件' }}</span></div>
         </article>
         <p v-if="validation" role="alert" class="p2-step-validation">{{validation}}</p>
-        <div class="p2-step-controls"><button class="p2-secondary" :disabled="stepIndex===0&&stage.kind!=='work'" @click="stepIndex>0?stepIndex--:subtab='备件清单'">上一步</button><span>{{ stepIndex+1 }} / {{ stage.tasks.length }}</span><button class="p2-primary" @click="nextStep">{{ stepIndex<stage.tasks.length-1?'下一步':readOnly?'查看下一阶段':stage.kind==='work'?'前往验收确认':'提交本轮反馈' }}</button></div>
+        <div class="p2-step-controls"><button class="p2-secondary" :disabled="stepIndex===0&&stage.kind!=='work'" @click="stepIndex>0?stepIndex--:subtab='备件清单'">上一步</button><span>{{ stepIndex+1 }} / {{ stage.tasks.length }}</span><button class="p2-primary" @click="nextStep">{{ stepIndex<stage.tasks.length-1?'下一步':readOnly?'查看下一阶段':stage.kind==='work'?'保存步骤并前往验收':'提交本轮反馈' }}</button></div>
       </section>
 
       <section v-else-if="stage.kind==='work'" class="p2-panel p2-pad-single">
         <div class="p2-section-title">{{ subtab }}</div>
         <template v-if="subtab.includes('准备')"><div v-for="(text,i) in workDetails.preparation" :key="text" class="p2-pad-list-row"><span>{{ i+1 }}</span>{{ text }}</div></template>
         <template v-else-if="subtab==='备件清单'"><table class="p2-cause-table"><thead><tr><th>备件 / 耗材</th><th>备料数量</th><th>使用条件与用途</th></tr></thead><tbody><tr v-for="part in workDetails.parts" :key="part.name"><td><strong>{{ part.name }}</strong><small v-if="part.specification" class="task-part-spec">{{ part.specification }}</small></td><td>{{ part.amount }}</td><td>{{ part.use }}</td></tr></tbody></table></template>
-        <template v-else-if="subtab==='验收确认'"><table class="p2-cause-table"><thead><tr><th>验收项目</th><th>验收要求</th><th>核对方法</th></tr></thead><tbody><tr v-for="row in acceptanceRows" :key="row.name"><td>{{ row.name }}</td><td>{{ row.req }}</td><td>{{ row.method }}</td></tr></tbody></table><InquiryMessage v-if="executionForm" :message="executionForm" @update-inquiry="updateExecution" @submit-inquiry="confirmExecution" /></template>
+        <template v-else-if="subtab==='验收确认'"><table class="p2-cause-table"><thead><tr><th>验收项目</th><th>验收要求</th><th>核对方法</th><th>验收记录</th></tr></thead><tbody><tr v-for="(row,index) in acceptanceRows" :key="row.name"><td>{{ row.name }}</td><td>{{ row.req }}</td><td>{{ row.method }}</td><td>{{executionForm?.values['acceptance_'+index]||'—'}}</td></tr></tbody></table><InquiryMessage v-if="leftExecutionForm" :message="leftExecutionForm" @update-inquiry="updateExecution" @submit-inquiry="confirmExecution" /></template>
         <template v-else-if="subtab==='关联工单'"><EventWorkOrderLink :event-id="todo.id" /></template>
         <footer v-if="subtab.includes('准备')||subtab==='备件清单'" class="p2-work-navigation">
           <button v-if="subtab==='备件清单'" type="button" class="p2-secondary" @click="subtab=tabs[0]">上一步：{{tabs[0]}}</button>
@@ -83,9 +85,9 @@
         <template v-if="store.completedTasks[todo.id]"><p>{{store.completedTasks[todo.id].reason}}</p><p>{{store.completedTasks[todo.id].actor}} · {{store.completedTasks[todo.id].at}}</p><button v-if="todo.trackingOnly" class="p2-primary" @click="router.push({path:'/situation/issue/'+todo.id,query:{tab:'事件概览'}})">返回事件确认处置 →</button><HealthTrackingPanel v-if="todo.trackingOnly" :request-id="todo.id" detail/><p v-else-if="isMaintenanceWorkflow(todo)">原周期维保计划保持有效。</p><button class="p2-secondary" @click="router.push({path:'/situation',query:{device:todo.deviceId}})">查看设备态势</button></template>
         <template v-else>
         <dl v-if="latestExecution" class="p2-execution-facts"><div><dt>实际执行人</dt><dd>{{ latestExecution.executor }}</dd></div><div><dt>实际设备与部位</dt><dd>{{ latestExecution.values.equipment }}</dd></div><div><dt>实际措施</dt><dd>{{ latestExecution.values.measures }}</dd></div><div><dt>实际执行时间</dt><dd>{{ latestExecution.values.executedAt.replace('T',' ') }}</dd></div><div><dt>验收与复测</dt><dd>{{ latestExecution.values.acceptance }}</dd></div><div><dt>来源及确认时间</dt><dd>{{ latestExecution.source }} · {{ latestExecution.confirmedAt }}</dd></div></dl>
-        <p v-if="!store.executionObservationReady(todo.id)">缺少可比监测数据，效果观察待补充；当前不生成改善结论。</p>
+
         <div v-for="(fact,i) in closedEvidence" :key="fact" class="p2-pad-list-row"><span>{{ String(i+1).padStart(2,'0') }}</span>{{ fact }}</div>
-        <div class="p2-pad-conclusion"><b>处理结果</b><p>现场检查、实际措施与验收反馈已提交，待办记为已处理。{{ store.executionObservationReady(todo.id)?'设备态势接续处理后的持续效果跟踪。':'缺少可比监测数据，效果观察待补充。' }}</p></div>
+        <div class="p2-pad-conclusion"><b>处理结果</b><p>现场检查、实际措施与验收反馈已提交，待办记为已处理。</p></div>
         <button v-if="store.executionObservationReady(todo.id)" type="button" class="p2-secondary p2-ready-button" @click="viewObservation">查看设备态势中的效果观察 →</button>
         <div v-if="store.caseMaterials[todo.id]" class="p2-case-source"><b>案例材料 · {{ store.caseMaterials[todo.id]?.status }}</b><p>来源：{{ store.caseMaterials[todo.id]?.sourceId }} · {{ store.caseMaterials[todo.id]?.sourceTitle }}</p><p>原始证据、现场反馈与实际措施已关联。后续效果记录继续补充。</p></div>
         <button v-if="!store.executionObservationReady(todo.id)" class="p2-secondary" @click="viewObservation">补充处理后可比记录</button>
@@ -127,8 +129,11 @@ const humanStages=computed(()=>(todo.value?.stages||[]).map((entry,index)=>({...
 const displayStages=computed(()=>{const steps=humanStages.value;return store.isTaskHandled(todo.value?.id)?[...steps,{id:'handled',kind:'handled',label:'处理结果',index:store.observationIndex(todo.value.id)}]:steps})
 const executionForm=computed(()=>store.logs[todo.value?.id]?.findLast(message=>message.purpose==='execution-record'&&message.stageId===stage.value?.id))
 const latestExecution=computed(()=>store.executionRecords[todo.value?.id]?.at(-1))
-const currentResult=computed({get:()=>stage.value?.kind==='work'?(executionForm.value?.values['task'+stepIndex.value]||results[taskKey(stepIndex.value)]):results[taskKey(stepIndex.value)],set:value=>{results[taskKey(stepIndex.value)]=value;if(stage.value.kind==='work'&&executionForm.value?.status==='pending')updateExecution({messageId:executionForm.value.id,values:{...executionForm.value.values,['task'+stepIndex.value]:value}})}})
-const currentNote=computed({get:()=>stage.value?.kind==='work'?(executionForm.value?.values['note'+stepIndex.value]||notes[taskKey(stepIndex.value)]):notes[taskKey(stepIndex.value)],set:value=>{notes[taskKey(stepIndex.value)]=value;if(stage.value.kind==='work'&&executionForm.value?.status==='pending')updateExecution({messageId:executionForm.value.id,values:{...executionForm.value.values,['note'+stepIndex.value]:value}})}})
+const currentResult=computed({get:()=>results[taskKey(stepIndex.value)],set:value=>results[taskKey(stepIndex.value)]=value})
+const currentNote=computed({get:()=>notes[taskKey(stepIndex.value)],set:value=>notes[taskKey(stepIndex.value)]=value})
+const stepReadOnly=computed(()=>readOnly.value||Boolean(stage.value?.kind==='work'&&store.workStepRecords[stageKey.value]))
+const leftExecutionForm=computed(()=>executionForm.value?{...executionForm.value,fields:executionForm.value.fields.filter(field=>!field.acceptanceItem)}:null)
+
 function updateExecution(payload){store.updateExecutionRecord(todo.value.id,payload.messageId,payload.values)}
 function confirmExecution(payload){store.confirmExecutionRecord(todo.value.id,payload.messageId,payload.values)}
 watch(()=>[todo.value?.id,stage.value?.kind],()=>{if(stage.value?.kind==='work'&&!store.isTaskHandled(todo.value.id))store.requestExecutionRecord(todo.value.id)},{immediate:true})
@@ -151,13 +156,23 @@ const actionLabel=computed(()=>readOnly.value?'查看下一阶段':stage.value?.
 const report=computed(()=>{const base=todo.value?.report||overviewReports[todo.value?.id==='drift'&&stage.value?.id==='event'?'driftEvent':todo.value?.id];return todo.value?.id==='main-warning'&&stage.value?.id==='event'?{...base,conclusion:stage.value.summary,basis:stage.value.evidence.join('；'),human:stage.value.judgement}:base})
 const cause=computed(()=>causeContent[todo.value?.id])
 const currentTask=computed(()=>guidedTask(stage.value?.tasks?.[stepIndex.value]||{}))
-const taskChoices=computed(()=>stage.value?.kind==='work'?['已完成','待补充']:(currentTask.value?.options||checkChoices(todo.value?.id,stage.value?.baseStageId||stage.value?.id,stepIndex.value)))
+const taskChoices=computed(()=>stage.value?.kind==='work'?['已完成','未完成','不适用']:(currentTask.value?.options||checkChoices(todo.value?.id,stage.value?.baseStageId||stage.value?.id,stepIndex.value)))
 const workDetails=computed(()=>stage.value?.workDetails||todo.value?.workDetails || (todo.value?.id==='maintenance'?{preparation:['确认靠港作业窗口、停机隔离和作业许可','核对轴瓦型号、润滑及测量工具'],parts:[{name:'1#缸连杆轴承轴瓦',amount:'1套',use:'提前保养换件'}],acceptance:['轴承间隙复测符合设备要求','润滑及复装检查完成'],placeholder:'例如：间隙复测合格，试运转振动2.2 mm/s'}:todo.value?.id==='drift'?{preparation:['确认停机隔离与高压燃油系统泄压条件','准备喷油器校验设备与拆装工具'],parts:[{name:'喷嘴组件',amount:'1套',use:'清洁后校验不合格时更换'}],acceptance:['喷雾形态校验合格','复装密封检查完成'],placeholder:'例如：喷雾形态正常，无泄漏，同工况排温差3°C'}:{preparation:['按现场规程确认冷却系统隔离与作业许可','准备滤器清洗工具，核对密封圈状态'],parts:[{name:'滤器密封圈',amount:'1套',use:'复装备用'}],acceptance:['滤器复装后无泄漏','流量与出口温度已复测'],placeholder:'例如：流量86.5 m³/h，出口温度79.1°C，无泄漏'}))
 const acceptanceRows=computed(()=>workDetails.value.acceptanceRows || workDetails.value.acceptance.map((req,i)=>({name:'验收项目 '+(i+1),req,method:'记录现场复测值、工况和检查结果，对照本机规程确认。'})))
 watch(stageKey,()=>{subtab.value=tabs.value[readOnly.value&&stage.value?.kind==='check'?1:0]||'';stepIndex.value=0;validation.value='';actionNote.value=''}, {immediate:true})
 function taskKey(i){return stageKey.value+':'+i}
 function attachFiles(event){attachments[taskKey(stepIndex.value)]=Array.from(event.target.files||[]).map(file=>file.name)}
-function nextStep(){if(stage.value.kind==='check'&&!readOnly.value&&!results[taskKey(stepIndex.value)]){validation.value='请先选择当前事项的实际结果。';return}validation.value='';if(stepIndex.value<stage.value.tasks.length-1)stepIndex.value++;else if(readOnly.value)advance();else if(stage.value.kind==='work')subtab.value='验收确认';else advance()}
+function nextStep(){
+ if(!stepReadOnly.value&&!results[taskKey(stepIndex.value)]){validation.value='请先选择当前事项的实际结果。';return}
+ validation.value=''
+ if(stepIndex.value<stage.value.tasks.length-1){stepIndex.value++;return}
+ if(stage.value.kind==='work'){
+  if(!readOnly.value){const form=store.stageFeedbackForm(todo.value.id);const result=store.submitStageFeedback(todo.value.id,form?.id);if(!result.ok){validation.value=result.error;return}}
+  subtab.value='验收确认';return
+ }
+ advance()
+}
+
 function advance(){
   if(readOnly.value){store.advanceTodo(todo.value.id);return}
   if(stage.value.kind==='event'&&subtab.value!=='候选原因'){subtab.value='候选原因';return}

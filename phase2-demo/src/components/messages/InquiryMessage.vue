@@ -2,8 +2,8 @@
   <section class="p2-inquiry" :data-inquiry-id="message.id">
     <p class="p2-inquiry-text">{{ message.text }}</p>
     <p v-if="message.hint" class="p2-inquiry-hint">{{ message.hint }}</p>
-    <dl v-if="message.status==='submitted'" class="p2-inquiry-receipt">
-      <div v-for="field in message.fields" :key="field.key"><dt>{{ field.label }}</dt><dd>{{ displayInquiryValue(field, values[field.key]) }}</dd></div>
+    <dl v-if="readOnly || message.status==='submitted'" class="p2-inquiry-receipt">
+      <div v-for="field in message.fields" :key="field.key"><dt>{{ field.label }}</dt><dd>{{ displayInquiryValue(field, receiptValue(field)) }}</dd></div>
     </dl>
     <form v-else ref="formElement" novalidate @submit.prevent="submit">
       <fieldset :disabled="message.status==='inactive' || message.busy">
@@ -18,6 +18,7 @@
         <button type="submit">{{ message.busy ? '提交中…' : message.submitLabel || '提交' }}</button>
       </fieldset>
     </form>
+    <p v-if="readOnly && message.status==='pending'" class="p2-inquiry-hint">待确认记录，相关填写与提交请在左侧工作区完成。</p>
     <p v-if="message.status==='submitted'" class="p2-inquiry-status" role="status">已提交{{ message.submittedAt ? ' · '+message.submittedAt : '' }}{{ message.receiptText ? '。'+message.receiptText : '' }}</p>
     <p v-if="message.status==='inactive'" class="p2-inquiry-hint">{{ message.inactiveReason || '此项询问当前不可提交' }}</p>
     <p v-if="message.submitError" class="p2-inquiry-error" role="alert">{{ message.submitError }}</p>
@@ -27,7 +28,7 @@
 import FormSelect from '@/components/forms/FormSelect.vue'
 import { computed, reactive, ref, watch, useId, nextTick } from 'vue'
 import { inquiryValues, validateInquiry, displayInquiryValue, assertInquiry } from '@/message-flows/inquiryFields'
-const props=defineProps({message:{type:Object,required:true}})
+const props=defineProps({message:{type:Object,required:true},readOnly:Boolean})
 const emit=defineEmits(['submit-inquiry','update-inquiry'])
 const prefix=useId(),values=reactive({}),attempted=ref(false),formElement=ref(null)
 watch(()=>[props.message.id,props.message.values,props.message.status],()=>{
@@ -39,10 +40,11 @@ watch(()=>[props.message.id,props.message.status],()=>{attempted.value=false})
 const errors=computed(()=>attempted.value ? validateInquiry(props.message,values) : {})
 const invalidFields=computed(()=>props.message.fields.filter(field=>errors.value[field.key]))
 function fieldId(field){return prefix+'-'+field.key}
+function receiptValue(field){return props.readOnly && props.message.status!=='submitted' ? props.message.values?.[field.key] ?? field.value : values[field.key]}
 function payload(){return {messageId:props.message.id,values:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,Array.isArray(value)?[...value]:value]))}}
-function update(){emit('update-inquiry',payload())}
+function update(){if(!props.readOnly)emit('update-inquiry',payload())}
 async function submit(){
-  if(props.message.status==='submitted'||props.message.status==='inactive'||props.message.busy)return
+  if(props.readOnly||props.message.status==='submitted'||props.message.status==='inactive'||props.message.busy)return
   attempted.value=true
   if(invalidFields.value.length){
     await nextTick()

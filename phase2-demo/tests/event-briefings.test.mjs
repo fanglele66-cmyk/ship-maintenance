@@ -31,7 +31,7 @@ test('initial cases retain their cutoff and never use later repair or human clos
  assert.doesNotMatch(JSON.stringify(warning),/密封垫老化|临时修复测试正常|HRD-FA|2026-06-09/)
  assert.doesNotMatch(JSON.stringify(tracking),/2026-08-28|已关闭|已确认正常|两次均勾选/)
  assert.match(tracking.tasks.map(task=>task.detail).join(' '),/4—7 月|Pmax/)
- assert.match(tracking.boundary,/不等于故障确诊/)
+ assert.match(tracking.boundary,/喷油器或排气阀维修依据各自检验结果/)
 })
 
 test('physical readings retain sensor identity, sampling time and limited interpretation',()=>{

@@ -27,28 +27,28 @@
 .app-container.app-container .p2-restored-assistant .p2-assistant-head { padding: 16px; min-height: 68px; border: 0; }
 .app-container.app-container .p2-restored-assistant .p2-ai-mark,
 .app-container.app-container .p2-restored-assistant .p2-avatar { display: none; }
-.app-container.app-container .p2-restored-assistant .p2-assistant-head strong { font-size: 18px; line-height: 28px; font-weight: 400; color: #1a1c1f; }
-.app-container.app-container .p2-restored-assistant .p2-assistant-head small { font-size: 12px; color: #9195a2; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head strong { font-size: calc(var(--wb-body) + 4px); line-height: 1.75; font-weight: 400; color: #1a1c1f; }
+.app-container.app-container .p2-restored-assistant .p2-assistant-head small { font-size: var(--wb-label); color: #9195a2; }
 .app-container.app-container .p2-restored-assistant .p2-messages { padding: 0 16px 16px; }
 .app-container.app-container .p2-restored-assistant .p2-message { margin: 0 0 20px; padding: 0; border: 0; gap: 0; }
 .app-container.app-container .p2-restored-assistant .p2-message[data-demo="true"]+.p2-message { border: 0; padding-top: 0; }
-.app-container.app-container .p2-restored-assistant .assistant .p2-bubble { max-width: 100%; width: 100%; font-size: 16px; line-height: 28px; color: #1a1c1f; }
-.app-container.app-container .p2-restored-assistant .p2-message.user .p2-bubble { background: #f3f7ff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 16px; line-height: 24px; color: #1a1c1f; }
-.app-container.app-container .p2-restored-assistant .p2-scene-details>summary h3 { font-size: 16px; line-height: 28px; font-weight: 500; }
+.app-container.app-container .p2-restored-assistant .assistant .p2-bubble { max-width: 100%; width: 100%; font-size: max(16px, var(--wb-body)); line-height: 1.75; color: #1a1c1f; }
+.app-container.app-container .p2-restored-assistant .p2-message.user .p2-bubble { background: #f3f7ff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: max(16px, var(--wb-body)); line-height: 1.6; color: #1a1c1f; }
+.app-container.app-container .p2-restored-assistant .p2-scene-details>summary h3 { font-size: max(16px, var(--wb-body)); line-height: 1.75; font-weight: 500; }
 .app-container.app-container .p2-restored-assistant .p2-dialog-paragraph { margin: 12px 0; }
 .app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,
-.app-container.app-container .p2-restored-assistant .p2-dialog-question { color: #1a1c1f; font-size: 16px; line-height: 28px; }
-.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph b { color: #6c7183; font-size: 14px; line-height: 22px; font-weight: 400; }
-.app-container.app-container .p2-restored-assistant .p2-demo-label { background: transparent; padding: 0; border-radius: 0; font-weight: 400; color: #9195a2; font-size: 12px; }
+.app-container.app-container .p2-restored-assistant .p2-dialog-question { color: #1a1c1f; font-size: max(16px, var(--wb-body)); line-height: 1.75; }
+.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph b { color: #6c7183; font-size: max(14px, var(--wb-body)); line-height: 22px; font-weight: 400; }
+.app-container.app-container .p2-restored-assistant .p2-demo-label { background: transparent; padding: 0; border-radius: 0; font-weight: 400; color: #9195a2; font-size: var(--wb-label); }
 .app-container.app-container .p2-restored-assistant .p2-demo-actions { flex-direction: column; align-items: stretch; gap: 8px; }
-.app-container.app-container .p2-restored-assistant .p2-demo-actions button { min-height: 40px; background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; color: #6c7183; font-size: 14px; }
+.app-container.app-container .p2-restored-assistant .p2-demo-actions button { min-height: 40px; background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; color: #6c7183; font-size: max(14px, var(--wb-body)); }
 .app-container.app-container .p2-restored-assistant .p2-feedback-record { background: #f5f7fa; border-color: #e5e6e7; border-radius: 8px; }
 .app-container.app-container .p2-restored-assistant .p2-compose { padding: 0 16px 16px; border: 0; }
 .app-container.app-container .p2-restored-assistant .p2-compose-shell,
 .app-container.app-container .kap-input-wrapper { display: flex; flex-direction: column; justify-content: space-between; min-height: 100px; padding: 12px; border: 1px solid #e8ebf1; border-radius: 16px; background: #fff; box-shadow: 0 8px 16px -12px #00000029; }
 .app-container.app-container .p2-restored-assistant .p2-compose-shell:focus-within,
 .app-container.app-container .kap-input-wrapper:focus-within { border-color: #cbb58e; box-shadow: 0 0 0 2px #b7935a14; }
-.app-container.app-container .p2-restored-assistant .p2-compose textarea { border: 0; background: transparent; border-radius: 0; padding: 0; font-size: 14px; line-height: 24px; box-shadow: none; }
+.app-container.app-container .p2-restored-assistant .p2-compose textarea { border: 0; background: transparent; border-radius: 0; padding: 0; font-size: max(14px, var(--wb-body)); line-height: 1.6; box-shadow: none; }
 .app-container.app-container .p2-restored-assistant .p2-compose-foot { margin-top: 8px; }
 .app-container.app-container .p2-restored-assistant .p2-compose-foot button,
 .app-container.app-container .kap-send-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; min-height: 36px; padding: 4px; border-radius: 50%; background: #1d2129; color: #fff; border: 0; }
@@ -58,8 +58,8 @@
 .app-container.app-container .kap-send-btn img { display: block; }
 .app-container.app-container .kap-sparkle { display: none; }
 .app-container.app-container .kap-header { border-bottom: 0; padding: 16px; }
-.app-container.app-container .kap-title { font-size: 18px; line-height: 28px; font-weight: 400; color: #1a1c1f; }
-.app-container.app-container .km { font-size: 16px; line-height: 28px; }
+.app-container.app-container .kap-title { font-size: calc(var(--wb-body) + 4px); line-height: 1.75; font-weight: 400; color: #1a1c1f; }
+.app-container.app-container .km { font-size: max(16px, var(--wb-body)); line-height: 1.75; }
 .app-container.app-container .km-user-bubble { background: #f3f7ff; border: 0; border-radius: 8px; color: #1a1c1f; }
 .app-container.app-container .kap-voice-btn { left: 12px; right: auto; bottom: 12px; }
 .app-container.app-container .kap-send-btn { right: 12px; bottom: 12px; }
@@ -67,19 +67,19 @@
   .app-container.app-container .p2-restored-assistant .assistant .p2-bubble,
   .app-container.app-container .p2-restored-assistant .user .p2-bubble,
   .app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,
-  .app-container.app-container .p2-restored-assistant .p2-dialog-question { font-size: 15px; line-height: 26px; }
+  .app-container.app-container .p2-restored-assistant .p2-dialog-question { font-size: 15px; line-height: 1.75; }
 }
 
 /* Daily deliveries are compact summaries, distinct from ordinary dialogue. */
 .app-container.app-container .p2-restored-assistant .p2-message.is-daily-push .p2-bubble { padding: 16px; border: 1px solid #e8ebf1; border-radius: 8px; background: linear-gradient(180deg,#faf8f4 0,#fff 76px); }
-.app-container.app-container .p2-restored-assistant .is-daily-push .p2-push-date { display: block; margin: 0 0 6px; text-align: left; color: #9195a2; font-size: 12px; line-height: 20px; }
-.app-container.app-container .p2-restored-assistant .is-daily-push .p2-demo-label { color: #947448; font-size: 12px; margin-bottom: 4px; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-push-date { display: block; margin: 0 0 6px; text-align: left; color: #9195a2; font-size: var(--wb-label); line-height: 20px; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-demo-label { color: #947448; font-size: var(--wb-label); margin-bottom: 4px; }
 .app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary { display: block; list-style: none; cursor: pointer; }
 .app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary::before { display: none; }
 .app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary::-webkit-details-marker { display: none; }
-.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary h3 { font-size: 17px; font-weight: 600; line-height: 26px; margin: 0 0 8px; }
-.app-container.app-container .p2-restored-assistant .p2-push-preview { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; line-height: 24px; color: #6c7183; margin: 0; }
-.app-container.app-container .p2-restored-assistant .p2-push-toggle { display: block; margin-top: 12px; color: #947448; font-size: 13px; line-height: 20px; }
+.app-container.app-container .p2-restored-assistant .is-daily-push .p2-scene-details>summary h3 { font-size: calc(var(--wb-body) + 3px); font-weight: 600; line-height: 1.75; margin: 0 0 8px; }
+.app-container.app-container .p2-restored-assistant .p2-push-preview { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: max(14px, var(--wb-body)); line-height: 1.6; color: #6c7183; margin: 0; }
+.app-container.app-container .p2-restored-assistant .p2-push-toggle { display: block; margin-top: 12px; color: #947448; font-size: max(13px, var(--wb-label)); line-height: 20px; }
 .app-container.app-container .p2-restored-assistant .p2-push-toggle::after { content: '展开回顾 ↓'; }
 .app-container.app-container .p2-restored-assistant .p2-scene-details[open] .p2-push-toggle::after { content: '收起回顾 ↑'; }
 .app-container.app-container .p2-restored-assistant .p2-scene-details[open] .p2-push-preview { display: none; }
@@ -106,3 +106,15 @@
 .p2-task-receipt footer button:focus-visible { outline:2px solid #a38e68; outline-offset:2px; }
 
 .app-container.app-container .p2-restored-assistant .p2-demo-actions button:disabled { opacity:.45; cursor:not-allowed; }
+
+/* Compact work controls and a consistent assistant reading scale. */
+.app-container.app-container .p2-primary,.app-container.app-container .p2-secondary{font-size:13px;min-height:34px;padding:7px 12px;line-height:1.5}
+.app-container.app-container .p2-check-stepper button>span{display:inline-flex;align-items:center;justify-content:center;text-align:center;flex:0 0 22px;width:22px;height:22px;line-height:1;padding:0}
+.app-container.app-container .assessment-actions.tracking-actions{width:min(100%,360px);gap:10px}.app-container.app-container .assessment-actions.tracking-actions>button{min-height:34px;white-space:nowrap;font-size:13px;padding:6px 10px}
+.app-container.app-container .observation-review-panel{flex:0 0 auto;min-height:max-content;height:auto}.app-container.app-container .observation-confirmation{display:flex;flex-direction:column;align-items:flex-start;gap:12px;flex:none}.app-container.app-container .observation-confirmation label{display:block;width:100%;margin:0;height:auto}.app-container.app-container .observation-confirmation textarea{display:block;min-height:72px;margin:7px 0 0;position:static}.app-container.app-container .observation-confirmation button{margin:0;position:static;flex:none}.app-container.app-container .observation-display{flex:0 0 auto}
+.app-container.app-container .p2-restored-assistant{font-size:13px;--wb-body:13px;--wb-label:11px}
+.app-container.app-container .p2-restored-assistant .p2-bubble,.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,.app-container.app-container .p2-restored-assistant .p2-dialog-question,.app-container.app-container .p2-restored-assistant .markdown-content{font-size:13px;line-height:1.65}
+.app-container.app-container .p2-restored-assistant .p2-scene-details>summary h3,.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph b{font-size:13px;line-height:1.6}
+.app-container.app-container .p2-restored-assistant .p2-demo-actions button{font-size:12px;min-height:32px;padding:6px 9px}
+.app-container.app-container .p2-restored-assistant .p2-inquiry,.app-container.app-container .p2-restored-assistant .p2-inquiry-field label,.app-container.app-container .p2-restored-assistant .p2-inquiry-field input,.app-container.app-container .p2-restored-assistant .p2-inquiry-field textarea,.app-container.app-container .p2-restored-assistant .p2-inquiry-field select{font-size:13px;line-height:1.55}
+.app-container.app-container .p2-restored-assistant .p2-inquiry button{font-size:13px;min-height:32px;padding:7px 10px}.app-container.app-container .p2-restored-assistant .p2-compose textarea{font-size:13px}.app-container.app-container .p2-restored-assistant .p2-compose-shell{min-height:82px;padding:10px}.app-container.app-container .p2-restored-assistant .p2-assistant-head{min-height:58px;padding:12px 16px}.app-container.app-container .p2-restored-assistant .p2-assistant-head strong{font-size:17px}

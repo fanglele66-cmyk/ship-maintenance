@@ -180,7 +180,7 @@ export function composeRepair(caseData,keys,round=1) {
   // and named checkpoints through every selected package combination.
   if(!compact&&packages.every(item=>item.acceptanceRows?.length))detail.acceptanceRows=packages.flatMap(item=>item.acceptanceRows.map(row=>({...row,name:packages.length>1?item.title+' · '+row.name:row.name})))
   const repair={title,tasks,evidence:packages.map(item=>'已确认处置范围：'+item.title),workDetails:detail,
-    ...(caseData.realCaseId?{markdown:`### 执行目标\n\n${title}。按本轮检查发现及获批范围实施，分别登记实际措施与用料。\n\n### 作业安排\n\n${tasks.map(task=>'- **'+task.label+'**：'+task.guide).join('\n')}\n\n### 提交成果\n\n提交隔离与复装工卡、实际领用及旧新件记录、现场测试和未完成项目。`}:{}),
+    ...(caseData.realCaseId?{markdown:`### 执行目标\n\n${title}。按本轮检查发现及获批范围实施，分别登记实际措施与用料。\n\n### 作业安排\n\n${tasks.map(task=>'- **'+task.label+'**：'+task.guide).join('\n')}\n\n### 提交成果\n\n提交隔离与复装维修作业单、实际领用及旧新件记录、现场测试和未完成项目。`}:{}),
   }
   return round>1?followupRepair(caseData,{...repair,packageKeys:keys},round):repair
 }

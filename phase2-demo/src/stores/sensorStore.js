@@ -8,8 +8,25 @@ export const useSensorStore = defineStore('sensor', () => {
   const simulationSensors=buildSimulationSensors(mockSensors)
   const sampledAt=ref(Date.now())
   const allSensors = ref(simulationSensors.map(s=>simulationSample(s,sampledAt.value,simulationConfig)))
+  // Retain only samples actually emitted in this session. Never regenerate a
+  // past repair window from today's simulator baseline.
+  const sampledFrames=[]
+  function retainSamples(){
+    const frame={timestamp:sampledAt.value,values:Object.fromEntries(allSensors.value.map(sensor=>[sensor.id,sensor.value]))}
+    if(sampledFrames.at(-1)?.timestamp===frame.timestamp)sampledFrames[sampledFrames.length-1]=frame
+    else sampledFrames.push(frame)
+    while(sampledFrames.length&&sampledFrames[0].timestamp<frame.timestamp-72*3600000)sampledFrames.shift()
+  }
+  retainSamples()
+  function recordedSensorChannels(ids,start,end=Date.now()){
+    return ids.map(id=>{
+      const sensor=allSensors.value.find(item=>item.id===id)
+      return {channelId:id,name:sensor?.nameCn||id,unit:sensor?.unit||'',sourceKind:'prototype',
+        trendData:sampledFrames.filter(frame=>frame.timestamp>=start&&frame.timestamp<=end).map(frame=>({timestamp:frame.timestamp,value:Number.isFinite(frame.values[id])?frame.values[id]:null}))}
+    })
+  }
   let timer=null
-  function refreshSimulation(){sampledAt.value=Date.now();allSensors.value=simulationSensors.map(s=>simulationSample(s,sampledAt.value,simulationConfig))}
+  function refreshSimulation(){sampledAt.value=Date.now();allSensors.value=simulationSensors.map(s=>simulationSample(s,sampledAt.value,simulationConfig));retainSamples()}
   function setSimulationBaselines(updates){
     for(const [id,settings] of Object.entries(updates)){const sensor=simulationSensors.find(s=>s.id===id);if(sensor)Object.assign(sensor,settings)}
     refreshSimulation()
@@ -143,7 +160,7 @@ export const useSensorStore = defineStore('sensor', () => {
 
   return {
     allSensors,
-    simulationConfig, sampledAt, configureSimulation, getSimulationTrend, setSimulationBaselines,
+    simulationConfig, sampledAt, configureSimulation, getSimulationTrend, setSimulationBaselines, recordedSensorChannels,
     currentSystem,
     currentDeviceId,
     currentSubsystem,

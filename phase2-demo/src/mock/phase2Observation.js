@@ -13,6 +13,7 @@ for(const item of Object.values(workflowCases))observationConfig[item.id]=item.o
 
 export function observationResult(id, records, targetDays) {
   const config=observationConfig[id], last=records.at(-1)
+  if(records.some(record=>record.auto))return automaticObservationResult(records,targetDays)
   if(last?.reviewChoice&&!records.some(record=>record.status==='abnormal')){
     if(last.status==='stable-confirmed')return {type:'archive',title:'持续稳定，待确认闭环',text:'已登记持续稳定的观察判断。请结合已保存的验收、运行记录与现场意见确认本轮闭环；本次确认不新增测点采样。',next:'确认闭环后归档本轮处置与观察记录。'}
     if(last.status==='incomplete')return {type:'extend',extensionApplied:true,title:'资料已记录，观察窗口已延长',text:`本次缺项与补充安排已保存，观察窗口延长至 ${targetDays*24} 小时。待补齐可比资料后继续评估。`,next:'按已记录的安排补充缺项，不以缺测数据判断稳定。'}
@@ -37,6 +38,21 @@ export function observationResult(id, records, targetDays) {
   if(last.day<targetDays) return {type:'continue',title:'已有改善，继续观察',text:`当前已记录${last.day*24}小时，计划观察${targetDays*24}小时。当前变化符合处理预期，仍需继续验证稳定性。`}
   const values=config.names.map((name,i)=>`${name}${config.before[i]} → ${last.values[i]} ${config.units[i]}`).join('；')
   return {type:'archive',title:'效果稳定，待确认闭环',text:`${values}。已有记录覆盖${targetDays*24}小时观察窗口，未记录原异常反复。请结合现场情况确认是否闭环，观测达标不自动代替人工确认。`}
+}
+
+export function automaticObservationResult(records,targetDays){
+  if(records.some(record=>record.status==='abnormal'))return {type:'reinspect',title:'已记录异常，需人工复查',text:'本轮已记录异常复查依据。保留自动采样、实际措施和验收记录，沿原事件继续排查。'}
+  const windows=records.filter(record=>record.auto).sort((a,b)=>Date.parse(a.windowEnd)-Date.parse(b.windowEnd))
+  let coveredMs=0,nextStart=null
+  for(const record of [...windows].reverse()){
+    const start=Date.parse(record.windowStart),end=Date.parse(record.windowEnd)
+    if(!record.covered||nextStart!==null&&end!==nextStart)break
+    coveredMs+=end-start;nextStart=start
+  }
+  const coveredHours=Number((coveredMs/3600000).toFixed(1)),targetHours=targetDays*24
+  if(coveredHours>=targetHours)return {type:'archive',title:'观察资料已覆盖，待人工确认',text:`最近连续 ${coveredHours} 小时采样已覆盖本轮 ${targetHours} 小时观察窗口。数据覆盖不等于确认修复成功；请核对可比工况、原报警及现场验收，再决定本轮是否闭环。`,coveredHours}
+  const missing=windows.at(-1)?.status==='incomplete'
+  return {type:missing?'extend':'continue',title:missing?'部分测点缺测，自动继续观察':windows.length?'自动观察中，等待覆盖本轮窗口':'自动观察已启动，等待首个两小时汇总',text:`系统每 2 小时更新传感器记录与资料摘要；目前连续完整覆盖 ${coveredHours} / ${targetHours} 小时。${missing?'缺测窗口保留为空，不作稳定或恢复判断。':'当前数据仅说明已采样范围，不自动判定故障已消除。'}`,coveredHours,extensionApplied:missing}
 }
 
 export function observationScene(id,records,targetDays){

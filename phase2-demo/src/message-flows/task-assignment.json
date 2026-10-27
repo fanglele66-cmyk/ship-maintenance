@@ -7,6 +7,12 @@
       "type": "select",
       "required": true,
       "options": []
+    },
+    {
+      "key": "due",
+      "label": "要求完成时间",
+      "type": "datetime-local",
+      "required": true
     }
   ],
   "optionalFields": [
@@ -23,12 +29,6 @@
       "type": "select",
       "required": false,
       "options": []
-    },
-    {
-      "key": "due",
-      "label": "计划时间",
-      "type": "text",
-      "required": true
     },
     {
       "key": "scope",

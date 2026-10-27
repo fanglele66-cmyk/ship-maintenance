@@ -861,3 +861,8 @@ situationContext.action = currentLayer.value === 1 ? 'enter_layer' : 'restore_la
 }
 
 </style>
+
+<style scoped>
+.situation-view,.situation-view :deep(*){scrollbar-width:none;-ms-overflow-style:none;scrollbar-gutter:auto}
+.situation-view::-webkit-scrollbar,.situation-view :deep(*::-webkit-scrollbar){width:0;height:0;display:none}
+</style>

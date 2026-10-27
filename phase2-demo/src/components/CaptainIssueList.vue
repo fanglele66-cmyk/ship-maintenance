@@ -1,4 +1,4 @@
-<template><section class="captain-issues"><ModuleHeader :title="title"><FormSelect v-if="!deviceId" v-model="device" :options="[{value:'',label:'全部设备'},...issueDevices]" placeholder="" aria-label="事件设备范围"/></ModuleHeader><nav class="issue-states" aria-label="事件处理状态"><button v-for="value in ['待决策','处置中']" :key="value" :class="{active:state===value}" :aria-pressed="state===value" @click="state=value">{{value}}</button></nav><div class="issue-list"><CaptainIssueRow v-for="item in visible" :key="item.id" :item="item" @open="open"/><div v-if="!filtered.length" class="issue-empty"><strong>{{emptyTitle}}</strong><p>{{emptyText}}</p><div><button v-if="alternateCount" class="text-link" @click="state=alternate">查看{{alternate}}事件</button><button class="text-link" @click="router.push('/event')">进入待办中心</button></div></div></div><button class="issue-more" @click="viewAll">查看全部事件</button></section></template>
+<template><section class="captain-issues"><ModuleHeader :title="title"><FormSelect v-if="!deviceId" v-model="device" :options="[{value:'',label:'全部设备'},...issueDevices]" placeholder="" aria-label="事件设备范围"/></ModuleHeader><nav class="issue-states" aria-label="事件处理状态"><button v-for="value in ['待决策','处置中']" :key="value" :class="{active:state===value}" :aria-pressed="state===value" @click="state=value">{{value}}</button></nav><div class="issue-list"><CaptainIssueRow v-for="item in visible" :key="item.id" :item="item" :compact="compact" @open="open"/><div v-if="!filtered.length" class="issue-empty"><strong>{{emptyTitle}}</strong><p>{{emptyText}}</p><div><button v-if="alternateCount" class="text-link" @click="state=alternate">查看{{alternate}}事件</button><button class="text-link" @click="router.push('/event')">进入待办中心</button></div></div></div><button class="issue-more" @click="viewAll">查看全部事件</button></section></template>
 <script setup>
 import FormSelect from './forms/FormSelect.vue'
 import ModuleHeader from './ModuleHeader.vue'
@@ -8,7 +8,7 @@ import {useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {workbenchIssues,issueDevices as allIssueDevices} from '@/mock/captainWorkbench'
 import {matchesSituationDevice} from '@/mock/situationScope'
-const props=defineProps({deviceId:String,deviceIds:Array,deviceOptions:Array,types:Array,limit:{type:Number,default:5},title:{type:String,default:'事件处置'}})
+const props=defineProps({compact:Boolean,deviceId:String,deviceIds:Array,deviceOptions:Array,types:Array,limit:{type:Number,default:5},title:{type:String,default:'事件处置'}})
 const store=usePhase2DemoStore(),router=useRouter(),state=ref('待决策'),device=ref('')
 const issueDevices=computed(()=>props.deviceOptions||allIssueDevices)
 const rows=computed(()=>workbenchIssues(store).filter(i=>i.eventState!=='已闭环'&&(!props.deviceIds||props.deviceIds.includes(i.deviceId))&&(!props.deviceId||i.deviceId===props.deviceId)&&matchesSituationDevice(i,device.value)&&(!props.types||props.types.includes(i.type))))

@@ -23,7 +23,17 @@ test('real branch feedback keeps evidence limits and gives an actionable next st
      assert.match(content.message,/下一步：/)
      assert.doesNotMatch(JSON.stringify(content),/undefined|演示|预设|模拟|参考/)
      assert.ok(branch.records.every(record=>record.isSimulation&&record.sourceCaseId===item.realCaseId&&record.note))
-     assert.doesNotMatch(branch.records.map(record=>record.note).join('\n'),/本轮选择|提交时补充|待补具体/)
+     for(const [index,record] of branch.records.entries()){
+      if(item.realType==='warning'&&stage.id!=='investigate'&&index===0&&record.result==='现场与系统一致'){
+       // An editable choice cannot claim historical platform values were
+       // measured locally. Keep the required field evidence explicit instead.
+       assert.match(record.note,/提交前补齐.*主机控制空气进口压力.*主机控制空气进口压力（安全监测）.*现场表计位置、时刻、实际读数与来源/)
+       assert.doesNotMatch(record.note,/0302|0303|DC0006|DC0007/)
+       assert.match(record.note,/原平台.*0\.57 MPa.*0\.54 MPa.*不能自动填写为现场测量/)
+       assert.match(record.note,/同源显示一致不等于独立校准/)
+       assert.doesNotMatch(record.note,/已核对.*现场读数|已完成.*独立校准/)
+      }else assert.doesNotMatch(record.note,/本轮选择|提交时补充|待补具体/)
+     }
      if(stage.id==='investigate'){
       const unknown=branch.records.filter(record=>record.result==='无法确认')
       for(const record of unknown)assert.ok(content.message.includes(record.label))
@@ -37,9 +47,10 @@ test('real branch feedback keeps evidence limits and gives an actionable next st
    assert.equal(count,54)
   })
   await t.test('a load explanation cannot erase an unresolved pressure reading mismatch',()=>{
-   const item=cases.warning,stage=item.stages.find(stage=>stage.id==='check')
+   const item=cases.warning,stage=item.stages.find(stage=>stage.kind==='check')
    for(const reading of ['读数不一致','无法确认']){
     const branch=feedbackPresets(item,stage).find(branch=>branch.records[0].result===reading&&branch.records[1].result==='工况变化可以解释')
+    assert.ok(branch,'each unresolved-reading combination must remain reachable')
     const content=realAssessmentContent(item,stage,branch.records)
     assert.match(content.message,/不能将资料不足写成预警不成立/)
     assert.match(decisionPreset(item,'end-warning',{records:branch.records}),/保留读数差异、缺项/)

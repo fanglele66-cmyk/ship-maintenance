@@ -15,16 +15,18 @@
   --wb-space: 20px;
 }
 @media (min-width: 1600px) {
-  :root { --wb-body: 15px; --wb-label: 13px; --wb-title: 24px; --wb-space: 24px; }
+  :root { --wb-body: 16px; --wb-label: 13px; --wb-title: 24px; --wb-space: 24px; }
 }
 @media (min-width: 2300px) {
-  :root { --wb-body: 16px; --wb-label: 14px; --wb-title: 26px; --wb-space: 28px; }
+  :root { --wb-body: 18px; --wb-label: 14px; --wb-title: 28px; --wb-space: 28px; --nav-width: 76px; --header-height: 56px; }
+  .app-container.app-container .nav-logo { height: var(--header-height); }
+  .app-container.app-container .nav-item { width: 56px; height: 56px; gap: 5px; }
 }
 .app-container.app-container { color: var(--wb-text); font-variant-numeric: tabular-nums; }
 .app-container.app-container .app-nav { background: var(--wb-navy); }
-.app-container.app-container .nav-label { font-size: 12px; }
+.app-container.app-container .nav-label { font-size: var(--wb-label); }
 .app-container.app-container .app-header { border-bottom: 1px solid var(--wb-line); }
-.app-container.app-container .header-section-title { font-size: 16px; }
+.app-container.app-container .header-section-title { font-size: max(16px, var(--wb-body)); }
 .app-container.app-container :where(button, a, input, select, textarea, [role="button"]):focus-visible {
   outline: 2px solid var(--wb-accent); outline-offset: 3px;
 }
@@ -84,7 +86,7 @@
 .app-container.app-container .p2-todo-list-head h2 { font-size: var(--wb-title); }
 .app-container.app-container .p2-todo-tools input, .app-container.app-container .p2-todo-tools select { height: 40px; font-size: var(--wb-body); border-radius: 6px; }
 .app-container.app-container .p2-todo-tools .p2-secondary { border-color: var(--wb-line); color: var(--wb-secondary); background: transparent; }
-.app-container.app-container .p2-todo-grid { grid-template-columns: repeat(auto-fill,minmax(300px,380px)); gap: 16px; }
+.app-container.app-container .p2-todo-grid { grid-template-columns: repeat(auto-fill,minmax(min(100%, 300px),380px)); gap: 16px; }
 .app-container.app-container .p2-todo-card { padding: 20px; min-height: 188px; }
 .app-container.app-container .p2-pad-detail { padding: var(--wb-space); }
 .app-container.app-container .p2-pad-detail .p2-detail-head { height: auto; min-height: 68px; padding-bottom: 16px; }
@@ -113,7 +115,7 @@
 .app-container.app-container .p2-pad-footer { min-height: 60px; height: auto; padding-top: 14px; }
 /* Keep the same assistant surface in situation and task screens. */
 .app-container.app-container .p2-todo-center>.p2-restored-assistant {
-  width: clamp(320px,23vw,480px); min-width: 320px; max-width: 480px; flex: none;
+  width: clamp(320px,25vw,560px); min-width: 320px; max-width: 560px; flex: none;
 }
 .app-container.app-container .p2-restored-assistant .p2-assistant-head { min-height: 76px; padding: 16px 20px; }
 .app-container.app-container .p2-restored-assistant .p2-assistant-head strong { font-size: 16px; }

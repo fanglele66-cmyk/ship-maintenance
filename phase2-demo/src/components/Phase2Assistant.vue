@@ -1,31 +1,32 @@
 <template>
-  <aside class="p2-assistant p2-restored-assistant">
-    <div class="p2-assistant-head"><span class="p2-ai-mark">✦</span><div><strong>{{props.title}}</strong><small>{{ contextLabel }}</small></div><ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="sessions.select" @new-conversation="sessions.newConversation" /></div>
-    <div ref="scrollRef" class="p2-messages" aria-live="polite">
-      <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" :disabled-actions="maintenanceDisabledActions" @action="runDemoAction" @confirm-record="store.confirmQuickRecord(key)" @submit-inquiry="submitInquiry" @update-inquiry="updateInquiry">
-        <template #actions>
-          <div v-if="props.dossier && message.noteCandidate" class="p2-demo-actions"><button v-if="!message.noteCandidate.registered" type="button" @click="registerMessageNote(message)">将这条补充登记为留言</button><small v-else>这条补充已登记到跟踪记录</small></div>
-          <div v-if="!props.maintenanceDetail && !props.dossier && mode==='attention' && index===lastAttentionSceneIndex" class="p2-demo-actions"><button v-if="!props.dossier && !store.regularMaintenanceInFocus && !store.attentionAction(key).required && ['maintenance','drift'].includes(key) && !store.todoCreated[key] && (key==='maintenance'||store.monitorStep.drift>=1)" type="button" @click="store.sendAttention('确认建立待办')">确认建立检查待办 →</button><button v-if="store.todoCreated[key]" type="button" @click="openLinkedTodo">查看关联待办 →</button></div>
-          <div v-if="props.dossier && message.r02Check" class="p2-demo-actions r02-decision"><small v-if="store.dossierReviews[key]?.decision==='deferred'">已保留暂不安排的决定与原因</small><template v-else><button type="button" @click="confirmScriptCheck">{{store.todoCreated[key]?'进入关联检查事件':'确认开展检查'}}</button><button v-if="!store.todoCreated[key]" type="button" @click="requestDeferral">暂不安排，补充原因</button></template></div>
-        </template>
-      </MessageRenderer>
+  <aside class="p2-assistant p2-restored-assistant" :data-audience="audience" :data-viewer="viewer">
+    <div class="p2-assistant-head"><span class="p2-ai-mark">✦</span><div><strong>{{props.title}}</strong><small>{{viewer}} · {{ contextLabel }}</small></div><ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="sessions.select" @new-conversation="sessions.newConversation" /></div>
+    <button v-if="workflowTaskId" type="button" class="assistant-workflow-shortcut" @click="focusWorkflow">{{audience==='assignee'?'查看当前反馈与处理表单':store.todoCreated[workflowTaskId]?'查看本事项决策与回交':'填写本事项派发安排'}} <span aria-hidden="true">↓</span></button>
+    <div ref="scrollRef" class="p2-messages" aria-live="polite" @wheel.passive="pauseAutoScroll" @pointerdown="pauseAutoScroll" @focusin="pauseAutoScroll" @keydown="pauseAutoScroll" @touchmove.passive="pauseAutoScroll">
+     <div ref="contentRef" class="assistant-message-content">
+      <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" @action="runDemoAction" />
+      <small v-if="props.dossier && store.dossierReviews[key]?.decision==='deferred'">已保留暂不安排的决定与原因</small>
+      <AssistantWorkflowPanel v-if="workflowTaskId||trackingIssueId" :key="workflowTaskId||trackingIssueId" ref="workflowPanel" :task-id="workflowTaskId||trackingIssueId" :tracking-id="trackingIssueId" :audience="audience" @submitted="workflowSubmitted" @reveal="revealWorkflow" @ask="askFollowup" />
+      <RecordImport v-if="importMessage" ref="recordImport" :message="importMessage" @apply="applyFile" @preview="scrollLatest" />
+     </div>
     </div>
-    <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><span></span><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
+    <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><button type="button" class="compose-attachment" aria-label="上传文件" title="上传 TXT、Markdown、CSV 或 JSON 记录" :disabled="!importMessage" @click="fileInput?.click()">＋</button><input ref="fileInput" class="compose-file-input" type="file" accept=".txt,.md,.csv,.json" @change="readAttachment"/><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
   </aside>
 </template>
 <script setup>
 import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
-import {workbenchIssues} from '@/mock/captainWorkbench'
 import { issueConversationMessages, mergeIssueConversation, issueReply, issueContext } from '@/message-flows/issueSources'
-import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import sendIcon from '@/assets/figma/send.svg'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
-import { useRouter } from 'vue-router'
 import { observationScene } from '@/mock/phase2Observation'
 import { observationMessages } from '@/message-flows/observationMessages'
 import { useAgentConversations, demoConversations } from '@/composables/useAgentConversations'
 import MessageRenderer from './messages/MessageRenderer.vue'
 import ConversationHistory from './messages/ConversationHistory.vue'
+import AssistantWorkflowPanel from './AssistantWorkflowPanel.vue'
+import RecordImport from './RecordImport.vue'
+import {assistantWorkflowTask,assistantWorkflowReply} from '@/message-flows/assistantWorkflow'
 import deviceFlow from '@/message-flows/device-overview.json'
 import { resolveMessageFlow } from '@/message-flows/resolveMessageFlow'
 import { deviceMessageSources, deviceConversationRecords } from '@/message-flows/deviceSources'
@@ -37,79 +38,66 @@ import { useEventWorkOrderStore } from '@/stores/eventWorkOrderStore'
 import { useMaintenanceAdviceStore } from '@/stores/maintenanceAdviceStore'
 import { appendMessages } from '@/message-flows/appendMessages'
 import { maintenanceMessageFlow, maintenanceReply } from '@/message-flows/maintenanceSources'
-import maintenanceInquiry from '@/message-flows/maintenance-inquiry.json'
+import { dispatchConversationAction } from '@/message-flows/conversationActions'
 import { operationAssessment } from '@/mock/phase2SituationContent'
 import deviceProfiles from '@/mock/deviceOverviewProfiles.json'
 import { attentionInquiry } from '@/message-flows/attentionInquiry'
-import { validateInquiry } from '@/message-flows/inquiryFields'
-const props=defineProps({title:{type:String,default:'检修助手'},mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean,planOnly:Boolean,deviceId:String,deviceName:String,issueId:String}),emit=defineEmits(['open-device','open-todo','open-item','issue-section']),store=usePhase2DemoStore(),scrollRef=ref(null)
-const router = useRouter()
+const props=defineProps({title:{type:String,default:'检修助手'},mode:{type:String,required:true},dossier:Boolean,maintenanceDetail:Boolean,planOnly:Boolean,deviceId:String,deviceName:String,issueId:String}),store=usePhase2DemoStore(),scrollRef=ref(null)
 const mode=computed(()=>props.issueId?'issue':props.maintenanceDetail ? 'attention' : props.dossier ? (store.situationObservationId?'observation':'attention') : props.mode==='attention'&&store.situationObservationId?'observation':props.mode==='attention'&&!store.attentionInFocus?'device':props.mode)
 const key=computed(()=>mode.value==='observation'?store.situationObservationId:mode.value==='attention'?store.selectedAttentionId:mode.value==='todo'?store.selectedTodoId:mode.value)
+const audience=computed(()=>mode.value==='todo'?'assignee':'captain')
+const viewer=computed(()=>audience.value==='captain'?'陈志远（轮机长）':store.assignments[key.value]?.owner||store.cases[key.value]?.owner||'任务负责人')
+const workflowPanel=ref(null),recordImport=ref(null),fileInput=ref(null)
+const trackingIssueId=computed(()=>props.issueId&&store.cases[props.issueId]?.trackingOnly?props.issueId:store.cases[key.value]?.trackingOnly?key.value:null)
+const importMessage=computed(()=>workflowPanel.value?.importMessage||null)
+function readAttachment(event){recordImport.value?.readFile(event)}
+function applyFile(values){workflowPanel.value?.applyImported(values)}
+const contentRef=ref(null)
+let stickToBottom=true,contentObserver
+// Following new messages stops as soon as the reader interacts with the panel.
+function pauseAutoScroll(){stickToBottom=false}
+async function scrollLatest(){stickToBottom=true;await nextTick();if(typeof requestAnimationFrame!=='undefined')requestAnimationFrame(()=>{if(stickToBottom)scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight,behavior:'auto'})})}
+async function revealWorkflow(messageId){
+ pauseAutoScroll();await nextTick()
+ const panel=workflowPanel.value?.$el,container=scrollRef.value
+ const element=messageId?[...(panel?.querySelectorAll?.('[data-inquiry-id]')||[])].find(node=>node.dataset.inquiryId===messageId):panel?.querySelector?.('.decision-form, .workflow-observation, .p2-inquiry:has(form)')
+ if(!container||!element)return
+ const box=container.getBoundingClientRect(),target=element.getBoundingClientRect(),padding=12
+ if(target.top>=box.top+padding&&target.bottom<=box.bottom-padding)return
+ const offset=target.height>box.height-padding*2||target.top<box.top+padding?target.top-box.top-padding:target.bottom-box.bottom+padding
+ container.scrollTo({top:container.scrollTop+offset,behavior:'auto'})
+}
+onMounted(()=>{if(typeof ResizeObserver!=='undefined'&&contentRef.value){contentObserver=new ResizeObserver(()=>{if(stickToBottom)scrollLatest()});contentObserver.observe(contentRef.value)}})
+onUnmounted(()=>contentObserver?.disconnect())
+function workflowSubmitted(){sessions.touch();scrollLatest()}
+function askFollowup(text){if(props.issueId)askIssue(text);else askWorkflow(text);scrollLatest()}
+const workflowTaskId=computed(()=>{
+ if(props.planOnly||props.maintenanceDetail)return null
+ if(props.issueId){const context=issueContext(props.issueId,store);return assistantWorkflowTask(store,{issueId:props.issueId,taskId:context?.taskId,decisionId:context?.decisionId})}
+ return ['todo','observation'].includes(mode.value)||props.dossier?assistantWorkflowTask(store,{taskId:key.value}):null
+})
 const advice=useMaintenanceAdviceStore(),workOrders=useEventWorkOrderStore()
 const genericDevice=computed(()=>Boolean(props.deviceId && props.deviceId!=='main-engine-1' && !props.dossier && !props.maintenanceDetail))
 const genericProfile=computed(()=>deviceStoryAssessment(store,props.deviceId))
 const genericReplies=reactive({})
 const genericConversation=computed(()=>[{role:'user',text:`查看${props.deviceName}当前运行情况和建议`},{role:'assistant',kind:'scene',title:props.deviceName+'运行概况',paragraphs:[{label:'当前判断',text:genericProfile.value.conclusion},{label:'判断依据',text:genericProfile.value.basis},{label:'下一步',text:genericProfile.value.next}]},...(genericReplies[props.deviceId]||[])])
-const agentId=computed(()=>props.planOnly?'routine-plan:maintenance':props.issueId?'issue:'+props.issueId:genericDevice.value?'device:'+props.deviceId:props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:1'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
+const pageContext=computed(()=>props.planOnly?'routine-plan:maintenance':props.issueId?'issue:'+props.issueId:genericDevice.value?'device:'+props.deviceId:props.maintenanceDetail?(store.regularMaintenanceInFocus?'maintenance-arrangements:1':'maintenance-advice:1'):mode.value==='device'?'device:main-engine-1':`${mode.value}:${key.value}`)
+const agentId=computed(()=>`${audience.value}:${viewer.value}:${pageContext.value}`)
 const sessions=useAgentConversations(agentId,id=>props.issueId?[]:demoConversations(id))
 const draft=sessions.draft
 const inquiryDrafts=reactive({}),inquiryErrors=reactive({})
 const currentInquiry=computed(()=>props.dossier && mode.value==='attention' ? attentionInquiry(store,key.value,inquiryDrafts) : null)
-function updateInquiry(payload){
-  if(mode.value==='todo' && displayedMessages.value.some(message=>message.id===payload.messageId&&message.purpose==='execution-record')){store.updateExecutionRecord(key.value,payload.messageId,payload.values);return}
-  if(props.maintenanceDetail){const message=advice.chatMessages.find(item=>item.id===payload.messageId && item.conversationId===sessions.active.value.id);if(message?.status==='pending')message.values={...payload.values};return}
-
-  const other=displayedMessages.value.find(message=>message.id===payload.messageId && ['r02-note','r02-defer'].includes(message.purpose))
-  if(other && other.status==='pending'){other.values={...payload.values};return}
-  if(currentInquiry.value?.id!==payload.messageId || currentInquiry.value.status!=='pending')return
-  inquiryDrafts[payload.messageId]={...payload.values}
-  delete inquiryErrors[payload.messageId]
-}
-function submitInquiry(payload){
-  if(mode.value==='todo' && displayedMessages.value.some(message=>message.id===payload.messageId&&message.purpose==='execution-record')){store.confirmExecutionRecord(key.value,payload.messageId,payload.values);sessions.touch();return}
-  if(props.maintenanceDetail){
-    const message=advice.chatMessages.find(item=>item.id===payload.messageId && item.conversationId===sessions.active.value.id)
-    if(!message || message.status!=='pending' || Object.keys(validateInquiry(message,payload.values)).length)return
-    const ok=message.purpose==='maintenance-defer'?advice.decide('defer',payload.values.information):advice.supplement(payload.values.information)
-    if(!ok)return
-    message.status='submitted';message.values={...payload.values};message.submittedAt=advice.records.at(-1).at;message.receiptText='已同步保存到建议的人员操作与记录中。'
-    sessions.touch();return
-  }
-
-  const other=displayedMessages.value.find(message=>message.id===payload.messageId && ['r02-note','r02-defer'].includes(message.purpose))
-  if(other){
-    if(other.status!=='pending' || Object.keys(validateInquiry(other,payload.values)).length)return
-    const session=sessions.active.value,records=store.logs[key.value]||[],start=records.length
-    if(other.purpose==='r02-defer'){
-      if(!store.deferR02Check(key.value,payload.values.reason))return
-    }else if(!store.registerDossierNote(key.value,`发生时间：${payload.values.time}；工况与位置：${payload.values.context}；现象：${payload.values.phenomenon}`))return
-    other.status='submitted';other.values={...payload.values};other.submittedAt=store.dossierNotes[key.value].at(-1).at
-    other.receiptText=other.purpose==='r02-defer'?'已保留暂不安排的决定与原因，不代表设备正常或事项结束。':'作为新的人员补充留存，历史结束状态保持不变。'
-    const added=records.slice(start);added.forEach(message=>{message.conversationId=session.id})
-    if(session.id!==sessions.agent.value.primaryId)session.messages.push(...added)
-    sessions.touch(session);return
-  }
-  const request=currentInquiry.value
-  if(!request || request.id!==payload.messageId || request.status!=='pending')return
-  if(Object.keys(validateInquiry(request,payload.values)).length)return
-  const records=store.logs[key.value]||[],start=records.length
-  if(!store.submitAttentionFeedback(key.value,payload.values)){
-    inquiryErrors[request.id]='当前要求已变化，请查看最新安排后再提交。';return
-  }
-  records.slice(start).forEach(message=>{message.conversationId=sessions.agent.value.primaryId})
-  delete inquiryDrafts[request.id]
-  sessions.touch(sessions.active.value)
-}
 async function focusInquiry(){
   sessions.select(sessions.agent.value.primaryId)
   await nextTick()
+  if(workflowTaskId.value){focusWorkflow();return}
   const element=scrollRef.value?.querySelector('.r02-decision') || scrollRef.value?.querySelector('.p2-inquiry')
   element?.scrollIntoView({block:'nearest',behavior:'smooth'})
   element?.querySelector('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')?.focus({preventScroll:true})
 }
+async function focusWorkflow(){pauseAutoScroll();await nextTick();const element=workflowPanel.value?.$el;element?.scrollIntoView?.({block:'start',behavior:'smooth'});element?.querySelector?.('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')?.focus({preventScroll:true})}
 defineExpose({focusInquiry})
-const messages=computed(()=>(store.logs[key.value]||[]).filter(message=>!message.conversationId || message.conversationId===sessions.agent.value.primaryId))
+const messages=computed(()=>(store.logs[key.value]||[]).filter(message=>(!message.conversationId || message.conversationId===sessions.agent.value.primaryId)&&(audience.value!=='assignee'||message.audience!=='captain')))
 const attentionConversation=computed(()=>{
   if (mode.value !== 'attention') return messages.value
   const id = key.value
@@ -118,7 +106,6 @@ const attentionConversation=computed(()=>{
   const accompanying = messages.value.filter(message => !['scene','feedbackRecord','recordDraft'].includes(message.kind) && !message.stageId && !(message.role === 'user' && /^(查看|进入)/.test(message.text || '')) && !message.observationContext)
   return [...followupConversation(report, topic),...accompanying]
 })
-function openLinkedTodo(){store.selectTodo(key.value);router.push({path:'/event',query:{todo:key.value}})}
 const shipConversation = computed(() => [shipOverviewConversation(store), ...messages.value.filter(message => message.role === 'user' || message.shipFollowup)])
 const deviceConversation = computed(() => [
  {role:'user',text:'查看主机当前运行情况和需要关注的事项'},
@@ -139,7 +126,11 @@ const dossierMessages=computed(()=>{
   return [summary,...(currentInquiry.value?[{...currentInquiry.value,submitError:inquiryErrors[currentInquiry.value.id]}]:[]),...replies ]
 })
 const maintenanceMessages=computed(()=>[...maintenanceMessageFlow(store,advice,store.regularMaintenanceInFocus,workOrders.state('maintenance')),...advice.chatMessages.filter(message=>message.conversationId===sessions.agent.value.primaryId)])
-const todoConversation=computed(()=>{const rows=messages.value;const first=rows.findIndex(row=>row.stageId);return rows.slice(Math.max(0,first-1)).filter(row=>!row.observationContext&&!row.title?.startsWith('效果观察')&&!row.text?.startsWith('本轮效果观察已自动结束')).map(row=>row.stageId&&row.kind==='scene'?{...row,expanded:row.stageId===store.currentStage?.id,historical:row.stageId!==store.currentStage?.id}:row)})
+const todoConversation=computed(()=>{
+ const rows=messages.value,first=rows.findIndex(row=>row.stageId),assignment=store.assignments[key.value]
+ const receipt=assignment&&store.todoCreated[key.value]?[{id:'task-dispatch:'+key.value+':'+(store.assignmentRecords[key.value]?.length||0),role:'assistant',kind:'scene',title:'收到轮机长派发的任务',markdown:`负责人：${assignment.owner}\n\n要求完成：${assignment.due?.replace('T',' ')}\n\n任务范围：${assignment.scope}`,at:[assignment.assignedBy,assignment.at].filter(Boolean).join(' · ')}]:[]
+ return [...receipt,...rows.slice(Math.max(0,first-1)).filter(row=>!row.observationContext&&!row.title?.startsWith('效果观察')&&!row.text?.startsWith('本轮效果观察已自动结束')).map(row=>row.stageId&&row.kind==='scene'?{...row,expanded:row.stageId===store.currentStage?.id,historical:row.stageId!==store.currentStage?.id}:row.role==='user'&&row.actor&&row.actor!==viewer.value?{...row,role:'assistant',text:`${row.actor}已提交记录：${row.text}`} :row)]
+})
 const routineMessages=[{role:'user',text:'查看主机连杆轴承的常规维保计划及提前建议关系'},{role:'assistant',text:'原周期计划当前为1860／2000运行小时，尚余约140小时。提前建议是基于健康变化和窗口的独立评估，未采纳或评估后不提前都不取消原计划。实际执行是否覆盖原项目，以作业范围与现场记录核对，不自动重置全部周期。'}]
 const automaticMessages=computed(()=>props.planOnly?routineMessages:props.issueId?issueConversationMessages(props.issueId,store):genericDevice.value?genericConversation.value:props.maintenanceDetail?maintenanceMessages.value:mode.value==='observation'?observationConversation.value:props.dossier?dossierMessages.value:mode.value==='ship'?shipConversation.value:mode.value==='attention'?attentionConversation.value:mode.value==='device'?deviceConversation.value:mode.value==='todo'?todoConversation.value:messages.value)
 watch(automaticMessages, value=>{
@@ -151,13 +142,8 @@ watch(automaticMessages, value=>{
   }
   else primary.messages=value
 }, {immediate:true,deep:true})
-const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
- ...(store.todoCreated.maintenance || store.isTaskHandled('maintenance')?['maintenance:check']:[]),
- ...(!advice.sufficient || advice.decision==='execute' || store.isTaskHandled('maintenance')?['maintenance:execute']:[]),
- ...(!advice.sufficient || advice.decision==='defer' || store.isTaskHandled('maintenance')?['maintenance:defer']:[])
-]:[])
-const displayedMessages=computed(()=>sessions.active.value.messages.map(message=>mode.value==='todo'&&message.purpose==='execution-record'&&message.status==='pending'?{id:message.id,role:'assistant',kind:'scene',expanded:true,title:'维修验收',markdown:'维修步骤和备件说明见左侧页面。完成实际作业后，在验收确认页填写执行时间、措施及验收结果；仍有异常时接续下一轮排查。',actions:[{id:'todo:acceptance',label:'前往验收确认'}]}:message))
-watch(()=>sessions.active.value.id,async()=>{if(props.issueId)mergeIssueConversation(sessions.active.value.messages,automaticMessages.value);await nextTick();scrollRef.value?.scrollTo({top:props.issueId?0:scrollRef.value.scrollHeight})})
+const displayedMessages=computed(()=>sessions.active.value.messages.filter(message=>!(workflowTaskId.value&&message.purpose==='execution-record'&&message.status==='pending')))
+watch(()=>sessions.active.value.id,()=>{if(props.issueId)mergeIssueConversation(sessions.active.value.messages,automaticMessages.value);scrollLatest()})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
 const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
 const placeholder=computed(()=>props.issueId?'询问判断依据、缺失证据或下一步安排…':props.maintenanceDetail?'询问检查依据，或补充现场与安排信息…':props.dossier?'询问当前判断、变化证据或后续安排…':mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
@@ -165,6 +151,7 @@ function send(){
   const text=draft.value.trim();if(!text)return
   if(props.planOnly){sessions.active.value.messages.push({role:'user',text},{role:'assistant',text:'常规计划按原项目和周期保留。提前评估、实际执行和周期完成是不同记录；可以查看本部件提前建议及人员决定，实际执行后再核对覆盖范围。'});sessions.touch();draft.value='';return}
   if(props.issueId){askIssue(text);draft.value='';return}
+  if(workflowTaskId.value){askWorkflow(text);draft.value='';return}
   if(genericDevice.value){const rows=genericReplies[props.deviceId] ||= [];rows.push({role:'user',text},{role:'assistant',text:/依据|判断|原因/.test(text)?genericProfile.value.basis:/建议|检查|处理|怎么/.test(text)?genericProfile.value.next:genericProfile.value.conclusion+' '+genericProfile.value.next});draft.value='';return}
   if(props.maintenanceDetail){askMaintenance(text);draft.value='';return}
   const session=sessions.active.value,records=store.logs[key.value]||[],start=records.length
@@ -197,17 +184,6 @@ function registerMessageNote(message){
   if(session.id!==sessions.agent.value.primaryId)session.messages.push(...added)
   sessions.touch(session)
 }
-function confirmScriptCheck(){
-  if(store.todoCreated[key.value]){openLinkedTodo();return}
-  store.confirmR02Check(key.value)
-}
-function requestDeferral(){
-  const session=sessions.active.value,records=store.logs[key.value],id='r02-defer:'+key.value
-  if(displayedMessages.value.some(item=>item.id===id))return
-  const request={id,type:'inquiry',purpose:'r02-defer',role:'assistant',status:'pending',text:'请补充暂不安排检查的原因。原事实保留，不等于设备正常或问题结束。',fields:[{key:'reason',label:'暂不安排的原因',type:'textarea',required:true}],values:{},submitLabel:'确认暂不安排',conversationId:session.id}
-  records.push(request)
-  if(session.id!==sessions.agent.value.primaryId)session.messages.push(request)
-}
 let monitorTimer=null
 function clearMonitorTimer(){if(monitorTimer){clearTimeout(monitorTimer);monitorTimer=null}}
 function askMaintenance(text){
@@ -218,40 +194,32 @@ function askMaintenance(text){
  if(id!==sessions.agent.value.primaryId)sessions.active.value.messages.push(...added)
  sessions.touch()
 }
-function askIssue(text){const session=sessions.active.value,afterEventRecordId=automaticMessages.value.findLast(message=>message.eventProcess)?.eventRecordId,at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text,at,afterEventRecordId}, {...issueReply(props.issueId,text,store),id:session.id+':reply:'+session.messages.length,at,afterEventRecordId});sessions.touch()}
+function askIssue(text){const session=sessions.active.value,afterEventRecordId=automaticMessages.value.findLast(message=>message.eventProcess)?.eventRecordId,at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text,at,afterEventRecordId}, {...((workflowTaskId.value||trackingIssueId.value)?assistantWorkflowReply(store,trackingIssueId.value&&store.canDecideTracking(trackingIssueId.value)?trackingIssueId.value:workflowTaskId.value||trackingIssueId.value,text,{audience:audience.value}):issueReply(props.issueId,text,store)),id:session.id+':reply:'+session.messages.length,at,afterEventRecordId});sessions.touch()}
+function askWorkflow(text){
+ const id=workflowTaskId.value;if(!id)return
+ const session=sessions.active.value,at=new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})
+ const rows=[{role:'user',text},{...assistantWorkflowReply(store,id,text,{audience:audience.value})}].map((message,index)=>({...message,id:session.id+':workflow:'+Date.now()+':'+session.messages.length+':'+index,at,conversationId:session.id,audience:audience.value,actor:viewer.value}))
+ ;(store.logs[id] ||= []).push(...rows)
+ if(session.id!==sessions.agent.value.primaryId)session.messages.push(...rows)
+ else session.messages=automaticMessages.value
+ sessions.touch(session)
+}
 function runDemoAction(id){
-  if(id==='todo:acceptance'){store.detailTab='验收确认';return}
- if(props.issueId){if(id==='issue:ask:evidence')askIssue('还需核实哪些信息？');else if(id==='issue:ask:next')askIssue('下一步如何安排？');else if(id.startsWith('issue:section:'))emit('issue-section',id.slice('issue:section:'.length));else if(id==='issue:task'){const taskId=workbenchIssues(store).find(item=>item.id===props.issueId)?.taskId||props.issueId;if(store.todoCreated[taskId]){store.selectTodo(taskId);router.push({path:'/event',query:{todo:taskId}})}}return}
-
- if(props.maintenanceDetail && id.startsWith('maintenance:')){
-  if(id.startsWith('maintenance:ask:')){const topic=id.split(':').at(-1);askMaintenance({basis:'为什么建议提前检查？',evidence:'需要补齐哪些检查证据？',arrangement:'已有安排是否冲突？'}[topic]);return}
-  if(id==='maintenance:event'){store.selectTodo('maintenance');router.push({path:'/event',query:{todo:'maintenance'}});return}
-  if(id==='maintenance:observation'){router.push('/situation/attention/maintenance');return}
-  if(id==='maintenance:advice'){router.push('/situation/maintenance/maintenance');return}
-  sessions.select(sessions.agent.value.primaryId)
-  if(id==='maintenance:check'){store.assignmentRequest='maintenance';return}
-  if(id==='maintenance:execute'){advice.decide('execute');return}
-  if(['maintenance:supplement','maintenance:defer'].includes(id)){
-   const purpose=id==='maintenance:defer'?'maintenance-defer':'maintenance-supplement'
-   const existing=advice.chatMessages.find(message=>message.purpose===purpose&&message.status==='pending'&&message.conversationId===sessions.active.value.id)
-   if(!existing)advice.chatMessages.push({...maintenanceInquiry,order:advice.nextOrder(),id:`${purpose}-${advice.chatMessages.length}`,purpose,conversationId:sessions.active.value.id,values:{},...(purpose==='maintenance-defer'?{text:'暂不采纳，记录原因',hint:'必须填写原因。建议和原事件保留，不代表设备恢复正常。',submitLabel:'保存决定'}:{})})
-   nextTick(()=>scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight,behavior:'smooth'}));return
-  }
-  return
- }
-
-  if(id==='device')emit('open-device')
-  else if(id==='todo')emit('open-todo')
-  else if(id.startsWith('ask:'))store.sendSituation(id.slice(4),mode.value)
-  else if(id.startsWith('item:'))emit('open-item',id.slice(5))
-  else if(id.startsWith('todo:')){store.selectTodo(id.slice(5));router.push({path:'/event',query:{todo:id.slice(5)}})}
+  return dispatchConversationAction(id,{
+    issue:props.issueId ? askIssue : undefined,
+    maintenance:props.maintenanceDetail ? askMaintenance : undefined,
+    situation:!props.issueId && !props.maintenanceDetail ? text=>workflowTaskId.value?askWorkflow(text):store.sendSituation(text,mode.value) : undefined
+  })
 }
 watch([mode,key],()=>{
   if(mode.value==='attention')store.selectAttention(key.value)
   else if(['device','sensor'].includes(mode.value))store.enterSituation(mode.value)
 },{immediate:true})
 watch([mode,key,()=>store.monitorStep.stable,()=>store.monitorStep.drift,()=>store.todoCreated.drift],()=>{clearMonitorTimer();if(mode.value!=='attention')return;const id=key.value;if(id==='drift'&&store.monitorStep.drift<1&&!store.todoCreated.drift)monitorTimer=setTimeout(()=>store.nextMonitor('drift'),4800)},{immediate:true})
-watch(()=>[agentId.value,displayedMessages.value.length],async(value,previous)=>{await nextTick();scrollRef.value?.scrollTo({top:props.issueId&&value[0]!==previous?.[0]?0:(mode.value==='ship'||props.maintenanceDetail)&&displayedMessages.value.length===1?0:scrollRef.value.scrollHeight,behavior:'smooth'})},{immediate:true})
+watch([agentId,()=>displayedMessages.value.length,workflowTaskId,()=>store.eventStatus[workflowTaskId.value]],async()=>{
+ if((mode.value==='ship'||props.maintenanceDetail)&&displayedMessages.value.length===1){pauseAutoScroll();await nextTick();scrollRef.value?.scrollTo({top:0,behavior:'auto'})}
+ else scrollLatest()
+},{immediate:true})
 watch(()=>store.currentStage?.id,async id=>{if(mode.value!=='todo'||!id||store.activeStage[key.value]>=store.progress[key.value])return;await nextTick();const container=scrollRef.value,element=container?.querySelector('[data-stage-id="'+id+'"]');if(element)container.scrollTo({top:element.getBoundingClientRect().top-container.getBoundingClientRect().top+container.scrollTop-12,behavior:'smooth'})})
 watch(() => [store.progress.fault, store.progress.drift, store.progress.maintenance, store.monitorStep.stable, store.todoCreated.maintenance, store.todoCreated.drift], () => { if (mode.value === 'device') store.enterSituation('device') })
 onUnmounted(clearMonitorTimer)
@@ -259,5 +227,8 @@ onUnmounted(clearMonitorTimer)
 <style>
 .p2-restored-assistant{width:350px;min-width:320px}.p2-restored-assistant .p2-messages{padding:16px 14px}.p2-restored-assistant .p2-message{margin-top:18px;gap:8px}.p2-restored-assistant .p2-message:first-child{margin-top:0}.p2-restored-assistant .p2-bubble{font-size:13px;line-height:1.7;min-width:0;flex:1;white-space:normal}.p2-restored-assistant .assistant .p2-bubble{background:transparent;padding:0;box-shadow:none}.p2-restored-assistant .user .p2-bubble{flex:initial;max-width:90%;background:#edf4ff;padding:9px 12px;border-radius:8px}.p2-bubble h3{font-size:14px;color:#24334a;margin:0 0 10px;font-weight:650}.p2-dialog-paragraph{margin:11px 0}.p2-dialog-paragraph b{font-size:12px;color:#52627b}.p2-dialog-paragraph p{margin-top:3px;color:#34465e}.p2-dialog-question{margin-top:13px;color:#34465e}.p2-feedback-record{border:1px solid #dce5f0;border-radius:8px;background:#fff;padding:12px}.p2-record-meta{font-size:11px;color:#7e8da1;padding-bottom:8px;border-bottom:1px solid #e7edf5}.p2-record-row{padding:9px 0;border-bottom:1px solid #edf1f6}.p2-record-row b{font-size:12px;color:#334b6e}.p2-record-row p{font-size:12px;margin-top:3px;color:#61718a}.p2-feedback-record .p2-secondary{margin-top:10px;font-size:12px;padding:7px 10px}.p2-restored-assistant .p2-compose textarea{font-size:13px;line-height:1.6}.p2-restored-assistant .p2-compose-foot button{font-size:12px;padding:7px 14px}
 .p2-restored-assistant .p2-assistant-head{gap:9px}.p2-demo-label{display:inline-flex;align-items:center;margin-bottom:6px;border-radius:10px;background:#eff6ff;color:#3874bd;padding:2px 8px;font-size:10px;font-weight:600;line-height:1.5}.p2-restored-assistant .user .p2-demo-label{display:block;width:max-content;margin-left:auto}.p2-demo-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.p2-demo-actions button{border:1px solid #d8e5f4;border-radius:6px;background:#fff;color:#3475c7;padding:7px 9px;font-size:11px;cursor:pointer}.p2-demo-actions button:hover{background:#f1f6fc}.p2-demo-label.is-change{background:#fff3de;color:#a37125}.p2-restored-assistant .p2-message[data-demo="true"] + .p2-message{padding-top:14px;border-top:1px solid #e9eef4}
+.assistant-workflow-shortcut{display:flex;justify-content:space-between;gap:12px;border:0;border-bottom:1px solid #e9eef4;background:#faf8f4;color:#8b7148;padding:10px 16px;text-align:left;font-size:12px;cursor:pointer}.assistant-workflow-shortcut:focus-visible{outline:2px solid #cbb58e;outline-offset:-2px}
 @media(max-width:1200px){.p2-restored-assistant{width:320px;min-width:300px}}
 </style>
+
+<style>.compose-file-input{display:none}.app-container.app-container .p2-restored-assistant .p2-compose-foot .compose-attachment{font-size:24px;width:30px;height:30px;min-height:30px;padding:0;display:grid;place-items:center;line-height:1;background:transparent;color:#7a8292;border:0;border-radius:5px;transform:none}.p2-restored-assistant .p2-compose{flex:none;position:relative}.p2-restored-assistant .p2-messages{min-height:0;scroll-padding-bottom:16px}</style>

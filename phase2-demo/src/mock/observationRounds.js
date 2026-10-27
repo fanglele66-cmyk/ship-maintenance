@@ -18,7 +18,8 @@ export function observationRoundSnapshot(store,id){
     records,target:store.observationTargets[id],
     config:observationConfig[id],...baselineFor(store,id,round),
     execution,
-    result:notStarted?{type:'reinspect',title:'验收未通过，未进入效果观察',text:'本轮执行与现场验收已保留；验收仍有异常，直接接续下一轮原因排查。本轮没有效果观察记录。'}:observationResult(id,records,store.observationTargets[id]),
+    automatic:store.automaticObservations?.[id]||null,
+    result:notStarted?{type:'reinspect',title:'验收未通过，未进入效果观察',text:'本轮执行与现场验收已保留；验收仍有异常，直接接续下一轮原因排查。本轮没有效果观察记录。'}:store.getObservationResult?.(id)||observationResult(id,records,store.observationTargets[id]),
     endedAt:new Date().toISOString(),status:notStarted?'not-started':'reinspect'})
 }
 
@@ -38,10 +39,12 @@ export function observationRoundViews(store,id){
   const closed=store.eventStatus[id]==='closed',result=store.getObservationResult(id)
   return [...history,{round,current:true,config,records:store.observationRecords[id]||[],
     target:store.observationTargets[id],...baselineFor(store,id,round),execution:currentExecution,
+    automatic:store.automaticObservations?.[id]?.executionId===currentExecution?.id?store.automaticObservations[id]:null,
     status:closed?'closed':'observing',result:closed?{...result,title:'本轮效果观察已闭环',text:result.text.replace('请结合现场情况确认是否闭环，观测达标不自动代替人工确认。','人工闭环确认已记录，本轮实际措施与观测依据可在设备动态回查。')}:result}]
 }
 
 export function observationRecordTime(record){
+  if(record.windowEnd)return new Date(record.windowEnd).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})
   if(record.recordedAt){
     const date=new Date(record.recordedAt)
     if(!Number.isNaN(date.getTime()))return date.toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})

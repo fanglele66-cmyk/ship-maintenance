@@ -44,12 +44,15 @@ export function initialIssueMessages(id,store){
  const question=questions[node?.kind]||`查看${issue.device}“${issue.title}”的当前进展和处理依据`
  return [{id:'issue-start-user:'+id+':'+revision,role:'user',text:question},{id:'issue-start-answer:'+id+':'+revision,role:'assistant',kind:'scene',expanded:true,title:'当前判断与安排',markdown:current,paragraphs:[{label:'初判',text:current},{label:'关键依据',text:issue.evidence.join('；')},{label:'判断边界',text:issue.limit},{label:'下一步',text:next}],actions:[{id:'issue:ask:evidence',label:'还需核实哪些信息？'},{id:'issue:ask:next',label:'下一步如何安排？'}]}]
 }
-// Project the immutable event journal into the same message stream as new questions.
+// The captain receives submitted work as assistant reports, not as their own speech.
+// The full original journal remains available in the event's processing records.
 export function issueConversationMessages(id,store){
  const process=eventProcessRecords(store,parentIssueId(id))
  const messages=process.records.flatMap(record=>{
   const meta={eventProcess:true,eventRecordId:record.id,eventKind:record.kind,eventPhase:record.phase,eventBaseline:Boolean(process.reference)||record.kind==='source'||record.id===parentIssueId(id)+':analysis'||record.id.includes(':origin:'),at:[record.actor,record.at].filter(Boolean).join(' · ')}
-  const message={...meta,id:'issue-process:'+id+':'+record.id,role:record.role,expanded:true,
+  const returned=record.role==='user'&&!String(record.actor||'').includes('轮机长')
+  if(returned)return [{...meta,id:'issue-process:'+id+':'+record.id,role:'assistant',kind:'scene',expanded:true,title:'现场回交 · '+record.title,markdown:`提交人：${record.actor||'任务负责人'}\n\n${[record.text,record.assessment].filter(Boolean).join('\n\n')}`,actor:record.actor,returnedRecord:true}]
+  const message={...meta,id:'issue-process:'+id+':'+record.id,role:record.role,actor:record.actor,expanded:true,
    ...(record.role==='assistant'?{kind:'scene',title:record.title,markdown:[record.text,record.assessment].filter(Boolean).join('\n\n')}:{text:record.text})}
   return [message,...(record.role==='user'&&record.assessment?[{...meta,id:message.id+':reply',role:'assistant',kind:'scene',title:'本次反馈后的判断',markdown:record.assessment,expanded:true,at:['智能机舱研判',record.at].filter(Boolean).join(' · ')}]:[])]
  })

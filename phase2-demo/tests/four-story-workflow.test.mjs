@@ -7,6 +7,7 @@ test('four scenario journeys preserve evidence and route every valid outcome',as
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
+  const {useSensorStore}=await server.ssrLoadModule('/src/stores/sensorStore.js')
   const {workbenchIssues,activeWorkbenchIssues}=await server.ssrLoadModule('/src/mock/captainWorkbench.js')
   function fresh(id){setActivePinia(createPinia());const store=usePhase2DemoStore();if(id){store.unlockedRecommendations[id]=true;store.createTodo(id);store.selectTodo(id);store.advanceTodo(id)}return store}
   function feedback(store,id,values){return store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:'现场记录 '+i,attachments:['记录'+i+'.png']}))}
@@ -65,12 +66,35 @@ test('four scenario journeys preserve evidence and route every valid outcome',as
    assert.equal(store.unlockedRecommendations['aux-maintenance'],undefined)
    assert.equal(activeWorkbenchIssues(store).some(item=>item.id==='aux-maintenance'),false)
   })
-  await t.test('accepted maintenance uses the standard execution record and observation, not a predetermined replacement',()=>{
+  await t.test('accepted maintenance uses the standard execution record and observation, not a predetermined replacement',st=>{
+   const start=Date.parse('2026-10-27T00:00:00+08:00'),hour=3600000
+   let now=start
+   st.mock.method(Date,'now',()=>now)
    const store=fresh('maintenance');assert.equal(store.advanceTodo('maintenance',feedback(store,'maintenance',['有提前处理依据','条件具备'])).advanced,true)
-   assert.equal(store.currentStage.id,'service');assert.equal(execute(store,'maintenance'),true)
+   const sensors=useSensorStore();sensors.configureSimulation({enabled:false})
+   // Fixed acquisition timestamps are selected from a supplied stream; neither
+   // accepting the job nor confirming closure creates a measurement.
+   const frames=Array.from({length:48*60},(_,index)=>({timestamp:start+(index+1)*60000,values:[2.2,64]}))
+   sensors.recordedSensorChannels=(ids,from,to)=>ids.map((channelId,index)=>({channelId,name:channelId,unit:index?'°C':'mm/s',sourceKind:'prototype-test-fixture',
+    trendData:frames.filter(frame=>frame.timestamp>=from&&frame.timestamp<=to).map(frame=>({timestamp:frame.timestamp,value:frame.values[index]}))}))
+   assert.equal(store.currentStage.id,'service');assert.equal(execute(store,'maintenance',{executedAt:'2026-10-27T00:00'}),true)
    assert.equal(store.isTaskHandled('maintenance'),true);assert.notEqual(store.eventStatus.maintenance,'closed')
-   store.selectObservation('maintenance');store.reviewObservation('maintenance');store.reviewObservation('maintenance');store.completeObservation('maintenance')
+   store.selectObservation('maintenance')
+   assert.equal(store.observationRecords.maintenance.length,0,'acceptance at the execution boundary does not invent a first sample')
+   store.completeObservation('maintenance');assert.equal(store.eventStatus.maintenance,'observing','an accepted job alone cannot close the event')
+   now=start+store.observationTargets.maintenance*24*hour
+   assert.equal(store.syncAutomaticObservation('maintenance',now),true)
+   assert.equal(store.getObservationResult('maintenance').type,'archive')
+   assert.equal(store.eventStatus.maintenance,'observing','complete data coverage is not automatic closure')
+   const receipts=JSON.stringify(store.observationRecords.maintenance.filter(record=>record.auto))
+   store.completeObservation('maintenance')
    assert.equal(store.eventStatus.maintenance,'closed');assert.ok(store.executionRecords.maintenance[0].values.measures)
+   assert.equal(JSON.stringify(store.observationRecords.maintenance.filter(record=>record.auto)),receipts,'human closure cannot rewrite the sensor receipts')
+   const confirmations=store.observationRecords.maintenance.filter(record=>!record.auto)
+   assert.equal(confirmations.length,1)
+   assert.equal(confirmations[0].status,'closed-confirmed')
+   assert.equal(confirmations[0].values,null,'closure records a decision, never a sensor reading')
+   assert.ok(confirmations[0].actor&&confirmations[0].recordedAt)
   })
   await t.test('needed maintenance without conditions stays arranged with no forced answer',()=>{
    const store=fresh('maintenance');const result=store.advanceTodo('maintenance',feedback(store,'maintenance',['有提前处理依据','条件暂不具备']))

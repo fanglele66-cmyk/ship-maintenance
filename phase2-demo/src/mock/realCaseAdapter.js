@@ -31,8 +31,8 @@ const findings=['发现异常','未见异常','无法确认']
 const readings=['现场与系统一致','读数不一致','无法确认']
 const task=(label,guide,options,packageKey)=>({label,guide,...(options?{options}:{}),...(packageKey?{package:packageKey}:{})})
 function taskSet(type){
- if(type==='alarm')return [task('核查 C2 ICU 液压机构与反馈','对照报警原始时序、控制指令与反馈，分别核查 ICV 控制和 ICU 液压执行机构；保存本轮取得的现场或检验记录，不由信号单独推定卡阻。',findings,'icv'),task('核查燃油供给与瞬态工况','记录同刻压力、其他缸响应及工况变化，说明已排除和仍未确认的方向。',findings,'supply')]
- if(type==='warning')return [task('核对压力测点及时间对应','对照低压窗口的主、安全测点及就地压力记录；注明采样来源与时刻，NF参考不作为独立确诊。',readings),task('核对工况及临时恢复解释','对照运行负荷、控制空气压力和操作记录，核对供气不足与工况切换的不同解释；不能由恢复片段倒推已修复。',['工况可比，偏离仍存在','工况变化可以解释','无法确认'])]
+ if(type==='alarm')return [task('核查 C2 ICU 液压机构与反馈','对齐报警时序与喷射指令、流量活塞反馈，检查二缸喷射控制单元（ICU）的插接件、反馈线束和伺服油液压活塞；保存检查位置、动作及表面状态。',findings,'icv'),task('核查燃油供给与瞬态工况','对齐燃油轨压力、六缸排气温度与启停时刻，核对燃油供给泵、阀位、滤器压差和接头密封；标明实际检查段及未检查部位。',findings,'supply')]
+ if(type==='warning')return [task('核对压力测点及时间对应','对照低压窗口的主机控制空气进口压力、主机控制空气进口压力（安全监测）及就地表计；注明位置、来源与时刻，两个进口测点不代表减压阀前后压力。',readings),task('核对工况及临时恢复解释','对照运行负荷、控制空气压力和操作记录，核对供气不足与工况切换的不同解释；不能由恢复片段倒推已修复。',['工况可比，偏离仍存在','工况变化可以解释','无法确认'])]
  return clone(baselineTaskSets[type])
 }
 function applyBriefing(item){
@@ -45,11 +45,11 @@ function applyBriefing(item){
  item.decisionLimit=brief.boundary
  item.evidenceSources=brief.sources
  item.taskScope=brief.tasks.map(t=>t.title+'：'+t.detail).join('；')
- item.report={...item.report,conclusion:brief.conclusion,human:brief.captainDecision+' '+brief.dispatchReason,system:brief.discovery.text}
+ item.report={...item.report,basis:facts.join('；'),conclusion:brief.conclusion,human:brief.captainDecision+' '+brief.dispatchReason,system:brief.discovery.text}
  item.cause.mechanism=brief.conclusion
  const directions={
-  alarm:[['二缸喷射控制与液压执行','二缸排温80.4°C，与其余五缸明显分离，并有流量活塞报警。','控制指令、反馈链路或执行异常都可能使喷射响应偏离，尚不能仅凭排温确定失效件。','核对ICV指令、ICU连接、流量活塞反馈及液压执行检查记录。'],['共同燃油供给与运行切换','同刻其余五缸排温316.9–352.2°C，主机处于重新启动后的运行段。','共同供给与操纵变化应一并排查；其他缸响应不等于供给全通路已排除。','对齐燃油轨压力、各缸响应、启停与供给操作时刻。']],
-  warning:[['减压环节调压异常','主、安全测点同步下降0.10 MPa，连续低压时为0.57/0.54 MPa。','可能影响控制空气出口压力的建立与稳定；须用入口/出口及现场检查区分具体原因。','记录减压阀两侧压力、调节状态及两组阀使用情况。'],['用气变化、供气与管路泄漏','同期转速102.0–104.4 RPM，但杂用空气操作尚需核对。','供气负荷变化或泄漏也可能造成双路低压，不能只看主机负荷排除用气因素。','核对操作时间、供气条件及已检查的管路接头范围。']],
+  alarm:[['二缸喷射控制与液压执行','二缸排温80.4°C，与其余五缸明显分离，并有流量活塞报警。','优先检查二缸喷射控制单元的插接件、反馈线束和伺服油液压活塞，将指令、反馈与实际动作对应。','核对喷射控制阀（ICV）指令、喷射控制单元（ICU）连接、流量活塞反馈及液压活塞检查记录。'],['共同燃油供给与运行切换','同刻其余五缸排温316.9–352.2°C，主机处于重新启动后的运行段。','共同供给与操纵变化应一并排查；其他缸响应不等于供给全通路已排除。','对齐燃油轨压力、各缸响应、启停与供给操作时刻。']],
+  warning:[['减压环节调压异常','主机控制空气进口压力与主机控制空气进口压力（安全监测）均下降0.10 MPa，连续低压片段分别为0.57/0.54 MPa。','另测减压阀前后压力，检查阀芯、阀座、密封垫及弹簧的调压和回位状态；两个主机进口压力测点用于核对供气响应。','记录减压阀前后表计位置、压力、调节状态及两组阀使用情况。'],['用气变化、供气与管路泄漏','同期转速102.0–104.4 RPM，但杂用空气操作尚需核对。','用气增加、供气不足或泄漏都可能使两个进口压力测点下降；主机转速与燃油指令不能替代用气量及供给检查。','核对操作时间、空气瓶压力、供气过滤器、排水阀和管路接头，记录堵塞、积水及查漏位置。']],
   ...baselineDirections,
  }
  item.cause.rows=(directions[item.realType]||[]).map(([name,cause,effect,check])=>({name,level:'待核实',cause,effect,check}))
@@ -78,7 +78,7 @@ function buildCase(record){
  const packages=taskPackages(type),service=maintenanceWork()
  let stages
  if(type==='alarm')stages=[intro,stage('investigate','原因排查','check','分别核实 C2 ICU 与供给方向',taskSet(type)),stage('repair','对应处置','work','只处理实际发现支持的范围')]
- else if(type==='warning')stages=[intro,stage('event','异常研判','check','核对低压事实与工况，确定排查方向',taskSet(type)),stage('investigate','原因排查','check','分别核查减压阀与控制空气供给',[task('核查空气减压阀状态','记录两组阀的使用状态与阀前后压力；在获准隔离条件下检查阀芯密封和调压动作，区分临时恢复与正式更换需求。',findings,'regulator'),task('核查控制空气供给及工况','保留上下游压力、负荷和供给条件，不以一个部件结论代替全部通路检查。',findings,'air')]),stage('repair','对应处置','work','记录核实后确认的范围')]
+ else if(type==='warning')stages=[intro,stage('event','异常研判','check','核对低压事实与工况，确定排查方向',taskSet(type)),stage('investigate','原因排查','check','分别核查减压阀与控制空气供给',[task('核查空气减压阀状态','记录两组阀的使用状态与阀前后压力；在获准隔离条件下检查阀芯密封和调压动作，区分临时恢复与正式更换需求。',findings,'regulator'),task('核查控制空气供给及工况','分别记录主空气瓶、控制空气瓶和用气端压力，检查控制空气过滤器、排水阀及管路接头；对照用气和阀组切换时刻定位堵塞、积水或泄漏。',findings,'air')]),stage('repair','对应处置','work','记录核实后确认的范围')]
  else if(type==='tracking')stages=[intro,stage('check','基线核实','check','核实一缸月度工况与测温基线',taskSet(type))]
  else stages=[intro,stage('check','提前评估','check','分别判断后续检查必要性与作业条件',taskSet(type)),stage('service','检查与维护','work',service.title,service.tasks)]
  stages.push(stage('observe',type==='tracking'?'核实结束':'效果观察','observe',type==='tracking'?'本次核实结束，月度健康跟踪继续':'补充处理后可比资料，禁止复用历史采样冒充修后数据'),stage('closed','本轮结束','closed','本轮处理记录已保留，可回查处置与观察依据'))
@@ -88,7 +88,7 @@ function buildCase(record){
  const result={id,realCaseId:record.id,realType:type,realReplay:true,scenarioPreset:true,latent:false,deviceId:record.deviceId||'main-engine-1',device:record.device||'主机',cardType:type==='maintenance'?'异动跟踪':typeNames[type],workflowKind:type==='maintenance'?'maintenance':type,sourceEventId:record.sourceEventId,initialTitle:record.title,eventTitle:record.title,eventId:record.id,firstObserved:record.occurredAt||record.timeRange?.start,source,owner:'李建国（大管轮）',trackingOnly:type==='tracking',stages,packages,observation,plan,series,snapshots:(record.facts||[]).map(f=>[f.label,[f.value,f.unit].filter(v=>v!==undefined).join(' '),f.time||'原资料记录',f.context||'按来源解释，不扩大结论']),report:{conclusion:record.conclusion||record.summary,basis:facts.join('；'),human:type==='tracking'?'补齐月度工况、测温与调整记录，保留已核实范围和未确认项。':'先核实现场情况，再按批准范围处理，记录实际措施与验收结果。',system:'保留原采样、原文结论及来源',operation:'按适用船舶规程确认'},cause:{mechanism:record.conclusion||record.summary,rows:(type==='alarm'?['C2 ICU 控制与反馈','燃油供给及瞬态工况']:type==='tracking'?['月度运行与热平衡','测温基线与采样对应']:type==='maintenance'?['四缸测温与燃烧检查需求','校验、备料与作业条件']:['空气减压阀','控制空气供给与运行工况']).map(name=>({name,level:'待核实',cause:'依据当前案例资料与适用检查核对',effect:'解释原指标变化，不能替代其他方向结论',check:'按实际范围记录'}))},workDetails:type==='maintenance'?service:{preparation:[],parts:[],acceptance:[]},pageContent:{overview:`### 真实资料结论\n\n${record.conclusion||record.summary}\n\n### 来源与演示边界\n\n${record.provenanceSummary||simulationNotice}\n\n${simulationNotice}`,analysis:`### 资料依据\n\n${facts.map(x=>'- '+x).join('\n')}\n\n### 判断限制\n\n${limits.map(x=>'- '+text(x)).join('\n')}`,evidence:`### 来源\n\n${(record.evidence||[]).map(e=>'- '+e.path+(e.line?':'+e.line:'')+' · '+(e.note||'')).join('\n')}\n\n### 边界\n\n${simulationNotice}`}}
  if(replay){
   const first=record.steps?.[0]||{},initial=first.summary||'起始事实待资料确认'
-  const boundary=type==='alarm'?'此时只确认报警与二缸变化，具体根因和处理结果尚待本轮核实。':type==='warning'?'此时只确认双测点低压和规则触发，根因、临时恢复与永久措施尚待核实。':type==='tracking'?'月度相对基线变化已见，热平衡和测温原因仍须核实。':'四缸相对基线持续下移；是否提前检查和实施条件仍待评估。'
+  const boundary=type==='alarm'?'此时只确认报警与二缸变化，具体根因和处理结果尚待本轮核实。':type==='warning'?'此时只确认主机控制空气进口压力低的AI检测结果，根因、临时恢复与永久措施尚待核实。':type==='tracking'?'月度相对基线变化已见，热平衡和测温原因仍须核实。':'四缸相对基线持续下移；是否提前检查和实施条件仍待评估。'
   const initialTitle=type==='alarm'?'二缸报警与喷射控制核实':type==='warning'?'控制空气双测点低压核实':type==='tracking'?'一缸排温长期基线抬升跟踪':'四缸测温与燃烧平衡检查评估'
   result.initialTitle=initialTitle;result.eventTitle=initialTitle
   result.report={...result.report,conclusion:initial+' '+boundary,basis:initial}

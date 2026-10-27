@@ -23,7 +23,8 @@
           v-if="item.path === '/event' && totalUnread > 0"
           class="nav-badge"
           :class="{ 'nav-badge-pulse': recentlyBumpedTotal }"
-          :title="`${totalUnread} 条未读`"
+          :title="`${totalUnread} 项待办未查看`"
+          :aria-label="`${totalUnread} 项待办未查看`"
         ></span>
       </router-link>
     </div>
@@ -40,7 +41,7 @@ const route = useRoute()
 const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
-const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:demoStore.activeTaskPortfolio.filter(todo=>demoStore.progress[todo.id]===0).length)
+const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:demoStore.unreadTaskIds.length)
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {

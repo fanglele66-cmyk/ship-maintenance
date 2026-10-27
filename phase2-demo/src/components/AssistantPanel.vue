@@ -177,37 +177,11 @@
           <div v-else-if="!msg.cardType" class="msg-content" :class="{ 'msg-content-with-options': msg.options && msg.options.length }">
             <div class="msg-text" v-html="getStreamContent(msg, idx)"></div>
             <div v-if="msg.options && msg.options.length && !msg._cancelled" class="msg-options-card">
-              <div class="msg-options-title-row">
-                <div class="msg-options-title">选择一个最接近的原因</div>
-                <button type="button" class="option-cancel-btn" @click.stop="cancelInlineOptions(msg)">取消</button>
-              </div>
-              <button
-                v-for="(opt, oi) in msg.options"
-                :key="oi"
-                type="button"
-                class="msg-option-row"
-                :class="{
-                  'option-other': opt.isOther,
-                  selected: msg._selectedOption === oi,
-                  'option-disabled': msg._selectedOption !== undefined && msg._selectedOption !== oi
-                }"
-                :aria-disabled="msg._selectedOption !== undefined && msg._selectedOption !== oi"
-                :disabled="msg._selectedOption !== undefined && msg._selectedOption !== oi"
-                @click.stop="handleInlineOptionClick(msg, opt, oi)"
-              >
-                <span v-if="!opt.isOther" class="option-radio"></span>
-                <span v-else class="option-edit-icon">✎</span>
+              <div class="msg-options-title-row"><div class="msg-options-title">原因参考</div></div>
+              <div v-for="(opt, oi) in msg.options" :key="oi" class="msg-option-row">
                 <span class="option-label">{{ opt.label }}</span>
-                <span v-if="opt.isOther" class="option-hint">手动输入</span>
-              </button>
-              <div
-                v-if="msg._selectedOption !== undefined && msg.options[msg._selectedOption]?.action === 'false_alarm_done'"
-                class="msg-options-confirm"
-              >
-                <button type="button" class="option-reselect-btn" @click.stop="resetInlineOption(msg)">重新选择</button>
-                <button type="button" class="option-confirm-btn" @click.stop="confirmInlineOption(msg)">确认标记误报</button>
               </div>
-              <div class="msg-options-footnote">选择原因并确认后记录；没有合适选项可手动输入</div>
+              <div class="msg-options-footnote">相关决定请在左侧工作区核对并记录。</div>
             </div>
           </div>
 
@@ -314,11 +288,11 @@
 
         <!-- 事件操作跟随助手最新回复出现，避免固定在输入框上方打断阅读流 -->
         <div
-          v-if="props.mode === 'event' && idx === messages.length - 1 && msg.role === 'assistant' && !isResponsePending && recommendedQuestions.length > 0"
+          v-if="props.mode === 'event' && idx === messages.length - 1 && msg.role === 'assistant' && !isResponsePending && conversationQuestions.length > 0"
           class="event-inline-actions"
         >
           <button
-            v-for="(q, actionIndex) in recommendedQuestions"
+            v-for="(q, actionIndex) in conversationQuestions"
             :key="actionIndex"
             type="button"
             class="event-rec-chip"
@@ -340,14 +314,14 @@
       </div>
 
       <!-- 态势助手以对话内追问引导，不再展示固定推荐问题卡。 -->
-      <div v-if="props.mode === 'auxiliary' && !isResponsePending && recommendedQuestions.length > 0" class="msg msg-ai">
-        <div class="msg-bubble">{{ recLabel }} {{ recommendedQuestions[0].text }} 如需进一步核实，可直接在下方补充信息。</div>
+      <div v-if="props.mode === 'auxiliary' && !isResponsePending && conversationQuestions.length > 0" class="msg msg-ai">
+        <div class="msg-bubble">{{ recLabel }} {{ conversationQuestions[0].text }} 如需进一步核实，可直接在下方补充信息。</div>
       </div>
-      <div v-if="props.mode === 'general' && !isResponsePending && recommendedQuestions.length > 0" class="msg msg-ai">
+      <div v-if="props.mode === 'general' && !isResponsePending && conversationQuestions.length > 0" class="msg msg-ai">
         <div class="msg-bubble chips-bubble">
           <div class="chips-hint">{{ recLabel }}</div>
           <div class="rec-chips">
-            <button v-for="(q, idx) in recommendedQuestions" :key="idx"
+            <button v-for="(q, idx) in conversationQuestions" :key="idx"
               class="rec-chip"
               :class="q.action !== 'send' ? 'rec-chip-cta' : ''"
               :style="q.highlight ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-bg);font-weight:600' : ''"
@@ -399,6 +373,7 @@ import { useDeviceStore } from '@/stores/deviceStore'
 import { useSensorStore } from '@/stores/sensorStore'
 import { eventPriorityLabels, eventStatusLabels } from '@/mock/events'
 import { knowledgeDocs } from '@/mock/knowledge'
+import { isConversationQuestion } from '@/message-flows/conversationActions'
 
 const props = defineProps({
   mode: { type: String, default: 'general' },
@@ -620,6 +595,7 @@ watch(messages, (list) => {
 
 // ============ Chips ============
 const recommendedQuestions = ref([])
+const conversationQuestions = computed(() => recommendedQuestions.value.filter(isConversationQuestion))
 const recLabel = computed(() => messages.value.length > 0 ? '猜你想问' : '试试问我')
 
 function getChipsByContext() {
@@ -1234,26 +1210,9 @@ function toggleGuideStep(stepIdx) {
 
 // ============ Chips 点击 ============
 function handleRecommendedClick(q) {
-  if (q.action === 'view_ai') { handleViewAi(); return }
-  if (q.action === 'open_data' || q.action === 'open_trend' || q.action === 'open_workload') { handleOpenEventModule(q.action); return }
-  if (q.action === 'start_check') { startIterativeCheck(); return }
-  if (q.action === 'start_check_item') { startCheckItem(); return }
-  if (q.action === 'check_fault') { handleCheckResult('fault_found'); return }
-  if (q.action === 'check_ok') { handleCheckResult('no_fault'); return }
-  if (q.action === 'repair_fixed') { handleRepairResult('fixed'); return }
-  if (q.action === 'repair_not_fixed') { handleRepairResult('not_fixed'); return }
-  if (q.action === 'continue_next') { continueNextCheck(); return }
-  if (q.action === 'goto_event' && q.eventId) { eventStore.selectEvent(q.eventId); return }
-  if (q.action === 'snooze') { handleSnooze(); return }
-  if (q.action === 'mark_false_alarm') { handleMarkFalseAlarm(); return }
-  if (q.action === 'confirm_close') { handleConfirmClose(); return }
-  if (q.action === 'manual_close_form') { handleManualCloseForm(); return }
-  // 排查/维修 chip → 通过 eventAssistantAction 通知 ProductDrawer
-  if (q.action === 'chip_check_normal' || q.action === 'chip_open_feedback' || q.action === 'chip_repair_solved' || q.action === 'chip_repair_not_fixed') {
-    handleChipAction(q.action)
-    return
-  }
-  inputText.value = q.text; sendMessage()
+  if (!isConversationQuestion(q)) return
+  inputText.value = q.text
+  sendMessage(true)
 }
 
 // ============ 排查/维修快速反馈 chip → 通知 ProductDrawer ============
@@ -1371,65 +1330,6 @@ function handleManualCloseForm() {
   }, 400)
 }
 
-// ============ 消息内联选项点击 ============
-function handleInlineOptionClick(msg, opt, optionIndex) {
-  const eid = props.eventContext?.id
-  if (!eid) return
-  if (eventAssistantAction[eid] !== 'false_alarm_options') return
-  if (msg._selectedOption !== undefined) return
-  msg._selectedOption = optionIndex
-
-  if (opt.action === 'false_alarm_other') {
-    // 回退到自由文本输入
-    eventStore.addMessage(eid, { role: 'user', content: '其他原因', ts: Date.now() })
-    eventAssistantAction[eid] = 'false_alarm_followup'
-    refreshChips()
-    nextTick(() => chatInputRef.value?.focus())
-    setTimeout(() => {
-      pushMsg(eid, { content: '请描述一下<b>实际工况或现场情况</b>，我会记录在事件报告中。' })
-      scrollToBottom()
-    }, 300)
-    return
-  }
-
-  // 预设原因需要用户再次确认，避免 iPad 端误触后直接闭环。
-}
-
-function resetInlineOption(msg) {
-  if (eventAssistantAction[props.eventContext?.id] !== 'false_alarm_options') return
-  delete msg._selectedOption
-}
-
-function cancelInlineOptions(msg) {
-  const eid = props.eventContext?.id
-  if (!eid || eventAssistantAction[eid] !== 'false_alarm_options') return
-  msg._cancelled = true
-  delete msg._selectedOption
-  eventAssistantAction[eid] = 'open_data'
-  refreshChips()
-}
-
-function confirmInlineOption(msg) {
-  const optionIndex = msg._selectedOption
-  const opt = msg.options?.[optionIndex]
-  if (!opt || opt.action !== 'false_alarm_done') return
-  const eid = props.eventContext?.id
-  if (!eid || eventAssistantAction[eid] !== 'false_alarm_options') return
-
-  const text = opt.text || opt.label
-  eventStore.addMessage(eid, { role: 'user', content: text, ts: Date.now() })
-  scrollToBottom()
-
-  isTyping.value = true
-  setTimeout(() => {
-    isTyping.value = false
-    eventStore.addMessage(eid, { role: 'assistant', content: '已记录你的反馈：<b>"' + text + '"</b>。该事件已标记为<b>误报</b>并闭环。', ts: Date.now() })
-    scrollToBottom(); refreshChips()
-    eventAssistantAction[eid] = 'false_alarm_closed'
-    eventStage[eid] = 'S5'
-    eventStore.updateEventStatus(eid, 'resolved')
-  }, 600)
-}
 function handleSnooze() {
   if (!props.eventContext) return
   const eid = props.eventContext.id
@@ -1644,7 +1544,7 @@ function continueNextCheck() {
 }
 
 // ============ 普通发送 ============
-function sendMessage() {
+function sendMessage(conversationOnly = false) {
   if (isEventInputDisabled.value) return
   const text = inputText.value.trim(); if (!text) return
   const sessionKey = props.mode === 'event' && props.eventContext ? props.eventContext.id : props.mode === 'general' ? 'general' : 'situation'
@@ -1652,7 +1552,7 @@ function sendMessage() {
   inputText.value = ''; scrollToBottom()
 
   // 误报追问中 → 用户回复后完成误报闭环
-  if (props.eventContext && eventAssistantAction[props.eventContext.id] === 'false_alarm_followup') {
+  if (conversationOnly !== true && props.eventContext && eventAssistantAction[props.eventContext.id] === 'false_alarm_followup') {
     isTyping.value = true
     setTimeout(() => {
       isTyping.value = false
@@ -1668,7 +1568,7 @@ function sendMessage() {
   }
 
   // 手动闭环追问中 → 用户回复后完成闭环
-  if (props.eventContext && eventAssistantAction[props.eventContext.id] === 'manual_close_followup') {
+  if (conversationOnly !== true && props.eventContext && eventAssistantAction[props.eventContext.id] === 'manual_close_followup') {
     isTyping.value = true
     setTimeout(() => {
       isTyping.value = false
@@ -1685,7 +1585,7 @@ function sendMessage() {
   }
 
   // 排查阶段自然语言反馈 → 先自动填充左侧当前排查卡，不直接提交
-  if (props.eventContext && props.mode === 'event' && eventStage[props.eventContext.id] === 'S2') {
+  if (conversationOnly !== true && props.eventContext && props.mode === 'event' && eventStage[props.eventContext.id] === 'S2') {
     const parsed = parseCheckFeedbackText(text)
     if (parsed) {
       const eid = props.eventContext.id

@@ -6,7 +6,19 @@ import {createSSRApp} from 'vue'
 import {renderToString} from '@vue/server-renderer'
 import {routerKey} from 'vue-router'
 
-test('all observation rounds retain independent execution, measurement and outcome receipts in chronological order',async()=>{
+// Compatibility fixture: these receipts were saved by the former observation
+// form. Loading history must remain supported after manual measurement entry is
+// removed; no fixture is submitted through the current automatic-data interface.
+function restoreLegacyMeasurement(store,id,round){
+  delete store.automaticObservations[id]
+  store.observationRecords[id].splice(0,store.observationRecords[id].length,{
+    day:0,values:[260+round,258+round],conditions:`第${round}轮同工况`,note:`第${round}轮观察说明`,
+    label:'已有改善，继续观察',status:'improving',reviewChoice:'continue',source:'人员观察记录',
+    recordedAt:`2026-10-${10+round}T12:00:00+08:00`,isSimulation:true,
+  })
+}
+
+test('legacy observation receipts retain independent execution, measurement and outcomes across chronological rounds',async()=>{
   const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
   try{
     const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
@@ -15,6 +27,7 @@ test('all observation rounds retain independent execution, measurement and outco
     const {default:SituationObservation}=await server.ssrLoadModule('/src/components/SituationObservation.vue')
     const pinia=createPinia();setActivePinia(pinia)
     const store=usePhase2DemoStore(),id='real-alarm-0430'
+    store.syncAutomaticObservation=()=>false // Rendering imported history must not append today's unrelated sensor windows.
     store.createTodo(id);store.selectTodo(id);store.advanceTodo(id)
     const completeRepair=round=>{
       store.advanceTodo(id,store.currentStage.tasks.map((task,i)=>({label:task.label,result:i?'未见异常':'发现异常',note:`第${round}轮核查证据`})))
@@ -23,9 +36,11 @@ test('all observation rounds retain independent execution, measurement and outco
       assert.equal(store.confirmExecutionRecord(id,form.id,{...form.values,...executionPreset(store.cases[id],store.currentStage,'complete'),
         measures:`第${round}轮实际措施原文`,acceptance:`第${round}轮验收原文`,executedAt:`2026-10-${10+round}T10:00`}),true)
     }
-    const measure=round=>assert.equal(store.submitObservationReview(id,'continue',{day:0,value0:260+round,value1:258+round,conditions:`第${round}轮同工况`,note:`第${round}轮观察说明`}),true)
+    const measure=round=>restoreLegacyMeasurement(store,id,round)
     completeRepair(1);measure(1)
-    assert.equal(store.submitObservationReview(id,'incomplete',{day:1,conditions:'首轮缺少夜间窗口',note:'补充夜间可比记录'}),true)
+    store.observationTargets[id]=2
+    store.observationRecords[id].push({day:1,values:null,conditions:'首轮缺少夜间窗口',note:'补充夜间可比记录',label:'资料不足，延长观察',status:'incomplete',reviewChoice:'incomplete',targetDays:2,source:'人员观察记录',recordedAt:'2026-10-12T10:00:00+08:00',isSimulation:true})
+    assert.equal(store.getObservationResult(id).type,'extend','previously saved missing-data and extension receipts remain readable')
     const firstTarget=store.observationTargets[id]
     assert.equal(store.submitObservationReview(id,'abnormal'),true)
     const originalRecord=store.observationRecords[id][0]
@@ -33,6 +48,8 @@ test('all observation rounds retain independent execution, measurement and outco
     let rounds=observationRoundViews(store,id)
     assert.deepEqual(rounds.map(item=>item.round),[1,2])
     assert.equal(rounds[0].target,firstTarget)
+    assert.equal(rounds[0].records[1].note,'补充夜间可比记录')
+    assert.equal(rounds[0].records[1].values,null,'missing historical measurements remain empty')
     assert.equal(rounds[0].result.type,'reinspect')
     assert.equal(rounds[0].execution.values.measures,'第1轮实际措施原文')
     assert.equal(rounds[1].execution,null,'first-round execution cannot appear as new repair')
@@ -75,6 +92,7 @@ test('failed acceptance is an unobserved repair round and later recurrence keeps
     const {default:SituationObservation}=await server.ssrLoadModule('/src/components/SituationObservation.vue')
     const pinia=createPinia();setActivePinia(pinia)
     const store=usePhase2DemoStore(),id='real-alarm-0430'
+    store.syncAutomaticObservation=()=>false
     store.createTodo(id);store.selectTodo(id);store.advanceTodo(id)
     const execute=(round,verification)=>{
       store.advanceTodo(id,store.currentStage.tasks.map((task,i)=>({label:task.label,result:i?'未见异常':'发现异常',note:`第${round}轮核查依据`})))
@@ -98,7 +116,7 @@ test('failed acceptance is an unobserved repair round and later recurrence keeps
     assert.match(html,/验收未通过，未进入效果观察/)
     assert.doesNotMatch(html,/第 1 轮 · 历史修复观察/)
     execute(2,'resolved')
-    assert.equal(store.submitObservationReview(id,'continue',{day:0,value0:262,value1:260,conditions:'第二轮可比工况',note:'本轮观察读数'}),true)
+    restoreLegacyMeasurement(store,id,2)
     assert.equal(store.submitObservationReview(id,'abnormal'),true)
     store.reopenTodo(id)
     assert.equal(store.workflowRounds[id],3)

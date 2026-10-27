@@ -133,6 +133,8 @@ onUnmounted(() => {
 }
 
 .header-section-title {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 16px;
   line-height: 28px;
   font-weight: 700;
@@ -296,6 +298,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 760px) {
+  .header-section-title-muted, .header-chevron { display: none; }
   .header-right { gap: 8px; }
   .header-ship-name { max-width: 96px; }
   .header-time { display: none; }

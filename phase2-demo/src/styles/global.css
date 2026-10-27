@@ -107,12 +107,10 @@
   }
 }
 
-/* ===== 流体根字号（自适应核心）=====
-   随视口宽度在 14px~16.5px 间平滑缩放：
-   手机≈14px / iPad 竖屏≈14.6px / iPad 横屏≈15.6px / 桌面≈16.5px
-   所有 rem 与 --font-* 变量都跟随此值自适应。 */
+/* rem-based controls keep their desktop size through 1080p, then grow
+   gradually to 18px at 2560px. Browser zoom still controls the viewport. */
 html {
-  font-size: 16px;
+  font-size: clamp(16px, calc(10px + 0.3125vw), 18px);
 }
 
 /* ===== Global ===== */
