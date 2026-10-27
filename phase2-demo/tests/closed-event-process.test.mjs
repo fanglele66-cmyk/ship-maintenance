@@ -97,7 +97,7 @@ test('closed event reference and live event processes keep evidence and task his
    assert.ok(process.records.some(item=>item.kind==='decision'&&item.text.includes('本次核实结束')))
    assert.equal(eventDirectoryRows(store).find(item=>item.id===id).eventState,'处置中')
    const answer=issueReply(id,'下一步怎么安排',store)
-   assert.deepEqual(answer.actions.map(item=>item.id),['issue:section:处置记录','issue:section:健康趋势观测'])
+   assert.deepEqual(answer.actions.map(item=>item.id),['issue:section:decision','issue:section:处置记录'])
   })
   await t.test('closed source events cannot leak into Todos even if older progress is incomplete',()=>{
    const store=fresh(),id='real-alarm-0430'

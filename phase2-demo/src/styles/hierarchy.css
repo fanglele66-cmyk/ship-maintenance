@@ -253,6 +253,10 @@
 .app-container.app-container .p2-pad-detail .p2-case-source { background: transparent; border: 0; border-top: 1px solid #ebeef5; border-radius: 0; padding: 16px 0; }
 .app-container.app-container .p2-pad-detail .p2-pad-list-row { background: transparent; border: 0; border-bottom: 1px solid #ebeef5; border-radius: 0; padding: 14px 0; }
 .app-container.app-container .p2-pad-detail .p2-data-overview { padding: 16px 0; }
+.app-container.app-container .p2-pad-body:has(>.p2-data-overview){overflow-y:auto;overscroll-behavior:contain}
+.app-container.app-container .p2-pad-body>.p2-data-overview{flex:0 0 auto;min-height:min-content;overflow:visible}
+.app-container.app-container .p2-pad-body:has(>.p2-data-overview)>.p2-pad-footer{flex:none}
+.app-container.app-container .p2-stage-rail{overflow-x:auto;flex-shrink:0;grid-template-columns:repeat(var(--stage-count),minmax(160px,1fr))}
 .app-container.app-container .p2-pad-detail .p2-trend-panel { border: 0; border-top: 1px solid #ebeef5; border-radius: 0; padding: 16px 0 0; }
 .app-container.app-container .p2-pad-detail .p2-pad-footer { background: #fff; border-top: 1px solid #ebeef5; max-width: none; width: 100%; box-sizing: border-box; }
 .app-container.app-container .knowledge-view .detail-body,

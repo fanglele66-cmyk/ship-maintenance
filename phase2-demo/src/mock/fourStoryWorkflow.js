@@ -1,10 +1,16 @@
+import {compactRepair} from './compactRepair.js'
+import {followupRepair} from './followupRounds.js'
 import fixtures from './fourStoryFixtures.json' with { type: 'json' }
 import {realWorkflowCases,assessRealCase} from './realCaseAdapter.js'
 import {healthTrackingSources,trackingContainerCases} from './healthTrackingSources.js'
-import {isMaintenanceWorkflow,parentIssueId,issueTypeNames,maintenanceRecommendations} from './issueRelationships.js'
+import {isMaintenanceWorkflow,parentIssueId,issueTypeNames,maintenanceRecommendations,observationParents} from './issueRelationships.js'
 import {closedEventReference} from './closedEventReferences.js'
+import {trackingProcessReference} from './trackingProcessReferences.js'
+import {trackingDispositionSummary,buildObservationTask} from './trackingDisposition.js'
 const allCases=[...fixtures.cases.map(item=>({...item,latent:true,legacyScenario:true})),...realWorkflowCases,...trackingContainerCases].map(item=>
   isMaintenanceWorkflow(item)?{...item,cardType:'异动跟踪',workflowKind:'maintenance',parentIssueId:parentIssueId(item.id)}:item)
+
+for(const [id,parent] of Object.entries(observationParents)){const source=allCases.find(item=>item.id===parent);if(source)allCases.push(buildObservationTask(source,id))}
 
 import {healthStoryMarkdown,storyTimeline} from './storyRecords.js'
 
@@ -16,7 +22,7 @@ export const historicalDecisions = fixtures.history.map(item=>item.type==='维�
   ?{...item,type:'异动跟踪',recordKind:'maintenance-decision',parentIssueId:'bearing-health'}:item)
 export const isWorkflow = id => Boolean(workflowCases[id])
 const types = issueTypeNames
-export const workflowIssues = allCases.filter(item=>!isMaintenanceWorkflow(item)).map(item => ({
+export const workflowIssues = allCases.filter(item=>parentIssueId(item.id)===item.id).map(item => ({
   id: item.id, deviceId: item.deviceId, device: item.device.split(' · ')[0], type: item.cardType,
   rank: types.indexOf(item.cardType), title: item.initialTitle, summary: item.report.conclusion,latent:Boolean(item.latent),
   isTrackingContainer:Boolean(item.isTrackingContainer), sourceCaseId:item.sourceCaseId,
@@ -87,8 +93,13 @@ export function storyDossier(store,id){
   }
   // The overview summarizes state; analysis interprets evidence; the timeline owns raw receipts.
   const summaries=item?.isTrackingContainer?recommendations.map(child=>storyDossier(store,child.id).overviewSummary).filter(Boolean):[]
-  const overviewSummary=summaries.join('；')||(store.eventStatus?.[id]==='closed'?'本轮已确认结束，处置结果与签认记录已归档。':execution?observation?.title||executionSummary(execution):decision?'本轮核实已结束，后续安排已记录。':assessment?'现场反馈已提交，最新研判与后续安排已更新。':store.ignoredSuggestions?.[id]?'本次建议已登记决定，原健康跟踪继续保留。':'')
-  const judgement=assessment?.message?`### 现场反馈后的研判\n\n${assessment.message}`:''
+  const disposition=store.trackingDispositions?.[id]
+  if(disposition)update=`### 当前处置结论\n\n${trackingDispositionSummary(disposition)}\n\n${disposition.reason||disposition.recommendation?.reason||''}`+(disposition.plan?`\n\n### 专项观察安排\n\n负责人：${disposition.plan.owner}\n\n关注指标：${disposition.plan.metrics}\n\n复核期限：${disposition.plan.deadline.replace('T',' ')}\n\n下次判断条件：${disposition.plan.criteria}`:'')+(disposition.observationResult?`\n\n### 最新观察反馈\n\n${disposition.observationResult.findings}`:'')
+  const prior=trackingProcessReference(id)
+  const priorFindings=prior?`### 首轮核实回交 · ${prior.at}\n\n${prior.feedback.map(entry=>`- **${entry.label}：${entry.result}**。${entry.note}`).join('\n\n')}`:''
+  if(prior&&disposition?.status==='review'&&!disposition.observationResult)update+='\n\n'+priorFindings
+  const overviewSummary=trackingDispositionSummary(disposition)||summaries.join('；')||(store.eventStatus?.[id]==='closed'?'本轮已确认结束，处置结果与签认记录已归档。':execution?observation?.title||executionSummary(execution):decision?'本轮核实已结束，后续安排已记录。':assessment?'现场反馈已提交，最新研判与后续安排已更新。':store.ignoredSuggestions?.[id]?'本次建议已登记决定，原健康跟踪继续保留。':'')
+  const judgement=assessment?.message?`### 现场反馈后的研判\n\n${assessment.message}`:priorFindings
   const childAnalysis=item?.isTrackingContainer?recommendations.map(child=>{const childAssessment=store.checkAssessments?.[child.id];return childAssessment?`### ${child.initialTitle}\n\n${childAssessment.message}`:''}).filter(Boolean).join('\n\n'):''
   return {...base,series,overviewSummary,maintenanceRecommendations:recommendations,timeline:storyTimeline(store,id),overviewMarkdown:item?.realCaseId?(overviewSummary?`### 当前处置状态\n\n${overviewSummary}`:overview):update?update+'\n\n### 起始依据\n\n'+(item?.report?.basis||base.conclusion):overview,analysisMarkdown:[judgement,childAnalysis,analysis].filter(Boolean).join('\n\n'),evidenceMarkdown:content.evidence||'来源资料及实际反馈按记录保留。',hasUpdate:Boolean(update),currentMarkdown:update||overview}
 }
@@ -113,7 +124,7 @@ ${stage.judgement||item?.report?.human||''}`
 
 ${stage.title}。范围来自已提交的检查发现；未见异常与尚未确认的项目不自动纳入维修。
 
-${(item.workDetails?.acceptance||[]).map(text=>'- '+text).join('\n')}
+${(stage.workDetails?.acceptance||item.workDetails?.acceptance||[]).map(text=>'- '+text).join('\n')}
 
 作业完成、现场验收、后续效果是三份记录。验收仍异常时接续原事件；缺可比数据时先补记录。`:''
   return [finding,content,scope].filter(Boolean).join('\n\n')
@@ -125,8 +136,8 @@ export function assessWorkflow(id,stage,feedback) {
   if(invalid)return {valid:false,advance:false,message:'请完整记录本轮各项目的实际结果。'}
   const values=feedback.map(entry=>entry.result)
   const common={valid:true,records:feedback.map(entry=>({...entry,attachments:[...(entry.attachments||[])]}))}
-  if(workflowCases[id]?.realCaseId)return assessRealCase(workflowCases[id],stage,feedback)
-  if(stage.id==='investigate') {
+  if(workflowCases[id]?.realCaseId)return assessRealCase(workflowCases[id],{...stage,id:stage.baseStageId||stage.id},feedback)
+  if((stage.baseStageId||stage.id)==='investigate') {
     const packages=stage.tasks.filter((_,i)=>values[i]==='发现异常').map(task=>task.package)
     const unknown=stage.tasks.filter((_,i)=>values[i]==='无法确认').map(task=>task.label)
     const meanings=id==='fault'?[
@@ -159,17 +170,19 @@ export function assessWorkflow(id,stage,feedback) {
     actions:supported&&ready?[]:['retry','end-maintenance']}
 }
 
-export function composeRepair(caseData,keys) {
+export function composeRepair(caseData,keys,round=1) {
   const packages=keys.map(key=>caseData.packages[key]).filter(Boolean)
   const title=packages.map(item=>item.title).join('及')
-  const tasks=packages.flatMap(item=>item.tasks)
-  const detail={preparation:packages.flatMap(item=>item.preparation),parts:packages.flatMap(item=>item.parts),acceptance:packages.flatMap(item=>item.acceptance)}
+  const compact=caseData.realCaseId?compactRepair(caseData,keys):null
+  const tasks=compact?.tasks||packages.flatMap(item=>item.tasks)
+  const detail=compact?.workDetails||{preparation:packages.flatMap(item=>item.preparation),parts:packages.flatMap(item=>item.parts),acceptance:packages.flatMap(item=>item.acceptance)}
   // Older workflows keep their own acceptance fallback; real tasks carry methods
   // and named checkpoints through every selected package combination.
-  if(packages.every(item=>item.acceptanceRows?.length))detail.acceptanceRows=packages.flatMap(item=>item.acceptanceRows.map(row=>({...row,name:packages.length>1?item.title+' · '+row.name:row.name})))
-  return {title,tasks,evidence:packages.map(item=>'已确认处置范围：'+item.title),workDetails:detail,
+  if(!compact&&packages.every(item=>item.acceptanceRows?.length))detail.acceptanceRows=packages.flatMap(item=>item.acceptanceRows.map(row=>({...row,name:packages.length>1?item.title+' · '+row.name:row.name})))
+  const repair={title,tasks,evidence:packages.map(item=>'已确认处置范围：'+item.title),workDetails:detail,
     ...(caseData.realCaseId?{markdown:`### 执行目标\n\n${title}。按本轮检查发现及获批范围实施，分别登记实际措施与用料。\n\n### 作业安排\n\n${tasks.map(task=>'- **'+task.label+'**：'+task.guide).join('\n')}\n\n### 提交成果\n\n提交隔离与复装工卡、实际领用及旧新件记录、现场测试和未完成项目。`}:{}),
   }
+  return round>1?followupRepair(caseData,{...repair,packageKeys:keys},round):repair
 }
 
 export function workflowReply(store,id,text) {
@@ -183,7 +196,7 @@ export function workflowReply(store,id,text) {
 }
 
 export function deviceStoryAssessment(store,deviceId){
-  const current=allCases.filter(item=>item.realCaseId&&item.deviceId===deviceId&&!isMaintenanceWorkflow(item))
+  const current=allCases.filter(item=>item.realCaseId&&item.deviceId===deviceId&&parentIssueId(item.id)===item.id)
   if(current.length){
     const context={cases:store.cases||workflowCases,unlockedRecommendations:store.unlockedRecommendations,
       todoCreated:store.todoCreated,ignoredSuggestions:store.ignoredSuggestions,completedTasks:store.completedTasks,

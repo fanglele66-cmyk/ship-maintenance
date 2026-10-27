@@ -11,7 +11,8 @@ export function baselineFeedback(item,index,value){
   {'有提前处理依据':'四缸相对偏差在 6 月下移后持续至 8 月，现有运行与调整记录尚不足以完整解释；建议先完成独立测温核验，并按燃烧平衡检查线索确定进一步范围。未直接指定换件。','暂无提前处理必要':'本轮已有工况与热平衡资料支持沿原计划继续观察，尚无需提前拆检的独立异常依据；记录适用基线和复核条件，原周期检查继续保留。','无法确认':'四缸月度变化已见，但负荷分布、独立校验和相关调整履历不齐；暂不能判断专项检查必要性，先补资料，不把条件缺失写成设备正常。'},
   {'条件具备':'校验设备证书、适配探头与接口密封备料、人员及获批停机隔离窗口已逐项核对；具备执行批准检查范围的条件，实际维护和换件仍由检查发现决定。','条件暂不具备':'独立校验设备或停机隔离窗口尚未落实，完整专项检查暂不能实施；已列明所缺条件和协调安排，期间保留月度跟踪与可开展的非侵入核查。','无法确认':'校验设备有效性、备料适配性与批准窗口尚未取得完整确认；先核对仪表证书、图册和作业计划，不把备料计划当作已经到位。'},
  ]
- return notes[index]?.[value]
+ const result=notes[index]?.[value]
+ return item.handoffTask?result?.replaceAll('四缸','一缸').replace('相对偏差在 6 月下移后持续至 8 月','相对偏差自 4 月抬升后持续至 8 月'):result
 }
 export function baselineAssessment(item,feedback){
  const [first,second]=feedback.map(r=>r.result)
@@ -20,5 +21,5 @@ export function baselineAssessment(item,feedback){
   return {title:complete?'基线与历史资料已核对，确认后续跟踪范围':first==='读数不一致'?'先核实测温差异，保留月度趋势':second==='无法确认'?'历史调整未确认，继续补齐资料':'按已覆盖月份留档，未确认范围继续跟踪',message:baselineFeedback(item,0,first)+'\n\n'+baselineFeedback(item,1,second)+'\n\n下一步：'+(complete?'提交能够解释的变化与未解释范围，由轮机长确认后结束本次核实；月度健康跟踪继续，已有基线解释不等于设备所有部件均正常。':'继续补充工况、调整履历或独立校验。若需结束本轮核实，明确缺项和负责人；不将未确认原因写成故障已排除。')}
  }
  const needed=first==='有提前处理依据',ready=second==='条件具备'
- return {title:needed&&ready?'检查依据与条件已确认，接续四缸专项检查':first==='暂无提前处理必要'?'按原计划跟踪，本轮不提前拆检':!needed?'先补必要性依据，保留原健康跟踪':'专项检查待安排，先落实实施条件',message:baselineFeedback(item,0,first)+'\n\n'+baselineFeedback(item,1,second)+'\n\n下一步：'+(needed&&ready?'按批准范围校验与检查，实际发现支持时才维护或换件。记录同工况复测和未解释偏差，结果回写本条跟踪。':needed?'落实校验、备料与作业窗口后继续；未实施项目保留待安排，不登记为已完成。':'记录本轮依据与未确认项，保留周期检查及月度观察；不以资料不足或条件就绪强制形成维修。')}
+ return {title:needed&&ready?'检查依据与条件已确认，接续专项检查':first==='暂无提前处理必要'?'按原计划跟踪，本轮不提前拆检':!needed?'先补必要性依据，保留原健康跟踪':'专项检查待安排，先落实实施条件',message:baselineFeedback(item,0,first)+'\n\n'+baselineFeedback(item,1,second)+'\n\n下一步：'+(needed&&ready?'按批准范围校验与检查，实际发现支持时才维护或换件。记录同工况复测和未解释偏差，结果回写本条跟踪。':needed?'落实校验、备料与作业窗口后继续；未实施项目保留待安排，不登记为已完成。':'记录本轮依据与未确认项，保留周期检查及月度观察；不以资料不足或条件就绪强制形成维修。')}
 }

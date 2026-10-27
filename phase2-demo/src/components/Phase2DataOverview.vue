@@ -1,5 +1,5 @@
 <template>
-  <section class="p2-data-overview"><BaselineTrend :scenario="scenario"/>
+  <section class="p2-data-overview"><BaselineTrend :scenario="observationParents[scenario]||scenario"/>
     <div class="p2-data-title"><strong>数据观测</strong><div v-if="sensors.length>3" class="p2-sensor-pages"><button :disabled="page===0" @click="page--" aria-label="上一组传感器">‹</button><span>{{ page+1 }} / {{ Math.ceil(sensors.length/3) }}</span><button :disabled="page>=Math.ceil(sensors.length/3)-1" @click="page++" aria-label="下一组传感器">›</button></div></div>
     <div class="p2-sensor-tabs" role="tablist" aria-label="监测参数">
       <button v-for="s in visibleSensors" :key="s.id" role="tab" :aria-selected="selected.includes(s.id)" :class="{active:selected.includes(s.id)}" @click="selectSensor(s.id)">
@@ -18,6 +18,7 @@
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import BaselineTrend from './BaselineTrend.vue'
+import {observationParents} from '@/mock/issueRelationships'
 import * as echarts from 'echarts'
 import { scenarioSensors } from '@/mock/phase2Content'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'

@@ -10,9 +10,15 @@ const profiles = {
  warning:{scope:'空气减压阀及控制空气供给',evidence:'0302、0303 双路压力、同刻转速与供气状态',observe:'0302、0303 双路压力、负荷与供气条件，以及低压是否反复',recheck:'复核减压阀调压与密封、上下游压力及切换操作，区分临时恢复和持续恢复'},
  ...baselineProfiles,
 }
-const profileFor=item=>profiles[item?.realType]||profiles.tracking
+const profileFor=item=>item?.handoffTask?JSON.parse(JSON.stringify(profiles.maintenance).replaceAll('四缸','一缸')):profiles[item?.realType]||profiles.tracking
 const shown=records=>records.map(record=>record.label+'：'+record.result).join('；')
 function caseFeedback(item,stage,index,value){
+ if(stage.round>1){
+  const task=stage.tasks[index],scope=task.label
+  if(value==='无法确认'||value==='条件暂不具备')return `第${stage.round}轮${scope}：前轮资料已对照，但本次复发片段或检查条件仍未齐，保留缺项及补查安排，不复用首轮发现作为本轮结论。`
+  if(value==='未见异常'||value==='暂无提前处理必要')return `第${stage.round}轮${scope}：已复核前轮措施与本次覆盖范围，尚未取得支持该方向新增处置的证据，保留未检查项目。`
+  return `第${stage.round}轮${scope}：已对照前轮实际措施、修后首测与复发条件，按本轮检查结果登记${value}；具体部位、工卡及复测资料随记录留存，不能据选项预定更换件。`
+ }
  if(stage.id==='investigate'){
   const notes=item.realType==='alarm'?[
    {
@@ -59,6 +65,12 @@ export function feedbackPresets(item,stage){
 export function realAssessmentContent(item,stage,feedback){
  if(!item?.realCaseId||stage?.kind!=='check')return {}
  const values=feedback.map(entry=>entry.result),[first,second]=values,p=profileFor(item)
+ if(item.realType==='maintenance'&&stage.round>1){
+  const supported=first==='有提前处理依据',ready=second==='条件具备'
+  const submitted=feedback.map(record=>`${record.label}：${record.result}。${record.note||'尚未附本轮具体检验或条件记录，不能扩大为部件结论。'}`).join('\n\n')
+  const next=supported&&ready?'本轮已提交新增检查依据及实施条件，接续本轮获批范围的补充检查或返工；实际措施以新增检验为准，已完成且无新疑点的前轮项目不重复拆换。':supported?'补齐本次窗口、仪器或备料缺项后再实施；前轮条件不能自动视为本轮仍具备。':first==='暂无提前处理必要'?'保留本轮未取得新增处置依据的范围，说明复发的解释与未覆盖项后决定是否结束本次复查，原计划和未完成需求继续保留。':'继续补充本次复发片段、独立检验和剩余项目，必要性尚未确认，不沿用首轮结论安排新作业。'
+  return {title:`第${stage.round}轮${supported&&ready?'复查依据与作业条件已提交':supported?'复查需求待落实条件':'复查依据继续核实'}`,message:`本轮对照前轮实际措施、验收及本次复发资料重新判断，前轮完成记录保持独立。\n\n${submitted}\n\n下一步：${next}`}
+ }
  if(stage.id==='investigate'){
   const names=value=>stage.tasks.filter((_,index)=>values[index]===value).map(task=>task.label)
   const found=names('发现异常'),normal=names('未见异常'),unknown=names('无法确认')
@@ -104,10 +116,16 @@ export function realExecutionContent(item,key,stage){
 export function executionPreset(item,stage,key){
  if(!item?.realCaseId||stage?.kind!=='work'||!executionPresetOptions.some(option=>option.id===key))return null
  const partial=key==='partial',p=profileFor(item),now=new Date(),local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16)
+ if(stage.round>1){
+  const measures=`第${stage.round}轮按本次批准范围完成复查后的处置，已将返工、新增作业及未完成项与前轮记录逐项对应；旧新件、实际领用与复装记录另行留存。`
+  const acceptance=key==='unresolved'?'本轮复测仍出现原异常，已保存复发工况与本轮措施，继续原因排查。':key==='pending'||partial?'本轮尚缺完整现场验收，保留剩余作业和需补的复测条件。':`本轮获批范围的复装及功能复核已完成，已保留 ${p.observe} 的复测资料；持续效果另行观察。`
+  return {...Object.fromEntries(stage.tasks.flatMap((task,index)=>[['task'+index,partial&&index===stage.tasks.length-1?'待补充':'已完成'],['note'+index,`第${stage.round}轮 ${task.label}：按本轮实际范围填写，前轮记录保持独立。`]])),equipment:item.device,executedAt:local,measures:partial?'本轮部分工作已记录，剩余作业与验收待补。':measures,acceptance,completion:partial?'partial':'completed',verification:key==='unresolved'?'unresolved':key==='pending'||partial?'pending':'resolved',comparable:key==='complete'?'available':'missing',isSimulation:true,sourceCaseId:item.realCaseId}
+ }
  const baseMeasures=item.realType==='alarm'?(stage.title.includes('ICU')?'按批准范围更换二缸 ICU，完成装复与动作测试，旧件检查记录保留。':'完成供给侧检查和本轮确认的供给响应处理，未安排二缸 ICU 更换。')+(stage.title.includes('ICU')&&stage.title.includes('燃油')?'同时完成已确认的燃油供给状态及喷射响应核对。':''):item.realType==='warning'?(stage.title.includes('减压阀')?'投入备用阀，完成原阀密封垫临时制作、清洁装复及压力测试；HRD-FA 供船和永久措施仍单独保留。':'完成控制空气供给侧检查与压力响应处理，减压阀未纳入本轮维修。'): '完成获批范围的四缸测温链路校验、燃烧平衡检查与六缸同工况复测；实际措施、未执行项目和未解释偏差分别记录。'
- const measures=baseMeasures+(item.realType==='warning'&&stage.tasks.some(task=>task.label==='处理过滤、积水或已定位泄漏')?' 已完成控制空气分段压力核对、放残与接口检查；实际发现和用料沿供气通路分别登记。':'')
- const restored=item.realType==='maintenance'?'四缸本次测温与燃烧检查范围已完成复核，实际拆装部位恢复；六缸同刻读数、转速、负荷与燃油资料已留存，未把相对零温差作为验收要求。':item.realType==='alarm'?'本轮拆装或检查接口未见泄漏，二缸喷射指令与反馈对应；本次测试未见原报警再次触发，已留存六缸排温与转速、负荷记录。仍需观察运行中复发情况。':'本轮阀组或供气通路检查范围内未见泄漏，双路压力复测约 0.67/0.64 MPa，已保留上下游压力、用气及切换记录；临时恢复与永久措施分别登记，持续稳定性另行观察。'
- const recurrence=item.realType==='maintenance'?'四缸测温或燃烧检查的原异常线索仍有反复，相对偏差尚未取得完整解释，需沿原跟踪继续核实。':item.realType==='alarm'?'复测中二缸原报警或喷射反馈异常仍有反复，暂不能确认本轮措施解决问题。':'复测中双路低压或调压异常仍有反复，暂不能确认本轮措施解决问题。'
+ const cylinderText=text=>item.realType==='maintenance'&&(item.baselineCylinder===1||item.handoffTask)?text.replaceAll('四缸','一缸'):text
+ const measures=cylinderText(baseMeasures)+(item.realType==='warning'&&stage.tasks.some(task=>task.label==='处理过滤、积水或已定位泄漏')?' 已完成控制空气分段压力核对、放残与接口检查；实际发现和用料沿供气通路分别登记。':'')
+ const restored=cylinderText(item.realType==='maintenance'?'四缸本次测温与燃烧检查范围已完成复核，实际拆装部位恢复；六缸同刻读数、转速、负荷与燃油资料已留存，未把相对零温差作为验收要求。':item.realType==='alarm'?'本轮拆装或检查接口未见泄漏，二缸喷射指令与反馈对应；本次测试未见原报警再次触发，已留存六缸排温与转速、负荷记录。仍需观察运行中复发情况。':'本轮阀组或供气通路检查范围内未见泄漏，双路压力复测约 0.67/0.64 MPa，已保留上下游压力、用气及切换记录；临时恢复与永久措施分别登记，持续稳定性另行观察。')
+ const recurrence=cylinderText(item.realType==='maintenance'?'四缸测温或燃烧检查的原异常线索仍有反复，相对偏差尚未取得完整解释，需沿原跟踪继续核实。':item.realType==='alarm'?'复测中二缸原报警或喷射反馈异常仍有反复，暂不能确认本轮措施解决问题。':'复测中双路低压或调压异常仍有反复，暂不能确认本轮措施解决问题。')
  const acceptance=partial?'本轮只记录已完成部分，未完成项与验收待补；不将部分复测写成整项验收通过。':key==='unresolved'?recurrence+`保留 ${p.evidence}，沿原事件返回核实。`:key==='pending'?`作业已完成，但 ${p.evidence} 的现场复测未完成，验收保持待补。`:restored+(key==='missing'?'尚缺处理后同工况连续记录，本次验收不代替持续效果。':'已确认可补充后续同工况观测，闭环仍需独立确认。')
  const noteFor=task=>task.feedback||( /复核|复查/.test(task.label)?key==='pending'?'本项已完成作业范围与原指标的资料核对；现场验收复测尚未完成，不视为验收通过。':partial?'本项记录与原指标已核对，整项作业仍有后续步骤未完成，不能据此确认整体验收。':acceptance:task.label.includes('ICU')?'二缸 ICU 已按批准范围装复，保留更换和旧件检查记录；ICV 电控未据此一并更换。':task.label.includes('减压阀')?item.realType==='maintenance'?'已完成减压阀动作和密封检查，维护范围单独登记；未把检查写成永久更换。':'已完成减压阀密封临时处理与装复，HRD-FA 永久措施尚未记为完成。':task.label.includes('燃油')?'已核对燃油供给状态与喷射指令、响应关系，本轮只处理已确认范围。':'已完成本轮批准的供给通路或维护检查，未纳入范围的项目继续保留。')
  return {...Object.fromEntries(stage.tasks.flatMap((task,index)=>[['task'+index,partial&&index===stage.tasks.length-1?'待补充':'已完成'],['note'+index,partial&&index===stage.tasks.length-1?task.label+'尚未完成；本次作业窗口内未取得完整复测，保留剩余检查并继续安排。':noteFor(task)]])),equipment:item.device,executedAt:local,
@@ -129,7 +147,7 @@ export function decisionPreset(item,action,assessment){
  if(!item?.realCaseId)return ''
  const records=assessment?.records||[],background=item.initialTitle+(records.length?'；'+shown(records):''),[first,second]=records.map(record=>record.result)
  const endWarning=first==='现场与系统一致'&&second==='工况变化可以解释'?'按工况解释申请结束本次核实；确认解释覆盖双路低压发生窗口，保留操作时间与原采样。当前恢复不等于永久修复。':'按已核对范围申请结束本轮核实，保留读数差异、缺项及后续安排；不将资料不足或读数不符写成预警误报。'
- const endMaintenance=first==='暂无提前处理必要'?'本轮不提前处理，保留四缸周期检查与月度基线跟踪；说明已核实资料如何支持当前安排。':first==='有提前处理依据'?'提前检查需求仍在，受限条件与后续安排继续保留；结束的是本次评估，不填写已执行或无需检修。':'必要性仍未确认，保留缺项与后续核实安排；不因资料不足取消原计划或填写维护已完成。'
+ const endMaintenance=first==='暂无提前处理必要'?'本轮不提前处理，保留对应气缸周期检查与月度基线跟踪；说明已核实资料如何支持当前安排。':first==='有提前处理依据'?'提前检查需求仍在，受限条件与后续安排继续保留；结束的是本次评估，不填写已执行或无需检修。':'必要性仍未确认，保留缺项与后续核实安排；不因资料不足取消原计划或填写维护已完成。'
  const directions={
   'false-alarm':'申请按误报核实结果结束本次报警。提交前填写具体通道、核对时间、独立核验及判定依据；现有报警与二缸变化本身不支持误报结论，原记录保留。',
   ignore:`本轮不采纳新增人工任务，保留 ${profileFor(item).evidence} 与原跟踪。提交时写明不采纳依据、继续关注内容和再次安排条件；不等于原信号消失或故障已排除。`,

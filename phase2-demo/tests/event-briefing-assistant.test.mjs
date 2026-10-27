@@ -14,7 +14,11 @@ test('event briefings explain decisions using selected evidence and retain live 
   for(const id of ids){
    const before=JSON.stringify(store.todoCreated)
    const answer=issueReply(id,'为什么需要轮机长判断并指派？',store)
-   assert.match(answer.markdown,/需要您确认|建议指派的原因/)
+   if(id==='real-health-c4-baseline'){
+    assert.match(answer.markdown,/首轮核实已回交，待轮机长再次决策/)
+    assert.match(answer.markdown,/尚未开展维修及修后效果观察/)
+    assert.equal(answer.actions[0].id,'issue:section:decision')
+   }else assert.match(answer.markdown,/需要您确认|建议指派的原因/)
    assert.ok(answer.markdown.length>200)
    const source=issueReply(id,'依据哪些数据和资料？',store)
    assert.doesNotMatch(source.markdown,/[A-Z]:[\\/]|ship_sop|模拟|演示|null|undefined/)

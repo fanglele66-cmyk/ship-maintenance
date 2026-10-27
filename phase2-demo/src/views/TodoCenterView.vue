@@ -32,7 +32,7 @@ const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),query=ref('
 const owners=computed(()=>[...new Set(store.activeTaskPortfolio.map(t=>store.assignments[t.id]?.owner||t.owner).filter(Boolean))])
 function closed(todo){return store.isTaskHandled(todo.id)}
 function cardTitle(todo){return todo.id==='drift'&&store.progress.drift>=2?todo.eventTitle:todo.initialTitle}
-function cardType(todo){return isMaintenanceWorkflow(todo)?'异动跟踪 · 维保评估任务':issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
+function cardType(todo){return isMaintenanceWorkflow(todo)?(store.trackingDispositions[parentIssueId(todo.id)]?.taskId===todo.id?'专项维保任务':'异动跟踪 · 维保评估任务'):issueCatalog.find(i=>i.id===todo.id)?.type||todo.cardType}
 function summary(todo){return store.completedTasks[todo.id]?.reason||(closed(todo)?'实际措施与现场验收已提交，持续效果与最终闭环在设备态势接续。':todo.stages[store.progress[todo.id]].summary)}
 
 const todoMarkdown=computed(()=>{
@@ -40,7 +40,7 @@ const todoMarkdown=computed(()=>{
  return `### 概况\n\n${report.overview}\n\n${report.bottleneck}\n\n### 建议\n\n${report.suggestionText}\n\n### 原因\n\n${report.reason}`
 })
 function openTodo(id){store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
-watch(()=>[route.path,route.query.todo,store.activeTaskPortfolio.map(item=>item.id).join('|')],()=>{if(route.path!=='/event')return;const id=route.query.todo;if(id&&store.activeTaskPortfolio.some(item=>item.id===id))store.selectTodo(id);else {store.closeTodo();if(id&&store.todoCreated[id])router.replace({path:'/situation/issue/'+parentIssueId(id),query:{...route.query,todo:undefined,from:'issues',tab:'处置记录'}})}},{immediate:true})
+watch(()=>[route.path,route.query.todo,store.activeTaskPortfolio.map(item=>item.id).join('|')],()=>{if(route.path!=='/event')return;const id=route.query.todo;if(id&&store.activeTaskPortfolio.some(item=>item.id===id))store.selectTodo(id);else {store.closeTodo();if(id&&store.todoCreated[id])router.replace({path:'/situation/issue/'+parentIssueId(id),query:{...route.query,todo:undefined,from:'issues',tab:store.cases[id]?.workflowKind==='tracking-observation'||store.cases[id]?.trackingOnly?'事件概览':store.executionObservationReady(id)?'效果观察':'处置记录'}})}},{immediate:true})
 const groups=computed(()=>{const items=store.activeTaskPortfolio.filter(todo=>(!owner.value||(store.assignments[todo.id]?.owner||todo.owner)===owner.value)&&(cardTitle(todo)+todo.device+cardType(todo)).includes(query.value.trim()));return[{title:'优先处理',items:items.filter(todo=>['报警事件','预警事件'].includes(todo.cardType))},{title:'处置中',items:items.filter(todo=>!['报警事件','预警事件'].includes(todo.cardType))}]})
 const updatedAt=ref(new Date())
 const updateLabel=computed(()=>updatedAt.value.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Shanghai'}))

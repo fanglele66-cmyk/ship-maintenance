@@ -156,7 +156,7 @@ const maintenanceDisabledActions=computed(()=>props.maintenanceDetail?[
  ...(!advice.sufficient || advice.decision==='execute' || store.isTaskHandled('maintenance')?['maintenance:execute']:[]),
  ...(!advice.sufficient || advice.decision==='defer' || store.isTaskHandled('maintenance')?['maintenance:defer']:[])
 ]:[])
-const displayedMessages=computed(()=>sessions.active.value.messages)
+const displayedMessages=computed(()=>sessions.active.value.messages.map(message=>mode.value==='todo'&&message.purpose==='execution-record'&&message.status==='pending'?{id:message.id,role:'assistant',kind:'scene',expanded:true,title:'维修验收',markdown:'维修步骤和备件说明见左侧页面。完成实际作业后，在验收确认页填写执行时间、措施及验收结果；仍有异常时接续下一轮排查。',actions:[{id:'todo:acceptance',label:'前往验收确认'}]}:message))
 watch(()=>sessions.active.value.id,async()=>{if(props.issueId)mergeIssueConversation(sessions.active.value.messages,automaticMessages.value);await nextTick();scrollRef.value?.scrollTo({top:props.issueId?0:scrollRef.value.scrollHeight})})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
 const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
@@ -220,6 +220,7 @@ function askMaintenance(text){
 }
 function askIssue(text){const session=sessions.active.value,afterEventRecordId=automaticMessages.value.findLast(message=>message.eventProcess)?.eventRecordId,at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text,at,afterEventRecordId}, {...issueReply(props.issueId,text,store),id:session.id+':reply:'+session.messages.length,at,afterEventRecordId});sessions.touch()}
 function runDemoAction(id){
+  if(id==='todo:acceptance'){store.detailTab='验收确认';return}
  if(props.issueId){if(id==='issue:ask:evidence')askIssue('还需核实哪些信息？');else if(id==='issue:ask:next')askIssue('下一步如何安排？');else if(id.startsWith('issue:section:'))emit('issue-section',id.slice('issue:section:'.length));else if(id==='issue:task'){const taskId=workbenchIssues(store).find(item=>item.id===props.issueId)?.taskId||props.issueId;if(store.todoCreated[taskId]){store.selectTodo(taskId);router.push({path:'/event',query:{todo:taskId}})}}return}
 
  if(props.maintenanceDetail && id.startsWith('maintenance:')){

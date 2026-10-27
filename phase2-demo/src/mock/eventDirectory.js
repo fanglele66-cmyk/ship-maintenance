@@ -1,5 +1,6 @@
+import {trackingDispositionSummary} from './trackingDisposition.js'
 import {workbenchIssues, issueDevices} from './captainWorkbench.js'
-import {isTrackingContainer, maintenanceChildIds} from './issueRelationships.js'
+import {isTrackingContainer, taskChildIds} from './issueRelationships.js'
 import {matchesSituationDevice} from './situationScope.js'
 import {closedEventReference} from './closedEventReferences.js'
 
@@ -22,7 +23,7 @@ function taskProgress(store, id) {
 
 export function eventDirectoryRows(store) {
   return workbenchIssues(store).map(row => {
-    const taskIds = [row.id, ...maintenanceChildIds(row.id)].filter(id =>
+    const taskIds = [row.id, ...taskChildIds(row.id)].filter(id =>
       !isTrackingContainer(id) && store.todoCreated?.[id])
     const tasks = taskIds.map(id => ({id, progress:taskProgress(store, id)}))
     const activeTasks = tasks.filter(task => task.progress !== '已完成')
@@ -34,8 +35,9 @@ export function eventDirectoryRows(store) {
       : activeTasks.length ? '已派发' : tasks.length ? '已完成' : '无人工任务'
     const taskId = activeTasks.find(task => task.id === row.taskId)?.id || activeTasks[0]?.id || tasks.at(-1)?.id || null
     const tracking = store.cases?.[row.id]?.trackingOnly || row.state === '跟踪中'
+    const disposition=store.trackingDispositions?.[row.id]
     const processingState = row.state === '已闭环' ? '已闭环'
-      : pendingDecision ? '待决策' : activeTasks.length ? '处置中'
+      : disposition ? disposition.status==='observing'?'专项观察中':'待轮机长确认' : pendingDecision ? '待决策' : activeTasks.length ? '处置中'
       : tracking ? '持续跟踪' : completedTaskCount ? '效果观察'
       : row.state === '已记录决定' ? '已记录决定' : row.state
     const taskCase = taskId && store.cases?.[taskId]
@@ -46,15 +48,16 @@ export function eventDirectoryRows(store) {
     const progressNote = pendingDecision && completedTaskCount
       ? `${completedTaskCount} 项任务已完成，新增建议等待决定`
       : tasks.length ? `${tasks.length} 项关联任务 · ${completedTaskCount} 项已完成`
+      : disposition?.priorProcessId ? disposition.status==='review'?'首轮核实已回交，待轮机长再次决策':'首轮核实过程已保留，后续安排沿原事件接续'
       : row.history ? '历史决定已保留，无关联执行任务' : '尚未建立人工执行任务'
     return {...row, taskId, taskIds, tasks, completedTaskCount, executionProgress,eventState:row.eventState,processingState,
       actionTaskId:row.eventState==='已闭环'?null:activeTasks.find(task=>task.id===taskId)?.id||activeTasks[0]?.id||null,
       reference:closedEventReference(row.id),
       taskOwner, stage, progressNote,
       firstObserved:store.cases?.[row.id]?.firstObserved || row.at || '',
-      continuation:processingState === '持续跟踪' && completedTaskCount
+      continuation:trackingDispositionSummary(disposition)|| (processingState === '持续跟踪' && completedTaskCount
         ? '本次人工任务已结束，健康趋势观测继续。'
-        : processingState === '效果观察' ? '人工任务已完成，持续效果与事件闭环仍待确认。' : '',
+        : processingState === '效果观察' ? '人工任务已完成，持续效果与事件闭环仍待确认。' : ''),
     }
   })
 }

@@ -11,21 +11,22 @@
   <main>
     <!-- 事件概览：结论与建议先行，关键依据摘要，推理可展开，快链与下一步 -->
     <template v-if="active==='事件概览'">
-      <EventDecisionBrief v-if="briefing" :brief="briefing" :event-type="issue.type"/>
+      <EventDecisionBrief v-if="briefing" :brief="decisionBriefing" :event-type="issue.type"/>
       <MarkdownContent v-else :content="dossier.overviewMarkdown"/>
-      <section v-if="briefing&&hasCurrentUpdate" class="dossier-block current-event-update"><h3>当前处置状态</h3><p>{{dossier.overviewSummary}}</p><button class="p2-link-button" type="button" @click="goTab('处置记录')">查看完整处置记录 →</button></section>
+      <section v-if="briefing&&hasCurrentUpdate&&!store.trackingDispositions[issue.id]" class="dossier-block current-event-update"><h3>当前处置状态</h3><p>{{dossier.overviewSummary}}</p><button class="p2-link-button" type="button" @click="goTab('处置记录')">查看完整处置记录 →</button></section>
+      <TrackingDisposition :scenario="issue.id"/>
       <div class="quick-links" aria-label="页签快链">
         <button type="button" @click="goTab('研判分析')">查看研判分析</button>
         <button type="button" @click="goTab('证据资料')">查看证据资料</button>
       </div>
       <button v-if="issue.type==='异动跟踪'" type="button" class="tracking-entry" @click="goTab('健康趋势观测')"><span><strong>健康趋势观测</strong><small>持续变化、现场核实与阶段性维保建议</small></span><span aria-hidden="true">查看跟踪 →</span></button>
       <section v-if="(issue.history||issue.eventState==='已闭环')&&!hasCurrentUpdate" class="dossier-block"><h3>处置结果</h3><p>{{dossier.reference?.result||store.completedTasks[issue.id]?.reason||issue.reason}}</p><button class="p2-link-button" type="button" @click="goTab('处置记录')">查看完整处置记录 →</button></section>
-      <section v-else-if="!issue.isTrackingContainer&&!store.isTaskHandled(issue.id)" class="next-step">
-        <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警现场核实':'评估并安排检查'"/>
+      <section v-else-if="issue.eventState!=='已闭环'&&!issue.isTrackingContainer&&!store.isTaskHandled(issue.id)" class="next-step">
+        <TaskAssignment :scenario="issue.id" :allow-ignore="issue.type!=='报警事件'" :action-title="issue.type==='报警事件'?'安排报警排查':issue.type==='预警事件'?'安排预警现场核实':'评估并安排检查'">
+          <template #secondary-action><button v-if="issue.type==='报警事件'" type="button" class="p2-secondary" @click="falseAlarmOpen=!falseAlarmOpen">{{falseAlarmOpen?'取消误报反馈':'反馈误报'}}</button></template>
+        </TaskAssignment>
         <button v-if="store.todoCreated[issue.id]" class="p2-primary" @click="openTask">查看处理任务</button>
         <template v-else-if="issue.type==='报警事件'">
-          <button class="p2-link-button" @click="falseAlarmOpen=!falseAlarmOpen">反馈误报</button>
-          <button v-if="falseAlarmOpen&&!feedback&&store.cases[issue.id]?.realCaseId" class="p2-secondary" @click="falseAlarmReason=decisionPreset(store.cases[issue.id],'false-alarm')">填写误报核实依据</button>
           <InquiryMessage v-if="falseAlarmOpen||feedback" :message="falseAlarmInquiry" @submit-inquiry="reportFalseAlarm"/>
         </template>
       </section>
@@ -130,8 +131,9 @@
 <div v-else class="p2-empty">未找到该事件，请返回态势中心。</div>
 </template>
 <script setup>
-import {decisionPreset} from '@/mock/realScenarioPresets'
 import BaselineTrend from './BaselineTrend.vue'
+import TrackingDisposition from './TrackingDisposition.vue'
+import {taskChildIds} from '@/mock/issueRelationships'
 import SituationTimeline from './SituationTimeline.vue'
 import SituationObservation from './SituationObservation.vue'
 import {computed,nextTick,ref,watch} from 'vue'
@@ -149,25 +151,34 @@ import TaskAssignment from './TaskAssignment.vue'
 import EventDecisionBrief from './EventDecisionBrief.vue'
 import EventEvidenceSources from './EventEvidenceSources.vue'
 import {eventBriefingFor} from '@/mock/eventBriefings'
+import {observationConfig} from '@/mock/phase2Observation'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
 watch(()=>props.scenario,id=>store.openRealCase(id),{immediate:true})
 const tabs=computed(()=>['事件概览',...(issue.value?.type==='异动跟踪'?['健康趋势观测']:[]),'研判分析','处置记录',...(observationTaskIds.value.length?['效果观察']:[]),'证据资料']),active=ref('事件概览'),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
 const rootRef=ref(null),overviewScroll=ref(0)
 const issue=computed(()=>workbenchIssues(store).find(item=>item.id===props.scenario))
-const recordIds=computed(()=>[...new Set([...(issue.value?.isTrackingContainer?[]:[props.scenario]),...(issue.value?.maintenanceRecommendations||[]).map(item=>item.id)])])
+const recordIds=computed(()=>[...new Set([...(issue.value?.isTrackingContainer?[]:[props.scenario]),...taskChildIds(props.scenario).filter(id=>store.todoCreated[id])])])
 const hasJournalRecords=computed(()=>store.storyJournal.some(record=>recordIds.value.includes(record.taskId)))
 const unloggedNotes=computed(()=>recordIds.value.flatMap(id=>store.dossierNotes[id]||[]).filter(note=>!dossier.value.timeline.some(entry=>entry.text===note.text||note.text==='忽略本次建议：'+entry.text)))
-const observationTaskIds=computed(()=>recordIds.value.filter(id=>store.executionRecords[id]?.length&&store.isTaskHandled(id)&&!store.completedTasks[id]&&store.eventStatus[id]!=='closed'))
+const observationTaskIds=computed(()=>recordIds.value.filter(id=>observationConfig[id]&&(store.executionRecords[id]?.length||store.observationHistory[id]?.length||store.observationRecords[id]?.length)))
 watch(tabs,value=>{if(!value.includes(active.value))active.value='处置记录'})
 watch(()=>[props.scenario,store.eventStatus[props.scenario]],()=>{if(store.eventStatus[props.scenario]==='pending'){falseAlarmOpen.value=false;falseAlarmReason.value='';feedback.value=false;active.value=tabs.value[0]}})
 watch(()=>[props.scenario,route.query.tab],()=>{active.value=tabs.value.includes(route.query.tab)?route.query.tab:tabs.value[0]},{immediate:true})
 const dossier=computed(()=>storyDossier(store,props.scenario))
 const briefing=computed(()=>eventBriefingFor(props.scenario))
+const decisionBriefing=computed(()=>{
+ const record=store.trackingDispositions[props.scenario]
+ if(!record?.priorProcessId||record.status!=='review'||record.observationResult)return briefing.value
+ return {...briefing.value,
+  captainDecision:'结合首轮核实反馈再次确认处置：已有充分解释时确认闭环；仍需现场检查时明确专项维保范围、责任人与条件；资料尚缺时确定补证与观察计划。',
+  dispatchReason:'首轮已复核月度相对变化并登记解释范围；工况、历史调整和独立测温校验仍有缺项。后续安排针对剩余信息需求，检查范围由补充证据确定。',
+ }
+})
 const rawSnapshots=computed(()=>(dossier.value.series||[]).flatMap(series=>{
   const index=series.values.findLastIndex(value=>Number.isFinite(value))
   return index<0?[]:[{name:series.name,value:series.values[index],unit:series.unit,at:series.labels[index]}]
 }))
-const hasCurrentUpdate=computed(()=>dossier.value.hasUpdate&&recordIds.value.some(id=>store.checkAssessments[id]||store.executionRecords[id]?.length||store.completedTasks[id]||store.ignoredSuggestions[id]))
+const hasCurrentUpdate=computed(()=>dossier.value.hasUpdate&&(Boolean(store.trackingDispositions[props.scenario])||recordIds.value.some(id=>store.checkAssessments[id]||store.executionRecords[id]?.length||store.completedTasks[id]||store.ignoredSuggestions[id])))
 const openedSeries=ref(new Set())
 watch(()=>props.scenario,()=>{openedSeries.value=new Set()})
 function toggleSeries(index,event){if(event.target.open)openedSeries.value.add(index);else openedSeries.value.delete(index)}
@@ -179,7 +190,7 @@ function goTab(tab){
 function openTask(){const id=issue.value.taskId||issue.value.id;if(!store.activeTaskPortfolio.some(item=>item.id===id)){goTab('处置记录');return}store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 const falseAlarmInquiry=computed(()=>({...assignmentTemplate.falseAlarm,text:'确认误报依据',hint:'记录现场核对与判断依据。本次处置将结束，原报警和快照仍保留。',id:'false-alarm-'+props.scenario,status:feedback.value?'submitted':'pending',values:{reason:falseAlarmReason.value},submitLabel:'确认误报并留档',receiptText:'本次误报决定及依据已保存，原始报警仍可回查。'}))
 function reportFalseAlarm(payload){const reason=payload.values.reason;if(!store.confirmFalseAlarm(issue.value.id,reason))return;falseAlarmReason.value=reason;feedback.value=true;falseAlarmOpen.value=false}
-async function showSection(section){if(section==='decision'){active.value=issue.value?.isTrackingContainer?'健康趋势观测':'事件概览';await nextTick();rootRef.value?.querySelector('.task-assignment')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.value.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
+async function showSection(section){if(section==='decision'){active.value=issue.value?.isTrackingContainer?'健康趋势观测':'事件概览';await nextTick();rootRef.value?.querySelector('.tracking-disposition, .task-assignment')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.value.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
 defineExpose({showSection})
 defineEmits(['back'])
 </script>

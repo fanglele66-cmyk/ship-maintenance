@@ -1,10 +1,9 @@
 <template>
   <section class="health-observation" aria-label="健康趋势观测">
-    <BaselineTrend :scenario="scenario"/>
     <div class="observation-intro">
       <div><span class="observation-kicker">持续观测 · 同一跟踪记录</span><h3>从健康变化到维保安排</h3></div>
       <span class="observation-state">{{ currentStage }}</span>
-      <p>结合可比趋势、现场反馈和计划窗口逐步判断。达到评估阶段后，维保建议和后续结果保留在本条异动跟踪中。</p>
+      <p>结合可比趋势与核实反馈，由轮机长确认变化解释、维保安排或专项观察。确认维保安排后，本次异动事件闭环，关联维保任务独立推进。</p>
     </div>
     <ol class="observation-stages" aria-label="健康跟踪阶段">
       <li v-for="(label, index) in stages" :key="label" :class="{ current: index === stageIndex, reached: index < stageIndex }">
@@ -14,7 +13,7 @@
 
     <HealthTrackingPanel :request-id="scenario" detail embedded />
 
-    <section v-if="!recommendations.length" class="observation-waiting">
+    <section v-if="!recommendations.length&&!store.trackingDispositions[scenario]&&!store.canDecideTracking(scenario)" class="observation-waiting">
       <h3>当前持续观测，尚未形成维保建议</h3>
       <p>先核对变化是否持续、工况是否可比，以及现场信息是否充分。形成新的检查需求后，再在此处评估必要性与实施条件。</p>
     </section>
@@ -31,11 +30,12 @@
         <MarkdownContent v-else :content="storyDossier(store, recommendation.id).evidenceMarkdown" />
       </details>
       <div v-if="store.completedTasks[recommendation.id]" class="recommendation-result">
-        <strong>本轮评估结果已回写</strong><p>{{ store.completedTasks[recommendation.id].reason }}</p><p>原健康跟踪和未完成的周期项目继续保留。</p>
+        <strong>关联维保任务结果</strong><p>{{ store.completedTasks[recommendation.id].reason }}</p><p>维保任务的执行与验收记录保持关联，原周期项目按实际完成范围登记。</p>
       </div>
-      <TaskAssignment v-else :scenario="recommendation.id" action-title="评估维保必要性与实施条件" />
+      <TaskAssignment v-else-if="!store.canDecideTracking(scenario)&&!store.trackingDispositions[scenario]" :scenario="recommendation.id" action-title="评估维保必要性与实施条件" />
       <button v-if="store.todoCreated[recommendation.id]" type="button" class="p2-secondary" @click="openTask(recommendation.id)">查看维保评估与执行记录</button>
     </article>
+    <BaselineTrend class="long-term-trend" :scenario="scenario"/>
   </section>
 </template>
 
@@ -56,10 +56,10 @@ import {eventBriefingFor} from '@/mock/eventBriefings'
 const props = defineProps({ scenario: { type: String, required: true } })
 const store = usePhase2DemoStore(), router = useRouter()
 const recommendations = computed(() => maintenanceRecommendations(store, props.scenario))
-const stages = ['健康趋势观测', '核实变化与背景', '形成维保建议', '评估与结果回写']
+const stages = ['健康趋势观测', '核实变化与背景', '轮机长处置决策', '事件闭环']
 const stageIndex = computed(() => {
-  if (recommendations.value.some(item => store.checkAssessments[item.id] || store.completedTasks[item.id] || store.executionRecords[item.id]?.length)) return 3
-  if (recommendations.value.length) return 2
+  if (store.trackingDispositions[props.scenario]?.status==='closed') return 3
+  if (store.canDecideTracking(props.scenario)||recommendations.value.length) return 2
   return store.todoCreated[props.scenario] || store.checkAssessments[props.scenario] ? 1 : 0
 })
 const currentStage = computed(() => stages[stageIndex.value])
@@ -78,6 +78,7 @@ function openTask(id) {
 
 <style scoped>
 .health-observation{padding-top:20px;color:#526176;line-height:1.8;min-width:0}
+.long-term-trend{margin-top:28px}
 .observation-intro{display:flex;align-items:center;justify-content:space-between;gap:10px 20px;flex-wrap:wrap}
 .observation-kicker{font-size:12px;color:#8c7858;letter-spacing:.03em}
 .health-observation h3{font-size:17px;color:#283b50;margin:4px 0}

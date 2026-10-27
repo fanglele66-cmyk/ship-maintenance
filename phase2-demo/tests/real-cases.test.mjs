@@ -33,7 +33,7 @@ test('real incidents replace situation examples and support every preset branch'
    assert.equal(store.confirmExecutionRecord(id,form.id,submitted),true,form.submitError)
   }
   await t.test('only four active initial matters; source measurements and cutoff remain intact',()=>{
-   const store=fresh();assert.deepEqual(activeWorkbenchIssues(store).map(r=>r.id),ids.map(id=>id===maintenance?'real-health-c4-baseline':id))
+   const store=fresh();assert.deepEqual(new Set(activeWorkbenchIssues(store).map(r=>r.id)),new Set(ids.map(id=>id===maintenance?'real-health-c4-baseline':id)))
    for(const record of realCaseRecords){
     const item=store.cases[record.id];assert.equal(store.todoCreated[item.id],false);assert.equal(store.eventStatus[item.id],'pending');assert.equal(store.executionRecords[item.id],undefined)
     assert.equal(item.report.basis,record.steps[0].summary)

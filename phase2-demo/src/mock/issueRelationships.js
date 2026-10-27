@@ -4,11 +4,19 @@ export const maintenanceParents = Object.freeze({
   maintenance: 'bearing-health',
   'aux-maintenance': 'aux-health',
   'real-maintenance-c4-baseline': 'real-health-c4-baseline',
+  'real-maintenance-c1-baseline': 'real-tracking-exhaust-baseline',
 })
+export const observationParents = Object.freeze({
+  'real-observation-c1-baseline':'real-tracking-exhaust-baseline',
+  'real-observation-c4-baseline':'real-health-c4-baseline',
+  'aux-observation':'aux-health',
+})
+export function observationChildId(id){return Object.keys(observationParents).find(child=>observationParents[child]===parentIssueId(id))}
+export function taskChildIds(id){return [...maintenanceChildIds(id),...Object.keys(observationParents).filter(child=>observationParents[child]===parentIssueId(id))]}
 export const trackingContainerIds = Object.freeze(['bearing-health', 'real-health-c4-baseline'])
 export const historicalIssueParents = Object.freeze({'maintenance-history': 'bearing-health'})
 export const issueTypeNames = Object.freeze(['报警事件', '预警事件', '异动跟踪'])
-export function parentIssueId(id) { return maintenanceParents[id] || historicalIssueParents[id] || id }
+export function parentIssueId(id) { return maintenanceParents[id] || observationParents[id] || historicalIssueParents[id] || id }
 export function maintenanceChildIds(id) {
   const parent = parentIssueId(id)
   return Object.keys(maintenanceParents).filter(child => maintenanceParents[child] === parent)
@@ -46,7 +54,7 @@ export function maintenanceRecommendations(store, id) {
 }
 export function canonicalIssueRoute(to) {
   const id = to.params?.attentionId
-  if (!id || !(maintenanceParents[id] || historicalIssueParents[id])) return null
+  if (!id || !(maintenanceParents[id] || observationParents[id] || historicalIssueParents[id])) return null
   const navigation = resolveIssueNavigation(id)
   return {
     path: `/situation/issue/${navigation.id}`,

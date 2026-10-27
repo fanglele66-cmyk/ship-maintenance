@@ -1,4 +1,6 @@
+import {guidedTask} from './taskGuidance.js'
 import {baselineTaskSets,baselineDirections} from './baselineTaskContent.js'
+import {buildC1Maintenance,c1MaintenanceId} from './trackingDisposition.js'
 import data from './realCases.json' with {type:'json'}
 import {observationPresets,realAssessmentContent} from './realScenarioPresets.js'
 import {eventBriefingFor} from './eventBriefings.js'
@@ -9,7 +11,7 @@ import {taskPackages, maintenanceWork, assigneeBriefs, assigneeStageMarkdown} fr
 export const realCaseRecords = data.cases || []
 const typeNames={alarm:'报警事件',warning:'预警事件',tracking:'异动跟踪',maintenance:'维保建议'}
 export const simulationNotice='人工派发、核实、作业和结束步骤为补全演示；不证明真实检查、维修或永久更换已经发生。'
-export const realCaseFor=id=>realCaseRecords.find(item=>item.id===id||item.id+'-replay'===id)
+export const realCaseFor=id=>realCaseRecords.find(item=>item.id===(id===c1MaintenanceId?'real-tracking-exhaust-baseline':id)||item.id+'-replay'===id)
 export const realCaseType=item=>item.viewId||Object.keys(typeNames).find(key=>typeNames[key]===item.type)||item.type
 const clone=value=>JSON.parse(JSON.stringify(value))
 const text=value=>typeof value==='string'?value:JSON.stringify(value||'')
@@ -76,7 +78,7 @@ function buildCase(record){
  const packages=taskPackages(type),service=maintenanceWork()
  let stages
  if(type==='alarm')stages=[intro,stage('investigate','原因排查','check','分别核实 C2 ICU 与供给方向',taskSet(type)),stage('repair','对应处置','work','只处理实际发现支持的范围')]
- else if(type==='warning')stages=[intro,stage('check','真实性核实','check','核对压力事实与发生工况',taskSet(type)),stage('event','异常研判','event','区分减压阀故障、临时恢复与未完成事项'),stage('investigate','原因排查','check','分别核查减压阀与控制空气供给',[task('核查空气减压阀状态','记录两组阀的使用状态与阀前后压力；在获准隔离条件下检查阀芯密封和调压动作，区分临时恢复与正式更换需求。',findings,'regulator'),task('核查控制空气供给及工况','保留上下游压力、负荷和供给条件，不以一个部件结论代替全部通路检查。',findings,'air')]),stage('repair','对应处置','work','记录核实后确认的范围')]
+ else if(type==='warning')stages=[intro,stage('event','异常研判','check','核对低压事实与工况，确定排查方向',taskSet(type)),stage('investigate','原因排查','check','分别核查减压阀与控制空气供给',[task('核查空气减压阀状态','记录两组阀的使用状态与阀前后压力；在获准隔离条件下检查阀芯密封和调压动作，区分临时恢复与正式更换需求。',findings,'regulator'),task('核查控制空气供给及工况','保留上下游压力、负荷和供给条件，不以一个部件结论代替全部通路检查。',findings,'air')]),stage('repair','对应处置','work','记录核实后确认的范围')]
  else if(type==='tracking')stages=[intro,stage('check','基线核实','check','核实一缸月度工况与测温基线',taskSet(type))]
  else stages=[intro,stage('check','提前评估','check','分别判断后续检查必要性与作业条件',taskSet(type)),stage('service','检查与维护','work',service.title,service.tasks)]
  stages.push(stage('observe',type==='tracking'?'核实结束':'效果观察','observe',type==='tracking'?'本次核实结束，月度健康跟踪继续':'补充处理后可比资料，禁止复用历史采样冒充修后数据'),stage('closed','本轮结束','closed','本轮处理记录已保留，可回查处置与观察依据'))
@@ -103,6 +105,8 @@ function buildCase(record){
  return applyBriefing(result)
 }
 export const realWorkflowCases=realCaseRecords.map(record=>buildCase(record))
+realWorkflowCases.push(buildC1Maintenance(realWorkflowCases.find(item=>item.id==='real-tracking-exhaust-baseline')))
+for(const item of realWorkflowCases)for(const stage of item.stages)if(stage.kind==='check')stage.tasks=stage.tasks.map(guidedTask)
 export const realHealthTracks=realWorkflowCases.filter(c=>c.trackingOnly).map(c=>({id:c.id+'-track',requestId:c.id,deviceId:c.deviceId,device:c.device,title:'一缸排温长期基线抬升跟踪',status:'待核实月度基线',conclusion:c.report.conclusion,next:c.report.human,realCaseId:c.realCaseId,nodes:(realCaseFor(c.id).steps||[]).filter(s=>!s.isSimulation&&(!c.realReplay||s.id===realCaseFor(c.id).steps?.[0]?.id)).map(s=>({label:s.title,at:s.time||realCaseFor(c.id).timeRange?.start,values:s.summary,context:'跨月同刻配对采样与工况筛选',judgement:s.result||''})),laterNodes:[]}))
 
 export function assessRealCase(item,stage,feedback){

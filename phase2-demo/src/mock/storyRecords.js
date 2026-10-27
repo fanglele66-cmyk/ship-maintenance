@@ -1,9 +1,10 @@
 import {realCaseFor} from './realCaseAdapter.js'
 import fixtures from './fourStoryFixtures.json' with {type:'json'}
 import {healthTrackingSources} from './healthTrackingSources.js'
-import {parentIssueId,maintenanceChildIds} from './issueRelationships.js'
+import {parentIssueId,taskChildIds} from './issueRelationships.js'
 import {closedEventReference} from './closedEventReferences.js'
 import {eventBriefingFor} from './eventBriefings.js'
+import {trackingProcessReference} from './trackingProcessReferences.js'
 
 // Original samples and user actions are separate immutable sources. Project them
 // into a single chronology; never rewrite an earlier sample with today's answer.
@@ -24,12 +25,17 @@ export function storyTimeline(store,id,{taskOnly=false}={}){
  const realTrack=sourceTrack(id,store),realId=realTrack?.realCaseId?(realTrack.sourceCaseId||realTrack.requestId):id,real=realCaseFor(realId)
  if(real){
   const entries=(store.storyJournal||[]).filter(entry=>taskOnly?entry.taskId===id:entry.taskId===realId||entry.rootId===realTrack?.id).map(entry=>({...entry,label:entry.title,at:entry.storyAt||'来源未记录具体时刻',done:true}))
+  const prior=!taskOnly?trackingProcessReference(id)?.records||[]:[]
+  // Stable reference IDs also protect resumed journals that retained these
+  // reference records. Keep the prior process before newly submitted actions.
+  const priorIds=new Set(prior.map(entry=>entry.id))
+  const live=entries.filter(entry=>!priorIds.has(entry.id))
   const first=real.steps?.[0]
-  return [...(!taskOnly&&first?[{id:realId+':initial-source',kind:'source',label:first.title,at:first.time||'来源未记录具体时刻',text:first.summary,assessment:first.result||'',actor:'原始采样／来源文献',isSimulation:false,done:true}]:[]),...entries]
+  return [...(!taskOnly&&first?[{id:realId+':initial-source',kind:'source',label:first.title,at:first.time||'来源未记录具体时刻',text:first.summary,assessment:first.result||'',actor:'原始采样／来源文献',isSimulation:false,done:true}]:[]),...prior.map(entry=>({...entry,done:true})),...live]
  }
  const track=sourceTrack(id,store),root=track?.id||id
  const original=!taskOnly&&track?track.nodes.map((node,index)=>({id:`${root}:origin:${index}`,kind:'sample',label:node.label,at:node.at||originalDate(node.label),text:node.values+'；'+node.context,assessment:node.judgement,actor:'AI设备健康分析',order:index-100,done:true})):[]
- const children=maintenanceChildIds(id)
+ const children=taskChildIds(id)
  const historical=!taskOnly?fixtures.history.filter(item=>parentIssueId(item.id)!==item.id&&parentIssueId(item.id)===(track?.requestId||id)).map(item=>({
    id:item.id,kind:'decision',label:item.title,at:item.at,text:item.reason,
    assessment:item.outcome,actor:item.actor,done:true,source:'已留存的历史决定',
@@ -59,6 +65,7 @@ export function healthStoryMarkdown(store,id){
 }
 export function storyRevision(store,id){
  const track=sourceTrack(id,store)
- const children=maintenanceChildIds(id)
- return (store.storyJournal||[]).filter(entry=>entry.taskId===id||children.includes(entry.taskId)||track&&entry.rootId===track.id).at(-1)?.id||'origin'
+ const children=taskChildIds(id)
+ const prior=trackingProcessReference(id)?.records||[],priorIds=new Set(prior.map(entry=>entry.id))
+ return (store.storyJournal||[]).filter(entry=>!priorIds.has(entry.id)&&(entry.taskId===id||children.includes(entry.taskId)||track&&entry.rootId===track.id)).at(-1)?.id||prior.at(-1)?.id||'origin'
 }

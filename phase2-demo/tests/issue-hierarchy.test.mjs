@@ -19,10 +19,11 @@ test('maintenance assessments stay within their health tracking and preserve exe
   await t.test('three event types and four initial matters retain separate source problems without exposing child events',()=>{
    const store=fresh(),rows=activeWorkbenchIssues(store)
    assert.deepEqual(issueTypes,['报警事件','预警事件','异动跟踪'])
-   assert.deepEqual(rows.map(row=>row.id),['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline',parent])
+   assert.deepEqual(rows.map(row=>row.id),['real-alarm-0430','real-warning-0523',parent,'real-tracking-exhaust-baseline'])
    assert.equal(new Set(rows.map(row=>row.sourceEventId)).size,4)
    assert.equal(rows.some(row=>row.id===child),false)
-   assert.equal(rows.find(row=>row.id===parent).decisionId,child)
+   assert.equal(rows.find(row=>row.id===parent).decisionId,parent)
+   assert.equal(rows.find(row=>row.id===parent).state,'待轮机长确认')
    assert.equal(rows.find(row=>row.id===parent).maintenanceRecommendations[0].id,child)
    assert.equal(store.cases[child].workflowKind,'maintenance')
    assert.equal(store.cases[child].cardType,'异动跟踪')

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {eventBriefings,eventBriefingFor} from '../src/mock/eventBriefings.js'
 
 test('each event briefing has a distinct decision, traceable facts and explicit branches',()=>{
- assert.deepEqual(Object.keys(eventBriefings),['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline','real-maintenance-c4-baseline'])
+ assert.deepEqual(Object.keys(eventBriefings),['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline','real-maintenance-c4-baseline','real-maintenance-c1-baseline'])
  for(const [id,item] of Object.entries(eventBriefings)){
   assert.equal(item.id,id)
   assert.ok(item.conclusion&&item.captainDecision&&item.dispatchReason&&item.boundary)
@@ -53,6 +53,6 @@ test('baseline maintenance stays within the same health tracking without a past 
  assert.deepEqual(child.facts,parent.facts);assert.deepEqual(child.sources,parent.sources)
  assert.match(parent.conclusion,/绝对排温并非持续下降/)
  assert.doesNotMatch(JSON.stringify(parent),/临修|HRD|控制空气|2026-06-09/)
- assert.ok(child.branches.some(branch=>branch.condition.includes('条件具备')))
+ assert.ok(child.branches.some(branch=>branch.next.includes('确认责任人')&&branch.next.includes('闭环本事件')))
  assert.ok(child.branches.some(branch=>branch.condition.includes('条件不具备')))
 })

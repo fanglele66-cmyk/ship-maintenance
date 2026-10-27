@@ -10,7 +10,7 @@ test('real branch feedback keeps evidence limits and gives an actionable next st
   const {feedbackPresets,realAssessmentContent,executionPreset,executionPresetOptions,realExecutionContent,realObservationContent,decisionPreset,observationPresets}=await server.ssrLoadModule('/src/mock/realScenarioPresets.js')
   const {observationResult}=await server.ssrLoadModule('/src/mock/phase2Observation.js')
   const cases=Object.fromEntries(realWorkflowCases.map(item=>[item.realType,item]))
-  await t.test('45 combinations preserve scope, missing evidence and distinct conclusions',()=>{
+  await t.test('54 combinations preserve scope, missing evidence and distinct conclusions',()=>{
    let count=0
    for(const item of realWorkflowCases)for(const stage of item.stages.filter(stage=>stage.kind==='check')){
     const original=JSON.stringify(item),branches=feedbackPresets(item,stage),messages=[]
@@ -34,7 +34,7 @@ test('real branch feedback keeps evidence limits and gives an actionable next st
     assert.equal(new Set(messages).size,9,'each combination must reflect both submitted directions')
     assert.equal(JSON.stringify(item),original,'editable branch drafts must not mutate the initial evidence or stage history')
    }
-   assert.equal(count,45)
+   assert.equal(count,54)
   })
   await t.test('a load explanation cannot erase an unresolved pressure reading mismatch',()=>{
    const item=cases.warning,stage=item.stages.find(stage=>stage.id==='check')
@@ -77,14 +77,14 @@ test('real branch feedback keeps evidence limits and gives an actionable next st
     assert.equal(new Set(messages).size,5)
    }
   })
-  await t.test('12 observation branches retain case-specific evidence and do not confuse elapsed time with sampling',()=>{
+  await t.test('16 observation branches retain case-specific evidence and do not confuse elapsed time with sampling',()=>{
    assert.deepEqual(observationPresets['real-alarm-0430'].before,[80.4,347.5])
    for(const item of [cases.alarm,cases.warning,cases.maintenance]){
     const days=item.observation.days
     for(const type of ['continue','extend','reinspect','archive']){
      const content=realObservationContent(item,type,days)
      assert.ok(content.title&&content.text&&content.next)
-     assert.match(content.text,item.realType==='alarm'?/二缸|ICU/:item.realType==='maintenance'?/四缸|排温|Pmax/:/压力|减压阀/)
+     assert.match(content.text,item.realType==='alarm'?/二缸|ICU/:item.realType==='maintenance'?/一缸|四缸|排温|Pmax/:/压力|减压阀/)
      if(type==='archive')assert.match(content.next,/由人员确认/)
     }
     const result=observationResult(item.id,[{status:'extended',day:0}],days+1)

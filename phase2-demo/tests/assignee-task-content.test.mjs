@@ -28,7 +28,7 @@ test('dispatched tasks retain operator instructions and scope-specific execution
     assert.ok(!item.stages.some(stage=>stage.kind==='work'),'normal maneuver verification must not invent repair')
     return
    }
-   if(item.realType==='warning'){submit(['现场与系统一致','工况可比，偏离仍存在']);store.advanceTodo(id)}
+   if(item.realType==='warning'){submit(['现场与系统一致','工况可比，偏离仍存在'])}
    submit(item.realType==='maintenance'?['有提前处理依据','条件具备']:[0,1].map(index=>directions.includes(index)?'发现异常':'未见异常'))
    const stage=store.currentStage,detail=item.workDetails
    assert.equal(stage.kind,'work')
@@ -38,13 +38,16 @@ test('dispatched tasks retain operator instructions and scope-specific execution
    assert.ok(detail.acceptanceRows.every(row=>row.name&&row.req&&row.method))
    assert.ok(stage.tasks.every(task=>task.checks.length>=2&&task.recordHint&&task.feedback))
    const form=store.executionInquiry(id)
-   assert.equal(form.fields.filter(field=>/^task\d+$/.test(field.key)).length,stage.tasks.length)
+   assert.deepEqual(form.fields.map(field=>field.key),['executedAt','measures','acceptance','verification'])
+   assert.deepEqual(form.fields.at(-1).options.map(option=>option.value),['resolved','unresolved'])
    assert.ok(!form.values.measures&&!form.values.acceptance,'instructions must not pre-confirm work')
    assert.ok(form.fields.filter(field=>/^note\d+$/.test(field.key)).every(field=>field.placeholder))
    if(item.realType!=='maintenance'){
     const selected=Object.values(item.packages).filter((_,index)=>directions.includes(index))
     assert.deepEqual(detail.parts.map(part=>part.name),selected.flatMap(pack=>pack.parts.map(part=>part.name)))
-    assert.deepEqual(stage.tasks.map(task=>task.label),selected.flatMap(pack=>pack.tasks.map(task=>task.label)))
+    assert.ok(stage.tasks.length>=2&&stage.tasks.length<=4,'repair sequence stays within 2–4 steps')
+    assert.equal(detail.acceptanceRows.length,stage.tasks.length)
+    assert.equal(stage.tasks.length,directions.length+2,'each selected direction plus shared isolation and restoration')
    }
    const draft=executionPreset(item,stage,'complete')
    assert.ok(stage.tasks.every((task,index)=>draft['note'+index]===task.feedback))

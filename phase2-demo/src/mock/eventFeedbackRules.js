@@ -11,8 +11,14 @@ for(const item of additionalScenarios)checkFeedbackRules[item.id+':investigate']
 export function checkChoices(eventId,stageId,index){const stage=workflowCases[eventId]?.stages.find(item=>item.id===stageId);return stage?choicesFor(stage,index):checkFeedbackRules[`${eventId}:${stageId}`]?.options[index]||['发现异常','未见异常','无法确认']}
 export function assessCheckFeedback(eventId,stage,feedback){
  if(workflowCases[eventId])return assessWorkflow(eventId,stage,feedback)
- if(!Array.isArray(feedback)||feedback.length!==stage.tasks?.length||feedback.some((entry,i)=>entry.label!==stage.tasks[i].label||!checkChoices(eventId,stage.id,i).includes(entry.result)))return {valid:false,advance:false,message:'请完整填写各项实际检查结果后提交。'}
- const rule=checkFeedbackRules[`${eventId}:${stage.id}`]
+ const baseStageId=stage.baseStageId||stage.id
+ if(!Array.isArray(feedback)||feedback.length!==stage.tasks?.length||feedback.some((entry,i)=>entry.label!==stage.tasks[i].label||!checkChoices(eventId,baseStageId,i).includes(entry.result)))return {valid:false,advance:false,message:'请完整填写各项实际检查结果后提交。'}
+ if(stage.round>1){
+  const packages=stage.tasks.filter((task,index)=>feedback[index].result==='发现异常').map(task=>task.followupKey)
+  const message=packages.length?'本轮新发现已保存，仅处理本次反馈支持的方向；未见异常及无法确认的项目不自动纳入维修。':'本轮复查结果已保存，尚无新增定位依据；继续补充复发工况和未覆盖检查，不沿用前轮维修范围。'
+  return {valid:true,advance:packages.length>0,packages,message,reply:message}
+ }
+ const rule=checkFeedbackRules[`${eventId}:${baseStageId}`]
  if(rule?.allowMultipleFindings&&feedback.every(entry=>entry.result==='发现异常')){
   const message='本轮反馈已保存，两处异常均保留，进入维修处置阶段。处置前请结合滤器与温控阀的实际发现确认作业范围，不能仅凭选项判定唯一原因，也不能只处理滤器就认定全部异常已排除。'
   return {valid:true,advance:true,message,reply:message}

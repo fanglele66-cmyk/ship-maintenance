@@ -20,9 +20,9 @@ export const cylinderOneBrief={
   {title:'提交基线解释与后续范围',detail:'分别登记已知固有差异、测温偏移、运行影响和仍需核实项；只有检查证据支持时，提出对应喷油或排气机构检查。'},
  ],
  branches:[
-  {condition:'历史记录能够解释变化，测温核对一致',next:'登记确认后的适用基线与工况，继续月度跟踪；不因偏差数值直接换件。'},
-  {condition:'存在通道差异或燃烧平衡异常线索',next:'保留原始记录，在本条跟踪中提出对应校验或专项检查需求，另行确认实施条件。'},
-  {condition:'历史调整或独立核验资料不足',next:'保留基线变化结论，补充缺项；不把原因未知写成正常或故障已确认。'},
+  {condition:'历史记录能够解释变化，测温核对一致',next:'由轮机长确认变化解释与适用工况，闭环本次异动事件，设备继续常规健康监测。'},
+  {condition:'存在通道差异或燃烧平衡异常线索',next:'形成校验或专项维保建议，轮机长确认责任人、范围与计划窗口后生成关联任务并闭环本事件；实际作业与验收由维保任务继续。'},
+  {condition:'历史调整或独立核验资料不足',next:'保存观察期限、关注指标、负责人及下次判断条件。提交观察结果后，由轮机长重新决定闭环、维保或延长观察。'},
  ],
  sources:[commonSource,{id:'baseline-report',title:'一缸温度异常轮机长确认问题清单',date:'2026-08-04 / 月度复核至 08-12',kind:'轮机长确认问题清单',summary:'原问题清单及配图，含 1—8 月三种缸间比较方法和现场确认项目。',records:[{label:'原观测时段',value:'2026-08-04 17:00:14—22:59:49，1,179 个样本'},{label:'一缸排温',value:'375.2–385.9°C；均值 380.33°C'},{label:'其余五缸均温',value:'369.72°C'},{label:'需轮机长确认',value:'历史排温差异；4—7 月喷油器、排气阀、Pmax 平衡及温度传感器校验情况'}]}],
  boundary:'同转速筛选不等于负荷和燃油条件完全一致。扫气温差长期稳定，冷却水与活塞油未支持一缸同步恶化；趋势成立不等于故障确诊。',
@@ -48,9 +48,10 @@ export const cylinderFourBrief={
   {title:'核对实施条件与验收安排',detail:'明确校验仪、探头或配套密封备料、批准范围及停机隔离窗口；验收保留同工况六缸数据和仍未解释的偏差。'},
  ],
  branches:[
-  {condition:'有专项检查依据，且实施条件具备',next:'按获批范围校验与检查，只有实际发现支持时才维护或换件；结果回写本跟踪。'},
+  {condition:'有专项检查依据，需要推动维保',next:'形成维保建议，确认责任人、范围、计划窗口与条件安排后闭环本事件；关联维保任务独立执行并保留结果。'},
   {condition:'有检查必要但条件不具备',next:'保留待安排需求，落实校验设备、备件或停机窗口，继续月度跟踪。'},
-  {condition:'已有基线解释或资料仍不充分',next:'记录不提前检查的依据或待补资料，保留继续观察安排；不强制修正至零温差。'},
+  {condition:'已有合理基线解释',next:'轮机长确认解释与依据后闭环本次异动事件，常规健康监测继续；不强制修正至零温差。'},
+  {condition:'原因或影响仍不明确',next:'提交观察期限、关注指标、负责人及下次判断条件。补充观察结果后重新确认处置。'},
  ],
  sources:[commonSource],
  boundary:'该变化由同刻数据库记录重新计算，并无四缸部件失效或维修完成记录。其他缸的变化会影响参照均值，必须结合工况、校验与现场检查判断原因。',
@@ -59,4 +60,5 @@ export const cylinderFourBrief={
 export const baselineBriefings={
  [cylinderOneBrief.id]:cylinderOneBrief,[cylinderFourBrief.id]:cylinderFourBrief,
  'real-maintenance-c4-baseline':{...cylinderFourBrief,id:'real-maintenance-c4-baseline',parentIssueId:cylinderFourBrief.id,title:'四缸测温与燃烧平衡检查评估'},
+ 'real-maintenance-c1-baseline':{...cylinderOneBrief,id:'real-maintenance-c1-baseline',parentIssueId:cylinderOneBrief.id,title:'一缸测温与燃烧平衡专项检查'},
 }

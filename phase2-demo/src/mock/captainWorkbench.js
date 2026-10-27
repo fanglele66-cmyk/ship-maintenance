@@ -3,12 +3,15 @@ import {issueTypeNames,maintenanceChildIds,maintenanceRecommendations,isTracking
 export const issueCatalog=[...workflowIssues,...historicalDecisions.filter(item=>!item.parentIssueId).map(item=>({...item,rank:issueTypeNames.indexOf(item.type),summary:item.reason,evidence:item.facts,limit:item.outcome,history:true,action:'查看记录'}))]
 export function issueState(store,id){
  const item=store.cases?.[id],children=maintenanceRecommendations(store,id)
+ const disposition=store.trackingDispositions?.[id]
+ if(disposition?.status==='closed')return {state:'已闭环',taskId:null,decisionId:id}
+ if(disposition)return {state:disposition.status==='observing'?'专项观察中':'待轮机长确认',taskId:null,decisionId:id}
  const assigned=children.find(child=>child.state==='已派发'&&store.eventStatus?.[child.id]!=='closed')
  const pending=children.find(child=>child.state==='待决策')
  if(assigned)return {state:'已派发',taskId:assigned.id,decisionId:assigned.id}
  if(pending)return {state:'待决策',taskId:null,decisionId:pending.id}
  if(!isTrackingContainer(id)&&store.todoCreated?.[id]&&!store.completedTasks?.[id]&&store.eventStatus?.[id]!=='closed')return {state:'已派发',taskId:id,decisionId:id}
- if(item?.trackingOnly&&(isTrackingContainer(id)||store.completedTasks?.[id]?.action==='finish-tracking'))return {state:children.some(child=>child.state==='已记录决定')?'已记录决定':'跟踪中',taskId:null,decisionId:null}
+ if(item?.trackingOnly&&(isTrackingContainer(id)||store.completedTasks?.[id]?.action==='finish-tracking'))return {state:store.completedTasks?.[id]?'待轮机长确认':children.some(child=>child.state==='已记录决定')?'已记录决定':'跟踪中',taskId:null,decisionId:id}
  return {state:store.eventStatus?.[id]==='closed'?'已闭环':store.ignoredSuggestions?.[id]?'已记录决定':'待决策',taskId:store.todoCreated?.[id]?id:null,decisionId:id}
 }
 // Public event status is deliberately independent of the executable task phase.
@@ -34,7 +37,7 @@ export function captainAnalysis(store,deviceIds){
 
 // Completion of hands-on work is distinct from closure after observation.
 export function isIssueClosed(store,id){const root=parentIssueId(id);return issueState(store,root).state==='已闭环'}
-export function activeWorkbenchIssues(store){return workbenchIssues(store).filter(i=>['待决策','已派发'].includes(i.state))}
+export function activeWorkbenchIssues(store){return workbenchIssues(store).filter(i=>i.eventState!=='已闭环')}
 
 export const issueDevices=[{value:'main-engine-1',label:'主机'},{value:'aux-engine-1',label:'1号辅机'},{value:'aux-engine-2',label:'2号辅机'},{value:'aux-engine-3',label:'3号辅机'}]
 export const issueTypes=[...issueTypeNames]

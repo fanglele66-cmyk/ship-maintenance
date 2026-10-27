@@ -1,4 +1,5 @@
-import {isMaintenanceWorkflow,isTrackingContainer,parentIssueId} from '@/mock/issueRelationships'
+import {isMaintenanceWorkflow,isTrackingContainer,parentIssueId,maintenanceChildIds,observationChildId,taskChildIds} from '@/mock/issueRelationships'
+import {trackingDispositionSummary} from '@/mock/trackingDisposition'
 import {isIssueClosed} from '@/mock/captainWorkbench'
 import {sourceTrack,storyDate,healthStoryMarkdown} from '@/mock/storyRecords'
 import additionalScenarios from '@/mock/additionalScenarios.json'
@@ -17,7 +18,10 @@ import { validateInquiry } from '@/message-flows/inquiryFields'
 import { assessCheckFeedback } from '@/mock/eventFeedbackRules'
 import {workflowCases,workflowIds,isWorkflow,composeRepair,workflowReply,healthTracks,deviceStoryAssessment,stageReport} from '@/mock/fourStoryWorkflow'
 import {realCaseFor} from '@/mock/realCaseAdapter'
+import {followupStage,followupRepair} from '@/mock/followupRounds'
 import {observationReviewOptions,parseObservationReview} from '@/mock/observationReview'
+import {observationRoundSnapshot} from '@/mock/observationRounds'
+import {trackingProcessReferences,trackingProcessReference} from '@/mock/trackingProcessReferences'
 
 export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const attention = attentionItems
@@ -26,6 +30,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const checkAssessments=reactive({}),completedTasks=reactive({}),eventStatus=reactive({})
   const healthUpdates=reactive({}),stageHistory=reactive({}),workflowRounds=reactive({})
   const unlockedRecommendations=reactive({})
+  const trackingDispositions=reactive({}),trackingObservationDrafts=reactive({})
   const storyJournal=reactive([]),dailyHealthReports=reactive([])
   let storySequence=0
   function recordStory(id,kind,title,text,assessment='',at=''){
@@ -53,6 +58,12 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const ignoredSuggestions=reactive({})
   const suggestionDecisions=reactive([])
   function defaultAssignment(id){return {owner:cases[id]?.owner||'李建国（大管轮）',collaborator:'',type:['maintenance','fault'].includes(id)?'检测排查':'现场核实',due:'尽快完成首轮核实',scope:cases[id]?.taskScope||cases[id]?.report?.human||'核对现场读数与工况，记录实际检查结果。',assignedBy:'陈志远（轮机长）'}}
+  function clearInitialTrackingReview(id){
+    const parent=parentIssueId(id),disposition=trackingDispositions[parent]
+    // A new maintenance action replaces only the authored starting state.
+    // Explicit captain choices and the retained process history stay intact.
+    if(isMaintenanceWorkflow(id)&&parent!==id&&disposition?.priorProcessId&&disposition.status==='review'&&!disposition.choice)delete trackingDispositions[parent]
+  }
   assignments.fault=defaultAssignment('fault')
   const stageAssignments=reactive({})
   function assignStage(id,index,owner){
@@ -63,8 +74,8 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     ;(stageAssignments[id] ||= {})[stage.id]={...assignments[id]}
     return true
   }
-  function assignTask(id,values){if(!todoCreated[id]||!values.owner||!values.scope?.trim()||!values.due?.trim())return false;const record={...values,assignedBy:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};assignments[id]=record;taskActors[id]=record.owner;(assignmentRecords[id] ||= []).push({...record});addLog(id,'user',`任务指派：${record.owner}负责${record.type}；${record.scope}；计划：${record.due}`);if(isWorkflow(id))recordStory(id,'assignment','轮机长派发任务',`${record.assignedBy}指定${record.owner}；${record.scope}；计划：${record.due}`);return true}
-  function ignoreSuggestion(id,reason){if(todoCreated[id]||!reason.trim())return false;ignoredSuggestions[id]={reason:reason.trim(),actor:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};suggestionDecisions.push({id,...ignoredSuggestions[id]});registerDossierNote(id,'忽略本次建议：'+reason.trim());if(isWorkflow(id))recordStory(id,'decision','本次不采纳建议',reason.trim(),'原健康记录及周期计划保留，不代表设备恢复。');return true}
+  function assignTask(id,values){if(!todoCreated[id]||!values.owner||!values.scope?.trim()||!values.due?.trim())return false;clearInitialTrackingReview(id);const record={...values,assignedBy:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};assignments[id]=record;taskActors[id]=record.owner;(assignmentRecords[id] ||= []).push({...record});addLog(id,'user',`任务指派：${record.owner}负责${record.type}；${record.scope}；计划：${record.due}`);if(isWorkflow(id))recordStory(id,'assignment','轮机长派发任务',`${record.assignedBy}指定${record.owner}；${record.scope}；计划：${record.due}`);return true}
+  function ignoreSuggestion(id,reason){if(todoCreated[id]||!reason.trim())return false;clearInitialTrackingReview(id);ignoredSuggestions[id]={reason:reason.trim(),actor:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})};suggestionDecisions.push({id,...ignoredSuggestions[id]});registerDossierNote(id,'忽略本次建议：'+reason.trim());if(isWorkflow(id))recordStory(id,'decision','本次不采纳建议',reason.trim(),'原健康记录及周期计划保留，不代表设备恢复。');return true}
   function confirmFalseAlarm(id,reason){
     if(cases[id]?.cardType!=='报警事件'||todoCreated[id]||eventStatus[id]==='closed'||!reason?.trim())return false
     completedTasks[id]={title:'误报决定已留档',reason:reason.trim(),actor:'陈志远（轮机长）',at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}),action:'false-alarm'}
@@ -186,6 +197,16 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   for(const item of additionalScenarios){const id=item.id;todoCreated[id]=item.initialCreated!==false;progress[id]=0;activeStage[id]=0;logs[id]=[];taskActors[id]=item.owner;assignments[id]={owner:item.owner,type:'检测排查',scope:item.report.human,due:'尽快核实并反馈',assignedBy:'陈志远（轮机长）'};eventUpdatedAt[id]='2026/10/12 07:30';observationReady[id]=false;observationRounds[id]=1;observationRecords[id]=[];observationHistory[id]=[];observationTargets[id]=item.observation.days}
   function initializeWorkflows(){
     for(const id of workflowIds){todoCreated[id]=false;progress[id]=0;activeStage[id]=0;logs[id] ||= [];taskActors[id]=cases[id].owner;assignments[id]=defaultAssignment(id);observationReady[id]=false;observationRounds[id]=1;observationRecords[id]=[];observationHistory[id]=[];observationTargets[id]=cases[id].observation.days;eventStatus[id]='pending';workflowRounds[id]=1}
+    for(const reference of trackingProcessReferences)initializeTrackingReview(reference)
+  }
+  // Resume the authored scenario at its retained handoff, without creating work
+  // orders or treating the process example as source measurements or repair work.
+  function initializeTrackingReview(reference){
+    if(!reference)return
+    const {eventId,trackId,at,summary,decision,feedback}=reference
+    trackingDispositions[eventId]={status:'review',at,priorProcessId:reference.id,reason:decision}
+    healthUpdates[trackId]={taskComplete:true,at,conclusion:summary,decision,feedback:JSON.parse(JSON.stringify(feedback))}
+    eventStatus[eventId]='awaiting-decision';eventUpdatedAt[eventId]=at
   }
   initializeWorkflows()
   function openRealCase(id){
@@ -210,7 +231,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   const selectedTodo = computed(() => selectedTodoId.value ? cases[selectedTodoId.value] : null)
   const taskPortfolio=computed(()=>visibleTodos.value)
   // Preserve the full portfolio for evidence/history; only actionable human work belongs in Todos.
-  const activeTaskPortfolio=computed(()=>visibleTodos.value.filter(item=>!isTaskHandled(item.id)&&!isIssueClosed({cases,eventStatus,todoCreated,completedTasks,ignoredSuggestions,unlockedRecommendations,executionRecords},item.id)))
+  const activeTaskPortfolio=computed(()=>visibleTodos.value.filter(item=>!isTaskHandled(item.id)&&(trackingDispositions[parentIssueId(item.id)]?.taskId===item.id||!isIssueClosed({cases,eventStatus,todoCreated,completedTasks,ignoredSuggestions,unlockedRecommendations,executionRecords,trackingDispositions},item.id))))
   const eventPortfolio=computed(()=>[...new Set(visibleTodos.value.map(item=>parentIssueId(item.id)))].map(id=>cases[id]))
   const visibleTodos = computed(() => workflowIds.filter(id => todoCreated[id]&&!isTrackingContainer(id)).map(id => cases[id]))
   for(const id of [...new Set(['fault','maintenance','drift',...extraIds,...workflowIds])])watch(()=>[todoCreated[id],progress[id]],()=>{
@@ -290,6 +311,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if (!cases[id] || todoCreated[id] || isTrackingContainer(id)) return false
     if(cases[id].latent&&!unlockedRecommendations[id])return false
     if (id === 'drift' && monitorStep.drift < 1) return false
+    clearInitialTrackingReview(id)
     delete ignoredSuggestions[id]
     assignments[id] ||= defaultAssignment(id)
     todoCreated[id] = true
@@ -369,24 +391,12 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     const stage=cases[id].stages[progress[id]]
     if(stage.kind!=='work')return null
     const existing=executionInquiry(id);if(existing)return existing
-    const previous=executionRecords[id]?.findLast(record=>!isWorkflow(id)||record.round===workflowRounds[id])
-    const fields=stage.tasks.flatMap((task,i)=>[{key:'task'+i,label:task.label,type:'select',required:true,options:[{value:'已完成',label:'已完成'},{value:'待补充',label:'待补充'}]},{key:'note'+i,label:task.label+'记录',type:'textarea',placeholder:task.recordHint||'记录现场发现、实际措施与受限项目'}])
-    const values={...(previous?.values||{}),equipment:previous?.values.equipment||cases[id].device,executor:taskActors[id]||assignments[id]?.owner}
-    stage.tasks.forEach((task,i)=>{values['task'+i]=taskResults[id+':'+stage.id+':'+i]||values['task'+i]||'';values['note'+i]=taskNotes[id+':'+stage.id+':'+i]||values['note'+i]||''})
-    const recordFields=JSON.parse(JSON.stringify(executionRecordTemplate.fields))
-    if(cases[id].realCaseId){
-      const hints={measures:'填写实际处理部位、清洁或换件措施、使用材料和未完成项目。',acceptance:(cases[id].workDetails?.acceptanceRows||[]).map(row=>row.name).join('；')+'。填写各项结果、复测时刻和工况；未通过项目单列。'}
-      for(const field of recordFields)if(hints[field.key])field.placeholder=hints[field.key]
-    }
-    if(isWorkflow(id)){
-      recordFields.find(field=>field.key==='completion').options[0].label='本轮作业已完成'
-      if(isMaintenanceWorkflow(cases[id])){
-        const verification=recordFields.find(field=>field.key==='verification')
-        verification.label='本次维保验收结果'
-        verification.options=[{value:'resolved',label:'本次范围验收通过'},{value:'unresolved',label:'仍有问题，返回评估'},{value:'pending',label:'尚未完成验收'}]
-      }
-    }
-    const message={...JSON.parse(JSON.stringify(executionRecordTemplate)),id:'execution-'+id+'-'+(++executionSequence),stageId:stage.id,round:workflowRounds[id]||1,fields:[...fields,...recordFields],values}
+    const previous=executionRecords[id]?.findLast(record=>record.round===(workflowRounds[id]||1))
+    const values={...(previous?.values||{}),equipment:cases[id].device,executor:taskActors[id]||assignments[id]?.owner}
+    const fields=JSON.parse(JSON.stringify(executionRecordTemplate.fields))
+    fields.find(field=>field.key==='measures').placeholder='记录实际处理部位、采取的措施及使用材料。'
+    fields.find(field=>field.key==='acceptance').placeholder='记录已完成的验收项目、复测结果与仍存在的异常。'
+    const message={...JSON.parse(JSON.stringify(executionRecordTemplate)),id:'execution-'+id+'-'+(++executionSequence),stageId:stage.id,round:workflowRounds[id]||1,fields,values}
     if(stage.recordCutoff)message.hint='本页记录截至 '+stage.recordCutoff.slice(0,10)+'。按实际检查与作业填写时间、措施及验收，不预填完成。'
     addLog(id,'assistant',message);return executionInquiry(id)
   }
@@ -394,8 +404,6 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     const message=executionInquiry(id);if(!message||message.id!==messageId)return false
     const preset=values.scenarioPreset??message.values.scenarioPreset
     message.values={...values,...(preset?{scenarioPreset:preset}:{})};delete message.submitError
-    const stage=cases[id].stages.find(entry=>entry.id===message.stageId)
-    stage.tasks.forEach((task,i)=>{taskResults[id+':'+stage.id+':'+i]=values['task'+i]||'';taskNotes[id+':'+stage.id+':'+i]=values['note'+i]||''})
     return true
   }
   function confirmExecutionRecord(id,messageId,values) {
@@ -406,10 +414,10 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     // Future story nodes have an explicit record date; ordinary tasks retain the wall-clock boundary.
     const recordLimit=Math.max(Date.now(),Date.parse(stage.recordCutoff||'')||0)
     if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(values.executedAt)||Date.parse(values.executedAt)>recordLimit){message.submitError='执行时间须有效，且不晚于当前记录时间。';return false}
-    if(values.completion==='completed'&&stage.tasks.some((_,i)=>values['task'+i]!=='已完成')){message.submitError='仍有未完成步骤，请保留进展或补齐实际结果。';return false}
-    // A checkbox is not a new post-work sample. Historical case data must never
-    // be reused as if it were monitoring after the user's rehearsal action.
-    if(cases[id].realCaseId){const preset=values.scenarioPreset??message.values.scenarioPreset;values={...values,scenarioPreset:preset,comparable:preset==='complete'&&values.comparable==='available'?'available':'missing'}}
+    // Steps are instructions. Only the acceptance form confirms actual work;
+    // historical measurements cannot become post-repair samples here.
+    values={executedAt:values.executedAt,measures:values.measures.trim(),acceptance:values.acceptance.trim(),verification:values.verification,
+      equipment:cases[id].device,executor:taskActors[id]||assignments[id]?.owner,completion:'completed',comparable:'missing'}
     updateExecutionRecord(id,messageId,values)
     const at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})
     const record={id:messageId,values:JSON.parse(JSON.stringify(values)),source:'人员确认',isSimulation:Boolean(cases[id].realCaseId),executor:values.executor||taskActors[id]||assignments[id]?.owner,assignedBy:assignments[id]?.assignedBy||'陈志远（轮机长）',confirmedAt:at,stageId:stage.id,round:workflowRounds[id]||1,scope:stage.tasks.map(task=>task.label)}
@@ -421,14 +429,14 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       eventUpdatedAt[id]=at
       if(values.completion!=='completed'){message.receiptText='已保留实际进展，未完成项目继续处理。';addLog(id,'assistant',message.receiptText);requestExecutionRecord(id);return true}
       if(values.verification==='unresolved'){
-        message.receiptText='实际作业已保存，原异常仍存在；沿原事件返回排查。'
+        message.receiptText='本轮执行与验收已保存，原异常仍存在，进入下一轮原因排查。'
         addLog(id,'assistant',message.receiptText);returnForInvestigation(id);return true
       }
       if(values.verification!=='resolved'){
         message.receiptText='作业记录已保存，验收尚未完成；当前不进入效果观察。'
         addLog(id,'assistant',message.receiptText);requestExecutionRecord(id);return true
       }
-      message.receiptText=values.comparable==='available'?'执行及现场验收已保存，接续后续可比节点观察，最终闭环仍需人工确认。':'执行及现场验收已保存，待补充可比数据；当前不生成改善结论。'
+      message.receiptText='执行及现场验收已保存，进入效果观察；可比监测资料在观察阶段补充。'
       addLog(id,'assistant',message.receiptText)
       progress[id]=observationIndex(id);activeStage[id]=progress[id];eventStatus[id]='observing';openStageConversation(id)
       return true
@@ -439,7 +447,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     }else requestExecutionRecord(id)
     return true
   }
-  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return isWorkflow(id)?Boolean(record&&record.values.completion==='completed'&&record.values.verification==='resolved'&&record.values.comparable==='available'):!record||record.values.completion==='completed'&&record.values.comparable==='available' }
+  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return isWorkflow(id)?Boolean(record&&record.values.completion==='completed'&&record.values.verification==='resolved'):!record||record.values.completion==='completed'&&record.values.comparable==='available' }
   function advanceWorkflow(id,feedback){
     const stage=cases[id].stages[activeStage[id]]
     if(stage.kind==='work')return {saved:false,advanced:false,message:'请在标准执行记录中确认实际措施与验收。'}
@@ -460,7 +468,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       }
       recordStory(id,'feedback',stage.label+'反馈',feedback.map(record=>`${record.label}：${record.result}；${record.note||'未附备注'}`).join('\n'),outcome.message)
       if(!outcome.advance)return {saved:true,advanced:false,message:outcome.message}
-      if(outcome.packages?.length){const repair=composeRepair(cases[id],outcome.packages);Object.assign(cases[id].stages.find(item=>item.kind==='work'),repair,{summary:outcome.message});cases[id].workDetails=repair.workDetails}
+      if(outcome.packages?.length){const repair=composeRepair(cases[id],outcome.packages,workflowRounds[id]||1);Object.assign(cases[id].stages.slice(activeStage[id]+1).find(item=>item.kind==='work'),repair,{summary:outcome.message});cases[id].workDetails=repair.workDetails}
       if(stage.id==='check'&&cases[id].cardType==='预警事件')cases[id].stages.find(item=>item.id==='event').evidence=feedback.map(record=>record.label+'：'+record.result+'；'+(record.note||'未附备注'))
     }
     const next=activeStage[id]+1
@@ -473,29 +481,132 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(!assessment||assessment.stageId!==cases[id].stages[progress[id]]?.id||!assessment.actions?.includes(action))return false
     if(action==='retry'){delete checkAssessments[id];return true}
     if(!reason.trim())return false
-    const record={title:action==='finish-tracking'?'本次核实已结束，健康跟踪继续':action==='end-warning'?'本次预警核实已结束':'本次提前评估已结束',reason:reason.trim(),actor:taskActors[id],at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}),completedAtIndex:progress[id],action}
+    const record={title:action==='finish-tracking'?'核实任务已完成，待轮机长确认':action==='end-warning'?'本次预警核实已结束':'本次提前评估已结束',reason:reason.trim(),actor:taskActors[id],at:new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}),completedAtIndex:progress[id],action}
     if(action==='supplement'){registerDossierNote(id,record.reason);return true}
     completedTasks[id]=record;eventStatus[id]='closed';eventUpdatedAt[id]=record.at
     progress[id]=observationIndex(id);activeStage[id]=progress[id]
     if(action==='finish-tracking'){
+      eventStatus[id]='awaiting-decision'
+      trackingDispositions[id]={status:'review',at:record.at}
       const track=healthTracks.find(item=>item.requestId===id)
       healthUpdates[track.id]={...(healthUpdates[track.id]||{}),taskComplete:true,decision:record.reason,at:record.at}
     }
     ;(stageHistory[id] ||= []).push({round:workflowRounds[id],stageId:'decision',title:record.title,at:record.at,reason:record.reason,actor:record.actor})
-    recordStory(id,'decision',record.title,record.reason,action==='finish-tracking'?'本次核实任务已结束，原健康链继续。':'本次决定与原计划、来源资料分别保留。')
+    recordStory(id,'decision',record.title,record.reason,action==='finish-tracking'?'核实任务已完成，请轮机长在事件中确认闭环、形成维保安排或继续专项观察。':'本次决定与原计划、来源资料分别保留。')
     addLog(id,'user',record.title+'：'+record.reason)
-    addLog(id,'assistant',action==='finish-tracking'?'本次人工核实已归档，反馈和限制保留在原健康记录；长期趋势继续。':action==='end-maintenance'?'本次提前评估结束，原周期计划保持有效；决定与依据可在设备记录回查。':'本次核实结论及依据已保存，原始预警和人员记录保留；不据此声明设备所有部位健康。')
+    addLog(id,'assistant',action==='finish-tracking'?'核实反馈已提交轮机长。请返回原事件，选择确认解释并闭环、形成维保安排或继续观察。':action==='end-maintenance'?'本次提前评估结束，原周期计划保持有效；决定与依据可在设备记录回查。':'本次核实结论及依据已保存，原始预警和人员记录保留；不据此声明设备所有部位健康。')
     return true
   }
+  function canDecideTracking(id){
+    return Boolean(cases[id]?.trackingOnly&&!isMaintenanceWorkflow(id)&&trackingDispositions[id]?.status!=='closed'&&(isTrackingContainer(id)||completedTasks[id]?.action==='finish-tracking'))
+  }
+  function recordTrackingDecision(id,record,title,text){
+    const at=new Date().toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'})
+    trackingDispositions[id]={...record,at,actor:'陈志远（轮机长）'}
+    eventStatus[id]=record.status==='closed'?'closed':'awaiting-decision';eventUpdatedAt[id]=at
+    const entry=recordStory(id,record.status==='closed'?'closure':'decision',title,text,trackingDispositionSummary(trackingDispositions[id]),at)
+    entry.actor='陈志远（轮机长）'
+    addLog(id,'assistant',trackingDispositionSummary(trackingDispositions[id]))
+    return {ok:true}
+  }
+  function decideTracking(id,choice,values={}){
+    if(!canDecideTracking(id))return {ok:false,error:'当前事件尚未完成核实或已经闭环，请刷新事件状态。'}
+    const previous=trackingDispositions[id]||{},reason=String(values.reason||'').trim()
+    if(!['explained','maintenance','observe'].includes(choice))return {ok:false,error:'请选择有效的处置分支。'}
+    if(previous.status==='observing'&&choice!=='observe')return {ok:false,error:'请先提交本轮观察结果，再确认事件结论。'}
+    if(choice==='observe'){
+      const plan=Object.fromEntries(['deadline','metrics','criteria','owner'].map(key=>[key,String(values[key]||'').trim()]))
+      if(Object.values(plan).some(value=>!value))return {ok:false,error:'请填写观察期限、关注指标、下次判断条件和观察负责人。'}
+      if(!Number.isFinite(Date.parse(plan.deadline))||Date.parse(plan.deadline)<=Date.now())return {ok:false,error:'观察期限应晚于当前时间。'}
+      const taskId=observationChildId(id)
+      if(!taskId||!cases[taskId])return {ok:false,error:'当前事件尚未配置观察任务。'}
+      const round=previous.status==='observing'?(previous.observationRound||1):(previous.observationRound||0)+1
+      unlockedRecommendations[taskId]=true
+      if(!todoCreated[taskId]&&!createTodo(taskId))return {ok:false,error:'观察任务创建失败。'}
+      const assignment={owner:plan.owner,due:plan.deadline.replace('T',' '),type:'专项观察',originEventId:id,scope:'关注指标：'+plan.metrics+'；下次判断条件：'+plan.criteria}
+      if(!assignTask(taskId,assignment))return {ok:false,error:'观察任务派发失败，请检查计划。'}
+      delete completedTasks[taskId];progress[taskId]=0;activeStage[taskId]=0;eventStatus[taskId]='assigned';workflowRounds[taskId]=round
+      if(previous.status!=='observing')trackingObservationDrafts[taskId]={observedAt:'',findings:''}
+      delete openedStages[taskId+':handled'];delete openedStages[taskId+':tracking-observation']
+      return recordTrackingDecision(id,{...previous,status:'observing',choice,plan,observationTaskId:taskId,observationRound:round,observationHistory:previous.observationHistory||[]},'派发第'+round+'轮专项观察',`负责人：${plan.owner}\n观察期限：${plan.deadline.replace('T',' ')}\n关注指标：${plan.metrics}\n下次判断条件：${plan.criteria}`)
+    }
+    if(!reason)return {ok:false,error:choice==='explained'?'请填写变化解释及闭环依据。':'请填写维保建议依据。'}
+    if(choice==='explained'){
+      if(maintenanceChildIds(id).some(child=>todoCreated[child]&&!isTaskHandled(child)))return {ok:false,error:'仍有关联维保任务待执行，请通过维保安排分支确认承接。'}
+      return recordTrackingDecision(id,{...previous,status:'closed',choice,reason},'确认变化解释，异动事件闭环',reason)
+    }
+    const taskId=maintenanceChildIds(id).find(child=>cases[child])
+    if(!taskId)return {ok:false,error:'当前事件尚未配置可承接的维保任务。'}
+    const scope=String(values.scope||'').trim()
+    if(!scope)return {ok:false,error:'请填写建议检查与维护范围。'}
+    if(eventStatus[taskId]==='closed'&&completedTasks[taskId]?.action!=='end-maintenance')return {ok:false,error:'关联维保作业已经闭环，请根据已有结果确认事件结论。'}
+    const recommendation={reason,scope,taskId,title:cases[taskId].initialTitle}
+    unlockedRecommendations[taskId]=true
+    return recordTrackingDecision(id,{...previous,status:'recommendation',choice,recommendation},'形成维保建议',`建议依据：${reason}\n建议范围：${scope}`)
+  }
+  function confirmTrackingMaintenance(id,values={}){
+    const previous=trackingDispositions[id],recommendation=previous?.recommendation
+    if(!canDecideTracking(id)||previous?.status!=='recommendation'||!recommendation)return {ok:false,error:'请先形成维保建议，再确认安排。'}
+    const fields=Object.fromEntries(['owner','due','scope','conditions'].map(key=>[key,String(values[key]||'').trim()]))
+    if(Object.values(fields).some(value=>!value))return {ok:false,error:'请填写责任人、计划窗口、实施范围及作业条件安排。'}
+    const taskId=recommendation.taskId
+    if(eventStatus[taskId]==='closed'&&completedTasks[taskId]?.action!=='end-maintenance')return {ok:false,error:'关联维保任务状态已变化，请重新核对。'}
+    // A finished assessment is retained in the journal; the approved arrangement
+    // starts a fresh execution round without treating the old assessment as work.
+    if(completedTasks[taskId]?.action==='end-maintenance'){
+      delete completedTasks[taskId];delete checkAssessments[taskId];delete recordDrafts[taskId]
+      workflowRounds[taskId]++;progress[taskId]=0;activeStage[taskId]=0;eventStatus[taskId]='assigned'
+      for(const collection of [taskResults,taskNotes,taskAttachments,workAcceptance,workAcceptanceNotes,openedStages])for(const key of Object.keys(collection))if(key.startsWith(taskId+':'))delete collection[key]
+    }
+    if(!todoCreated[taskId]&&!createTodo(taskId))return {ok:false,error:'维保任务创建失败，请检查任务状态。'}
+    const assignment={...fields,type:'专项维保',originEventId:id,scope:fields.scope+'；作业条件安排：'+fields.conditions}
+    if(!assignTask(taskId,assignment))return {ok:false,error:'维保安排未保存，请检查必填内容。'}
+    cases[taskId].taskScope=assignment.scope
+    return recordTrackingDecision(id,{...previous,status:'closed',choice:'maintenance',taskId,arrangement:fields,reason:recommendation.reason},'确认维保安排，异动事件闭环',`维保任务：${cases[taskId].initialTitle}\n责任人：${fields.owner}\n计划窗口：${fields.due}\n实施范围：${fields.scope}\n作业条件安排：${fields.conditions}\n维保执行、验收与效果观察由关联任务继续推进。`)
+  }
+  function submitTrackingObservation(id,values={}){
+    const previous=trackingDispositions[id],findings=String(values.findings||'').trim(),observedAt=String(values.observedAt||'').trim()
+    if(!canDecideTracking(id)||previous?.status!=='observing')return {ok:false,error:'当前没有待提交的专项观察计划。'}
+    if(!findings||!Number.isFinite(Date.parse(observedAt))||Date.parse(observedAt)>Date.now())return {ok:false,error:'请填写实际观察结果及不晚于当前的观察时间。'}
+    const taskId=previous.observationTaskId
+    if(!taskId||!todoCreated[taskId]||isTaskHandled(taskId))return {ok:false,error:'本轮观察任务已经提交或尚未派发。'}
+    const result={plan:{...previous.plan},findings,observedAt,actor:previous.plan.owner,taskId,round:previous.observationRound}
+    completedTasks[taskId]={action:'finish-observation',title:'第'+result.round+'轮观察已提交',reason:findings,actor:result.actor,at:observedAt.replace('T',' '),completedAtIndex:0}
+    progress[taskId]=observationIndex(taskId);activeStage[taskId]=progress[taskId];eventStatus[taskId]='closed'
+    trackingObservationDrafts[taskId]={observedAt:'',findings:''}
+    const at=new Date().toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'})
+    trackingDispositions[id]={...previous,status:'review',at,observationResult:result,observationHistory:[...(previous.observationHistory||[]),result]}
+    eventStatus[id]='awaiting-decision';eventUpdatedAt[id]=at
+    const entry=recordStory(taskId,'feedback',completedTasks[taskId].title,`观察时间：${observedAt.replace('T',' ')}\n关注指标：${result.plan.metrics}\n判断条件：${result.plan.criteria}\n新增记录：${findings}`,'观察资料已提交，交轮机长确认下一步处置。',observedAt.replace('T',' '));entry.actor=result.actor
+    addLog(taskId,'user',findings);addLog(id,'assistant',trackingDispositionSummary(trackingDispositions[id]))
+    return {ok:true}
+  }
+
   function returnForInvestigation(id){
-    const index=cases[id].stages.findIndex(item=>item.id===(isMaintenanceWorkflow(cases[id])?'check':'investigate'))
-    if(index<0)return
-    ;(stageHistory[id] ||= []).push({round:workflowRounds[id],stageId:'return',title:'原异常仍存在，返回原事件排查',execution:JSON.parse(JSON.stringify(executionRecords[id]?.at(-1)||{}))})
-    recordStory(id,'return','返回原任务继续核实','本轮实际执行与验收已保存，原问题仍存在；不重复建单。')
-    workflowRounds[id]++;delete completedTasks[id];delete checkAssessments[id];eventStatus[id]='assigned'
-    cases[id].stages.slice(index).forEach(stage=>{delete openedStages[id+':'+stage.id];stage.tasks?.forEach((_,i)=>{delete taskResults[id+':'+stage.id+':'+i];delete taskNotes[id+':'+stage.id+':'+i];delete taskAttachments[id+':'+stage.id+':'+i]})})
+    const item=cases[id],blueprint=workflowCases[id]||scenarioCases[id]
+    const check=blueprint.stages.find(stage=>stage.id===(isMaintenanceWorkflow(item)?'check':'investigate'))
+    const work=blueprint.stages.find(stage=>stage.kind==='work')
+    if(!check||!work)return false
+    const previousRound=workflowRounds[id]||1,round=previousRound+1
+    // Failed acceptance skips observation, but it still belongs to its own
+    // repair round. Keep that receipt and align the next observation number.
+    if(observationRounds[id]<round){
+      observationHistory[id].push(observationRoundSnapshot({observationRounds,workflowRounds,observationRecords,observationHistory,observationTargets,executionRecords},id))
+      observationRecords[id].splice(0);observationTargets[id]=observationConfig[id].days;observationRounds[id]=round;observationReady[id]=false
+    }
+    const oldWork=item.stages.findLast(stage=>stage.kind==='work')
+    if(oldWork&&!oldWork.workDetails)oldWork.workDetails=JSON.parse(JSON.stringify(item.workDetails||{}))
+    ;(stageHistory[id] ||= []).push({round:previousRound,stageId:'return',title:'验收仍异常，接续第'+round+'轮原因排查',execution:JSON.parse(JSON.stringify(executionRecords[id]?.at(-1)||{}))})
+    recordStory(id,'return','进入第'+round+'轮原因排查','前轮核实、实际措施与验收全部保留；本轮根据仍存在的异常重新核查原因。')
+    const nextStages=[check,work].map(stage=>followupStage(item,{...JSON.parse(JSON.stringify(stage)),baseStageId:stage.baseStageId||stage.id,id:(stage.baseStageId||stage.id)+'-r'+round,round,label:'第'+round+'轮'+(stage.kind==='check'?'原因排查':'对应处置')},round,{execution:executionRecords[id]?.at(-1),observations:observationHistory[id]?.at(-1)?.records||[]}))
+    const index=observationIndex(id)
+    item.stages.splice(index,0,...nextStages)
+    item.workDetails=nextStages[1].workDetails
+    workflowRounds[id]=round;delete completedTasks[id];delete checkAssessments[id];delete recordDrafts[id];eventStatus[id]='assigned'
     progress[id]=index;activeStage[id]=index
-    openStageConversation(id,'前轮实际措施和验收已保存，原异常仍存在；本轮需重新核实原因，不重复创建事件。')
+    delete openedStages[id+':handled']
+    openStageConversation(id,'前轮实际措施和验收已保存，当前进入第'+round+'轮原因排查。')
+    return true
   }
   function advanceHealthTrack(id){
     const track=healthTracks.find(item=>item.id===id)
@@ -545,6 +656,13 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
         if(last?.submissionMessage!==checkResult.message){addLog(id,'assistant',checkResult.message);const latest=logs[id].filter(entry=>entry.kind==='feedbackRecord'&&entry.task===stage.title).at(-1);if(latest)latest.submissionMessage=checkResult.message}
         return {saved:true,advanced:false,message:checkResult.message}
       }
+      if(stage.round>1&&checkResult.packages?.length){
+        const work=cases[id].stages[activeStage[id]+1]
+        if(work?.kind==='work'){
+          Object.assign(work,followupRepair(cases[id],{...work,packageKeys:checkResult.packages},stage.round))
+          cases[id].workDetails=work.workDetails
+        }
+      }
     }
     if(stage.kind==='observe'&&getObservationResult(id).type!=='archive')return
     if (feedback.length && stage.kind!=='check') addLog(id, 'assistant', { kind:'feedbackRecord', title:`${stage.label}反馈已提交`, task:stage.title, records:feedback })
@@ -574,7 +692,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(isTaskHandled(id)){addLog(id,'assistant','本轮人工处理已完成。持续观测由设备态势自动跟踪；案例材料已按事件来源汇集，等待岸端审阅。');return}
     if(activeStage[id]<progress[id]){addLog(id,'assistant','当前显示已完成阶段，原反馈已保留。请切换到当前阶段后补充新的处理记录。');return}
     if(stage.kind==='work'){
-      if(/记录|补充|已完成|处理|更换|清洗|验收|复测/.test(text)){const request=requestExecutionRecord(id);if(request)updateExecutionRecord(id,request.id,{...request.values,supplement:[request.values.supplement,text.trim()].filter(Boolean).join('\n')});addLog(id,'assistant','已保留这条补充，请在执行记录卡片中核对对应字段、实际时间及验收，再确认。原文保留在对话中，不自动认定完成。')}
+      if(/记录|补充|已完成|处理|更换|清洗|验收|复测/.test(text)){const request=requestExecutionRecord(id);if(request)updateExecutionRecord(id,request.id,{...request.values,supplement:[request.values.supplement,text.trim()].filter(Boolean).join('\n')});addLog(id,'assistant','已保留这条补充，请在左侧验收确认中核对对应字段、实际时间及验收，再确认。原文保留在对话中，不自动认定完成。')}
       else addLog(id,'assistant',{kind:'scene',...sceneFor(id,stage)})
       return
     }
@@ -659,8 +777,12 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   }
   function resetRealScenario(id){
     if(!cases[id]?.realCaseId)return false
+    if(isTrackingContainer(id))for(const child of taskChildIds(id)){
+      resetRealScenario(child)
+      delete unlockedRecommendations[child]
+    }
     cases[id]=JSON.parse(JSON.stringify(workflowCases[id]))
-    for(const collection of [checkAssessments,completedTasks,executionRecords,ignoredSuggestions,stageHistory,assignmentRecords,recordDrafts,dossierNotes,dossierReviews,stageAssignments])delete collection[id]
+    for(const collection of [checkAssessments,completedTasks,executionRecords,ignoredSuggestions,stageHistory,assignmentRecords,recordDrafts,dossierNotes,dossierReviews,stageAssignments,trackingDispositions,trackingObservationDrafts])delete collection[id]
     for(const collection of [taskResults,taskNotes,taskAttachments,workAcceptance,workAcceptanceNotes,openedStages])for(const key of Object.keys(collection))if(key.startsWith(id+':'))delete collection[key]
     for(let i=storyJournal.length-1;i>=0;i--)if(storyJournal[i].taskId===id)storyJournal.splice(i,1)
     for(let i=suggestionDecisions.length-1;i>=0;i--)if(suggestionDecisions[i].id===id)suggestionDecisions.splice(i,1)
@@ -672,6 +794,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(selectedTodoId.value===id)selectedTodoId.value=null
     if(situationObservationId.value===id)situationObservationId.value=null
     eventStatus[id]='pending'
+    initializeTrackingReview(trackingProcessReference(id))
     return true
   }
   function startObservation(id){
@@ -681,7 +804,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(isWorkflow(id))recordStory(id,'observation','处理后首测',observationConfig[id].names.map((name,i)=>name+' '+observationRecords[id].at(-1).values[i]+' '+observationConfig[id].units[i]).join('；'),'首测不能证明持续恢复，后续在可比窗口验证。')
   }
   function getObservationResult(id){return observationResult(id,observationRecords[id],observationTargets[id])}
-  function sceneFor(id,stage){if(stage.kind==='handled')return {title:stage.title,paragraphs:completedTasks[id]?[{label:'本次结果',text:completedTasks[id].reason},{label:'后续安排',text:cases[id].trackingOnly?'本次人工核实已结束，原长期健康记录继续保留与更新。':'本次决定及来源记录保留，原计划不自动取消。'}]:[{label:'实际措施',text:executionRecords[id]?.at(-1)?.values.measures||'请查看实际执行记录。'},{label:'后续验证',text:executionObservationReady(id)?'现场验收已提交，后续可比节点在设备态势查看；最终闭环需人工确认。':'尚缺可比记录，当前不生成改善结论。'}]};if(stage.kind==='observe')return observationScene(id,observationRecords[id],observationTargets[id]);if(stage.kind==='closed'){const scene=stageScene(id,stage);scene.paragraphs.push({label:'观察结论',text:getObservationResult(id).text});return scene}if(isWorkflow(id))return {title:stage.title,expanded:true,markdown:stageReport({cases,checkAssessments,stageHistory},id,stage)};return stageScene(id,stage)}
+  function sceneFor(id,stage){if(stage.kind==='handled')return {title:stage.title,paragraphs:completedTasks[id]?[{label:'本次结果',text:completedTasks[id].reason},{label:'后续安排',text:cases[id].trackingOnly?'本次人工核实已结束，原长期健康记录继续保留与更新。':'本次决定及来源记录保留，原计划不自动取消。'}]:[{label:'实际措施',text:executionRecords[id]?.at(-1)?.values.measures||'请查看实际执行记录。'},{label:'后续验证',text:executionObservationReady(id)?'现场验收已提交，后续可比节点在设备态势查看；最终闭环需人工确认。':'尚缺可比记录，当前不生成改善结论。'}]};if(stage.kind==='observe')return observationScene(id,observationRecords[id],observationTargets[id]);if(stage.kind==='closed'){const scene=stageScene(id,stage);scene.paragraphs.push({label:'观察结论',text:getObservationResult(id).text});return scene}if(isWorkflow(id)||stage.round>1)return {title:stage.title,expanded:true,markdown:stageReport({cases,checkAssessments,stageHistory},id,stage)};return stageScene(id,stage)}
   function reviewObservation(id){
     if(cases[id].realCaseId){if(getObservationResult(id).type==='continue')applyObservationPreset(id,'stable');return}
     if(!executionObservationReady(id)||!isTaskHandled(id)||getObservationResult(id).type!=='continue')return
@@ -718,14 +841,15 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     delete openedStages[id+':handled']
     if(observationTimers[id]){clearTimeout(observationTimers[id]);delete observationTimers[id]}
     if(getObservationResult(id).type!=='reinspect')return
-    if(isWorkflow(id)){workflowRounds[id]++;eventStatus[id]='assigned';delete checkAssessments[id];delete completedTasks[id]}
-    const index=cases[id].stages.findIndex(s=>s.id===(isMaintenanceWorkflow(cases[id])?'check':'investigate'))
-    observationHistory[id].push({round:observationRounds[id],records:observationRecords[id].map(r=>({...r}))})
-    observationRecords[id].splice(0);observationTargets[id]=observationConfig[id].days;observationRounds[id]++
-    progress[id]=index;activeStage[id]=index;observationReady[id]=false;delete recordDrafts[id]
-    cases[id].stages.slice(index).forEach(s=>{delete openedStages[`${id}:${s.id}`];(s.tasks||[]).forEach((_,i)=>{delete taskResults[`${id}:${s.id}:${i}`];delete taskNotes[`${id}:${s.id}:${i}`];delete taskAttachments[`${id}:${s.id}:${i}`]})})
-    const workKey=`${id}:${id==='maintenance'?'service':'repair'}`;delete workAcceptance[workKey];delete workAcceptanceNotes[workKey]
-    addLog(id,'assistant','观察期内出现反复，已重新打开现场核实。历史观测与反馈保留，需重新提交本轮检查和处理结果。');openStageConversation(id)
+    if(isWorkflow(id)){
+      observationHistory[id].push(observationRoundSnapshot({observationRounds,workflowRounds,observationRecords,observationHistory,observationTargets,executionRecords},id))
+      observationRecords[id].splice(0);observationTargets[id]=observationConfig[id].days;observationRounds[id]++;observationReady[id]=false
+      returnForInvestigation(id)
+      return
+    }
+    observationHistory[id].push(observationRoundSnapshot({observationRounds,workflowRounds,observationRecords,observationHistory,observationTargets,executionRecords},id))
+    observationRecords[id].splice(0);observationTargets[id]=observationConfig[id].days;observationRounds[id]++;observationReady[id]=false
+    returnForInvestigation(id)
   }
 
   function enterSituation(mode) {
@@ -753,7 +877,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
 
   function resetDemo() {
     storyJournal.splice(0);dailyHealthReports.splice(0)
-    for(const collection of [checkAssessments,completedTasks,eventStatus,healthUpdates,stageHistory,workflowRounds,unlockedRecommendations])Object.keys(collection).forEach(key=>delete collection[key])
+    for(const collection of [checkAssessments,completedTasks,eventStatus,healthUpdates,stageHistory,workflowRounds,unlockedRecommendations,trackingDispositions,trackingObservationDrafts])Object.keys(collection).forEach(key=>delete collection[key])
     Object.assign(cases,JSON.parse(JSON.stringify(scenarioCases)))
     Object.keys(stageAssignments).forEach(id=>delete stageAssignments[id])
     Object.values(observationTimers).forEach(clearTimeout)
@@ -800,5 +924,5 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
   captureHealthSnapshot()
   selectAttention('maintenance')
   // Action completion is explicit and independent from chat and event progress.
-  return {submitObservationReview,activeTaskPortfolio,eventPortfolio,applyObservationPreset,resetRealScenario,openRealCase,storyJournal,dailyHealthReports,unlockedRecommendations,recordObservationEvidence,confirmFalseAlarm,checkAssessments,completedTasks,eventStatus,healthUpdates,stageHistory,workflowRounds,decideCheck,advanceHealthTrack,supplementObservation, captainEntry,showCaptainWorkbench,taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodo, selectedTodoId, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
+  return {trackingObservationDrafts,trackingDispositions,canDecideTracking,decideTracking,confirmTrackingMaintenance,submitTrackingObservation,submitObservationReview,activeTaskPortfolio,eventPortfolio,applyObservationPreset,resetRealScenario,openRealCase,storyJournal,dailyHealthReports,unlockedRecommendations,recordObservationEvidence,confirmFalseAlarm,checkAssessments,completedTasks,eventStatus,healthUpdates,stageHistory,workflowRounds,decideCheck,advanceHealthTrack,supplementObservation, captainEntry,showCaptainWorkbench,taskPortfolio,stageAssignments,assignStage,suggestionDecisions,assignmentRequest,taskActors,assignments,assignmentRecords,ignoredSuggestions,defaultAssignment,assignTask,ignoreSuggestion,executionRecords,executionInquiry,requestExecutionRecord,updateExecutionRecord,confirmExecutionRecord,executionObservationReady,eventUpdatedAt, deferR02Check, deviceDataTopic, sendR02Message, confirmR02Check, dossierReviews, askDossierQuestion, dossierNotes, registerDossierNote, attentionFeedback, attentionAction, submitAttentionFeedback, observationIndex, isTaskHandled, effectObservations, caseMaterials, situationObservationId, selectObservation, clearObservationFocus, sendObservation, completeObservation, attention, cases, selectedAttentionId, selectedAttention, selectedTodo, selectedTodoId, visibleTodos, todoCreated, progress, activeStage, currentStage, monitorStep, logs, inputDraft, detailTab, attentionInFocus, regularMaintenanceInFocus, recordDrafts, taskResults, taskNotes, taskAttachments, workAcceptance, workAcceptanceNotes, dataViews, observationRecords, observationHistory, observationTargets, getObservationResult, observationReady, observationRounds, reviewObservation, extendObservation, reopenTodo, confirmQuickRecord, enterSituation, selectAttention, createTodo, sendAttention, sendSituation, nextMonitor, selectTodo, closeTodo, selectStage, advanceTodo, sendTodo, resetDemo }
 })
