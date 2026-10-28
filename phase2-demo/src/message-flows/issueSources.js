@@ -21,7 +21,7 @@ function briefingReply(id,text,context){
  if(!sources&&(!sections.length||/核实|检查|任务|安排|下一步|怎么/.test(text)))sections.push(['本次核实要取得什么',brief.tasks.map(t=>`- **${t.title}**：${t.detail}`).join('\n')])
  if(dossier.hasUpdate)sections.push(['已提交反馈后的进展',dossier.currentMarkdown])
  sections.push(['当前安排',next],['尚待确认',brief.boundary])
- return {role:'assistant',kind:'scene',expanded:true,title:decision?'决策依据与指派范围':sources?'事件来源与数据依据':branches?'核实结果与后续处置':'本事件核实要点',markdown:sections.map(([label,content])=>`### ${label}\n\n${content}`).join('\n\n'),actions:[{id:assigned?'issue:task':isTrackingContainer(id)?'issue:section:健康趋势观测':'issue:section:decision',label:assigned?'继续原待办':isTrackingContainer(id)?'查看维保评估建议':'查看决策区'},{id:'issue:section:证据资料',label:'核对数据与资料'}]}
+ return {role:'assistant',kind:'scene',expanded:true,title:decision?'决策依据与指派范围':sources?'事件来源与数据依据':branches?'核实结果与后续处置':'本事件核实要点',markdown:sections.map(([label,content])=>`### ${label}\n\n${content}`).join('\n\n'),actions:[{id:assigned?'issue:task':'issue:section:decision',label:assigned?'继续原待办':isTrackingContainer(id)?'查看维保评估建议':'查看决策区'},{id:'issue:section:证据资料',label:'核对数据与资料'}]}
 }
 
 export function issueContext(id,store){
@@ -31,7 +31,7 @@ export function issueContext(id,store){
  const contextId=issue.taskId||issue.decisionId||issue.maintenanceRecommendations?.find(item=>item.decision)?.id||id
  const assigned=Boolean(issue.taskId&&!store.completedTasks?.[issue.taskId]&&!store.isTaskHandled?.(issue.taskId)&&issue.eventState!=='已闭环'),ignored=store.ignoredSuggestions[contextId]
  const disposition=store.trackingDispositions?.[id]
- const next=disposition?trackingDispositionSummary(disposition):issue.history?issue.outcome:store.completedTasks?.[contextId]?store.completedTasks[contextId].reason:assigned?`已派发给${store.assignments[contextId]?.owner||'原负责人'}，沿原任务查看现场反馈和当前进展，不重复安排。`:ignored?`本次不采纳依据：${ignored.reason}。原材料和周期计划保留；这不代表设备已恢复正常，可在健康趋势观测中重新评估。`:isTrackingContainer(id)?'在健康趋势观测中查看已形成的建议，分别确认提前必要性与作业条件；从建议派发评估，原跟踪继续。':dossier.recommendation
+ const next=disposition?trackingDispositionSummary(disposition):issue.history?issue.outcome:store.completedTasks?.[contextId]?store.completedTasks[contextId].reason:assigned?`已派发给${store.assignments[contextId]?.owner||'原负责人'}，沿原任务查看现场反馈和当前进展，不重复安排。`:ignored?`本次不采纳依据：${ignored.reason}。原材料和周期计划保留；这不代表设备已恢复正常，可结合研判分析中的趋势重新评估。`:isTrackingContainer(id)?'在事件概览中查看已形成的建议，分别确认提前必要性与作业条件；从建议派发评估，原跟踪继续。':dossier.recommendation
  return {issue,dossier,next,assigned,ignored,taskId:issue.taskId,decisionId:issue.decisionId}
 }
 export function initialIssueMessages(id,store){
@@ -99,7 +99,7 @@ export function issueReply(id,text,store){
  if(disposition)return {role:'assistant',kind:'scene',expanded:true,title:'异动处置与后续安排',markdown:dossier.currentMarkdown,actions:[{id:'issue:section:decision',label:disposition.status==='closed'?'查看闭环结果与关联任务':'查看处置决策'},{id:'issue:section:处置记录',label:'查看完整处置记录'}]}
  const handledTaskId=[issue.taskId,issue.id,...maintenanceChildIds(issue.id)].find(id=>id&&store.todoCreated?.[id]&&store.isTaskHandled?.(id))
  if(issue.history||issue.eventState==='已闭环')return {role:'assistant',kind:'scene',expanded:true,title:'本事件闭环依据与记录',markdown:`### 闭环结果\n\n${dossier.reference?.result||next||dossier.conclusion}\n\n### 如何回查\n\n本对话保留发现、研判、派发、执行反馈与人工确认；左侧处置记录及证据资料保留来源和结果。已闭环事件不会再次进入待办。`,actions:[{id:'issue:section:处置记录',label:'查看处置记录'},{id:'issue:section:证据资料',label:'查看证据资料'}]}
- if(handledTaskId&&!assigned)return {role:'assistant',kind:'scene',expanded:true,title:'人工任务结果与事件后续',markdown:`### 已提交的人工结果\n\n${dossier.currentMarkdown||next}\n\n### 后续安排\n\n本次人工任务已结束，已提交的反馈与判断保留在事件处置记录。${store.cases?.[issue.id]?.trackingOnly?'原健康趋势继续观察，新的现场核实需要重新明确范围。':'在本事件接续效果观察，依据可比记录和人工确认决定是否闭环。'}`,actions:[{id:'issue:section:处置记录',label:'查看处置记录'},{id:store.cases?.[issue.id]?.trackingOnly?'issue:section:健康趋势观测':'issue:section:效果观察',label:store.cases?.[issue.id]?.trackingOnly?'查看健康趋势观测':'接续效果观察'}]}
+ if(handledTaskId&&!assigned)return {role:'assistant',kind:'scene',expanded:true,title:'人工任务结果与事件后续',markdown:`### 已提交的人工结果\n\n${dossier.currentMarkdown||next}\n\n### 后续安排\n\n本次人工任务已结束，已提交的反馈与判断保留在事件处置记录。${store.cases?.[issue.id]?.trackingOnly?'原健康趋势继续观察，新的现场核实需要重新明确范围。':'在本事件接续效果观察，依据可比记录和人工确认决定是否闭环。'}`,actions:[{id:'issue:section:处置记录',label:'查看处置记录'},{id:store.cases?.[issue.id]?.trackingOnly?'issue:section:研判分析':'issue:section:效果观察',label:store.cases?.[issue.id]?.trackingOnly?'查看趋势研判':'接续效果观察'}]}
  if(id==='aux-health'&&store.healthUpdates?.['aux2-health'])return {role:'assistant',kind:'scene',expanded:true,title:'原健康记录与当前进展',markdown:healthStoryMarkdown(store,id),actions:[{id:'issue:section:证据资料',label:'查看原始数据与记录'}]}
  const briefResponse=briefingReply(parentIssueId(id),text,context)
  if(briefResponse)return briefResponse
@@ -107,5 +107,5 @@ export function issueReply(id,text,store){
  const explanation=evidence?[{label:'已有依据',text:issue.evidence.join('；')},{label:'尚需核对',text:[...new Set((dossier.comparisons||[]).map(row=>row.missing).filter(Boolean))].join('；')||issue.limit},{label:'判断范围',text:issue.limit}]:[{label:'当前安排',text:next},{label:'处理边界',text:assigned?'具体检查、排查和验收在原待办中接续，轮机长无需重复派发。':'先审阅依据，再在左侧决定是否采纳并选择负责人；当前不会自动建立任务。'}]
  const specific=id==='main-warning'&&/独立|压差|联合/.test(text)?'### 证据之间的关系\n\n压差由同刻上游减下游计算，与滤后供油压力共享原始测量，不能重复计作独立证明。上游也下降，因此还应核对上游供油及调节，不能只凭压差认定滤器堵塞。':id==='main-warning'&&/辅机|健康跟踪|长期/.test(text)?'### 两次核实的目标\n\n本次核实当前润滑供油风险，成立后继续原因排查；辅机核实补充长期健康背景，本次任务可结束，原趋势仍继续。动作都可能是读数和现场观察，目标及后续去向不同。':id==='main-warning'&&/更换|换件|滤芯/.test(text)?'### 是否可以决定换件\n\n读数一致只能支持当前供油变化，具体部件仍需实际检查。取得过滤段或其他方向的实际发现后，才确定相应措施；暂不预定更换。':id==='aux-health'&&/拆|寿命|换件/.test(text)?'### 当前判断范围\n\n持续排温偏移值得保留并核实，温度与其比较量仍不足以确定损坏部件或剩余寿命。先补测点、实际读数与背景；实际反馈决定如何解释，不能自动安排拆机。':''
  const health=isTrackingContainer(parentIssueId(id))
- return {role:'assistant',kind:'scene',expanded:true,title:evidence?'核实依据与缺项':'下一步安排',markdown:specific||explanation.map(item=>`### ${item.label}\n\n${item.text}`).join('\n\n'),paragraphs:explanation,actions:[{id:evidence?'issue:section:证据资料':assigned?'issue:task':health?'issue:section:健康趋势观测':'issue:section:decision',label:evidence?'查看证据资料':assigned?'查看原待办':health?'查看健康趋势观测':'查看决策区'}]}
+ return {role:'assistant',kind:'scene',expanded:true,title:evidence?'核实依据与缺项':'下一步安排',markdown:specific||explanation.map(item=>`### ${item.label}\n\n${item.text}`).join('\n\n'),paragraphs:explanation,actions:[{id:evidence?'issue:section:证据资料':assigned?'issue:task':health?'issue:section:研判分析':'issue:section:decision',label:evidence?'查看证据资料':assigned?'查看原待办':health?'查看趋势研判':'查看决策区'}]}
 }

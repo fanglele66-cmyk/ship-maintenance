@@ -112,9 +112,35 @@
 .app-container.app-container .p2-check-stepper button>span{display:inline-flex;align-items:center;justify-content:center;text-align:center;flex:0 0 22px;width:22px;height:22px;line-height:1;padding:0}
 .app-container.app-container .assessment-actions.tracking-actions{width:min(100%,360px);gap:10px}.app-container.app-container .assessment-actions.tracking-actions>button{min-height:34px;white-space:nowrap;font-size:13px;padding:6px 10px}
 .app-container.app-container .observation-review-panel{flex:0 0 auto;min-height:max-content;height:auto}.app-container.app-container .observation-confirmation{display:flex;flex-direction:column;align-items:flex-start;gap:12px;flex:none}.app-container.app-container .observation-confirmation label{display:block;width:100%;margin:0;height:auto}.app-container.app-container .observation-confirmation textarea{display:block;min-height:72px;margin:7px 0 0;position:static}.app-container.app-container .observation-confirmation button{margin:0;position:static;flex:none}.app-container.app-container .observation-display{flex:0 0 auto}
-.app-container.app-container .p2-restored-assistant{font-size:13px;--wb-body:13px;--wb-label:11px}
-.app-container.app-container .p2-restored-assistant .p2-bubble,.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,.app-container.app-container .p2-restored-assistant .p2-dialog-question,.app-container.app-container .p2-restored-assistant .markdown-content{font-size:13px;line-height:1.65}
-.app-container.app-container .p2-restored-assistant .p2-scene-details>summary h3,.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph b{font-size:13px;line-height:1.6}
+.app-container.app-container .p2-restored-assistant{font-size:15px;--wb-body:15px;--wb-label:12px}
+.app-container.app-container .p2-restored-assistant .p2-bubble,.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph p,.app-container.app-container .p2-restored-assistant .p2-dialog-question,.app-container.app-container .p2-restored-assistant .markdown-content{font-size:15px;line-height:1.75}
+.app-container.app-container .p2-restored-assistant .p2-scene-details>summary h3,.app-container.app-container .p2-restored-assistant .p2-dialog-paragraph b{font-size:15px;line-height:1.65}
 .app-container.app-container .p2-restored-assistant .p2-demo-actions button{font-size:12px;min-height:32px;padding:6px 9px}
-.app-container.app-container .p2-restored-assistant .p2-inquiry,.app-container.app-container .p2-restored-assistant .p2-inquiry-field label,.app-container.app-container .p2-restored-assistant .p2-inquiry-field input,.app-container.app-container .p2-restored-assistant .p2-inquiry-field textarea,.app-container.app-container .p2-restored-assistant .p2-inquiry-field select{font-size:13px;line-height:1.55}
-.app-container.app-container .p2-restored-assistant .p2-inquiry button{font-size:13px;min-height:32px;padding:7px 10px}.app-container.app-container .p2-restored-assistant .p2-compose textarea{font-size:13px}.app-container.app-container .p2-restored-assistant .p2-compose-shell{min-height:82px;padding:10px}.app-container.app-container .p2-restored-assistant .p2-assistant-head{min-height:58px;padding:12px 16px}.app-container.app-container .p2-restored-assistant .p2-assistant-head strong{font-size:17px}
+.app-container.app-container .p2-restored-assistant .p2-inquiry,.app-container.app-container .p2-restored-assistant .p2-inquiry-field label,.app-container.app-container .p2-restored-assistant .p2-inquiry-field input,.app-container.app-container .p2-restored-assistant .p2-inquiry-field textarea,.app-container.app-container .p2-restored-assistant .p2-inquiry-field select{font-size:14px;line-height:1.6}
+.app-container.app-container .p2-restored-assistant .p2-inquiry button{font-size:14px;min-height:32px;padding:7px 10px}.app-container.app-container .p2-restored-assistant .p2-compose textarea{font-size:14px}.app-container.app-container .p2-restored-assistant .p2-compose-shell{min-height:82px;padding:10px}.app-container.app-container .p2-restored-assistant .p2-assistant-head{min-height:58px;padding:12px 16px}.app-container.app-container .p2-restored-assistant .p2-assistant-head strong{font-size:17px}
+
+/* Recommendations read as an assistant reply; supporting evidence is optional. */
+.app-container.app-container .p2-restored-assistant .assistant-advice{font-size:15px;line-height:1.75;color:#34465e;padding-top:12px}
+.app-container.app-container .p2-restored-assistant .assistant-advice-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#896a3a;margin-bottom:9px}
+.app-container.app-container .p2-restored-assistant .assistant-advice-label>span{display:grid;place-items:center;width:23px;height:23px;background:#f5f0e7;border-radius:7px;font-size:15px}
+.app-container.app-container .p2-restored-assistant .assistant-advice-analysis{margin:0 0 13px}
+.app-container.app-container .p2-restored-assistant .assistant-advice-next{padding-left:12px;border-left:2px solid #c2a064;margin:13px 0}
+.app-container.app-container .p2-restored-assistant .assistant-advice-next>strong{font-size:13px;font-weight:600;color:#786449}
+.app-container.app-container .p2-restored-assistant .assistant-advice-next>p{margin:3px 0 0}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis{font-size:14px;margin:12px 0;color:#607086}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis>summary,.app-container.app-container .p2-restored-assistant .assistant-record-details>summary{cursor:pointer;font-size:13px;line-height:1.7;color:#798393;padding:5px 0}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis>summary{display:flex;align-items:center;gap:9px;list-style:none;color:#6e7785;font-weight:500}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis>summary::-webkit-details-marker{display:none}
+.app-container.app-container .p2-restored-assistant .assistant-basis-chevron{font-size:17px;line-height:1;transition:transform .15s}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis[open] .assistant-basis-chevron{transform:rotate(180deg)}
+.app-container.app-container .p2-restored-assistant .assistant-basis-content{margin:7px 0 12px 3px;padding:1px 0 1px 14px;border-left:2px solid #e2e5eb;color:#737e8e}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis dl{margin:0;padding:0}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis dt{font-weight:500;margin-top:11px;color:#606b7a}
+.app-container.app-container .p2-restored-assistant .assistant-advice-basis dd{margin:3px 0 0}
+.app-container.app-container .p2-restored-assistant .assistant-advice-boundary{font-size:13px;margin:12px 0 0}
+.app-container.app-container .p2-restored-assistant .assistant-advice-action{display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 14px;background:#262522;border:1px solid #262522;border-radius:6px;color:#fff;font-size:14px;line-height:1.5;cursor:pointer;margin:14px 0 2px}
+.app-container.app-container .p2-restored-assistant .assistant-advice-action:hover{background:#42403a}
+.app-container.app-container .p2-restored-assistant .assistant-advice-action:focus-visible,.app-container.app-container .p2-restored-assistant .assistant-advice-basis>summary:focus-visible{outline:2px solid #b7935a;outline-offset:3px}
+.app-container.app-container .p2-restored-assistant .assistant-record-details .markdown-content{font-size:14px}
+.app-container.app-container .p2-restored-assistant .assistant-advice.is-streaming .assistant-advice-analysis:empty::after{content:'·';color:#a5acb6}
+@media(prefers-reduced-motion:reduce){.app-container.app-container .p2-restored-assistant .assistant-basis-chevron{transition:none}}

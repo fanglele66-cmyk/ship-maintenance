@@ -19,7 +19,7 @@ export const healthReview={
 export const healthReviewReceipt=taskReceipt({
  id:'main-engine-health-receipt-20261012-0800',runId:healthReview.runId,title:'主机每日健康回顾',completedAt:healthReview.completedAt,executionStatus:'completed',subject:'主机',analysisRange:healthReview.analysisRange,
  conclusion:healthReview.conclusion,change:healthReview.change,arrangement:healthReview.recommendation,requiresAction:true,dataLimit:healthReview.coverage+'；结论仅覆盖已接入指标。',
- actions:[{id:'todo:fault',label:'查看冷却系统事件'},{id:'item:drift',label:'查看3#缸异动跟踪档案'},{id:'item:bearing-health',label:'查看轴承健康趋势观测'}]
+ actions:[{id:'todo:fault',label:'查看冷却系统事件'},{id:'item:drift',label:'查看3#缸异动跟踪档案'},{id:'item:bearing-health',label:'查看轴承异动跟踪'}]
 })
 
 export function overviewActions(store,advice={}){
@@ -38,11 +38,11 @@ export function overviewActions(store,advice={}){
 }
 
 export function deviceHealthReply(store,text){
- if(/先做|做什么|今日|今天|待处理/.test(text))return '先查看冷却系统原事件的当前检查要求。3#缸：'+store.attentionAction('drift').text+'。轴承请查看健康趋势观测内的最新人员决定与安排；4#缸暂无人工要求。'
+ if(/先做|做什么|今日|今天|待处理/.test(text))return '先查看冷却系统原事件的当前检查要求。3#缸：'+store.attentionAction('drift').text+'。轴承请查看事件概览内的最新人员决定与安排；4#缸暂无人工要求。'
  if(/滤器|堵塞|堵了/.test(text))return '温升与流量下降提示冷却侧可能发生变化，但尚不能定位滤器堵塞。需要结合现场读数、泵组和回路状态检查，具体排查沿原冷却系统事件接续。'
  if(/4#|4号/.test(text))return '4#缸相对差本次由8°C降至7°C，暂未扩大，但仍反复出现；继续系统跟踪，不单凭这项变化要求维修。新的现场情况可在该异动跟踪档案补充。'
  if(/3#|3号|核对了|核实了/.test(text))return '3#缸当前安排：'+store.attentionAction('drift').text+'。普通留言不能替代结构化核实，核实提交也不等于确诊或已开展检查。'
  if(/全部|正常|健康|没问题/.test(text))return '目前仍有待核实或处理的问题，不能认定整台主机全部正常。最后有效健康研判为'+healthReview.completedAt+'，仅覆盖已接入指标；未覆盖部位仍按原巡检规程检查。'
- if(/维保|轴承|1#/.test(text))return '轴承振动缓升值得核验，但不能据此确认磨损或直接换件。请在“健康趋势观测”内查看建议的最新证据、人员决定与原计划关联，不重复建立任务。'
+ if(/维保|轴承|1#/.test(text))return '轴承振动缓升值得核验，但不能据此确认磨损或直接换件。请在“事件概览”内查看建议的最新证据、人员决定与原计划关联，不重复建立任务。'
  return '本次主机健康研判完成于'+healthReview.completedAt+'，数据截止'+healthReview.dataCutoff+'。'+healthReview.recommendation+' 当前行动可在左侧列表查看。'
 }

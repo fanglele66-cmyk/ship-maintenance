@@ -30,9 +30,13 @@ test('maintenance decisions, linked orders and processing records have one dedic
   assert.equal(orders.state(child).linked.id,'CBY-WO-202610-018')
   assert.equal(orders.state(child).linked.jobCardNo,'CBY-JOB-202610-018')
   const render=async tab=>{const app=createSSRApp(Detail,{scenario:id});app.use(pinia);app.provide(routerKey,{push(){}});app.provide(routeLocationKey,{query:{tab},path:'/situation/issue/'+id});return renderToString(app)}
-  const health=await render('健康趋势观测')
-  assert.doesNotMatch(health,/本跟踪的阶段建议|跟踪与处理记录/)
-  assert.match(health,/长期健康趋势/)
+  for(const tab of ['研判分析','健康趋势观测','健康趋势分析']){
+   const analysis=await render(tab)
+   assert.doesNotMatch(analysis,/本跟踪的阶段建议|跟踪与处理记录/)
+   assert.doesNotMatch(analysis,/role="tab"[^>]*>健康趋势/)
+   assert.match(analysis,/长期健康趋势/)
+   assert.match(analysis,/aria-selected="true"[^>]*>研判分析/)
+  }
   let maintenance=await render('维保任务')
   assert.match(maintenance,/CBY-WO-202610-018/)
   assert.match(maintenance,/维修作业单号/)

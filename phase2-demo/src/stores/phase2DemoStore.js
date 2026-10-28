@@ -929,7 +929,7 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
       return
     }
     if(mode==='device') {const report=deviceStoryAssessment({todoCreated,isTaskHandled,completedTasks,ignoredSuggestions},'main-engine-1');addLog(id,'assistant',/依据|原因|数据/.test(value)?report.basis:report.conclusion+'\n\n'+report.next);return}
-    if (/维保|轴承|1#缸/.test(value)) addLog(id, 'assistant', '主机的1#缸连杆轴承接近计划检修时数，振动缓升。请进入轴承异动跟踪的“健康趋势观测”查看建议，并决定是否建立人工检查待办。')
+    if (/维保|轴承|1#缸/.test(value)) addLog(id, 'assistant', '主机的1#缸连杆轴承接近计划检修时数，振动缓升。请进入轴承异动跟踪的“事件概览”查看建议，并决定是否建立人工检查待办。')
     else if (/关注|排温|3#缸/.test(value)) addLog(id, 'assistant', '主机的3#缸需要核实，4#缸反复偏差由系统跟踪；2#缸已结束。压力和机体振动保留为普通数据，不计入关注。')
     else addLog(id, 'assistant', mode === 'sensor' ? '可在左侧选择传感器查看趋势；设备层的异动跟踪及其阶段性建议保留在上一层。' : '请先进入左侧主机设备层。健康趋势内保留阶段性建议，人工待办沿原任务接续。')
   }

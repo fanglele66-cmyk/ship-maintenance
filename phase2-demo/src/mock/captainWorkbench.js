@@ -32,7 +32,7 @@ export function captainAnalysis(store,deviceIds){
  const rows=workbenchIssues(store).filter(item=>!item.history&&(!deviceIds||deviceIds.includes(item.deviceId)))
  const pending=rows.filter(item=>item.state==='待决策'),assigned=rows.filter(item=>item.state==='已派发')
  const brief=rows.map(item=>'- **'+item.title+'**：'+item.state+(item.stage?' · '+item.stage:'')).join('\n')
- return `### 健康态势分析\n\n当前有 ${pending.length} 项待决策、${assigned.length} 项已派发。二缸报警、控制空气预警与异动跟踪按各自证据推进；维保建议在健康趋势观测中形成。\n\n${brief}\n\n### 建议\n\n优先核对报警和低压预警的现场依据；一缸与四缸基线变化需结合工况、历史调整和测温校验解释，专项检查分别评估必要性与条件。已有任务沿原事项跟进。\n\n一缸与四缸采用同刻六缸月度资料分别跟踪；后续建议及执行记录归入该跟踪，不重复计为独立事件。`
+ return `### 健康态势分析\n\n当前有 ${pending.length} 项待决策、${assigned.length} 项已派发。二缸报警、控制空气预警与异动跟踪按各自证据推进；维保建议由事件概览中的处置决策形成。\n\n${brief}\n\n### 建议\n\n优先核对报警和低压预警的现场依据；一缸与四缸基线变化需结合工况、历史调整和测温校验解释，专项检查分别评估必要性与条件。已有任务沿原事项跟进。\n\n一缸与四缸采用同刻六缸月度资料分别跟踪；后续建议及执行记录归入该跟踪，不重复计为独立事件。`
 }
 
 // Completion of hands-on work is distinct from closure after observation.

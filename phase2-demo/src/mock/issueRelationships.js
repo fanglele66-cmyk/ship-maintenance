@@ -30,7 +30,7 @@ export function isTrackingContainer(item) {
 }
 export function resolveIssueNavigation(id) {
   const parent = parentIssueId(id)
-  return {id: parent, ...(parent !== id ? {tab: '健康趋势观测',
+  return {id: parent, ...(parent !== id ? {tab: historicalIssueParents[id] ? '处置记录' : '事件概览',
     ...(historicalIssueParents[id] ? {recordId: id} : {recommendationId: id})} : {})}
 }
 export function recommendationAvailable(store, id) {

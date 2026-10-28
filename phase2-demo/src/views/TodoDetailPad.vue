@@ -1,11 +1,17 @@
 <template>
   <div v-if="todo && stage" class="p2-detail p2-pad-detail">
-    <header class="p2-detail-head">
+    <header class="p2-detail-head p2-task-header">
       <BackButton :label="route.query.from==='issues'?'返回事件目录':'返回待办中心'" @click="returnToList" />
-      <div><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
+      <div class="p2-task-title"><span class="p2-eyebrow">{{ cardType }} · {{ todo.device }}</span><h2>{{ cardTitle }}</h2></div>
+      <dl class="p2-task-summary" aria-label="任务安排与进度">
+        <div><dt>负责人</dt><dd>{{ store.assignments[todo.id]?.owner || todo.owner }}</dd></div>
+        <div><dt>要求完成</dt><dd>{{ store.assignments[todo.id]?.due?.replace('T',' ') || '待安排' }}</dd></div>
+        <div><dt>当前阶段</dt><dd>{{ taskStageLabel }}</dd></div>
+        <div><dt>完成情况</dt><dd>{{ taskCompletion }}</dd></div>
+      </dl>
       <span class="p2-badge" :class="store.isTaskHandled(todo.id)?'blue':'red'">{{ store.isTaskHandled(todo.id)?'已处理':'未处理' }}</span>
     </header>
-    <div v-if="isMaintenanceWorkflow(todo)" class="p2-parent-track"><span>本任务承接原异动事件的维保安排，独立记录作业、验收与效果观察；完成结果保持关联。</span><button type="button" class="p2-link-button" @click="router.push({path:'/situation/issue/'+parentIssueId(todo.id),query:{tab:'健康趋势观测'}})">返回所属异动跟踪 →</button></div>
+    <div v-if="isMaintenanceWorkflow(todo)" class="p2-parent-track"><span>本任务承接原异动事件的维保安排，独立记录作业、验收与效果观察；完成结果保持关联。</span><button type="button" class="p2-link-button" @click="router.push({path:'/situation/issue/'+parentIssueId(todo.id),query:{tab:'研判分析'}})">返回所属异动跟踪 →</button></div>
     <nav class="p2-stage-rail" :style="{'--stage-count':displayStages.length}" aria-label="处理阶段">
       <button v-for="(step,position) in displayStages" :key="step.id" class="p2-stage-card" :class="{active:step.kind==='handled'?stage.kind==='handled':store.activeStage[todo.id]===step.index,done:step.kind!=='handled'&&store.progress[todo.id]>step.index,locked:store.progress[todo.id]<step.index}" :disabled="store.progress[todo.id]<step.index" @click="store.selectStage(todo.id,step.index)">
         <span>{{ String(position+1).padStart(2,'0') }}</span><strong>{{ step.label }}</strong><small>{{ step.kind==='handled'?'处理记录':store.progress[todo.id]>step.index?'已完成':store.progress[todo.id]===step.index?'当前阶段':'待接续' }}</small>
@@ -13,31 +19,11 @@
     </nav>
     <div class="p2-pad-body" :key="stageKey">
       <nav class="p2-subtabs" aria-label="阶段内容"><button v-for="tab in tabs" :key="tab" :class="{active:subtab===tab}" @click="subtab=tab">{{ tab }}</button></nav>
-      <CheckAssessment v-if="!store.isTaskHandled(todo.id)&&store.checkAssessments[todo.id]?.stageId===stage.id" :scenario="todo.id"/>
+      <CheckAssessment v-if="subtab!=='数据观测'&&!store.isTaskHandled(todo.id)&&store.checkAssessments[todo.id]?.stageId===stage.id" :scenario="todo.id"/>
 
-      <TrackingObservationTask v-if="todo.workflowKind==='tracking-observation'&&subtab!=='数据观测'&&subtab!=='时间线'" :task-id="todo.id"/>
+      <Phase2DataOverview v-if="subtab==='数据观测'" :scenario="todo.id" :stage="stage.id" />
+      <TrackingObservationTask v-else-if="todo.workflowKind==='tracking-observation'&&subtab!=='时间线'" :task-id="todo.id"/>
       <div v-else-if="assessmentPending" class="p2-submission-receipt"><p>本轮反馈已保存。请根据上方判断决定下一步；需要改补时选择“继续补充本轮核实”。</p></div>
-        <div v-else-if="['建议速览','概览'].includes(subtab)" class="p2-pad-overview">
-        <section class="p2-panel p2-overview-meta"><dl>
-          <div><dt>首次观测时间</dt><dd>{{ todo.firstObserved || (todo.id==='fault'?'10-07 10:30':todo.id==='drift'?'10-10 08:00':'10-01 08:00') }}</dd></div>
-          <div><dt>关注设备</dt><dd>{{ todo.device }}</dd></div>
-          <div><dt>触发来源</dt><dd>{{ source }}</dd></div>
-          <div><dt>当前阶段</dt><dd>{{ stage.label }}</dd></div>
-          <div><dt>待办负责人</dt><dd>{{store.assignments[todo.id]?.owner||todo.owner}}</dd></div>
-          <div v-if="store.assignments[todo.id]?.due"><dt>要求完成时间</dt><dd>{{store.assignments[todo.id].due.replace('T',' ')}}</dd></div>
-          <div><dt>本次要求</dt><dd>{{store.assignments[todo.id]?.scope}}</dd></div>
-        </dl></section>
-        <section class="p2-panel p2-overview-analysis">
-          <MarkdownContent v-if="isWorkflow(todo.id)" :content="currentStageMarkdown"/>
-          <template v-else>
-          <div class="p2-report-block"><h3>初判结论</h3><p>{{ report.conclusion }}</p></div>
-          <div class="p2-report-block"><h3>判断依据</h3><p>{{ report.basis }}</p></div>
-          <div class="p2-report-block"><h3>下一步建议</h3><dl class="p2-next-advice"><div><dt>系统监测</dt><dd>{{ report.system }}</dd></div><div><dt>船舶操作</dt><dd>{{ report.operation }}</dd></div><div><dt>人工事项</dt><dd>{{ report.human }}</dd></div></dl></div>
-
-          </template>
-        </section>
-      </div>
-      <Phase2DataOverview v-else-if="subtab==='数据观测'" :scenario="todo.id" :stage="stage.id" />
       <section v-else-if="subtab==='候选原因'" class="p2-panel p2-pad-cause">
         <div class="p2-section-title">当前异常机理判断</div><p>{{ cause.mechanism }}</p>
         <div class="p2-section-title p2-cause-table-title">候选故障分析</div>
@@ -116,17 +102,22 @@ import {storyTimeline} from '@/mock/storyRecords'
 import CheckAssessment from '@/components/CheckAssessment.vue'
 import TrackingObservationTask from '@/components/TrackingObservationTask.vue'
 import HealthTrackingPanel from '@/components/HealthTrackingPanel.vue'
-import MarkdownContent from '@/components/MarkdownContent.vue'
-import {isWorkflow,stageReport} from '@/mock/fourStoryWorkflow'
-import { overviewReports, causeContent } from '@/mock/phase2Content'
+import { causeContent } from '@/mock/phase2Content'
 function returnToList(){store.closeTodo();router.replace(route.query.from==='issues'?issueDirectoryLocation(route.query,{resume:true}):'/event')}
 const route=useRoute(),router=useRouter(),store=usePhase2DemoStore(),todo=computed(()=>store.selectedTodo),stage=computed(()=>store.currentStage)
 const subtab=computed({get:()=>store.detailTab,set:value=>store.detailTab=value})
 const assessmentPending=computed(()=>!store.isTaskHandled(todo.value?.id)&&store.checkAssessments[todo.value?.id]?.stageId===stage.value?.id)
-const currentStageMarkdown=computed(()=>todo.value&&stage.value?stageReport(store,todo.value.id,stage.value):'')
 const results=store.taskResults,notes=store.taskNotes,attachments=store.taskAttachments,prepared=reactive({}),validation=ref(''),actionNote=ref(''),stepIndex=ref(0)
-const humanStages=computed(()=>(todo.value?.stages||[]).map((entry,index)=>({...entry,index})).filter(entry=>!['observe','closed'].includes(entry.kind)&&(!store.completedTasks[todo.value.id]||entry.index<=store.completedTasks[todo.value.id].completedAtIndex)))
+const isSummaryStage=entry=>['intro','overview','event'].includes(entry?.kind)
+const humanStages=computed(()=>(todo.value?.stages||[]).map((entry,index)=>({...entry,index})).filter(entry=>!isSummaryStage(entry)&&!['observe','closed'].includes(entry.kind)&&(!store.completedTasks[todo.value.id]||entry.index<=store.completedTasks[todo.value.id].completedAtIndex)))
 const displayStages=computed(()=>{const steps=humanStages.value;return store.isTaskHandled(todo.value?.id)?[...steps,{id:'handled',kind:'handled',label:'处理结果',index:store.observationIndex(todo.value.id)}]:steps})
+const taskStageLabel=computed(()=>store.isTaskHandled(todo.value?.id)?'处理完成':todo.value?.stages[store.progress[todo.value?.id]]?.label||stage.value?.label)
+const taskCompletion=computed(()=>{
+ const id=todo.value?.id,completed=store.completedTasks[id],execution=store.executionRecords[id]?.at(-1)
+ if(store.isTaskHandled(id)){const at=completed?.at||execution?.confirmedAt;return at?'已完成 · '+at:'已完成'}
+ const count=humanStages.value.filter(entry=>entry.index<store.progress[id]).length
+ return `${count} / ${humanStages.value.length} 阶段完成`
+})
 const executionForm=computed(()=>store.logs[todo.value?.id]?.findLast(message=>message.purpose==='execution-record'&&message.stageId===stage.value?.id))
 const latestExecution=computed(()=>store.executionRecords[todo.value?.id]?.at(-1))
 const currentResult=computed({get:()=>results[taskKey(stepIndex.value)],set:value=>results[taskKey(stepIndex.value)]=value})
@@ -143,8 +134,7 @@ const accepted=computed({get:()=>store.workAcceptance[stageKey.value]||[],set:va
 const acceptanceNote=computed({get:()=>store.workAcceptanceNotes[stageKey.value]||'',set:value=>store.workAcceptanceNotes[stageKey.value]=value})
 const cardTitle=computed(()=>todo.value?.id==='drift'&&store.progress.drift>=2?todo.value.eventTitle:todo.value?.initialTitle)
 const cardType=computed(()=>isMaintenanceWorkflow(todo.value)?'异动跟踪 · 专项维保任务':todo.value?.id==='drift'&&store.progress.drift>=2?'故障/异常事件的排查与处置':todo.value?.cardType)
-const source=computed(()=>todo.value?.source || (todo.value?.id==='fault'?'传感器告警':todo.value?.id==='drift'?'日常健康扫查 · 持续监测':'日常健康扫查 · 预测维保'))
-const tabs=computed(()=>{if(!stage.value)return[];if(stage.value.kind==='handled')return['摘要','时间线'];if(todo.value?.workflowKind==='tracking-observation')return['观察任务','数据观测'];if(stage.value.kind==='check')return[stage.value.label+'准备',stage.value.label+'步骤',...(stage.value.id==='event'?['候选原因']:[])];if(stage.value.kind==='work'){const word=isMaintenanceWorkflow(todo.value)?'保养':'维修';return[word+'准备','备件清单',word+'步骤','验收确认',...(isMaintenanceWorkflow(todo.value)?['关联工单']:[])]}if(isMaintenanceWorkflow(todo.value))return['建议速览','数据观测'];return stage.value.id==='event'?['概览','数据观测','候选原因']:['概览','数据观测']})
+const tabs=computed(()=>{if(!stage.value)return[];if(stage.value.kind==='handled')return['摘要','时间线'];if(todo.value?.workflowKind==='tracking-observation')return['数据观测','观察任务'];if(stage.value.kind==='check')return['数据观测',stage.value.label+'准备',stage.value.label+'步骤',...(stage.value.id==='event'?['候选原因']:[])];if(stage.value.kind==='work'){const word=isMaintenanceWorkflow(todo.value)?'保养':'维修';return[word+'准备','备件清单',word+'步骤','验收确认',...(isMaintenanceWorkflow(todo.value)?['关联工单']:[])]}return['数据观测']})
 const closedEvidence=computed(()=>{
   if(stage.value?.kind!=='handled')return stage.value?.evidence||[]
   if(latestExecution.value)return []
@@ -153,13 +143,21 @@ const closedEvidence=computed(()=>{
   return feedback?.records.map(record=>[record.result,record.note].filter(Boolean).join('；'))||work.evidence
 })
 const actionLabel=computed(()=>readOnly.value?'查看下一阶段':stage.value?.kind==='event'&&subtab.value!=='候选原因'?'查看候选原因':stage.value?.action)
-const report=computed(()=>{const base=todo.value?.report||overviewReports[todo.value?.id==='drift'&&stage.value?.id==='event'?'driftEvent':todo.value?.id];return todo.value?.id==='main-warning'&&stage.value?.id==='event'?{...base,conclusion:stage.value.summary,basis:stage.value.evidence.join('；'),human:stage.value.judgement}:base})
 const cause=computed(()=>causeContent[todo.value?.id])
 const currentTask=computed(()=>guidedTask(stage.value?.tasks?.[stepIndex.value]||{}))
 const taskChoices=computed(()=>stage.value?.kind==='work'?['已完成','未完成','不适用']:(currentTask.value?.options||checkChoices(todo.value?.id,stage.value?.baseStageId||stage.value?.id,stepIndex.value)))
 const workDetails=computed(()=>stage.value?.workDetails||todo.value?.workDetails || (todo.value?.id==='maintenance'?{preparation:['确认靠港作业窗口、停机隔离和作业许可','核对轴瓦型号、润滑及测量工具'],parts:[{name:'1#缸连杆轴承轴瓦',amount:'1套',use:'提前保养换件'}],acceptance:['轴承间隙复测符合设备要求','润滑及复装检查完成'],placeholder:'例如：间隙复测合格，试运转振动2.2 mm/s'}:todo.value?.id==='drift'?{preparation:['确认停机隔离与高压燃油系统泄压条件','准备喷油器校验设备与拆装工具'],parts:[{name:'喷嘴组件',amount:'1套',use:'清洁后校验不合格时更换'}],acceptance:['喷雾形态校验合格','复装密封检查完成'],placeholder:'例如：喷雾形态正常，无泄漏，同工况排温差3°C'}:{preparation:['按现场规程确认冷却系统隔离与作业许可','准备滤器清洗工具，核对密封圈状态'],parts:[{name:'滤器密封圈',amount:'1套',use:'复装备用'}],acceptance:['滤器复装后无泄漏','流量与出口温度已复测'],placeholder:'例如：流量86.5 m³/h，出口温度79.1°C，无泄漏'}))
 const acceptanceRows=computed(()=>workDetails.value.acceptanceRows || workDetails.value.acceptance.map((req,i)=>({name:'验收项目 '+(i+1),req,method:'记录现场复测值、工况和检查结果，对照本机规程确认。'})))
-watch(stageKey,()=>{subtab.value=tabs.value[readOnly.value&&stage.value?.kind==='check'?1:0]||'';stepIndex.value=0;validation.value='';actionNote.value=''}, {immediate:true})
+watch(stageKey,()=>{
+ // Overview records remain in persisted history; opening a task starts its first actionable stage.
+ // Re-read current state because the assistant can enter that stage in the same render cycle.
+ const id=todo.value?.id,current=todo.value?.stages[store.activeStage[id]]
+ if(id&&store.todoCreated[id]&&isSummaryStage(current)){
+  if(store.activeStage[id]===store.progress[id])store.advanceTodo(id)
+  else {const next=humanStages.value.find(entry=>entry.index>store.activeStage[id]&&entry.index<=store.progress[id]);if(next)store.selectStage(id,next.index)}
+ }
+ subtab.value=tabs.value[0]||'';stepIndex.value=0;validation.value='';actionNote.value=''
+}, {immediate:true})
 function taskKey(i){return stageKey.value+':'+i}
 function attachFiles(event){attachments[taskKey(stepIndex.value)]=Array.from(event.target.files||[]).map(file=>file.name)}
 function nextStep(){
@@ -190,6 +188,7 @@ function viewObservation(){router.push({path:'/situation/issue/'+parentIssueId(t
 </script>
 
 <style scoped>
+.p2-pad-detail .p2-detail-head.p2-task-header{height:auto;align-items:center;flex-wrap:wrap;gap:12px 18px;padding-bottom:16px}.p2-task-header .p2-task-title{flex:1 1 260px;min-width:230px}.p2-task-header .p2-task-title h2{margin:4px 0 0;overflow-wrap:anywhere}.p2-task-header>.p2-badge{flex:none;margin-left:0}.p2-task-summary{display:grid;grid-template-columns:minmax(100px,1fr) minmax(135px,1.25fr) minmax(80px,.85fr) minmax(100px,1fr);gap:8px 18px;flex:0 1 530px;margin:0 0 0 auto;padding:0;font-size:12px;line-height:1.6}.p2-task-summary>div{min-width:0}.p2-task-summary dt{color:#7b8797;font-size:11px;margin-bottom:3px}.p2-task-summary dd{margin:0;color:#34445d;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}@media(max-width:1300px){.p2-task-summary{flex-basis:100%;margin-left:42px;order:2}.p2-task-header>.p2-badge{margin-left:auto}}@media(max-width:700px){.p2-task-header .p2-task-title{min-width:0;flex-basis:180px}.p2-task-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;margin-left:0}}
 .p2-execution-facts{display:grid;gap:12px;padding:16px 0;border-bottom:1px solid #e8ebf1;margin-bottom:20px}.p2-execution-facts>div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px}.p2-execution-facts dt{color:#858c9b}.p2-execution-facts dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .task-operator{display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:13px;color:#697487}.task-operator select{padding:7px 10px;border:1px solid #dce2eb;border-radius:6px;background:#fff;font:inherit}
 .stage-assignment-prompt{margin:12px 0;padding:18px 22px;border:1px solid #d9e5f0;border-radius:8px;background:#f6f9fc;font-size:14px}.stage-assignment-prompt p{margin:6px 0 12px}.stage-assignment-prompt label{display:flex;align-items:center;gap:12px}.stage-assignment-prompt select{padding:8px 12px;border:1px solid #ccd8e6;border-radius:6px;background:#fff;font:inherit}.stage-assignment-prompt>div{display:flex;gap:10px;margin-top:14px}

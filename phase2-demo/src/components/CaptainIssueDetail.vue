@@ -26,18 +26,11 @@
         </template>
       </section>
     </template>
-    <HealthTrendObservation v-else-if="active==='健康趋势观测'" :scenario="issue.id" />
     <LinkedMaintenanceTasks v-else-if="active==='维保任务'" :scenario="issue.id" />
     <template v-else-if="active==='处置记录'">
       <h3>{{issue.eventState==='已闭环'?'闭环结果与处置过程':'已提交的处置过程'}}</h3>
-      <div v-if="dossier.reference" class="reference-results" aria-label="事件处置结果">
-        <section class="dossier-block"><h3>关联核实任务</h3><p>{{dossier.reference.task.at}} · {{dossier.reference.task.assignedBy}}派发给{{dossier.reference.task.owner}}</p><p>{{dossier.reference.task.scope}}</p><p>{{dossier.reference.task.result}}</p></section>
-        <section class="dossier-block"><h3>执行反馈与实际措施</h3><p>{{dossier.reference.feedback.at}} · {{dossier.reference.feedback.finding}}</p><p>{{dossier.reference.feedback.measure}}</p></section>
-        <section class="dossier-block"><h3>验收依据与结果</h3><p>{{dossier.reference.acceptance.at}} · {{dossier.reference.acceptance.actor}}</p><p>{{dossier.reference.acceptance.basis}}</p><p>{{dossier.reference.acceptance.result}}</p></section>
-        <section class="dossier-block"><h3>闭环确认与后续安排</h3><p>{{dossier.reference.closure.at}} · {{dossier.reference.closure.actor}}：{{dossier.reference.closure.result}}</p><p>{{dossier.reference.closure.followup}}</p></section>
-      </div>
-      <SituationTimeline v-if="!dossier.reference&&dossier.timeline?.length" :entries="dossier.timeline" expanded/>
-      <p v-else-if="!dossier.reference" class="block-empty">尚未提交派发或执行记录。起始发现与研判见右侧处置过程。</p>
+      <SituationTimeline v-if="dossier.timeline?.length" :entries="dossier.timeline" expanded/>
+      <p v-else class="block-empty">尚未提交派发或执行记录。起始发现与研判见右侧处置过程。</p>
       <section v-for="recordId in recordIds.filter(id=>!hasJournalRecords&&store.executionRecords[id]?.length)" :key="recordId" class="dossier-block"><h3>实际执行与验收</h3><div v-for="(record,index) in store.executionRecords[recordId]" :key="index"><p>{{record.values.executedAt}} · {{record.executor || record.values.executor}}</p><p>{{record.values.measures}}</p><p v-if="record.values.acceptance!==record.values.measures">{{record.values.acceptance}}</p></div></section>
       <section v-if="!hasJournalRecords&&!dossier.reference" class="dossier-block">
         <h3>人员补充与已有决定</h3>
@@ -137,7 +130,6 @@ import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {workbenchIssues} from '@/mock/captainWorkbench'
 import {storyDossier} from '@/mock/fourStoryWorkflow'
 import MarkdownContent from './MarkdownContent.vue'
-import HealthTrendObservation from './HealthTrendObservation.vue'
 import LinkedMaintenanceTasks from './LinkedMaintenanceTasks.vue'
 import InquiryMessage from './messages/InquiryMessage.vue'
 import assignmentTemplate from '@/message-flows/task-assignment.json'
@@ -149,7 +141,7 @@ import {eventBriefingFor} from '@/mock/eventBriefings'
 import {observationConfig} from '@/mock/phase2Observation'
 const props=defineProps({scenario:String}),store=usePhase2DemoStore(),router=useRouter(),route=useRoute()
 watch(()=>props.scenario,id=>store.openRealCase(id),{immediate:true})
-const tabs=computed(()=>['事件概览',...(issue.value?.type==='异动跟踪'?['健康趋势观测',...(maintenanceTaskIds.value.length?['维保任务']:[])]:[]),'研判分析','处置记录',...(observationTaskIds.value.length?['效果观察']:[]),'证据资料']),active=ref('事件概览'),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
+const tabs=computed(()=>['事件概览',...(issue.value?.type==='异动跟踪'&&maintenanceTaskIds.value.length?['维保任务']:[]),'研判分析','处置记录',...(observationTaskIds.value.length?['效果观察']:[]),'证据资料']),active=ref('事件概览'),falseAlarmOpen=ref(false),falseAlarmReason=ref(''),feedback=ref(false)
 const rootRef=ref(null),overviewScroll=ref(0)
 const issue=computed(()=>workbenchIssues(store).find(item=>item.id===props.scenario))
 const recordIds=computed(()=>[...new Set([...(issue.value?.isTrackingContainer?[]:[props.scenario]),...taskChildIds(props.scenario).filter(id=>store.todoCreated[id])])])
@@ -159,7 +151,7 @@ const unloggedNotes=computed(()=>recordIds.value.flatMap(id=>store.dossierNotes[
 const observationTaskIds=computed(()=>recordIds.value.filter(id=>observationConfig[id]&&(store.executionRecords[id]?.length||store.observationHistory[id]?.length||store.observationRecords[id]?.length)))
 watch(tabs,value=>{if(!value.includes(active.value))active.value='处置记录'})
 watch(()=>[props.scenario,store.eventStatus[props.scenario]],()=>{if(store.eventStatus[props.scenario]==='pending'){falseAlarmOpen.value=false;falseAlarmReason.value='';feedback.value=false;active.value=tabs.value[0]}})
-watch(()=>[props.scenario,route.query.tab],()=>{active.value=tabs.value.includes(route.query.tab)?route.query.tab:tabs.value[0]},{immediate:true})
+watch(()=>[props.scenario,route.query.tab],()=>{const tab=normalizeSection(route.query.tab);active.value=tabs.value.includes(tab)?tab:tabs.value[0]},{immediate:true})
 const dossier=computed(()=>storyDossier(store,props.scenario))
 const briefing=computed(()=>eventBriefingFor(props.scenario))
 const decisionBriefing=computed(()=>{
@@ -179,6 +171,7 @@ const openedSeries=ref(new Set())
 watch(()=>props.scenario,()=>{openedSeries.value=new Set()})
 function toggleSeries(index,event){if(event.target.open)openedSeries.value.add(index);else openedSeries.value.delete(index)}
 function goTab(tab){
+  tab=normalizeSection(tab)
   if(active.value==='事件概览'&&tab!=='事件概览')overviewScroll.value=rootRef.value?.scrollTop||0
   active.value=tab
   if(tab==='事件概览')nextTick(()=>{if(rootRef.value)rootRef.value.scrollTop=overviewScroll.value})
@@ -186,7 +179,8 @@ function goTab(tab){
 function openTask(){const id=issue.value.taskId||issue.value.id;if(!store.activeTaskPortfolio.some(item=>item.id===id)){goTab('处置记录');return}store.selectTodo(id);router.push({path:'/event',query:{todo:id}})}
 const falseAlarmInquiry=computed(()=>({...assignmentTemplate.falseAlarm,text:'确认误报依据',hint:'记录现场核对与判断依据。本次处置将结束，原报警和快照仍保留。',id:'false-alarm-'+props.scenario,status:feedback.value?'submitted':'pending',values:{reason:falseAlarmReason.value},submitLabel:'确认误报并留档',receiptText:'本次误报决定及依据已保存，原始报警仍可回查。'}))
 function reportFalseAlarm(payload){const reason=payload.values.reason;if(!store.confirmFalseAlarm(issue.value.id,reason))return;falseAlarmReason.value=reason;feedback.value=true;falseAlarmOpen.value=false}
-async function showSection(section){if(section==='decision'){active.value=issue.value?.isTrackingContainer?'健康趋势观测':'事件概览';await nextTick();rootRef.value?.querySelector('.tracking-disposition, .task-assignment')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.value.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
+function normalizeSection(section){return ['健康趋势观测','健康趋势分析'].includes(section)?'研判分析':section}
+async function showSection(section){section=normalizeSection(section);if(section==='decision'){active.value='事件概览';await nextTick();rootRef.value?.querySelector('.tracking-disposition, .task-assignment')?.scrollIntoView({block:'start',behavior:'smooth'})}else if(tabs.value.includes(section)){goTab(section);await nextTick();if(rootRef.value)rootRef.value.scrollTop=0}}
 defineExpose({showSection})
 defineEmits(['back'])
 </script>
@@ -209,7 +203,6 @@ defineEmits(['back'])
 .lead-conclusion{font-weight:600;color:#33415a;margin:4px 0 10px}
 .lead-recommendation{color:#4c5f78}
 .dossier-block{margin-top:18px}
-.reference-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:12px;margin:16px 0}.reference-results .dossier-block{margin:0;border:1px solid #e4eaf1;border-radius:7px;padding:12px 15px;background:#fbfcfe}.reference-results h3{margin:0 0 8px}
 .snapshot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px;margin:10px 0}
 .snapshot-card{border:1px solid #e4eaf1;border-radius:8px;padding:12px 14px;background:#fbfcfe;display:flex;flex-direction:column;gap:4px}
 .snapshot-card small{color:#7a8595;font-size:var(--wb-label,12px)}

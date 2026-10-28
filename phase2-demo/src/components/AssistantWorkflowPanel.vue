@@ -41,7 +41,7 @@
    <p>{{store.completedTasks[taskId]?.reason||closureReason||'实际措施、验收与观察记录已保留，可在本事件处置记录中回查。'}}</p>
    <details v-if="executionForm"><summary>查看本轮执行验收回执</summary><InquiryMessage :message="executionForm" read-only /></details>
   </div>
-  <section v-if="followup" class="workflow-followups" aria-label="后续追问"><strong>{{followup.title}}</strong><p>{{followup.question}}</p><button v-for="question in followup.questions" :key="question" type="button" class="p2-secondary" @click="emit('ask',question)">{{question}}</button></section>
+  <section v-if="followup&&showFollowups" class="workflow-followups" aria-label="后续追问"><strong>{{followup.title}}</strong><p>{{followup.question}}</p><button v-for="question in followup.questions" :key="question" type="button" class="p2-secondary" @click="emit('ask',question)">{{question}}</button></section>
   <p v-if="error" class="workflow-error" role="alert">{{error}}</p>
   <p v-if="receipt" class="workflow-notice" role="status">{{receipt}}</p>
  </section>
@@ -56,7 +56,7 @@ import TrackingDisposition from './TrackingDisposition.vue'
 import {isTrackingContainer} from '@/mock/issueRelationships'
 import {workflowFollowup} from '@/message-flows/workflowFollowup'
 import crew from '@/mock/crew.json'
-const props=defineProps({taskId:{type:String,required:true},trackingId:String,audience:{type:String,default:'assignee'}}),store=usePhase2DemoStore(),error=ref(''),receipt=ref(''),decisionId=useId(),checkDecisionId=useId(),checkAction=ref(''),checkReason=ref('')
+const props=defineProps({taskId:{type:String,required:true},trackingId:String,audience:{type:String,default:'assignee'},showFollowups:{type:Boolean,default:true}}),store=usePhase2DemoStore(),error=ref(''),receipt=ref(''),decisionId=useId(),checkDecisionId=useId(),checkAction=ref(''),checkReason=ref('')
 const captain=computed(()=>props.audience==='captain')
 const emit=defineEmits(['submitted','reveal','ask'])
 const trackingPanel=ref(null),trackingRoot=computed(()=>props.trackingId||(store.cases[props.taskId]?.trackingOnly?props.taskId:null)),trackingDecisionActive=computed(()=>captain.value&&trackingRoot.value&&(store.canDecideTracking(trackingRoot.value)||isTrackingContainer(props.taskId)))
@@ -129,7 +129,7 @@ const followup=computed(()=>captain.value&&assigned.value&&!observing.value&&!tr
 function reportTracking(){error.value='';receipt.value='';emit('submitted')}
 const importMessage=computed(()=>trackingDecisionActive.value?trackingPanel.value?.importMessage:captain.value?(!assigned.value?assignmentForm.value:observing.value?decisionForm.value:null):feedbackForm.value?.status==='pending'?feedbackForm.value:executionForm.value?.status==='pending'&&feedbackForm.value?.status==='submitted'?executionForm.value:checkDecisionForm.value)
 function applyImported(values){const message=importMessage.value;if(!message)return;if(trackingDecisionActive.value)trackingPanel.value?.applyImported(values);else if(message.id===assignmentForm.value.id)applyAssignment(values);else if(message.id===feedbackForm.value?.id)applyFeedback(values);else if(message.id===executionForm.value?.id)applyExecution(values);else if(message.id===decisionForm.value?.id)updateObservation({messageId:message.id,values});else updateCheckDecision({messageId:message.id,values});emit('reveal',trackingDecisionActive.value?undefined:message.id)}
-defineExpose({importMessage,applyImported})
+defineExpose({importMessage,applyImported,followup})
 // Watch individual identifiers: rebuilding a form's values is not a new form.
 watch([()=>decisionForm.value?.id,()=>checkDecisionForm.value?.id],async([decision,check])=>{const id=decision||check;if(id){await nextTick();emit('reveal',id)}})
 watch([()=>props.taskId,()=>stage.value?.id,()=>feedbackForm.value?.status,observing,closed,trackingDecisionActive],async()=>{await nextTick();emit('reveal')})

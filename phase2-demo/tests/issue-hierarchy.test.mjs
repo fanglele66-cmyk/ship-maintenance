@@ -91,13 +91,13 @@ test('maintenance assessments stay within their health tracking and preserve exe
    assert.match(issueContext(parent,other).next,/保留原后续检查/)
    assert.equal(isIssueClosed(other,parent),false)
   })
-  await t.test('legacy deep links map to parent health tab; task links and unrelated routes are preserved',()=>{
+  await t.test('legacy deep links map to the parent decision page; task links and unrelated routes are preserved',()=>{
    for(const [childId,parentId] of [['maintenance','bearing-health'],['aux-maintenance','aux-health'],[child,parent]]){
     assert.equal(parentIssueId(childId),parentId)
     assert.deepEqual(maintenanceChildIds(parentId),[childId])
     const target=canonicalIssueRoute({params:{section:'maintenance',attentionId:childId},query:{from:'device',device:'main-engine-1'},hash:'#record'})
     assert.equal(target.path,'/situation/issue/'+parentId)
-    assert.deepEqual(target.query,{from:'device',device:'main-engine-1',tab:'健康趋势观测',recommendation:childId})
+    assert.deepEqual(target.query,{from:'device',device:'main-engine-1',tab:'事件概览',recommendation:childId})
     assert.equal(target.hash,'#record')
    }
    assert.equal(canonicalIssueRoute({params:{attentionId:parent},query:{}}),null)

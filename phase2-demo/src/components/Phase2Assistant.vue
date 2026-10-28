@@ -2,14 +2,19 @@
   <aside class="p2-assistant p2-restored-assistant" :data-audience="audience" :data-viewer="viewer">
     <div class="p2-assistant-head"><span class="p2-ai-mark">✦</span><div><strong>{{props.title}}</strong><small>{{viewer}} · {{ contextLabel }}</small></div><ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="sessions.select" @new-conversation="sessions.newConversation" /></div>
     <button v-if="workflowTaskId" type="button" class="assistant-workflow-shortcut" @click="focusWorkflow">{{audience==='assignee'?'查看当前反馈与处理表单':store.todoCreated[workflowTaskId]?'查看本事项决策与回交':'填写本事项派发安排'}} <span aria-hidden="true">↓</span></button>
-    <div ref="scrollRef" class="p2-messages" aria-live="polite" @wheel.passive="pauseAutoScroll" @pointerdown="pauseAutoScroll" @focusin="pauseAutoScroll" @keydown="pauseAutoScroll" @touchmove.passive="pauseAutoScroll">
+    <div ref="scrollRef" class="p2-messages" @wheel.passive="pauseAutoScroll" @pointerdown="pauseAutoScroll" @focusin="pauseAutoScroll" @keydown="pauseAutoScroll" @touchmove.passive="pauseAutoScroll">
      <div ref="contentRef" class="assistant-message-content">
-      <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" @action="runDemoAction" />
+      <MessageRenderer v-for="(message,index) in displayedMessages" :key="message.id || index" :message="message" :expanded="index===(mode==='attention'?lastAttentionSceneIndex:displayedMessages.length-1)" @action="runDemoAction" @stream-progress="followResponse" @stream-complete="completeResponse" />
       <small v-if="props.dossier && store.dossierReviews[key]?.decision==='deferred'">已保留暂不安排的决定与原因</small>
-      <AssistantWorkflowPanel v-if="workflowTaskId||trackingIssueId" :key="workflowTaskId||trackingIssueId" ref="workflowPanel" :task-id="workflowTaskId||trackingIssueId" :tracking-id="trackingIssueId" :audience="audience" @submitted="workflowSubmitted" @reveal="revealWorkflow" @ask="askFollowup" />
-      <RecordImport v-if="importMessage" ref="recordImport" :message="importMessage" @apply="applyFile" @preview="scrollLatest" />
+      <div v-if="workflowTaskId||trackingIssueId" class="assistant-form-disclosure">
+       <button v-if="workflowExpanded" type="button" class="assistant-form-collapse" :aria-expanded="workflowExpanded" @click="workflowExpanded=false">收起当前表单 ↑</button>
+       <AssistantWorkflowPanel v-show="workflowExpanded" :key="workflowTaskId||trackingIssueId" ref="workflowPanel" :task-id="workflowTaskId||trackingIssueId" :tracking-id="trackingIssueId" :audience="audience" :show-followups="false" @submitted="workflowSubmitted" @reveal="revealWorkflow" @ask="askFollowup" />
+      </div>
+      <section v-if="workflowFollowup" class="assistant-followups" aria-label="后续追问"><p>{{workflowFollowup.question}}</p><button v-for="question in workflowFollowup.questions" :key="question" type="button" @click="askFollowup(question)">{{question}}</button></section>
+      <RecordImport v-if="importMessage" ref="recordImport" :message="importMessage" @apply="applyFile" @preview="revealImport" />
      </div>
     </div>
+    <button v-if="hasNewReply" class="assistant-new-reply" type="button" @click="showLatestReply">有新回复 ↓</button>
     <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><button type="button" class="compose-attachment" aria-label="上传文件" title="上传 TXT、Markdown、CSV 或 JSON 记录" :disabled="!importMessage" @click="fileInput?.click()">＋</button><input ref="fileInput" class="compose-file-input" type="file" accept=".txt,.md,.csv,.json" @change="readAttachment"/><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
   </aside>
 </template>
@@ -27,6 +32,8 @@ import ConversationHistory from './messages/ConversationHistory.vue'
 import AssistantWorkflowPanel from './AssistantWorkflowPanel.vue'
 import RecordImport from './RecordImport.vue'
 import {assistantWorkflowTask,assistantWorkflowReply} from '@/message-flows/assistantWorkflow'
+import {workflowAdvice,presentWorkflowConversation,reconcileWorkflowAdvice} from '@/message-flows/assistantPresentation'
+import {eventBriefingFor} from '@/mock/eventBriefings'
 import deviceFlow from '@/message-flows/device-overview.json'
 import { resolveMessageFlow } from '@/message-flows/resolveMessageFlow'
 import { deviceMessageSources, deviceConversationRecords } from '@/message-flows/deviceSources'
@@ -50,26 +57,57 @@ const viewer=computed(()=>audience.value==='captain'?'陈志远（轮机长）':
 const workflowPanel=ref(null),recordImport=ref(null),fileInput=ref(null)
 const trackingIssueId=computed(()=>props.issueId&&store.cases[props.issueId]?.trackingOnly?props.issueId:store.cases[key.value]?.trackingOnly?key.value:null)
 const importMessage=computed(()=>workflowPanel.value?.importMessage||null)
+const workflowFollowup=computed(()=>workflowPanel.value?.followup||null)
 function readAttachment(event){recordImport.value?.readFile(event)}
-function applyFile(values){workflowPanel.value?.applyImported(values)}
-const contentRef=ref(null)
-let stickToBottom=true,contentObserver
-// Following new messages stops as soon as the reader interacts with the panel.
-function pauseAutoScroll(){stickToBottom=false}
-async function scrollLatest(){stickToBottom=true;await nextTick();if(typeof requestAnimationFrame!=='undefined')requestAnimationFrame(()=>{if(stickToBottom)scrollRef.value?.scrollTo({top:scrollRef.value.scrollHeight,behavior:'auto'})})}
+async function applyFile(values){workflowExpanded.value=true;await nextTick();workflowPanel.value?.applyImported(values)}
+async function revealImport(){pauseAutoScroll();await nextTick();revealMessage(recordImport.value?.$el)}
+const contentRef=ref(null),workflowExpanded=ref(false),hasNewReply=ref(false)
+let followNewReply=false,entryLandingPending=false,entryGeneration=0,followFrame=null
+// Editing and reading never trigger a jump. Only an explicit send/submit follows a new reply.
+function pauseAutoScroll(){followNewReply=false}
+function messageElement(id){return [...(scrollRef.value?.querySelectorAll?.('[data-message-id]')||[])].find(node=>node.dataset.messageId===id)}
+function revealMessage(element,behavior='smooth'){
+ const container=scrollRef.value;if(!container||!element)return
+ container.scrollTo({top:Math.max(0,container.scrollTop+element.getBoundingClientRect().top-container.getBoundingClientRect().top-12),behavior})
+}
+async function showLatestReply(){
+ followNewReply=true;hasNewReply.value=false;await nextTick()
+ const latest=[...displayedMessages.value].reverse().find(message=>message.role==='assistant')
+ revealMessage(messageElement(latest?.id)||scrollRef.value?.querySelector?.('.is-current-advice'))
+}
+async function scrollLatest(){if(!entryLandingPending)await showLatestReply()}
+function followResponse(payload){
+ if(!followNewReply||entryLandingPending||followFrame!==null)return
+ if(typeof requestAnimationFrame==='undefined')return
+ followFrame=requestAnimationFrame(()=>{
+  followFrame=null
+  const container=scrollRef.value
+  const response=messageElement(payload?.messageId)?.querySelector?.('.assistant-advice')||container?.querySelector?.('.is-current-advice')
+  if(!followNewReply||!container||!response)return
+  const box=container.getBoundingClientRect(),target=response.getBoundingClientRect()
+  if(target.bottom>box.bottom-16)container.scrollTo({top:container.scrollTop+target.bottom-box.bottom+24,behavior:'smooth'})
+ })
+}
+function completeResponse(payload){
+ const id=payload?.messageId||payload?.id||payload
+ const snapshot=sessions.active.value.adviceHistory?.find(row=>row.id===id)
+ if(snapshot)snapshot.animate=false
+ followResponse(payload)
+}
 async function revealWorkflow(messageId){
+ if(entryLandingPending||!workflowExpanded.value)return
  pauseAutoScroll();await nextTick()
+ if(entryLandingPending)return
  const panel=workflowPanel.value?.$el,container=scrollRef.value
  const element=messageId?[...(panel?.querySelectorAll?.('[data-inquiry-id]')||[])].find(node=>node.dataset.inquiryId===messageId):panel?.querySelector?.('.decision-form, .workflow-observation, .p2-inquiry:has(form)')
  if(!container||!element)return
  const box=container.getBoundingClientRect(),target=element.getBoundingClientRect(),padding=12
  if(target.top>=box.top+padding&&target.bottom<=box.bottom-padding)return
  const offset=target.height>box.height-padding*2||target.top<box.top+padding?target.top-box.top-padding:target.bottom-box.bottom+padding
- container.scrollTo({top:container.scrollTop+offset,behavior:'auto'})
+ container.scrollTo({top:container.scrollTop+offset,behavior:'smooth'})
 }
-onMounted(()=>{if(typeof ResizeObserver!=='undefined'&&contentRef.value){contentObserver=new ResizeObserver(()=>{if(stickToBottom)scrollLatest()});contentObserver.observe(contentRef.value)}})
-onUnmounted(()=>contentObserver?.disconnect())
-function workflowSubmitted(){sessions.touch();scrollLatest()}
+onUnmounted(()=>{if(followFrame!==null)cancelAnimationFrame(followFrame)})
+function workflowSubmitted(){workflowExpanded.value=false;entryGeneration++;entryLandingPending=false;sessions.touch();showLatestReply()}
 function askFollowup(text){if(props.issueId)askIssue(text);else askWorkflow(text);scrollLatest()}
 const workflowTaskId=computed(()=>{
  if(props.planOnly||props.maintenanceDetail)return null
@@ -95,7 +133,7 @@ async function focusInquiry(){
   element?.scrollIntoView({block:'nearest',behavior:'smooth'})
   element?.querySelector('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')?.focus({preventScroll:true})
 }
-async function focusWorkflow(){pauseAutoScroll();await nextTick();const element=workflowPanel.value?.$el;element?.scrollIntoView?.({block:'start',behavior:'smooth'});element?.querySelector?.('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')?.focus({preventScroll:true})}
+async function focusWorkflow(){pauseAutoScroll();workflowExpanded.value=true;await nextTick();const element=workflowPanel.value?.$el;revealMessage(element);element?.querySelector?.('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')?.focus({preventScroll:true})}
 defineExpose({focusInquiry})
 const messages=computed(()=>(store.logs[key.value]||[]).filter(message=>(!message.conversationId || message.conversationId===sessions.agent.value.primaryId)&&(audience.value!=='assignee'||message.audience!=='captain')))
 const attentionConversation=computed(()=>{
@@ -142,13 +180,39 @@ watch(automaticMessages, value=>{
   }
   else primary.messages=value
 }, {immediate:true,deep:true})
-const displayedMessages=computed(()=>sessions.active.value.messages.filter(message=>!(workflowTaskId.value&&message.purpose==='execution-record'&&message.status==='pending')))
-watch(()=>sessions.active.value.id,()=>{if(props.issueId)mergeIssueConversation(sessions.active.value.messages,automaticMessages.value);scrollLatest()})
+const currentAdvice=computed(()=>{
+ const context=props.issueId?issueContext(props.issueId,store):null
+ const id=audience.value==='captain'&&trackingIssueId.value&&store.canDecideTracking(trackingIssueId.value)?trackingIssueId.value:workflowTaskId.value||props.issueId
+ return id?workflowAdvice(store,id,{audience:audience.value,context,brief:eventBriefingFor(props.issueId||id)}):null
+})
+watch([currentAdvice,()=>sessions.active.value.messages,()=>sessions.active.value.id],([advice,messages])=>{
+ if(!advice)return
+ const conversation=sessions.active.value,hadHistory=Boolean(conversation.adviceHistory?.length)
+ reconcileWorkflowAdvice(conversation,messages,advice,{animate:hadHistory})
+},{immediate:true,deep:true,flush:'post'})
+const displayedMessages=computed(()=>presentWorkflowConversation(sessions.active.value.messages.filter(message=>!(workflowTaskId.value&&message.purpose==='execution-record'&&message.status==='pending')),currentAdvice.value,sessions.active.value.adviceHistory||[]))
+watch(()=>currentAdvice.value?.lifecycleKey,()=>{workflowExpanded.value=false})
+async function landInConversation(){
+ const generation=++entryGeneration
+ entryLandingPending=true;followNewReply=false;workflowExpanded.value=false;hasNewReply.value=false
+ await nextTick()
+ if(typeof requestAnimationFrame!=='undefined')await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))
+ if(generation!==entryGeneration)return
+ entryLandingPending=false
+ const returnedFromAcceptance=audience.value==='captain'&&workflowTaskId.value&&store.isTaskHandled?.(workflowTaskId.value)&&store.executionRecords?.[workflowTaskId.value]?.length
+ if(returnedFromAcceptance){await showLatestReply();return}
+ const container=scrollRef.value,advice=container?.querySelector?.('.is-current-advice')
+ if(container&&advice)container.scrollTo({top:Math.max(0,container.scrollTop+advice.getBoundingClientRect().top-container.getBoundingClientRect().top-12),behavior:'auto'})
+ else if(container)container.scrollTo({top:0,behavior:'auto'})
+}
+watch(agentId,landInConversation,{immediate:true})
+watch(()=>sessions.active.value.id,()=>{if(props.issueId)mergeIssueConversation(sessions.active.value.messages,automaticMessages.value);landInConversation()})
 const lastAttentionSceneIndex=computed(()=>displayedMessages.value.findLastIndex(message=>message.kind==='scene'))
 const contextLabel=computed(()=>props.issueId?(issueContext(props.issueId,store)?.issue.title):genericDevice.value?props.deviceName+' · 设备态势':mode.value==='observation'?'主机 · 处理后效果观察':mode.value==='todo'?store.currentStage?.label:mode.value==='attention'?(store.regularMaintenanceInFocus?'1#缸连杆轴承 · 常规维保计划':store.selectedAttention?.title):mode.value==='ship'?'远洋6号 · 态势监测':mode.value==='device'?'主机 · 设备态势':'传感器 · 数据观测')
 const placeholder=computed(()=>props.issueId?'询问判断依据、缺失证据或下一步安排…':props.maintenanceDetail?'询问检查依据，或补充现场与安排信息…':props.dossier?'询问当前判断、变化证据或后续安排…':mode.value==='ship'?'询问船舶运行、设备变化或处理建议…':mode.value==='observation'?'补充新的现场现象或数据缺失情况…':mode.value==='todo'?'输入现场发现、检查或处理结果…':mode.value==='attention'?'补充现场情况，或回复是否建立待办…':'输入你想了解的设备情况…')
 function send(){
   const text=draft.value.trim();if(!text)return
+  followNewReply=true;hasNewReply.value=false
   if(props.planOnly){sessions.active.value.messages.push({role:'user',text},{role:'assistant',text:'常规计划按原项目和周期保留。提前评估、实际执行和周期完成是不同记录；可以查看本部件提前建议及人员决定，实际执行后再核对覆盖范围。'});sessions.touch();draft.value='';return}
   if(props.issueId){askIssue(text);draft.value='';return}
   if(workflowTaskId.value){askWorkflow(text);draft.value='';return}
@@ -194,17 +258,18 @@ function askMaintenance(text){
  if(id!==sessions.agent.value.primaryId)sessions.active.value.messages.push(...added)
  sessions.touch()
 }
-function askIssue(text){const session=sessions.active.value,afterEventRecordId=automaticMessages.value.findLast(message=>message.eventProcess)?.eventRecordId,at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text,at,afterEventRecordId}, {...((workflowTaskId.value||trackingIssueId.value)?assistantWorkflowReply(store,trackingIssueId.value&&store.canDecideTracking(trackingIssueId.value)?trackingIssueId.value:workflowTaskId.value||trackingIssueId.value,text,{audience:audience.value}):issueReply(props.issueId,text,store)),id:session.id+':reply:'+session.messages.length,at,afterEventRecordId});sessions.touch()}
+function askIssue(text){const session=sessions.active.value,afterEventRecordId=automaticMessages.value.findLast(message=>message.eventProcess)?.eventRecordId,at=new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});session.messages.push({id:session.id+':user:'+session.messages.length,role:'user',text,at,afterEventRecordId}, {...((workflowTaskId.value||trackingIssueId.value)?assistantWorkflowReply(store,trackingIssueId.value&&store.canDecideTracking(trackingIssueId.value)?trackingIssueId.value:workflowTaskId.value||trackingIssueId.value,text,{audience:audience.value}):issueReply(props.issueId,text,store)),id:session.id+':reply:'+session.messages.length,animate:true,at,afterEventRecordId});sessions.touch()}
 function askWorkflow(text){
  const id=workflowTaskId.value;if(!id)return
  const session=sessions.active.value,at=new Date().toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})
- const rows=[{role:'user',text},{...assistantWorkflowReply(store,id,text,{audience:audience.value})}].map((message,index)=>({...message,id:session.id+':workflow:'+Date.now()+':'+session.messages.length+':'+index,at,conversationId:session.id,audience:audience.value,actor:viewer.value}))
+ const rows=[{role:'user',text},{...assistantWorkflowReply(store,id,text,{audience:audience.value}),animate:true}].map((message,index)=>({...message,id:session.id+':workflow:'+Date.now()+':'+session.messages.length+':'+index,at,conversationId:session.id,audience:audience.value,actor:viewer.value}))
  ;(store.logs[id] ||= []).push(...rows)
  if(session.id!==sessions.agent.value.primaryId)session.messages.push(...rows)
  else session.messages=automaticMessages.value
  sessions.touch(session)
 }
 function runDemoAction(id){
+  if(id==='workflow:focus'){focusWorkflow();return}
   return dispatchConversationAction(id,{
     issue:props.issueId ? askIssue : undefined,
     maintenance:props.maintenanceDetail ? askMaintenance : undefined,
@@ -216,10 +281,11 @@ watch([mode,key],()=>{
   else if(['device','sensor'].includes(mode.value))store.enterSituation(mode.value)
 },{immediate:true})
 watch([mode,key,()=>store.monitorStep.stable,()=>store.monitorStep.drift,()=>store.todoCreated.drift],()=>{clearMonitorTimer();if(mode.value!=='attention')return;const id=key.value;if(id==='drift'&&store.monitorStep.drift<1&&!store.todoCreated.drift)monitorTimer=setTimeout(()=>store.nextMonitor('drift'),4800)},{immediate:true})
-watch([agentId,()=>displayedMessages.value.length,workflowTaskId,()=>store.eventStatus[workflowTaskId.value]],async()=>{
+watch(()=>displayedMessages.value.map(message=>message.id).join('|'),async(next,previous)=>{
+ if(entryLandingPending)return
  if((mode.value==='ship'||props.maintenanceDetail)&&displayedMessages.value.length===1){pauseAutoScroll();await nextTick();scrollRef.value?.scrollTo({top:0,behavior:'auto'})}
- else scrollLatest()
-},{immediate:true})
+ else if(previous&&next!==previous){if(followNewReply)showLatestReply();else hasNewReply.value=true}
+})
 watch(()=>store.currentStage?.id,async id=>{if(mode.value!=='todo'||!id||store.activeStage[key.value]>=store.progress[key.value])return;await nextTick();const container=scrollRef.value,element=container?.querySelector('[data-stage-id="'+id+'"]');if(element)container.scrollTo({top:element.getBoundingClientRect().top-container.getBoundingClientRect().top+container.scrollTop-12,behavior:'smooth'})})
 watch(() => [store.progress.fault, store.progress.drift, store.progress.maintenance, store.monitorStep.stable, store.todoCreated.maintenance, store.todoCreated.drift], () => { if (mode.value === 'device') store.enterSituation('device') })
 onUnmounted(clearMonitorTimer)
@@ -228,6 +294,8 @@ onUnmounted(clearMonitorTimer)
 .p2-restored-assistant{width:350px;min-width:320px}.p2-restored-assistant .p2-messages{padding:16px 14px}.p2-restored-assistant .p2-message{margin-top:18px;gap:8px}.p2-restored-assistant .p2-message:first-child{margin-top:0}.p2-restored-assistant .p2-bubble{font-size:13px;line-height:1.7;min-width:0;flex:1;white-space:normal}.p2-restored-assistant .assistant .p2-bubble{background:transparent;padding:0;box-shadow:none}.p2-restored-assistant .user .p2-bubble{flex:initial;max-width:90%;background:#edf4ff;padding:9px 12px;border-radius:8px}.p2-bubble h3{font-size:14px;color:#24334a;margin:0 0 10px;font-weight:650}.p2-dialog-paragraph{margin:11px 0}.p2-dialog-paragraph b{font-size:12px;color:#52627b}.p2-dialog-paragraph p{margin-top:3px;color:#34465e}.p2-dialog-question{margin-top:13px;color:#34465e}.p2-feedback-record{border:1px solid #dce5f0;border-radius:8px;background:#fff;padding:12px}.p2-record-meta{font-size:11px;color:#7e8da1;padding-bottom:8px;border-bottom:1px solid #e7edf5}.p2-record-row{padding:9px 0;border-bottom:1px solid #edf1f6}.p2-record-row b{font-size:12px;color:#334b6e}.p2-record-row p{font-size:12px;margin-top:3px;color:#61718a}.p2-feedback-record .p2-secondary{margin-top:10px;font-size:12px;padding:7px 10px}.p2-restored-assistant .p2-compose textarea{font-size:13px;line-height:1.6}.p2-restored-assistant .p2-compose-foot button{font-size:12px;padding:7px 14px}
 .p2-restored-assistant .p2-assistant-head{gap:9px}.p2-demo-label{display:inline-flex;align-items:center;margin-bottom:6px;border-radius:10px;background:#eff6ff;color:#3874bd;padding:2px 8px;font-size:10px;font-weight:600;line-height:1.5}.p2-restored-assistant .user .p2-demo-label{display:block;width:max-content;margin-left:auto}.p2-demo-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.p2-demo-actions button{border:1px solid #d8e5f4;border-radius:6px;background:#fff;color:#3475c7;padding:7px 9px;font-size:11px;cursor:pointer}.p2-demo-actions button:hover{background:#f1f6fc}.p2-demo-label.is-change{background:#fff3de;color:#a37125}.p2-restored-assistant .p2-message[data-demo="true"] + .p2-message{padding-top:14px;border-top:1px solid #e9eef4}
 .assistant-workflow-shortcut{display:flex;justify-content:space-between;gap:12px;border:0;border-bottom:1px solid #e9eef4;background:#faf8f4;color:#8b7148;padding:10px 16px;text-align:left;font-size:12px;cursor:pointer}.assistant-workflow-shortcut:focus-visible{outline:2px solid #cbb58e;outline-offset:-2px}
+.assistant-form-disclosure:empty{display:none}.assistant-form-collapse{display:block;margin:18px 0 0 auto;border:0;background:transparent;color:#8b7148;font-size:13px;padding:6px 0;cursor:pointer}.assistant-form-disclosure .assistant-workflow{margin-top:8px}.assistant-new-reply{align-self:center;flex:none;margin:5px auto;padding:6px 14px;border:1px solid #e0d5c4;border-radius:16px;background:#fffaf1;color:#8b7148;font-size:13px;cursor:pointer}.p2-restored-assistant .p2-messages{overflow-anchor:none;scroll-behavior:smooth}
+.assistant-followups{margin-top:20px;padding-top:12px;border-top:1px solid #edf0f3;color:#66758a;font-size:13px;line-height:1.7}.assistant-followups p{margin:0 0 8px}.assistant-followups button{display:block;width:100%;margin-top:6px;padding:7px 10px;border:1px solid #e4e9ef;border-radius:5px;background:#fff;color:#627287;font-size:13px;text-align:left;cursor:pointer}
 @media(max-width:1200px){.p2-restored-assistant{width:320px;min-width:300px}}
 </style>
 
