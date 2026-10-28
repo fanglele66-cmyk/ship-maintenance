@@ -4,19 +4,21 @@ import {canonicalIssueRoute} from '@/mock/issueRelationships'
 const routes = [
   { path: '/', redirect: '/situation' },
   {path:'/real-cases',redirect:'/situation'},
-  {path:'/issues',name:'SituationIssues',component:()=>import('@/views/CaptainIssuesView.vue'),meta:{title:'事件中心'}},
+  {path:'/reports/:reportId?',name:'LifecycleReport',component:()=>import('@/views/LifecycleReportView.vue'),meta:{title:'报告'}},
+  {path:'/issues',name:'SituationIssues',component:()=>import('@/views/LifecycleListView.vue'),meta:{title:'事件中心'}},
+  {path:'/situation/issue/:attentionId(real-alarm-0430|real-warning-0523|real-tracking-exhaust-baseline|real-health-c4-baseline)',name:'EventLifecycle',component:()=>import('@/views/EventLifecycleView.vue'),meta:{title:'事件中心'}},
   {path:'/situation/issues',redirect:to=>({path:'/issues',query:to.query,hash:to.hash})},
   {
     path: '/event',
     name: 'EventCenter',
-    component: () => import('@/views/TodoCenterView.vue'),
+    component: () => import('@/views/LifecycleTodoView.vue'),
     meta: { title: '待办中心', icon: '📌' }
   },
   {
     path: '/situation/:section(attention|maintenance|issue)?/:attentionId?',
     name: 'Situation',
     component: () => import('@/views/SituationView.vue'),
-    meta: { title: '态势中心', icon: '📡' }
+    meta: { title: '首页', icon: '📡' }
   },
   {
     path: '/phase1-event',

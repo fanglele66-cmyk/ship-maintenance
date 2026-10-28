@@ -22,7 +22,8 @@
           {{ statusLabel }}
         </span>
       </div>
-      <GlobalNotifications />
+      <button class="header-role-switch" type="button" :aria-label="lifecycle.state.role==='captain'?'切换为大管轮':'切换为轮机长'" @click="lifecycle.setRole(lifecycle.state.role==='captain'?'engineer':'captain')">{{lifecycle.state.role==='captain'?'轮机长':'大管轮'}} ⇄</button>
+      <LifecycleNotifications />
       <span class="header-time">{{ currentTime }}</span>
     </div>
   </header>
@@ -34,7 +35,9 @@ import 'element-plus/es/components/popover/style/css'
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BackButton from './BackButton.vue'
-import GlobalNotifications from './GlobalNotifications.vue'
+import LifecycleNotifications from './LifecycleNotifications.vue'
+import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
+const lifecycle=useEventLifecycleStore()
 import { shipInfo, statusLabels } from '@/mock/devices'
 import { knowledgeDocs } from '@/mock/knowledge'
 import { useEventStore } from '@/stores/eventStore'
@@ -44,9 +47,9 @@ import { useRoute, useRouter } from 'vue-router'
 const eventStore = useEventStore()
 const route = useRoute()
 const router = useRouter()
-const displayShipName=computed(()=>route.path.startsWith('/situation')||['/issues','/event'].includes(route.path)?'长航碧玉':shipInfo.name)
+const displayShipName=computed(()=>route.path.startsWith('/situation')||route.path.startsWith('/reports')||['/issues','/event'].includes(route.path)?'长航碧玉':shipInfo.name)
 const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
-const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')&&route.query.from==='issues'?'事件中心':route.meta.title || '船舶设备检修助手')
+const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')?(route.query.from==='tasks'?'待办中心':'事件中心'):route.meta.title || '船舶设备检修助手')
 const detailTitle = computed(() => {
   if (selectedEvent.value) return selectedEvent.value.title
   if (route.path.startsWith('/inspection')) {

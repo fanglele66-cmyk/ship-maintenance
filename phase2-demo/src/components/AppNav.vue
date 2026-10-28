@@ -36,16 +36,21 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useEventStore } from '@/stores/eventStore'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
+import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 
 const route = useRoute()
 const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
+const lifecycle=useEventLifecycleStore()
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
-const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:demoStore.unreadTaskIds.length)
+const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:lifecycle.unread)
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {
-  const issueDetail = route.path.startsWith('/situation/issue/') && route.query.from === 'issues'
+  const detail=route.path.startsWith('/situation/issue/')
+  if(detail){if(route.query.from==='tasks')return path==='/event';if(route.query.from==='workbench')return path==='/situation';return path==='/issues'}
+  if(route.path.startsWith('/reports'))return path==='/situation'
+  const issueDetail = false
   if (path === '/issues') return route.path === '/issues' || issueDetail
   if (path === '/situation' && issueDetail) return false
   return route.path === path || route.path.startsWith(path + '/')
@@ -66,7 +71,7 @@ watch(totalUnread, (v) => {
 onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
 
 const navItems = [
-  { path: '/situation', label: '态势', icon: '/nav-icons/situation.svg' },
+  { path: '/situation', label: '首页', icon: '/nav-icons/situation.svg' },
   { path: '/issues', label: '事件', icon: '/nav-icons/event.svg' },
   { path: '/event', label: '待办', icon: '/nav-icons/inspection.svg' },
   { path: '/knowledge', label: '知识', icon: '/nav-icons/knowledge.svg' }

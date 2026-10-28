@@ -21,14 +21,13 @@
     </section>
    </div>
   </section>
-  <div class="captain-right" tabindex="0" aria-label="健康态势与事件处置">
+  <div class="captain-right" aria-label="24小时运行与轮机工作台">
    <section class="captain-analysis">
-    <ModuleHeader title="健康态势分析"><span class="analysis-window">分析时间窗 {{analysisWindow.label}}</span></ModuleHeader>
-    <div class="captain-analysis-body"><p class="analysis-overview">{{brief.overview}}</p><div class="analysis-columns"><section><h4>运行风险</h4><p v-for="row in brief.risks" :key="row.id"><b>{{row.title}}</b><span>{{compactFinding(row)}}</span></p><p v-if="!brief.risks.length">当前无待跟进的报警或预警。</p></section><section><h4>设备变化</h4><p v-for="row in brief.changes" :key="row.id"><b>{{row.title}}</b><span>{{compactFinding(row)}}</span></p><p v-if="!brief.changes.length">当前无待跟进的设备异动。</p></section></div><p class="analysis-decision"><b>轮机长关注</b> {{decisionSummary}}</p></div>
+    <ModuleHeader title="工况态势"><span class="analysis-window">近24小时 · AIS 航迹回放</span></ModuleHeader>
+    <div class="lc-home-chronology"><section v-for="period in chronology.periods" :key="period.start" class="lc-home-period"><time>{{period.time}}</time><strong class="lc-operation-status" :class="'operation-'+period.tone">{{period.status}}</strong><p>{{period.detail}}</p><p class="lc-ais-line">AIS · {{period.ais}}</p><small class="lc-ais-position">时段末位置 {{period.position}}</small></section></div>
    </section>
-   <CaptainIssueList :limit="3" :compact="true" :device-ids="situationDeviceIds" :device-options="situationDeviceOptions"/>
+   <LifecycleWorkbench ref="workbench" compact/>
   </div>
-  <ShipDailyReportDrawer v-if="reportsOpen" :reports="dailyReports" @close="reportsOpen=false" @open-events="reportsOpen=false;router.push('/issues')"/>
  </div>
 </template>
 <script setup>
@@ -39,23 +38,28 @@ import {useDeviceStore} from '@/stores/deviceStore'
 import {useSensorStore} from '@/stores/sensorStore'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {captainDeviceSignal} from '@/mock/captainWorkbench'
-import {captainSituationBrief} from '@/mock/captainCoordination'
-import {overviewAnalysisWindow} from '@/mock/overviewAnalysisWindow'
-import {periodReadings,shipDailyReports} from '@/mock/shipDailyReports'
+
+
+
 import {situationDeviceIds,situationDeviceOptions,situationPositions as positions} from '@/mock/situationScope'
 import ModuleHeader from '@/components/ModuleHeader.vue'
-import MarkdownContent from '@/components/MarkdownContent.vue'
-import CaptainIssueList from '@/components/CaptainIssueList.vue'
-import ShipDailyReportDrawer from '@/components/ShipDailyReportDrawer.vue'
+
+
+
+import LifecycleWorkbench from '@/components/LifecycleWorkbench.vue'
+import {navigationChronology} from '../workflow/navigationChronology'
+import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
+const lifecycle=useEventLifecycleStore(),workbench=ref(null)
 const emit=defineEmits(['selectDevice','selectItem']),store=usePhase2DemoStore(),deviceStore=useDeviceStore(),twinRef=ref(null)
 const sensorStore=useSensorStore()
-const router=useRouter(),reportsOpen=ref(false),dailyReports=ref([])
-function openReports(){dailyReports.value=shipDailyReports(sensorStore,sensorStore.sampledAt);reportsOpen.value=true}
+const router=useRouter()
+function openReports(){router.push('/reports/navigation-24h')}
 function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return point?Number(point.value).toFixed(1):'—'}
 const auxiliaryRpmPoints=computed(()=>sensorStore.allSensors.filter(s=>s.deviceId.startsWith('aux-engine-')&&s.unit==='rpm'))
 const runningAuxiliaries=computed(()=>auxiliaryRpmPoints.value.filter(s=>s.value>0).length)
 const sampleTimeIso=computed(()=>new Date(sensorStore.sampledAt).toISOString())
 const sampleTimeLabel=computed(()=>new Date(sensorStore.sampledAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Shanghai'}))
+const chronology=computed(()=>navigationChronology(sensorStore,Math.floor(sensorStore.sampledAt/3600000)*3600000))
 const {width,height}=useElementSize(twinRef)
 const sceneStyle=computed(()=>{const scale=Math.max(width.value/941,height.value/1672);return {height:1672*scale+'px',width:941*scale+'px'}})
 const devices=computed(()=>{
@@ -65,16 +69,6 @@ const devices=computed(()=>{
  const signal=signals.includes('danger')?'danger':signals.includes('warning')?'warning':'normal'
  return [...(main?[{...main,signal:captainDeviceSignal(store,main.id)}]:[]),{id:'aux-system',name:'辅机',system:'辅机系统',signal}]
 })
-const analysisWindow=computed(()=>overviewAnalysisWindow(Math.floor(sensorStore.sampledAt/1800000)*1800000))
-const brief=computed(()=>{
- const range=analysisWindow.value,readings=periodReadings(sensorStore,range.start,range.end)
- return captainSituationBrief(store,{deviceIds:situationDeviceIds,readings,hours:range.hours})
-})
-const decisionSummary=computed(()=>brief.value.decisions.length?brief.value.decisions.map(row=>row.title.replace('二缸报警与喷射控制核实','二缸报警').replace('控制空气双测点低压核实','控制空气低压').replace('一缸排温长期基线抬升跟踪','一缸基线抬升').replace('四缸排温相对基线下移跟踪','四缸基线下移')+'：'+(row.processingState==='待轮机长确认'?'审阅核实结果并确认后续安排':'确认范围、负责人和时限')).join('；')+'。':'按已派发任务跟进执行与观察结果。')
-function compactFinding(row){
- if(row.eventState!=='待决策')return row.processingState==='待轮机长确认'?'核实反馈已回交，待确认解释、维保或继续观察。':row.processingState+'；沿已有安排跟进现场结果。'
- return row.id==='real-alarm-0430'?'二缸排温偏离并伴喷射反馈报警，检查喷射控制与燃油供给。':row.id==='real-warning-0523'?'主机控制空气进口压力与安全监测压力下降，检查供气及减压阀。':row.id.includes('c4')?'四缸相对排温下移，核实测温链路及工况变化。':'一缸相对排温抬升，核实测温、喷油及调整记录。'
-}
 </script>
 <style scoped>
 .captain-workbench{display:grid;grid-template-columns:clamp(280px,28vw,480px) minmax(0,1fr);gap:16px;height:100%;min-height:0;background:#f3f5f8}.captain-twin{display:flex;flex-direction:column;min-height:0;background:#001b30;border-radius:8px;overflow:hidden}.captain-twin header{display:flex;align-items:center;gap:12px;color:#e0eef7;padding:18px 20px;border-bottom:1px solid #16364a;font-size:var(--wb-body)}.captain-twin header span{font-size:var(--wb-label);color:#91b1c5}.twin-viewport{flex:1;min-height:0;position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden}.twin-scene{position:relative;flex:none}.twin-scene img{width:100%;height:100%;object-fit:contain}.twin-device{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;padding:10px 16px;border:1px solid #38627b;border-radius:6px;background:#092639eF;color:#e9f4fb;font:inherit;font-size:var(--wb-body);cursor:pointer;white-space:nowrap}.twin-device:hover,.twin-device:focus-visible{border-color:#89d7f2;outline:2px solid #89d7f255;outline-offset:2px}.twin-device i{width:8px;height:8px;border-radius:50%;background:#47ad72}.twin-device i.danger{background:#e15c55}.twin-device i.warning{background:#e6a444}.captain-right{display:grid;grid-template-rows:auto minmax(0,1fr);gap:16px;min-width:0;min-height:0}.captain-analysis{background:white;border-radius:8px;padding:18px 22px;max-height:44vh;overflow:auto}.captain-analysis header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.captain-analysis header strong{font-size:calc(var(--wb-body) + 2px);font-weight:600;color:#202020}.captain-analysis time{font-size:var(--wb-label);color:#7c8797;white-space:nowrap}.captain-analysis :deep(.markdown-content){font-size:var(--wb-body);line-height:1.75}.captain-analysis :deep(h4:first-child){margin-top:0}.captain-analysis :deep(h4){font-size:calc(var(--wb-body) + 2px);line-height:1.5;margin:12px 0 4px}.captain-analysis :deep(p){margin:4px 0 9px}@media(max-width:1100px){.captain-workbench{grid-template-columns:minmax(250px,29%) minmax(0,1fr);gap:12px}.captain-analysis{padding:16px;max-height:46vh}.captain-right{gap:12px}}@media(max-width:760px){.captain-workbench{display:flex;flex-direction:column;height:auto;overflow:auto}.captain-twin{height:500px;flex:none}.captain-right{display:flex;flex-direction:column}.captain-analysis{max-height:none}.captain-right :deep(.captain-issues){min-height:400px}}
@@ -133,8 +127,8 @@ function compactFinding(row){
 <style scoped>
 @media(min-width:761px){
 .captain-workbench{height:100%;overflow:hidden;grid-template-columns:clamp(250px,25vw,420px) minmax(0,1fr);gap:12px}
-.captain-right{display:grid;grid-template-rows:auto auto;align-content:start;overflow:hidden;gap:12px}
-.captain-analysis{min-height:0;overflow:visible}
+.captain-right{display:grid;grid-template-rows:max-content minmax(0,1fr);align-content:start;overflow:hidden;gap:12px}
+.captain-analysis{min-height:0;max-height:none;overflow:visible}
 .captain-analysis-body{padding:0 18px 14px;max-width:none;font-size:clamp(14px,.65vw,16px);line-height:1.65}
 .captain-analysis :deep(.module-header){padding:12px 18px;min-height:40px}
 .analysis-overview{margin:0 0 10px!important}
