@@ -63,7 +63,7 @@ for (const [id, title] of Object.entries(expectedTitles)) assert.equal(nodes.get
 for (const id of ['alarm', 'warning', 'tracking', 'report-analysis']) assert.equal(nodes.get(id)?.kind, 'ai')
 for (const id of ['investigation-report', 'repair-report']) assert.equal(nodes.get(id)?.kind, 'human')
 assert.equal(nodes.get('notification')?.kind, 'stage')
-for (const id of ['report-revision', 'role-conversation', 'page-logs']) assert(!nodes.has(id), 'Removed node returned: ' + id)
+for (const id of ['report-revision', 'role-conversation', 'page-logs', 'decision-review']) assert(!nodes.has(id), 'Removed node returned: ' + id)
 assert.equal(views.get('pages').title, '用户动线')
 assert(nodes.get('effect-observation').sources.includes('mapped-samples'))
 assert(nodes.get('effect-observation').related.includes('sample'))
@@ -76,7 +76,11 @@ for (const node of nodes.values()) {
     assert(source.line > 0 && source.line <= content.split('\n').length, 'Invalid evidence line: ' + source.path)
   }
 }
-for (const id of Object.keys(taskTypes)) assert.deepEqual(nodes.get(id).sources, ['triage-dispatch'], 'Task bypasses confirmed dispatch: ' + id)
+const taskGates = { 'task-investigation': ['triage-dispatch', 'notification'], 'task-repair': ['notification'], 'task-recheck': ['notification'] }
+for (const [id, gates] of Object.entries(taskGates)) assert.deepEqual(nodes.get(id).sources, gates, 'Task bypasses initial or follow-up confirmation: ' + id)
+assert.deepEqual(nodes.get('plan-draft').sources, ['triage'], 'Initial task draft must not receive follow-up decisions')
+assert.equal(nodes.get('notification').layer, 'task')
+for (const id of ['branch-continue', 'branch-repair', 'state-event']) assert.equal(nodes.get(id).layer, 'task')
 // A report can return to decision; repair never starts merely by submitting it.
 assert(!nodes.get('investigation-report').outputs.includes('task-repair'))
 assert(!nodes.get('plan-draft').outputs.some(id => Object.hasOwn(taskTypes, id)))
@@ -108,12 +112,15 @@ for (const view of views.values()) {
   const paths = view.id === 'pages' ? [['page-home', 'page-event'], ['page-todo', 'page-event'], ['page-issues', 'page-event'], ['page-event', 'page-reports']] : [
     ['sample', 'mapped-samples'], ['mapped-samples', 'sample-quality'], ['sample-quality', 'time-features'],
     ['triage', 'triage-dispatch'], ['triage-dispatch', 'task-investigation'], ['task-investigation', 'investigation-report'],
-    ['investigation-report', 'decision-review'], ['decision-review', 'triage-dispatch'], ['triage-dispatch', 'task-repair'],
+    ['investigation-report', 'notification'], ['notification', 'task-investigation'], ['notification', 'task-repair'],
     ['task-repair', 'repair-report'], ['repair-report', 'effect-observation'], ['effect-observation', 'result-review'],
     ['result-review', 'task-recheck'], ['task-recheck', 'investigation-report'], ['result-review', 'closure-report'],
   ]
   // The status view intentionally condenses observation into its task/result ownership cards.
   for (const [from, to] of paths) if (displayed.has(from) && displayed.has(to)) assert(reaches(from, to), view.id + ': broken path ' + from + ' -> ' + to)
+  if (view.id !== 'pages') {
+    for (const initial of ['triage', 'plan-draft', 'triage-dispatch']) assert(!reaches('notification', initial), view.id + ': lifecycle incorrectly returns to the initial event column')
+  }
   if (['alarm', 'warning', 'tracking'].includes(view.id)) assert(reaches(view.id, 'triage-dispatch'))
 }
 for (const flow of data.branchFlows) {

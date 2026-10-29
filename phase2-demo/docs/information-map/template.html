@@ -230,7 +230,8 @@ function flowTargetLinks(next,stageId,model){
     else if(model.stageCodes.has(id)){const back=Number(model.stageCodes.get(id))<Number(model.stageCodes.get(stageId));prefix=back?'↶':'→';label=(back?'返回步骤 ':'进入步骤 ')+code}
     else if(model.branchCodes.has(id))label='转到分支 '+code;
     else label=title;
-    const targetView=!code?arr(DATA.views).find(v=>isFlowView(v.id)&&v.id!==state.view&&(v.id===id||arr(v.columns).some(c=>arr(c.groups).some(g=>arr(g.ids).includes(id))))):null;
+    const inCurrentView=arr(currentView()?.columns).some(c=>arr(c.groups).some(g=>arr(g.ids).includes(id)));
+    const targetView=!code&&!inCurrentView?arr(DATA.views).find(v=>isFlowView(v.id)&&v.id!==state.view&&(v.id===id||arr(v.columns).some(c=>arr(c.groups).some(g=>arr(g.ids).includes(id))))):null;
     return `<button class="flow-next-link ${id===stageId?'self-loop':''}" data-flow-target="${esc(id)}"${targetView?` data-flow-view="${esc(targetView.id)}"`:''} title="${esc(title)}"><span>${prefix}</span>${esc(label)}${code?`<small>${esc(title)}</small>`:targetView?'<small>转至'+esc(targetView.title)+'</small>':''}</button>`;
   }).join('');
 }
@@ -292,8 +293,8 @@ function navigateFlowNode(id,viewId){
   if(viewId&&viewId!==state.view){state.flowModes[viewId]='abstract';if(nodes.has(id))state.selected=id;showView(viewId)}
   else if(nodes.has(id))selectNode(id);
   requestAnimationFrame(()=>{
-    const target=Array.from($('flow-map').querySelectorAll('[data-flow-id]')).find(el=>el.dataset.flowId===id);
-    if(target){const parent=target.closest('details.flow-stage');if(parent)parent.open=true;if(target.tagName==='DETAILS')target.open=true;target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}
+    const target=Array.from($('flow-map').querySelectorAll('[data-flow-id],[data-node]')).find(el=>el.dataset.flowId===id||el.dataset.node===id);
+    if(target){for(let parent=target.closest('details');parent;parent=parent.parentElement?.closest('details'))parent.open=true;if(target.tagName==='DETAILS')target.open=true;target.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}
   });
 }
 

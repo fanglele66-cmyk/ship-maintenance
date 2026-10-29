@@ -4,7 +4,7 @@
     "description": "事件信息与排查建议 → 待派任务 → 人工派发 → 步骤反馈 → 处置报告 → 再次决策；传感器信息支持效果观察，按生命周期阶段接续并人工闭环。",
     "meta": {
       "date": "2026-10-29",
-      "presentationRevision": "user-journeys-feedback-disposal-reports",
+      "presentationRevision": "initial-event-followup-lifecycle",
       "scope": "船端四个当前事件；岸基仅同步边界"
     },
     "entities": [
@@ -51,13 +51,13 @@
       },
       {
         "id": "event",
-        "title": "事件与反复决策",
-        "description": "初判、待派草稿、报告后再决策"
+        "title": "事件初始信息与首次分流",
+        "description": "初判、初始排查草稿与首次派发"
       },
       {
         "id": "task",
         "title": "本轮任务与中间产物",
-        "description": "反馈、报告、AI分析与效果观察"
+        "description": "任务、反馈、处置报告与生命周期接续"
       },
       {
         "id": "result",
@@ -101,6 +101,10 @@
       {
         "title": "事件产物与生命周期步骤",
         "text": "报警事件、预警事件、异动跟踪均为 AI 产物；派发、回交、补充、闭环通知归流程步骤，衔接阶段与接续角色。"
+      },
+      {
+        "title": "初始事件与后续生命周期分列",
+        "text": "左侧只展示初始信息、首次分流与首次派发；排查后的再次决策、后续草稿和确认派发合并在右侧派发 / 回交 / 补充 / 闭环通知中。"
       }
     ],
     "nodes": [
@@ -656,31 +660,29 @@
         "kind": "ai",
         "scope": "船舶 → 设备 → 事件",
         "stage": "轮机长审阅与决定",
-        "summary": "派发前可查看排查 / 维修 / 复查步骤；轮机长通过 AI 检修助手调整范围和步骤。",
+        "summary": "事件初始阶段的待派排查草稿；轮机长核对排查范围、依据与步骤后进行首次派发。",
         "fields": [
           {
-            "name": "内容",
-            "description": "范围、依据、步骤、来源报告、版本、生成状态。"
+            "name": "初始排查",
+            "description": "事件信息、建议排查范围、检查步骤及生成状态。"
           },
           {
-            "name": "生成",
-            "description": "初始排查和维修可用已有步骤；继续排查调用模型，复查有预设步骤并可生成。"
+            "name": "首次派发门槛",
+            "description": "草稿就绪且有步骤，由轮机长确认负责人、未来完成时限和范围。"
           },
           {
-            "name": "边界",
-            "description": "草稿 ready 且有步骤才可派发；生成失败保留可用版本或错误，不视为已派发。"
+            "name": "后续接续",
+            "description": "排查报告回交后的草稿、再次决策与新一轮派发统一归右侧生命周期步骤。"
           }
         ],
         "sources": [
-          "triage",
-          "decision-review",
-          "result-review"
+          "triage"
         ],
         "outputs": [
           "triage-dispatch"
         ],
         "related": [],
-        "page": "待派发排查 / 待派发维修 / 复查任务",
+        "page": "初始风险提醒 → 待派发排查",
         "notes": [],
         "evidence": [
           {
@@ -692,20 +694,20 @@
       },
       {
         "id": "triage-dispatch",
-        "title": "确认本轮派发",
+        "title": "确认首次派发",
         "layer": "event",
         "kind": "human",
         "scope": "船舶 → 设备 → 事件",
         "stage": "轮机长审阅与决定",
-        "summary": "确认负责人、未来完成时限、范围及就绪的任务草稿后，创建本轮任务。",
+        "summary": "事件开始时，轮机长确认负责人、未来完成时限、范围与就绪的排查草稿后创建首轮任务。",
         "fields": [
           {
             "name": "创建门槛",
             "description": "轮机长确认；负责人有效；完成时间晚于当前；依据非空；草稿就绪且匹配当前阶段。"
           },
           {
-            "name": "轮次边界",
-            "description": "排查、维修、复查分别生成任务 ID，保留旧轮报告；并非一个任务自动流转到维修。"
+            "name": "后续派发",
+            "description": "继续排查、维修和复查由右侧生命周期步骤承接，不返回初始事件分流。"
           }
         ],
         "sources": [
@@ -713,8 +715,6 @@
         ],
         "outputs": [
           "task-investigation",
-          "task-repair",
-          "task-recheck",
           "notification"
         ],
         "related": [],
@@ -743,7 +743,8 @@
           }
         ],
         "sources": [
-          "triage-dispatch"
+          "triage-dispatch",
+          "notification"
         ],
         "outputs": [
           "task-feedback"
@@ -774,7 +775,7 @@
           }
         ],
         "sources": [
-          "triage-dispatch"
+          "notification"
         ],
         "outputs": [
           "task-feedback"
@@ -805,7 +806,7 @@
           }
         ],
         "sources": [
-          "triage-dispatch"
+          "notification"
         ],
         "outputs": [
           "task-feedback"
@@ -891,7 +892,6 @@
         ],
         "outputs": [
           "report-analysis",
-          "decision-review",
           "notification"
         ],
         "related": [],
@@ -982,9 +982,8 @@
           "repair-report"
         ],
         "outputs": [
-          "decision-review",
-          "result-review",
-          "notification"
+          "notification",
+          "result-review"
         ],
         "related": [],
         "page": "处置决策 / 阶段报告 / 全部报告；补充内容在同一报告内留存",
@@ -997,47 +996,6 @@
           },
           {
             "path": "ship-maintenance/phase2-demo/src/workflow/reportRevisions.js",
-            "line": 1,
-            "note": "本次按当前实现核对；历史证据见案例资料"
-          }
-        ]
-      },
-      {
-        "id": "decision-review",
-        "title": "排查后再次决策",
-        "layer": "event",
-        "kind": "stage",
-        "scope": "船舶 → 设备 → 事件",
-        "stage": "轮机长审阅与决定",
-        "summary": "提交排查报告后回到轮机长；按本轮结果提供下一步。",
-        "fields": [
-          {
-            "name": "无异常结果",
-            "description": "提供“继续排查”；审阅新草稿后重新派发。"
-          },
-          {
-            "name": "有异常结果",
-            "description": "提供“派发维修”；由本轮 result 字段匹配异常规则，备注不能自动改变分支。"
-          },
-          {
-            "name": "当前菜单",
-            "description": "三类事件均使用该决策规则；当前没有“关联维保单”可选项。"
-          }
-        ],
-        "sources": [
-          "investigation-report",
-          "report-analysis"
-        ],
-        "outputs": [
-          "plan-draft",
-          "shore-packet"
-        ],
-        "related": [],
-        "page": "处置决策 + 阶段报告",
-        "notes": [],
-        "evidence": [
-          {
-            "path": "ship-maintenance/phase2-demo/src/workflow/lifecycleDecisions.js",
             "line": 1,
             "note": "本次按当前实现核对；历史证据见案例资料"
           }
@@ -1119,7 +1077,7 @@
           "investigation-report"
         ],
         "outputs": [
-          "plan-draft",
+          "notification",
           "closure-report",
           "shore-packet"
         ],
@@ -1175,7 +1133,7 @@
         "kind": "stage",
         "scope": "船舶 → 设备 → 事件",
         "stage": "事件生命周期阶段衔接",
-        "summary": "通过派发、回交、补充和闭环步骤衔接事件生命周期，明确当前阶段、接续角色及下一步入口，并生成对应通知。",
+        "summary": "承接派发后的整个生命周期：接收处置报告、排查后再次决策、确认后续任务、补充复核与闭环通知。初次分流留在左侧，后续继续排查、维修和复查在此接续。",
         "fields": [
           {
             "name": "派发 → 执行",
@@ -1184,6 +1142,18 @@
           {
             "name": "回交 → 再次决策",
             "description": "人工反馈形成处置报告并回交：排查后进入待处置决策，维修或无异常复查后进入待结果处置。"
+          },
+          {
+            "name": "无异常结果",
+            "description": "提供“继续排查”；审阅新草稿后重新派发。"
+          },
+          {
+            "name": "有异常结果",
+            "description": "提供“派发维修”；由本轮 result 字段匹配异常规则，备注不能自动改变分支。"
+          },
+          {
+            "name": "后续任务草稿与确认派发",
+            "description": "审阅继续排查、维修或复查的当前草稿；确认负责人、未来完成时限及范围后才创建新一轮任务。生成失败或取消均不创建任务，旧轮反馈和报告继续保留。"
           },
           {
             "name": "补充 → 复核",
@@ -1197,16 +1167,21 @@
         "sources": [
           "triage-dispatch",
           "report-analysis",
-          "closure-report"
-        ],
-        "outputs": [
-          "state-event"
-        ],
-        "related": [
-          "decision-review",
+          "closure-report",
+          "investigation-report",
           "result-review"
         ],
-        "page": "右上角通知 / 待办入口",
+        "outputs": [
+          "state-event",
+          "task-investigation",
+          "task-repair",
+          "task-recheck",
+          "shore-packet"
+        ],
+        "related": [
+          "result-review"
+        ],
+        "page": "排查后处置决策 / 后续任务草稿 / 轮机长确认派发 / 通知与待办入口",
         "notes": [],
         "evidence": [
           {
@@ -1218,6 +1193,11 @@
             "path": "ship-maintenance/phase2-demo/src/workflow/eventLifecycle.js",
             "line": 1,
             "note": "生命周期阶段与状态在派发、提交、闭环操作中同步更新"
+          },
+          {
+            "path": "ship-maintenance/phase2-demo/src/workflow/lifecycleDecisions.js",
+            "line": 1,
+            "note": "本次按当前实现核对；历史证据见案例资料"
           }
         ]
       },
@@ -1241,7 +1221,7 @@
         ],
         "sources": [
           "triage",
-          "decision-review",
+          "notification",
           "result-review",
           "closure-report"
         ],
@@ -1291,10 +1271,10 @@
       {
         "id": "state-event",
         "title": "事件阶段与业务状态",
-        "layer": "event",
+        "layer": "task",
         "kind": "view",
         "scope": "船舶 → 设备 → 事件",
-        "stage": "轮机长审阅与决定",
+        "stage": "派发后的生命周期状态",
         "summary": "同一事件贯穿提醒、各轮排查 / 维修、结果处置与归档。",
         "fields": [
           {
@@ -1782,10 +1762,10 @@
       {
         "id": "branch-continue",
         "title": "无异常结果，继续排查",
-        "layer": "event",
+        "layer": "task",
         "kind": "branch",
         "scope": "船舶 → 设备 → 事件",
-        "stage": "轮机长审阅与决定",
+        "stage": "报告回交后的再次决策",
         "summary": "新任务与旧报告同属原事件；无法确认不写成已修复",
         "fields": [
           {
@@ -1798,10 +1778,10 @@
           }
         ],
         "sources": [
-          "decision-review"
+          "notification"
         ],
         "outputs": [
-          "plan-draft"
+          "notification"
         ],
         "related": [],
         "page": "事件详情",
@@ -1817,10 +1797,10 @@
       {
         "id": "branch-repair",
         "title": "有异常结果，派发维修",
-        "layer": "event",
+        "layer": "task",
         "kind": "branch",
         "scope": "船舶 → 设备 → 事件",
-        "stage": "轮机长审阅与决定",
+        "stage": "报告回交后的再次决策",
         "summary": "排查提交本身不启动维修；必须轮机长再次派发",
         "fields": [
           {
@@ -1833,10 +1813,10 @@
           }
         ],
         "sources": [
-          "decision-review"
+          "notification"
         ],
         "outputs": [
-          "plan-draft"
+          "notification"
         ],
         "related": [],
         "page": "事件详情",
@@ -1871,7 +1851,7 @@
           "result-review"
         ],
         "outputs": [
-          "plan-draft"
+          "notification"
         ],
         "related": [],
         "page": "事件详情",
@@ -1961,8 +1941,8 @@
         "id": "overview",
         "title": "信息总览",
         "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
-        "subtitle": "来源 → 场景 → 轮机长决策 ⇄ 本轮任务与报告 → 结果处置",
-        "note": "沿分支回到轮机长决策。每次派发创建独立任务，历史报告保留；点击信息卡查看字段、页面归属和源码依据。",
+        "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
+        "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
           {
             "id": "raw",
@@ -2019,11 +1999,11 @@
           {
             "id": "event",
             "layer": "event",
-            "title": "事件与反复决策",
-            "subtitle": "04 / 初判、待派草稿、报告后再决策",
+            "title": "事件初始信息与首次分流",
+            "subtitle": "04 / 初判、初始排查草稿与首次派发",
             "groups": [
               {
-                "title": "事件与反复决策",
+                "title": "事件初始信息与首次分流",
                 "ids": [
                   "alarm",
                   "warning",
@@ -2031,8 +2011,7 @@
                   "risk-brief",
                   "triage",
                   "plan-draft",
-                  "triage-dispatch",
-                  "decision-review"
+                  "triage-dispatch"
                 ]
               }
             ]
@@ -2041,7 +2020,7 @@
             "id": "task",
             "layer": "task",
             "title": "本轮任务与中间产物",
-            "subtitle": "05 / 反馈、报告、AI分析与效果观察",
+            "subtitle": "05 / 反馈、处置报告与生命周期接续",
             "groups": [
               {
                 "title": "本轮任务与中间产物",
@@ -2252,18 +2231,6 @@
             "label": ""
           },
           {
-            "from": "decision-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "result-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "plan-draft",
             "to": "triage-dispatch",
             "type": "output",
@@ -2272,18 +2239,6 @@
           {
             "from": "triage-dispatch",
             "to": "task-investigation",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-repair",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-recheck",
             "type": "output",
             "label": ""
           },
@@ -2331,7 +2286,7 @@
           },
           {
             "from": "investigation-report",
-            "to": "decision-review",
+            "to": "notification",
             "type": "flow",
             "label": "普通排查 / 复查有异常"
           },
@@ -2367,7 +2322,7 @@
           },
           {
             "from": "report-analysis",
-            "to": "decision-review",
+            "to": "notification",
             "type": "output",
             "label": ""
           },
@@ -2378,7 +2333,7 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "shore-packet",
             "type": "output",
             "label": ""
@@ -2404,12 +2359,6 @@
           {
             "from": "result-review",
             "to": "shore-packet",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "report-analysis",
-            "to": "notification",
             "type": "output",
             "label": ""
           },
@@ -2448,6 +2397,30 @@
             "to": "notification",
             "type": "flow",
             "label": "处置报告回交或补充后衔接下一阶段"
+          },
+          {
+            "from": "notification",
+            "to": "task-investigation",
+            "type": "flow",
+            "label": "确认继续排查后创建新轮次"
+          },
+          {
+            "from": "notification",
+            "to": "task-repair",
+            "type": "flow",
+            "label": "确认维修范围后派发"
+          },
+          {
+            "from": "notification",
+            "to": "task-recheck",
+            "type": "flow",
+            "label": "确认复查安排后派发"
+          },
+          {
+            "from": "result-review",
+            "to": "notification",
+            "type": "flow",
+            "label": "后续复查与生命周期接续"
           }
         ]
       },
@@ -2455,8 +2428,8 @@
         "id": "alarm",
         "title": "报警事件",
         "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
-        "subtitle": "来源 → 场景 → 轮机长决策 ⇄ 本轮任务与报告 → 结果处置",
-        "note": "沿分支回到轮机长决策。每次派发创建独立任务，历史报告保留；点击信息卡查看字段、页面归属和源码依据。",
+        "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
+        "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
           {
             "id": "raw",
@@ -2511,23 +2484,20 @@
           {
             "id": "event",
             "layer": "event",
-            "title": "事件与反复决策",
-            "subtitle": "04 / 初判、待派草稿、报告后再决策",
+            "title": "事件初始信息与首次分流",
+            "subtitle": "04 / 初判、初始排查草稿与首次派发",
             "groups": [
               {
-                "title": "事件与反复决策",
+                "title": "事件初始信息与首次分流",
                 "ids": [
                   "alarm",
                   "risk-brief",
                   "triage",
                   "plan-draft",
                   "triage-dispatch",
-                  "decision-review",
                   "branch-dispatch",
                   "branch-false",
-                  "branch-shore",
-                  "branch-continue",
-                  "branch-repair"
+                  "branch-shore"
                 ]
               }
             ]
@@ -2536,7 +2506,7 @@
             "id": "task",
             "layer": "task",
             "title": "本轮任务与中间产物",
-            "subtitle": "05 / 反馈、报告、AI分析与效果观察",
+            "subtitle": "05 / 反馈、处置报告与生命周期接续",
             "groups": [
               {
                 "title": "本轮任务与中间产物",
@@ -2549,7 +2519,9 @@
                   "repair-report",
                   "report-analysis",
                   "effect-observation",
-                  "notification"
+                  "notification",
+                  "branch-continue",
+                  "branch-repair"
                 ]
               }
             ]
@@ -2696,18 +2668,6 @@
             "label": ""
           },
           {
-            "from": "decision-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "result-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "plan-draft",
             "to": "triage-dispatch",
             "type": "output",
@@ -2716,18 +2676,6 @@
           {
             "from": "triage-dispatch",
             "to": "task-investigation",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-repair",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-recheck",
             "type": "output",
             "label": ""
           },
@@ -2775,7 +2723,7 @@
           },
           {
             "from": "investigation-report",
-            "to": "decision-review",
+            "to": "notification",
             "type": "flow",
             "label": "普通排查 / 复查有异常"
           },
@@ -2811,7 +2759,7 @@
           },
           {
             "from": "report-analysis",
-            "to": "decision-review",
+            "to": "notification",
             "type": "output",
             "label": ""
           },
@@ -2822,7 +2770,7 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "shore-packet",
             "type": "output",
             "label": ""
@@ -2852,12 +2800,6 @@
             "label": ""
           },
           {
-            "from": "report-analysis",
-            "to": "notification",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "closure-report",
             "to": "notification",
             "type": "output",
@@ -2874,12 +2816,6 @@
             "to": "branch-dispatch",
             "type": "flow",
             "label": "需要现场排查"
-          },
-          {
-            "from": "branch-dispatch",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
           },
           {
             "from": "triage",
@@ -2906,28 +2842,16 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "branch-continue",
             "type": "flow",
             "label": "已提交报告未匹配异常结果"
           },
           {
-            "from": "branch-continue",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "decision-review",
+            "from": "notification",
             "to": "branch-repair",
             "type": "flow",
             "label": "当前报告结果匹配异常规则"
-          },
-          {
-            "from": "branch-repair",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
           },
           {
             "from": "result-review",
@@ -2985,19 +2909,19 @@
           },
           {
             "from": "branch-repair",
-            "to": "triage-dispatch",
+            "to": "task-repair",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
           {
             "from": "branch-continue",
-            "to": "triage-dispatch",
+            "to": "task-investigation",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
           {
             "from": "branch-recheck",
-            "to": "triage-dispatch",
+            "to": "notification",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
@@ -3024,6 +2948,30 @@
             "to": "notification",
             "type": "flow",
             "label": "处置报告回交或补充后衔接下一阶段"
+          },
+          {
+            "from": "notification",
+            "to": "task-investigation",
+            "type": "flow",
+            "label": "确认继续排查后创建新轮次"
+          },
+          {
+            "from": "notification",
+            "to": "task-repair",
+            "type": "flow",
+            "label": "确认维修范围后派发"
+          },
+          {
+            "from": "notification",
+            "to": "task-recheck",
+            "type": "flow",
+            "label": "确认复查安排后派发"
+          },
+          {
+            "from": "result-review",
+            "to": "notification",
+            "type": "flow",
+            "label": "后续复查与生命周期接续"
           }
         ]
       },
@@ -3031,8 +2979,8 @@
         "id": "warning",
         "title": "预警事件",
         "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
-        "subtitle": "来源 → 场景 → 轮机长决策 ⇄ 本轮任务与报告 → 结果处置",
-        "note": "沿分支回到轮机长决策。每次派发创建独立任务，历史报告保留；点击信息卡查看字段、页面归属和源码依据。",
+        "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
+        "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
           {
             "id": "raw",
@@ -3087,23 +3035,20 @@
           {
             "id": "event",
             "layer": "event",
-            "title": "事件与反复决策",
-            "subtitle": "04 / 初判、待派草稿、报告后再决策",
+            "title": "事件初始信息与首次分流",
+            "subtitle": "04 / 初判、初始排查草稿与首次派发",
             "groups": [
               {
-                "title": "事件与反复决策",
+                "title": "事件初始信息与首次分流",
                 "ids": [
                   "warning",
                   "risk-brief",
                   "triage",
                   "plan-draft",
                   "triage-dispatch",
-                  "decision-review",
                   "branch-dispatch",
                   "branch-false",
-                  "branch-shore",
-                  "branch-continue",
-                  "branch-repair"
+                  "branch-shore"
                 ]
               }
             ]
@@ -3112,7 +3057,7 @@
             "id": "task",
             "layer": "task",
             "title": "本轮任务与中间产物",
-            "subtitle": "05 / 反馈、报告、AI分析与效果观察",
+            "subtitle": "05 / 反馈、处置报告与生命周期接续",
             "groups": [
               {
                 "title": "本轮任务与中间产物",
@@ -3125,7 +3070,9 @@
                   "repair-report",
                   "report-analysis",
                   "effect-observation",
-                  "notification"
+                  "notification",
+                  "branch-continue",
+                  "branch-repair"
                 ]
               }
             ]
@@ -3272,18 +3219,6 @@
             "label": ""
           },
           {
-            "from": "decision-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "result-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "plan-draft",
             "to": "triage-dispatch",
             "type": "output",
@@ -3292,18 +3227,6 @@
           {
             "from": "triage-dispatch",
             "to": "task-investigation",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-repair",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-recheck",
             "type": "output",
             "label": ""
           },
@@ -3351,7 +3274,7 @@
           },
           {
             "from": "investigation-report",
-            "to": "decision-review",
+            "to": "notification",
             "type": "flow",
             "label": "普通排查 / 复查有异常"
           },
@@ -3387,7 +3310,7 @@
           },
           {
             "from": "report-analysis",
-            "to": "decision-review",
+            "to": "notification",
             "type": "output",
             "label": ""
           },
@@ -3398,7 +3321,7 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "shore-packet",
             "type": "output",
             "label": ""
@@ -3428,12 +3351,6 @@
             "label": ""
           },
           {
-            "from": "report-analysis",
-            "to": "notification",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "closure-report",
             "to": "notification",
             "type": "output",
@@ -3450,12 +3367,6 @@
             "to": "branch-dispatch",
             "type": "flow",
             "label": "需要现场排查"
-          },
-          {
-            "from": "branch-dispatch",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
           },
           {
             "from": "triage",
@@ -3482,28 +3393,16 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "branch-continue",
             "type": "flow",
             "label": "已提交报告未匹配异常结果"
           },
           {
-            "from": "branch-continue",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "decision-review",
+            "from": "notification",
             "to": "branch-repair",
             "type": "flow",
             "label": "当前报告结果匹配异常规则"
-          },
-          {
-            "from": "branch-repair",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
           },
           {
             "from": "result-review",
@@ -3561,19 +3460,19 @@
           },
           {
             "from": "branch-repair",
-            "to": "triage-dispatch",
+            "to": "task-repair",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
           {
             "from": "branch-continue",
-            "to": "triage-dispatch",
+            "to": "task-investigation",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
           {
             "from": "branch-recheck",
-            "to": "triage-dispatch",
+            "to": "notification",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
@@ -3600,6 +3499,30 @@
             "to": "notification",
             "type": "flow",
             "label": "处置报告回交或补充后衔接下一阶段"
+          },
+          {
+            "from": "notification",
+            "to": "task-investigation",
+            "type": "flow",
+            "label": "确认继续排查后创建新轮次"
+          },
+          {
+            "from": "notification",
+            "to": "task-repair",
+            "type": "flow",
+            "label": "确认维修范围后派发"
+          },
+          {
+            "from": "notification",
+            "to": "task-recheck",
+            "type": "flow",
+            "label": "确认复查安排后派发"
+          },
+          {
+            "from": "result-review",
+            "to": "notification",
+            "type": "flow",
+            "label": "后续复查与生命周期接续"
           }
         ]
       },
@@ -3607,8 +3530,8 @@
         "id": "tracking",
         "title": "异动跟踪",
         "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。 当前异动跟踪也使用派发维修；维保仅保留兼容资料。",
-        "subtitle": "来源 → 场景 → 轮机长决策 ⇄ 本轮任务与报告 → 结果处置",
-        "note": "沿分支回到轮机长决策。每次派发创建独立任务，历史报告保留；点击信息卡查看字段、页面归属和源码依据。",
+        "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
+        "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
           {
             "id": "raw",
@@ -3663,23 +3586,20 @@
           {
             "id": "event",
             "layer": "event",
-            "title": "事件与反复决策",
-            "subtitle": "04 / 初判、待派草稿、报告后再决策",
+            "title": "事件初始信息与首次分流",
+            "subtitle": "04 / 初判、初始排查草稿与首次派发",
             "groups": [
               {
-                "title": "事件与反复决策",
+                "title": "事件初始信息与首次分流",
                 "ids": [
                   "tracking",
                   "risk-brief",
                   "triage",
                   "plan-draft",
                   "triage-dispatch",
-                  "decision-review",
                   "branch-dispatch",
                   "branch-false",
-                  "branch-shore",
-                  "branch-continue",
-                  "branch-repair"
+                  "branch-shore"
                 ]
               }
             ]
@@ -3688,7 +3608,7 @@
             "id": "task",
             "layer": "task",
             "title": "本轮任务与中间产物",
-            "subtitle": "05 / 反馈、报告、AI分析与效果观察",
+            "subtitle": "05 / 反馈、处置报告与生命周期接续",
             "groups": [
               {
                 "title": "本轮任务与中间产物",
@@ -3701,7 +3621,9 @@
                   "repair-report",
                   "report-analysis",
                   "effect-observation",
-                  "notification"
+                  "notification",
+                  "branch-continue",
+                  "branch-repair"
                 ]
               }
             ]
@@ -3842,18 +3764,6 @@
             "label": ""
           },
           {
-            "from": "decision-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "result-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "plan-draft",
             "to": "triage-dispatch",
             "type": "output",
@@ -3862,18 +3772,6 @@
           {
             "from": "triage-dispatch",
             "to": "task-investigation",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-repair",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-recheck",
             "type": "output",
             "label": ""
           },
@@ -3921,7 +3819,7 @@
           },
           {
             "from": "investigation-report",
-            "to": "decision-review",
+            "to": "notification",
             "type": "flow",
             "label": "普通排查 / 复查有异常"
           },
@@ -3957,7 +3855,7 @@
           },
           {
             "from": "report-analysis",
-            "to": "decision-review",
+            "to": "notification",
             "type": "output",
             "label": ""
           },
@@ -3968,7 +3866,7 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "shore-packet",
             "type": "output",
             "label": ""
@@ -3998,12 +3896,6 @@
             "label": ""
           },
           {
-            "from": "report-analysis",
-            "to": "notification",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "closure-report",
             "to": "notification",
             "type": "output",
@@ -4020,12 +3912,6 @@
             "to": "branch-dispatch",
             "type": "flow",
             "label": "需要现场排查"
-          },
-          {
-            "from": "branch-dispatch",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
           },
           {
             "from": "triage",
@@ -4052,28 +3938,16 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "branch-continue",
             "type": "flow",
             "label": "已提交报告未匹配异常结果"
           },
           {
-            "from": "branch-continue",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "decision-review",
+            "from": "notification",
             "to": "branch-repair",
             "type": "flow",
             "label": "当前报告结果匹配异常规则"
-          },
-          {
-            "from": "branch-repair",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
           },
           {
             "from": "result-review",
@@ -4131,19 +4005,19 @@
           },
           {
             "from": "branch-repair",
-            "to": "triage-dispatch",
+            "to": "task-repair",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
           {
             "from": "branch-continue",
-            "to": "triage-dispatch",
+            "to": "task-investigation",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
           {
             "from": "branch-recheck",
-            "to": "triage-dispatch",
+            "to": "notification",
             "type": "flow",
             "label": "确认负责人、时限与范围后创建本轮任务"
           },
@@ -4170,6 +4044,30 @@
             "to": "notification",
             "type": "flow",
             "label": "处置报告回交或补充后衔接下一阶段"
+          },
+          {
+            "from": "notification",
+            "to": "task-investigation",
+            "type": "flow",
+            "label": "确认继续排查后创建新轮次"
+          },
+          {
+            "from": "notification",
+            "to": "task-repair",
+            "type": "flow",
+            "label": "确认维修范围后派发"
+          },
+          {
+            "from": "notification",
+            "to": "task-recheck",
+            "type": "flow",
+            "label": "确认复查安排后派发"
+          },
+          {
+            "from": "result-review",
+            "to": "notification",
+            "type": "flow",
+            "label": "后续复查与生命周期接续"
           }
         ]
       },
@@ -4177,8 +4075,8 @@
         "id": "states",
         "title": "状态与归属",
         "description": "事件状态、任务状态、草稿、报告版本和观察窗口分别解释；待办同时承载决策与执行。",
-        "subtitle": "来源 → 场景 → 轮机长决策 ⇄ 本轮任务与报告 → 结果处置",
-        "note": "沿分支回到轮机长决策。每次派发创建独立任务，历史报告保留；点击信息卡查看字段、页面归属和源码依据。",
+        "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
+        "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
           {
             "id": "raw",
@@ -4235,11 +4133,11 @@
           {
             "id": "event",
             "layer": "event",
-            "title": "事件与反复决策",
-            "subtitle": "04 / 初判、待派草稿、报告后再决策",
+            "title": "事件初始信息与首次分流",
+            "subtitle": "04 / 初判、初始排查草稿与首次派发",
             "groups": [
               {
-                "title": "事件与反复决策",
+                "title": "事件初始信息与首次分流",
                 "ids": [
                   "alarm",
                   "warning",
@@ -4247,9 +4145,7 @@
                   "risk-brief",
                   "triage",
                   "plan-draft",
-                  "triage-dispatch",
-                  "decision-review",
-                  "state-event"
+                  "triage-dispatch"
                 ]
               }
             ]
@@ -4258,7 +4154,7 @@
             "id": "task",
             "layer": "task",
             "title": "本轮任务与中间产物",
-            "subtitle": "05 / 反馈、报告、AI分析与效果观察",
+            "subtitle": "05 / 反馈、处置报告与生命周期接续",
             "groups": [
               {
                 "title": "本轮任务与中间产物",
@@ -4270,7 +4166,9 @@
                   "task-feedback",
                   "investigation-report",
                   "repair-report",
-                  "maintenance-compat"
+                  "maintenance-compat",
+                  "state-event",
+                  "notification"
                 ]
               }
             ]
@@ -4469,18 +4367,6 @@
             "label": ""
           },
           {
-            "from": "decision-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "result-review",
-            "to": "plan-draft",
-            "type": "output",
-            "label": ""
-          },
-          {
             "from": "plan-draft",
             "to": "triage-dispatch",
             "type": "output",
@@ -4489,18 +4375,6 @@
           {
             "from": "triage-dispatch",
             "to": "task-investigation",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-repair",
-            "type": "output",
-            "label": ""
-          },
-          {
-            "from": "triage-dispatch",
-            "to": "task-recheck",
             "type": "output",
             "label": ""
           },
@@ -4536,7 +4410,7 @@
           },
           {
             "from": "investigation-report",
-            "to": "decision-review",
+            "to": "notification",
             "type": "flow",
             "label": "普通排查 / 复查有异常"
           },
@@ -4547,7 +4421,7 @@
             "label": ""
           },
           {
-            "from": "decision-review",
+            "from": "notification",
             "to": "shore-packet",
             "type": "output",
             "label": ""
@@ -4575,6 +4449,36 @@
             "to": "shore-packet",
             "type": "output",
             "label": ""
+          },
+          {
+            "from": "notification",
+            "to": "task-investigation",
+            "type": "flow",
+            "label": "确认继续排查后创建新轮次"
+          },
+          {
+            "from": "notification",
+            "to": "task-repair",
+            "type": "flow",
+            "label": "确认维修范围后派发"
+          },
+          {
+            "from": "notification",
+            "to": "task-recheck",
+            "type": "flow",
+            "label": "确认复查安排后派发"
+          },
+          {
+            "from": "result-review",
+            "to": "notification",
+            "type": "flow",
+            "label": "后续复查与生命周期接续"
+          },
+          {
+            "from": "notification",
+            "to": "state-event",
+            "type": "flow",
+            "label": "记录当前生命周期阶段"
           }
         ]
       },
@@ -4750,38 +4654,38 @@
             "layer": "event"
           },
           {
-            "id": "decision-review-branches",
-            "stageId": "decision-review",
-            "title": "排查后再次决策",
+            "id": "notification-decisions",
+            "stageId": "notification",
+            "title": "处置报告回交后的再次决策",
             "branches": [
               {
                 "id": "branch-continue",
                 "title": "无异常结果，继续排查",
                 "condition": "已提交报告未匹配异常结果",
-                "action": "审阅下一轮待派排查，重新确认派发",
+                "action": "审阅下一轮待派排查，重新确认派发，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "新任务与旧报告同属原事件；无法确认不写成已修复",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "task-investigation"
                 ]
               },
               {
                 "id": "branch-repair",
                 "title": "有异常结果，派发维修",
                 "condition": "当前报告结果匹配异常规则",
-                "action": "核对范围与草稿，确认本轮维修",
+                "action": "核对范围与草稿，确认本轮维修，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "排查提交本身不启动维修；必须轮机长再次派发",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "task-repair"
                 ]
               }
             ],
-            "layer": "event"
+            "layer": "task"
           },
           {
             "id": "result-review-branches",
@@ -4792,13 +4696,13 @@
                 "id": "branch-recheck",
                 "title": "派发复查",
                 "condition": "结果需进一步现场核实",
-                "action": "查看复查草稿，确认负责人、时限和范围",
+                "action": "查看复查草稿，确认负责人、时限和范围，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "新增复查任务；无异常回结果处置，有异常回处置决策",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "notification"
                 ]
               },
               {
@@ -4881,38 +4785,38 @@
             "layer": "event"
           },
           {
-            "id": "decision-review-branches",
-            "stageId": "decision-review",
-            "title": "排查后再次决策",
+            "id": "notification-decisions",
+            "stageId": "notification",
+            "title": "处置报告回交后的再次决策",
             "branches": [
               {
                 "id": "branch-continue",
                 "title": "无异常结果，继续排查",
                 "condition": "已提交报告未匹配异常结果",
-                "action": "审阅下一轮待派排查，重新确认派发",
+                "action": "审阅下一轮待派排查，重新确认派发，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "新任务与旧报告同属原事件；无法确认不写成已修复",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "task-investigation"
                 ]
               },
               {
                 "id": "branch-repair",
                 "title": "有异常结果，派发维修",
                 "condition": "当前报告结果匹配异常规则",
-                "action": "核对范围与草稿，确认本轮维修",
+                "action": "核对范围与草稿，确认本轮维修，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "排查提交本身不启动维修；必须轮机长再次派发",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "task-repair"
                 ]
               }
             ],
-            "layer": "event"
+            "layer": "task"
           },
           {
             "id": "result-review-branches",
@@ -4923,13 +4827,13 @@
                 "id": "branch-recheck",
                 "title": "派发复查",
                 "condition": "结果需进一步现场核实",
-                "action": "查看复查草稿，确认负责人、时限和范围",
+                "action": "查看复查草稿，确认负责人、时限和范围，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "新增复查任务；无异常回结果处置，有异常回处置决策",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "notification"
                 ]
               },
               {
@@ -5012,38 +4916,38 @@
             "layer": "event"
           },
           {
-            "id": "decision-review-branches",
-            "stageId": "decision-review",
-            "title": "排查后再次决策",
+            "id": "notification-decisions",
+            "stageId": "notification",
+            "title": "处置报告回交后的再次决策",
             "branches": [
               {
                 "id": "branch-continue",
                 "title": "无异常结果，继续排查",
                 "condition": "已提交报告未匹配异常结果",
-                "action": "审阅下一轮待派排查，重新确认派发",
+                "action": "审阅下一轮待派排查，重新确认派发，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "新任务与旧报告同属原事件；无法确认不写成已修复",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "task-investigation"
                 ]
               },
               {
                 "id": "branch-repair",
                 "title": "有异常结果，派发维修",
                 "condition": "当前报告结果匹配异常规则",
-                "action": "核对范围与草稿，确认本轮维修",
+                "action": "核对范围与草稿，确认本轮维修，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "排查提交本身不启动维修；必须轮机长再次派发",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "task-repair"
                 ]
               }
             ],
-            "layer": "event"
+            "layer": "task"
           },
           {
             "id": "result-review-branches",
@@ -5054,13 +4958,13 @@
                 "id": "branch-recheck",
                 "title": "派发复查",
                 "condition": "结果需进一步现场核实",
-                "action": "查看复查草稿，确认负责人、时限和范围",
+                "action": "查看复查草稿，确认负责人、时限和范围，确认负责人、未来时限与范围后创建本轮任务",
                 "result": "新增复查任务；无异常回结果处置，有异常回处置决策",
                 "products": [
-                  "plan-draft"
+                  "notification"
                 ],
                 "next": [
-                  "triage-dispatch"
+                  "notification"
                 ]
               },
               {
@@ -5211,11 +5115,11 @@
             },
             {
               "id": "current-3",
-              "stageId": "decision-review",
+              "stageId": "notification",
               "title": "轮机长再次决策",
               "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
               "productIds": [
-                "plan-draft",
+                "notification",
                 "task-repair"
               ],
               "isSimulation": true,
@@ -5340,11 +5244,11 @@
             },
             {
               "id": "current-3",
-              "stageId": "decision-review",
+              "stageId": "notification",
               "title": "轮机长再次决策",
               "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
               "productIds": [
-                "plan-draft",
+                "notification",
                 "task-repair"
               ],
               "isSimulation": true,
@@ -5456,11 +5360,11 @@
             },
             {
               "id": "current-3",
-              "stageId": "decision-review",
+              "stageId": "notification",
               "title": "轮机长再次决策",
               "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
               "productIds": [
-                "plan-draft",
+                "notification",
                 "task-repair"
               ],
               "isSimulation": true,
@@ -5535,12 +5439,12 @@
             },
             {
               "id": "current-0",
-              "stageId": "decision-review",
+              "stageId": "notification",
               "title": "回看首轮报告，继续排查",
               "summary": "当前原型预置首轮报告，进入时已待处置决策；从阶段条回看首轮，再继续排查。",
               "productIds": [
                 "investigation-report",
-                "plan-draft"
+                "notification"
               ],
               "isSimulation": true,
               "action": "对应当前页面的可选操作；本地图不写回应用。",
@@ -5548,7 +5452,7 @@
             },
             {
               "id": "current-1",
-              "stageId": "triage-dispatch",
+              "stageId": "notification",
               "title": "确认派发，形成独立任务",
               "summary": "轮机长填写负责人、未来时限和批准范围；本步为产品操作演示。",
               "productIds": [
@@ -5575,11 +5479,11 @@
             },
             {
               "id": "current-3",
-              "stageId": "decision-review",
+              "stageId": "notification",
               "title": "轮机长再次决策",
               "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
               "productIds": [
-                "plan-draft",
+                "notification",
                 "task-repair"
               ],
               "isSimulation": true,
