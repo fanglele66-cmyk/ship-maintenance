@@ -1,6 +1,7 @@
 <template>
  <form class="lc-form" @submit.prevent="submit" :aria-label="captain?'轮机长处置表单':'执行反馈表单'">
   <template v-if="captain">
+   <LifecycleDecisionBasis v-if="showBasis" :event="event" :action="decision.action"/>
    <label>本次处置<select aria-label="本次处置" v-model="decision.action" required @change="changeAction"><option value="" disabled>请选择处置方式</option><option v-for="o in options" :key="o.value" :value="o.value">{{o.label}}</option></select></label>
    <template v-if="decision.action">
     <label>{{dispatch?'安排范围与依据':decision.action==='shore'?'同步内容与岸端支持需求':'决定依据与后续安排'}}<textarea v-model="decision.reason" required rows="3" :placeholder="dispatch?'明确检查/处理对象、已确认原因及本轮要求':'说明判断依据、设备安全影响与后续安排'"/></label>
@@ -27,7 +28,8 @@
 import {computed,ref} from 'vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {currentTask,decisionOptions,proposedPlan,people} from '../workflow/eventLifecycle'
-const props=defineProps({event:{type:Object,required:true}}),emit=defineEmits(['submitted','expanded'])
+import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
+const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true}}),emit=defineEmits(['submitted','expanded'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>currentTask(props.event)),options=computed(()=>decisionOptions(props.event))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,deadline:'',order:'',window:''}))
 const dispatch=computed(()=>['investigate','repair','maintenance'].includes(decision.value.action))

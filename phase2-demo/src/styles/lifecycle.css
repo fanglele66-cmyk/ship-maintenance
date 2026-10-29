@@ -5,6 +5,8 @@
 @media(max-width:760px){.lc-workspace{display:flex;flex-direction:column;height:auto;overflow:auto}.lc-main{overflow:visible}.lc-assistant{min-height:600px;max-height:80vh}.lc-home-chronology{grid-template-columns:1fr}.lc-tabs{gap:15px;overflow-x:auto}.lc-title h1{font-size:18px}}
 
 /* Workspace roots fill the flex-based app viewport. */
+.lc-event-number{margin-left:12px;color:#8491a1;font-variant-numeric:tabular-nums}
+.lc-decision-content{padding-top:15px}.lc-decision-content h2{font-size:19px;margin:12px 0}.lc-decision-content .lc-review-summary{padding:12px 16px;font-size:13px}.lc-decision-content .lc-review-summary p{margin:6px 0;line-height:1.7}.lc-decision-content .lc-review-summary button{font-size:12px;padding:5px 9px}.lc-analysis-brief{margin:0;font-size:13px;line-height:1.7}.lc-analysis-brief>div{display:grid;grid-template-columns:150px 1fr;gap:15px;padding:7px 0;border-bottom:1px solid #edf0f5}.lc-analysis-brief dt{font-weight:500;color:#53667b}.lc-analysis-brief dd{margin:0;color:#60748a}.lc-decision-content .lc-decision{margin:16px 0 0;padding:14px 16px}.lc-decision-content .lc-form{max-width:none}.lc-decision-content .lc-decision-basis{margin-bottom:5px}.lc-decision-content .lc-decision>h3{font-size:12px;font-weight:400;color:#8894a5;margin:0 0 12px}@media(max-width:800px){.lc-analysis-brief>div{grid-template-columns:1fr;gap:4px}.lc-event-number{display:block;margin-left:0}}
 .lc-home-chronology .lc-operation-status{padding:2px 7px;border-radius:4px;font-size:12px;line-height:1.6}
 .lc-home-chronology .operation-cruise{color:#36786c;background:#eaf5ef}
 .lc-home-chronology .operation-anchored{color:#6b6296;background:#f1edf8}
@@ -14,6 +16,8 @@
 .lc-board.compact .lc-board-list{overflow:auto;scrollbar-width:thin;flex:0 1 auto}.lc-board.compact .lc-board-footer{justify-content:center;border-top:1px solid #edf0f5;margin-top:0}.lc-board.compact .lc-board-footer button{border:0;font-size:12px;padding:8px}
 @media(min-width:1101px){.lc-home-chronology{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .lc-workspace,.lc-list-page,.lc-todo-page,.lc-report-page,.lc-access{flex:1;width:100%;min-width:0;box-sizing:border-box}
+.lc-board-row.lc-clickable{cursor:pointer;transition:background .15s}.lc-board-row.lc-clickable:hover{background:#faf8f3}.lc-board-row.lc-clickable:focus-visible{outline:2px solid #b3945a;outline-offset:-2px}
+.lc-assistant .assistant-advice-basis{font-size:13px}.lc-assistant .assistant-basis-content{color:#687a90;padding-left:15px;line-height:1.85}.lc-assistant .assistant-basis-content h3{font-size:13px;margin:18px 0 8px;color:#465d76}.lc-assistant .assistant-basis-content h4{font-size:12px;color:#798b9e;margin:12px 0 5px}.lc-assistant .assistant-basis-content ul{padding-left:18px}.lc-assistant .assistant-basis-content li{margin-bottom:9px}.lc-assistant .assistant-advice-basis summary{padding:9px 0;border-top:1px solid #edf0f5}.lc-assistant .assistant-advice-basis[open] .assistant-basis-chevron{transform:rotate(180deg)}
 .lc-notifications>button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .lc-home-period{display:flex;flex-wrap:wrap;align-content:flex-start;gap:3px 10px;padding:7px 0}
 .lc-home-period time{width:100%;font-size:11px!important}

@@ -15,7 +15,7 @@
     <p class="result-count">共 {{ filtered.length }} 项<span>已闭环事件及完整处置记录保留在这里。</span></p>
     <div class="event-cards">
      <article v-for="item in visible" :key="item.id" class="event-card" :data-event-id="item.id">
-      <div class="card-meta"><span class="event-type" :class="'rank-'+item.rank">{{item.type}}</span><span class="event-device">{{item.device}}</span></div>
+      <div class="card-meta"><span class="event-type" :class="'rank-'+item.rank">{{item.type}}</span><span class="event-device">{{item.device}}</span><span class="event-number">{{item.number}}</span></div>
       <button class="card-title" @click="open(item)">{{item.title}}<span aria-hidden="true">›</span></button>
       <p class="card-summary">{{item.summary}}</p>
       <dl class="event-progress">
@@ -27,7 +27,7 @@
       <p v-if="item.continuation" class="continuation">{{item.continuation}}</p>
       <footer class="card-footer">
        <span class="event-time">{{item.firstObserved || '保留原事件记录'}}</span>
-       <div><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看待办</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'回看处置记录':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
+       <div><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看待办</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'查看闭环结果':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
       </footer>
      </article>
     </div>

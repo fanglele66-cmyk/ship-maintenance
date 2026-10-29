@@ -1,12 +1,17 @@
 import {defineStore} from 'pinia'
 import {reactive,computed,watch} from 'vue'
-import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,submitTask,askAssistant,people} from '../workflow/eventLifecycle.js'
+import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,submitTask,askAssistant,people,refreshLifecyclePresentation} from '../workflow/eventLifecycle.js'
+import {useSensorStore} from './sensorStore'
+import {syncLifecycleObservations} from '../workflow/lifecycleObservation.js'
 const storageKey='engine-room-captain-workflow-v1',roleKey='engine-room-current-role'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let initial=createLifecycleState()
  try{const saved=JSON.parse(localStorage.getItem(storageKey));if(saved?.version===1&&Object.keys(initial.events).every(id=>saved.events?.[id]))initial=saved;const role=sessionStorage.getItem(roleKey);if(['captain','engineer'].includes(role))initial.role=role}catch{}
+ refreshLifecyclePresentation(initial)
  initial.notices||=[];initial.role||='captain'
  const state=reactive(initial)
+ const sensors=useSensorStore(),syncObservations=()=>syncLifecycleObservations(state,sensors)
+ watch(()=>sensors.sampledAt,syncObservations,{immediate:true})
  const snapshot=()=>JSON.stringify({version:1,events:state.events,notices:state.notices})
  let lastStored=snapshot()
  watch(()=>[state.events,state.notices],()=>{const value=snapshot();if(value!==lastStored)try{lastStored=value;localStorage.setItem(storageKey,value)}catch{}},{deep:true})
@@ -14,6 +19,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  window.addEventListener('storage',event=>{
   if(event.key!==storageKey||!event.newValue)return
   try{const incoming=JSON.parse(event.newValue);if(incoming.version!==1||!Object.keys(state.events).every(id=>incoming.events?.[id]))return
+   refreshLifecyclePresentation(incoming)
    lastStored=JSON.stringify({version:1,events:incoming.events,notices:incoming.notices||[]});state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
  })
@@ -23,5 +29,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  function setRole(role){if(['captain','engineer'].includes(role)){state.role=role;try{sessionStorage.setItem(roleKey,role)}catch{}}}
  function markRead(id){if(state.events[id])state.events[id].unread[state.role]=false}
  function acknowledge(id){markRead(id);state.notices.filter(n=>n.eventId===id&&n.recipient===state.role).forEach(n=>n.read=true)}
- return {state,events,pending,tasks,reports,unread,notices,people,setRole,markRead,acknowledge,decide:(id,f)=>{decide(state,id,f);acknowledge(id)},submit:(id)=>{const report=submitTask(state,id);acknowledge(id);return report},ask:(id,text)=>askAssistant(state,id,text)}
+ return {state,events,pending,tasks,reports,unread,notices,people,setRole,markRead,acknowledge,decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit:(id)=>{const report=submitTask(state,id);syncObservations();acknowledge(id);return report},ask:(id,text)=>askAssistant(state,id,text)}
 })

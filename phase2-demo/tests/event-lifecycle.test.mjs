@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createLifecycleState,decide,submitTask,currentTask,decisionOptions,visibleEvents,people,proposedPlan} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,decide,submitTask,currentTask,decisionOptions,visibleEvents,people,proposedPlan,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
+import {adviceDetails} from '../src/workflow/lifecycleAnalysis.js'
 import {navigationChronology} from '../src/workflow/navigationChronology.js'
+import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 const alarm='real-alarm-0430',warning='real-warning-0523',tracking='real-tracking-exhaust-baseline',c4='real-health-c4-baseline'
 const deadline=()=>new Date(Date.now()+86400000).toISOString().slice(0,16)
 function assign(state,id,action='investigate'){state.role='captain';decide(state,id,{action,owner:people.engineer,deadline:deadline(),reason:'检查已确认的异常部位并记录实际发现',order:'CBY-WO-2026-1028-01',window:'宁波靠港 08:00—14:00'})}
@@ -13,3 +15,51 @@ test('role scoped visibility, notices, optional notes and validation',()=>{const
 test('shore is an audited pending handoff, not a silent closure',()=>{const s=createLifecycleState();assign(s,alarm);s.role='captain';decide(s,alarm,{action:'shore',reason:'请岸端提供 ICU 适配备件资料。'});assert.equal(s.events[alarm].phase,'investigation');assert.equal(s.events[alarm].shore[0].status,'待岸端接收');assert.throws(()=>assign(s,alarm),/当前阶段/)})
 test('notifications route each handoff to the receiving role',()=>{const s=createLifecycleState();assign(s,alarm);assert.equal(s.notices.length,1);assert.equal(s.notices[0].recipient,'engineer');assert.equal(s.notices[0].eventId,alarm);finish(s,alarm);assert.equal(s.notices.length,2);assert.equal(s.notices[1].recipient,'captain');assert.match(s.notices[1].title,/排查报告/);const ids=s.notices.map(n=>n.id);assert.equal(new Set(ids).size,2)})
 test('24h AIS chronology follows unequal state boundaries and contains operations only',()=>{const end=Date.now(),s={allSensors:[{id:'aux',deviceId:'aux-engine-1',unit:'rpm'}],getSimulationTrend:id=>[{value:id==='s-012'?94:id==='main-load'?70:id==='ship-speed'?10:750}]};const r=navigationChronology(s,end);assert.equal(r.end-r.start,86400000);assert.equal(r.periods.length,6);assert.ok(new Set(r.periods.map(p=>p.end-p.start)).size>1);for(let i=1;i<r.periods.length;i++)assert.equal(r.periods[i].start,r.periods[i-1].end);assert.ok(r.periods.some(p=>p.navigation==='锚泊'));assert.ok(r.periods.every(p=>p.position&&p.ais));assert.doesNotMatch(r.markdown,/待决策|风险|报警|预警|异动/)})
+test('reports lead with conclusion and analysis, preserve submitted evidence at the bottom',()=>{
+ const s=createLifecycleState();assign(s,warning);const report=finish(s,warning),text=report.markdown
+ assert.ok(text.indexOf('## 原因判断与排查结论')<text.indexOf('## AI分析'))
+ assert.ok(text.indexOf('## AI分析')<text.indexOf('## 现场排查记录'))
+ assert.ok(text.indexOf('## 现场排查记录')<text.indexOf('## 附件索引'))
+ assert.doesNotMatch(text,/AI报告摘要/);assert.match(report.analysisMarkdown,/减压阀密封缺陷/)
+ const before=structuredClone(s.events[warning].tasks[0]),id=report.id
+ report.presentationVersion=1;report.markdown='旧版内容'
+ refreshLifecyclePresentation(s)
+ assert.equal(report.id,id);assert.match(report.markdown,/## AI分析/);assert.deepEqual(s.events[warning].tasks[0],before)
+})
+test('expandable evidence is case-specific and historical advice cannot see future findings',()=>{
+ const s=createLifecycleState(),e=s.events[alarm],initial=e.conversations.captain[0]
+ assign(s,alarm);const task=currentTask(e);task.draft.records.forEach((r,i)=>r.result=task.steps[i].options[0]);task.draft.summary='本轮独有现场标记：活塞卡滞';s.role='engineer';submitTask(s,alarm)
+ const oldDetails=adviceDetails(e,initial,'captain')
+ assert.match(oldDetails,/23:27|SLOW DOWN/);assert.doesNotMatch(oldDetails,/本轮独有现场标记/)
+ assert.match(e.conversations.engineer.at(-1).detailsMarkdown,/本轮独有现场标记/)
+ assert.match(s.events[warning].conversations.captain[0].detailsMarkdown,/不能用两者之差代替减压阀前后压降/)
+ assert.match(s.events[tracking].conversations.captain[0].detailsMarkdown,/月度相对偏差/)
+ assert.match(s.events[c4].conversations.captain[0].detailsMarkdown,/绝对排温持续下降/)
+})
+test('event numbers survive migration and closure reports put findings before source records',()=>{
+ const s=createLifecycleState();assert.equal(new Set(Object.values(s.events).map(e=>e.number)).size,4)
+ const e=s.events[warning],number=e.number;assign(s,warning);finish(s,warning);assign(s,warning,'repair');finish(s,warning)
+ s.role='captain';decide(s,warning,{action:'close',reason:'密封已更换，复测记录确认供气恢复，维持常规监测。'})
+ const report=e.reports.at(-1);assert.equal(report.eventNumber,number);assert.match(report.markdown,new RegExp(number));assert.ok(report.markdown.indexOf('## AI分析')<report.markdown.indexOf('## 现场记录与过程报告索引'))
+ delete e.number;refreshLifecyclePresentation(s);assert.equal(e.number,number)
+})
+test('two-hour observation preserves real samples and leaves absent channels empty after reload',()=>{
+ const s=createLifecycleState();assign(s,warning);finish(s,warning);assign(s,warning,'repair');finish(s,warning)
+ const task=currentTask(s.events[warning]),start=Date.parse(task.submittedAt),hour=3600000
+ const sensors={recordedSensorChannels:ids=>ids.map((id,i)=>({channelId:id,unit:'MPa',sourceKind:'recorded',trendData:i?[]:[{timestamp:start+60000,value:0.64},{timestamp:start+hour,value:0.65}]}))}
+ syncLifecycleObservations(s,sensors,start+hour);assert.equal(task.observation.records.length,0);assert.deepEqual(task.observation.pending.values,[0.65,null])
+ const empty={recordedSensorChannels:ids=>ids.map(id=>({channelId:id,unit:'MPa',sourceKind:'recorded',trendData:[]}))}
+ syncLifecycleObservations(s,empty,start+2*hour)
+ assert.equal(task.observation.records.length,1);assert.deepEqual(task.observation.records[0].values,[0.65,null]);assert.equal(task.observation.records[0].covered,false)
+ const snapshot=structuredClone(task.observation.records[0]);syncLifecycleObservations(s,empty,start+4*hour)
+ assert.deepEqual(task.observation.records[0],snapshot);assert.deepEqual(task.observation.records[1].values,[null,null])
+ task.observationEndedAt=new Date(start+4*hour).toISOString();const frozen=structuredClone(task.observation)
+ syncLifecycleObservations(s,sensors,start+8*hour);assert.deepEqual(task.observation,frozen)
+})
+test('new work and closure finish previous observation without losing its history',()=>{
+ const s=createLifecycleState();assign(s,alarm);finish(s,alarm);assign(s,alarm,'repair');finish(s,alarm)
+ const previous=currentTask(s.events[alarm]);previous.observation={records:[{id:'saved-window',values:[421,419]}]}
+ assign(s,alarm,'investigate');assert.ok(previous.observationEndedAt);assert.deepEqual(previous.observation.records,[{id:'saved-window',values:[421,419]}])
+ finish(s,alarm);assign(s,alarm,'repair');finish(s,alarm)
+ const current=currentTask(s.events[alarm]);s.role='captain';decide(s,alarm,{action:'close',reason:'按处理和复测记录确认闭环。'});assert.ok(current.observationEndedAt)
+})

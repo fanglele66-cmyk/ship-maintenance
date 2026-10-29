@@ -4,7 +4,7 @@
   <p v-if="message.analysis" class="assistant-advice-analysis">{{visibleAnalysis}}</p>
   <div v-if="visibleRecommendation" class="assistant-advice-next"><strong>建议您</strong><p>{{visibleRecommendation}}</p></div>
   <details v-if="!streaming && (message.detailsMarkdown || message.basis?.length)" class="assistant-advice-basis">
-   <summary><span>分析依据</span><span class="assistant-basis-chevron" aria-hidden="true">⌄</span></summary>
+   <summary><span>{{message.basisLabel||'分析依据'}}</span><span class="assistant-basis-chevron" aria-hidden="true">⌄</span></summary>
    <div class="assistant-basis-content">
     <MarkdownContent v-if="message.detailsMarkdown" :content="message.detailsMarkdown" />
     <dl v-else><template v-for="(row,index) in message.basis" :key="index"><dt>{{row.label}}</dt><dd>{{row.text}}</dd></template></dl>
