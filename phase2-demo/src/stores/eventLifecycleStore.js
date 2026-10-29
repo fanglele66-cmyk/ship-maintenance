@@ -6,6 +6,7 @@ import {syncLifecycleObservations} from '../workflow/lifecycleObservation.js'
 import {aiStreamRequest} from '../services/aiClient'
 import {supplementaryReports,applyReportSupplement} from '../workflow/reportRevisions'
 import {acceptTaskPlan} from '../workflow/taskPlanning.js'
+import {updateObservationAdvice} from '../workflow/observationAdvice.js'
 const storageKey='engine-room-captain-workflow-v1',roleKey='engine-room-current-role'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let initial=createLifecycleState()
@@ -129,5 +130,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   }finally{clearTimeout(progressTimer);delete pendingRequests[key]}
  }
  function applySupplement(id,messageId){const message=state.events[id]?.conversations.engineer.find(m=>m.id===messageId);if(!message?.proposal)throw Error('找不到修订稿。');return applyReportSupplement(state,id,message.proposal)}
- return {state,events,pending,tasks,reports,unread,notices,people,pendingRequests,prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit:(id)=>{const report=submitTask(state,id);syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}}
+ return {state,events,pending,tasks,reports,unread,notices,people,pendingRequests,prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit:(id)=>{const report=submitTask(state,id);syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}}
 })

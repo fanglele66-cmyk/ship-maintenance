@@ -1,8 +1,9 @@
 <template>
- <form class="lc-form" @submit.prevent="submit" :aria-label="captain?'轮机长处置表单':'执行反馈表单'">
+ <form class="lc-form" @submit.prevent="submit" :aria-label="shoreOnly?'岸基同步表单':captain?'轮机长处置表单':'执行反馈表单'">
   <template v-if="captain">
-   <LifecycleDecisionBasis v-if="showBasis" :event="event" :action="decision.action"/>
-   <label>本次处置<select aria-label="本次处置" v-model="decision.action" required @change="changeAction"><option value="" disabled>请选择处置方式</option><option v-for="o in options" :key="o.value" :value="o.value">{{o.label}}</option></select></label>
+   <LifecycleDecisionBasis v-if="showBasis&&!shoreOnly" :event="event" :action="decision.action"/>
+   <p v-if="shoreOnly" class="lc-muted">将事件与闭环报告发送岸基，事件保持已闭环。</p>
+   <label v-else>本次处置<select aria-label="本次处置" v-model="decision.action" required @change="changeAction"><option value="" disabled>请选择处置方式</option><option v-for="o in options" :key="o.value" :value="o.value">{{o.label}}</option></select></label>
    <template v-if="decision.action">
     <label>{{dispatch?'安排范围与依据':decision.action==='shore'?'同步内容与岸基支持需求':'决定依据与后续安排'}}<textarea v-model="reason" :disabled="dispatch&&plan?.status!=='ready'" required rows="3" :placeholder="dispatch?'明确检查/处理对象、已确认原因及本轮要求':'说明判断依据、设备安全影响与后续安排'"/></label>
     <template v-if="dispatch">
@@ -30,13 +31,13 @@ import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {currentTask,decisionOptions,ensureTaskPlan,people} from '../workflow/eventLifecycle'
 import {planTabLabel} from '../workflow/taskPlanning'
 import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
-const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true}}),emit=defineEmits(['submitted','expanded'])
+const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false}}),emit=defineEmits(['submitted','expanded'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>currentTask(props.event)),options=computed(()=>decisionOptions(props.event))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,deadline:'',order:'',window:''}))
 const plan=computed(()=>captain.value?ensureTaskPlan(props.event):null)
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))
 const reason=computed({get:()=>dispatch.value?plan.value?.scope||'':decision.value.action==='shore'?decision.value.shoreReason||'':decision.value.reason,set:value=>{if(dispatch.value&&plan.value){plan.value.scope=value;plan.value.version++}else if(decision.value.action==='shore')decision.value.shoreReason=value;else decision.value.reason=value}})
-watch(options,list=>{if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})
+watch(options,list=>{if(props.shoreOnly){decision.value.action=list.some(o=>o.value==='shore')?'shore':'';return}if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})
 const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'确认关联并安排维保',shore:'提交岸基同步',close:'确认闭环并归档',false:'确认误报并归档'}[decision.value.action]))
 const orders=computed(()=>[{number:props.event.id.includes('c4')?'CBY-WO-2026-1028-04':'CBY-WO-2026-1028-01',title:props.event.id.includes('c4')?'四缸测温与燃烧平衡专项检查':'一缸测温与燃烧平衡专项检查'}])
 const windows=['V261028 · 上海—宁波航次，航行期间资料复核','V261029 · 宁波靠港，10月29日 08:00—14:00 停机窗口','V261031 · 上海靠港，10月31日 09:00—16:00 检修窗口']

@@ -1,5 +1,5 @@
 <template>
- <div class="lc-notifications"><button aria-label="通知中心" @click="open=!open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i v-if="store.unread"/></button>
+ <div class="lc-notifications"><button type="button" aria-label="通知中心" :aria-expanded="open" @click="open=!open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i v-if="store.unread"/></button>
   <section v-if="open" class="lc-notice-menu"><header>待处理通知 <button @click="open=false" aria-label="关闭通知">×</button></header><button v-for="e in unread" :key="e.id" @click="visit(e.id)"><strong>{{e.title}}</strong><small>{{e.status}}</small></button><p v-if="!unread.length">暂无未读通知</p></section>
   <aside v-if="toast" class="lc-notice-toast" role="status" aria-live="polite"><header><small>{{store.state.events[toast.eventId]?.type}} · {{store.state.events[toast.eventId]?.device}}</small><time>{{timeText(toast.at).slice(-5)}}</time><button aria-label="关闭提醒" @click="dismiss">×</button></header><strong>{{toast.title}}</strong><p>{{toast.text}}</p><button class="lc-notice-open" @click="visit(toast.eventId)">查看并处理 →</button><small v-if="queued>1" class="lc-notice-count">另有 {{queued-1}} 项提醒</small></aside>
  </div>

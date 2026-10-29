@@ -103,7 +103,7 @@
             placeholder="输入追问..." @keyup.enter="sendMessage"
           />
           <button class="kap-send-btn" :disabled="!inputText.trim()" @click="sendMessage" title="发送">
-            <img :src="sendIcon" alt="" aria-hidden="true" />
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
           </button>
         </div>
       </div>
@@ -113,7 +113,6 @@
 </template>
 
 <script setup>
-import sendIcon from '@/assets/figma/send.svg'
 import ConversationHistory from './messages/ConversationHistory.vue'
 import { useAgentConversations, demoConversations } from '@/composables/useAgentConversations'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'

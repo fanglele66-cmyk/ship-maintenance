@@ -22,7 +22,7 @@
           {{ statusLabel }}
         </span>
       </div>
-      <button class="header-role-switch" type="button" :aria-label="lifecycle.state.role==='captain'?'切换为大管轮':'切换为轮机长'" @click="lifecycle.setRole(lifecycle.state.role==='captain'?'engineer':'captain')">{{lifecycle.state.role==='captain'?'轮机长':'大管轮'}} ⇄</button>
+      <button class="header-role-switch" type="button" :aria-label="lifecycle.state.role==='captain'?'切换为大管轮':'切换为轮机长'" @click="lifecycle.setRole(lifecycle.state.role==='captain'?'engineer':'captain')"><span>{{lifecycle.state.role==='captain'?'轮机长':'大管轮'}}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4 4-4-4 4-4"/></svg></button>
       <LifecycleNotifications />
       <span class="header-time">{{ currentTime }}</span>
     </div>

@@ -9,6 +9,7 @@ import './styles/workbench.css'
 import './styles/hierarchy.css'
 import './styles/conversation.css'
 import './styles/lifecycle.css'
+import './styles/controls.css'
 
 const app = createApp(App)
 app.use(createPinia())

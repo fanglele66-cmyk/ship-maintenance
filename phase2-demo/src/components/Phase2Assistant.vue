@@ -15,14 +15,13 @@
      </div>
     </div>
     <button v-if="hasNewReply" class="assistant-new-reply" type="button" @click="showLatestReply">有新回复 ↓</button>
-    <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><button type="button" class="compose-attachment" aria-label="上传文件" title="上传 TXT、Markdown、CSV 或 JSON 记录" :disabled="!importMessage" @click="fileInput?.click()">＋</button><input ref="fileInput" class="compose-file-input" type="file" accept=".txt,.md,.csv,.json" @change="readAttachment"/><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><img :src="sendIcon" alt="" aria-hidden="true" /></button></div></div></form>
+    <form class="p2-compose" @submit.prevent="send"><div class="p2-compose-shell"><textarea v-model="draft" rows="2" :placeholder="placeholder" aria-label="对话输入" @keydown.enter.exact.prevent="send"></textarea><div class="p2-compose-foot"><button type="button" class="compose-attachment" aria-label="上传文件" title="上传 TXT、Markdown、CSV 或 JSON 记录" :disabled="!importMessage" @click="fileInput?.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><input ref="fileInput" class="compose-file-input" type="file" accept=".txt,.md,.csv,.json" @change="readAttachment"/><button type="submit" aria-label="发送" title="发送" :disabled="!draft.trim()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div></div></form>
   </aside>
 </template>
 <script setup>
 import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
 import { issueConversationMessages, mergeIssueConversation, issueReply, issueContext } from '@/message-flows/issueSources'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import sendIcon from '@/assets/figma/send.svg'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { observationScene } from '@/mock/phase2Observation'
 import { observationMessages } from '@/message-flows/observationMessages'
@@ -299,4 +298,4 @@ onUnmounted(clearMonitorTimer)
 @media(max-width:1200px){.p2-restored-assistant{width:320px;min-width:300px}}
 </style>
 
-<style>.compose-file-input{display:none}.app-container.app-container .p2-restored-assistant .p2-compose-foot .compose-attachment{font-size:24px;width:30px;height:30px;min-height:30px;padding:0;display:grid;place-items:center;line-height:1;background:transparent;color:#7a8292;border:0;border-radius:5px;transform:none}.p2-restored-assistant .p2-compose{flex:none;position:relative}.p2-restored-assistant .p2-messages{min-height:0;scroll-padding-bottom:16px}</style>
+<style>.compose-file-input{display:none}.p2-restored-assistant .p2-compose{flex:none;position:relative}.p2-restored-assistant .p2-messages{min-height:0;scroll-padding-bottom:16px}</style>

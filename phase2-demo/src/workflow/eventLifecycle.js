@@ -144,7 +144,7 @@ export function decide(state,id,form){
   advice(e,'engineer',`轮机长已派发${taskName(task)}任务：${task.scope}`,kind==='investigation'?'先查看数据，再逐项核查；记录原因、依据及未确认项，提交排查报告。':'按已批准范围逐项执行，填写实际措施和复测结果，完成后提交报告给轮机长。')
  }else if(action==='shore'){
   const record={id:uid('shore'),at,reason:form.reason,reportId:e.reports.at(-1)?.id||null,status:'待岸基接收',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,brief:e.brief,tasks:e.tasks,reports:e.reports,decisions:e.decisions,at})};e.shore.push(record)
-  say(e,'captain','user','提交岸基同步：'+form.reason);advice(e,'captain','已整理事件及关联报告，加入岸基同步记录。','当前状态为待岸基接收，可继续处理船上任务。')
+  say(e,'captain','user','提交岸基同步：'+form.reason);advice(e,'captain','已整理事件及关联报告，加入岸基同步记录。',e.phase==='closed'?'当前状态为待岸基接收，事件保持已闭环，闭环报告与处置记录已保留。':'当前状态为待岸基接收，可继续处理船上任务。')
  }else{
   const prior=currentTask(e);if(prior?.status==='submitted'&&prior.kind!=='investigation')prior.observationEndedAt=at
   e.status='已闭环';phase(e,'closed','闭环归档');e.closedAt=at;e.closeReason=form.reason;e.unread.captain=false

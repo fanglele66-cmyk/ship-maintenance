@@ -8,8 +8,9 @@ export async function aiRequest(path,body,method=body?'POST':'GET'){
 import {readEventStream} from './eventStream.js'
 
 
-export async function aiStreamRequest(body,onProgress){
- const response=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Engine-Room-Client':'local-ui'},body:JSON.stringify({...body,stream:true}),signal:AbortSignal.timeout(185000)})
+export async function aiStreamRequest(body,onProgress,{signal}={}){
+ const timeout=AbortSignal.timeout(185000)
+ const response=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Engine-Room-Client':'local-ui'},body:JSON.stringify({...body,stream:true}),signal:signal?AbortSignal.any([signal,timeout]):timeout})
  if(response.headers.get('content-type')?.includes('application/json')){
   const result=await response.json();throw Error(result.error||'当前后台未启用流式输出。')
  }

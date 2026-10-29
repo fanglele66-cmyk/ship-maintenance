@@ -28,7 +28,8 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    if(busy>=2)return send(429,{error:'模型正在处理其他请求，请稍后重试。'})
    const text=input.text?.trim()
    if(!text||text.length>12000)return send(400,{error:'请输入 1—12000 字的问题或补充内容。'})
-   const revision=input.mode==='report',planning=input.mode==='plan',editing=planning&&input.planMode==='edit',report=input.report
+   const revision=input.mode==='report',planning=input.mode==='plan',observing=input.mode==='observation',editing=planning&&input.planMode==='edit',report=input.report
+   if(observing&&(input.role!=='captain'||input.event?.phase!=='review'))return send(400,{error:'只有轮机长可以获取当前效果观察建议。'})
    if(planning&&(input.role!=='captain'||!input.event||!Array.isArray(input.event.tasks)||!dispatchAction(input.event)||input.plan?.action!==dispatchAction(input.event)))return send(400,{error:'当前阶段或身份不能修改待派任务。'})
    if(revision&&(input.role!=='engineer'||!report?.id||!report.taskId||!['排查报告','维修报告','维保作业报告'].includes(report.kind)||report.eventId!==input.event?.id||report.owner!==input.actor||input.event?.phase==='closed'))return send(400,{error:'只能补充本人已提交且尚未闭环的排查或作业报告。'})
    busy++;counted=true
@@ -45,7 +46,7 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    const sources=config.knowledgeEnabled?await knowledge.search(planning?[input.event.title,input.event.reports?.at(-1)?.summary,text].filter(Boolean).join(' '):text):[]
    if(streaming){emit('meta',{sources});emit('progress',{stage:'evidence',label:`已整理事件资料${sources.length?'，检索到 '+sources.length+' 处参考资料':''}`,summary:input.event?.reports?.at(-1)?.summary?'最近报告：'+input.event.reports.at(-1).summary.slice(0,300):input.event?.brief?.discovery?.text||'将依据本次问题生成回答。'})}
    const data={question:text,event:input.event?{title:input.event.title,phase:input.event.phase,number:input.event.number,brief:input.event.brief,reports:input.event.reports?.map(r=>({kind:r.kind,summary:r.summary,...(planning?{markdown:r.markdown}: {})})),tasks:input.event.tasks}:null,history:(input.history||[]).slice(-8),knowledge:sources.map(({id,file,title,startLine,endLine,text})=>({id,file,title,startLine,endLine,text})),...(revision?{report:{kind:report.kind,owner:report.owner,summary:report.summary,markdown:report.markdown}}: {}),...(planning?{pendingTask:input.plan,decision:dispatchAction(input.event),observations:input.observations}: {})}
-   const instruction=revision?system+`\n本次是报告修订。正文直接叙述事实和判断，不写“修订后结论”、内部 ID、重复的元数据或自我合规声明。结论控制在 300 字以内，每个分析小节控制在 250 字以内。将用户补充并入已有结论和分析，保留原事实和未确认项。矛盾内容明确记为待核实，不擅自消除。用户补充按“执行人补充”标明，知识只作参考。不要改动报告编号、人员、时刻、任务范围、逐项记录或报告类型。仅返回 JSON，不要代码围栏：{"summary":"修订后的完整原因或处理结论","analysis":{"evidence":"证据与范围核对","interpretation":"原因或措施解释","unverified":"待核实事项及冲突","next":"建议处置"}}。每个字段必须非空；只输出这五个文本字段，不增加字段。`:system+'\n回答时先给结论；有技术判断时附简短的“依据与待核实事项”。'
+   const instruction=revision?system+`\n本次是报告修订。正文直接叙述事实和判断，不写“修订后结论”、内部 ID、重复的元数据或自我合规声明。结论控制在 300 字以内，每个分析小节控制在 250 字以内。将用户补充并入已有结论和分析，保留原事实和未确认项。矛盾内容明确记为待核实，不擅自消除。用户补充按“执行人补充”标明，知识只作参考。不要改动报告编号、人员、时刻、任务范围、逐项记录或报告类型。仅返回 JSON，不要代码围栏：{"summary":"修订后的完整原因或处理结论","analysis":{"evidence":"证据与范围核对","interpretation":"原因或措施解释","unverified":"待核实事项及冲突","next":"建议处置"}}。每个字段必须非空；只输出这五个文本字段，不增加字段。`:observing?system+'\n本次输出修后观察建议，严格执行本产品的两小时闭环建议规则：已满两小时、采样有效、指标平稳且无实际异常时直接推荐本轮闭环；未满两小时且数据良好、无异常时，提示等到本轮满两小时后推荐闭环；只有数据质量不足或实际异常、未完成项才建议补齐或复查。不要用缺正常基线、尚未验证高负荷或本轮范围外未维修的部件增加闭环条件，也不要再等待下一周期。建议闭环不等于自动闭环，最终由轮机长决定。仅用一段80—120字说明当前情况与下一步，不另列依据、待核实事项或长篇限制。':system+'\n回答时先给结论；有技术判断时附简短的“依据与待核实事项”。'
    if(Array.isArray(input.event?.tasks))data.availableDecisions=lifecycleDecisionOptions(input.event)
    if(planning){
     data.event.brief={conclusion:input.event.brief?.conclusion,facts:input.event.brief?.facts,boundary:input.event.brief?.boundary}
