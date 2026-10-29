@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const sourceRoot = path.join(appRoot, 'docs', 'information-map')
 const output = path.join(appRoot, 'public', 'information-map.html')
+const repositoryDoc = path.join(appRoot, 'docs', '智能机舱-态势与事项信息地图.html')
 const workspaceDoc = path.resolve(appRoot, '..', '..', 'doc', '智能机舱-态势与事项信息地图.html')
 const readJson = async (file) => JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''))
 const [model, sharedCases, template] = await Promise.all([
@@ -45,105 +46,94 @@ const data = {
   ...model.graph,
   realCases: { ...sharedCases, ...model.casePresentation.metadata, cases },
 }
-const nodes = new Map(data.nodes.map((node) => [node.id, node]))
-const views = new Map(data.views.map((view) => [view.id, view]))
-assert.equal(nodes.size, data.nodes.length, 'Duplicate map node IDs')
-assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'states'], 'Map must contain the five supported views')
-assert.deepEqual(data.branchFlows.map((flow) => flow.id), ['alarm', 'warning', 'tracking'])
-assert(!views.has('maintenance'), 'Maintenance must remain inside tracking')
+const nodes = new Map(data.nodes.map(node => [node.id, node]))
+const views = new Map(data.views.map(view => [view.id, view]))
 const layers = ['raw', 'processing', 'scenario', 'event', 'task', 'result']
-assert.deepEqual(data.informationLayers.map((layer) => layer.id), layers)
-const taskTypes = { 'task-alarm': 'alarm', 'task-warning': 'warning', 'task-tracking': 'tracking', 'task-maintenance': 'tracking' }
-for (const [id, type] of Object.entries(taskTypes)) {
-  assert.equal(nodes.get(id).sourceEventType, type, `Wrong source event for ${id}`)
-  assert.equal(nodes.get(id).creationGate, 'triage-dispatch', `${id} needs confirmed dispatch`)
-  assert.deepEqual(nodes.get(id).sources, ['triage-dispatch'], `${id} bypasses confirmed dispatch`)
+const taskTypes = { 'task-investigation': 'investigation', 'task-repair': 'repair', 'task-recheck': 'recheck' }
+assert.equal(nodes.size, data.nodes.length, 'Duplicate map node IDs')
+assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'states', 'pages'])
+assert.deepEqual(data.informationLayers.map(layer => layer.id), layers)
+assert.deepEqual(data.branchFlows.map(flow => flow.id), ['alarm', 'warning', 'tracking'])
+const expectedTitles = {
+  crew: '角色与权限', 'risk-brief': '事件信息与排查建议',
+  'report-analysis': '处置报告', 'investigation-report': '排查/复查反馈',
+  'repair-report': '维修反馈', 'effect-observation': '效果观察', 'task-feedback': '步骤反馈',
 }
-assert.deepEqual(nodes.get('triage-dispatch').outputs, Object.keys(taskTypes))
-assert(nodes.get('task-progress').fields.some((field) => field.name === '创建门槛'))
-assert.deepEqual(nodes.get('state-issue-decision').fields.map((field) => field.name), ['待决策', '处置中', '已闭环'])
-for (const [removed, merged] of Object.entries(data.nodeAliases)) {
-  assert(!nodes.has(removed), `Merged node still exists: ${removed}`)
-  assert(nodes.has(merged), `Missing canonical merged node: ${merged}`)
+for (const [id, title] of Object.entries(expectedTitles)) assert.equal(nodes.get(id)?.title, title)
+for (const id of ['alarm', 'warning', 'tracking', 'report-analysis']) assert.equal(nodes.get(id)?.kind, 'ai')
+for (const id of ['investigation-report', 'repair-report']) assert.equal(nodes.get(id)?.kind, 'human')
+assert.equal(nodes.get('notification')?.kind, 'stage')
+for (const id of ['report-revision', 'role-conversation', 'page-logs']) assert(!nodes.has(id), 'Removed node returned: ' + id)
+assert.equal(views.get('pages').title, '用户动线')
+assert(nodes.get('effect-observation').sources.includes('mapped-samples'))
+assert(nodes.get('effect-observation').related.includes('sample'))
+for (const node of nodes.values()) {
+  for (const id of [...node.sources, ...node.outputs, ...node.related, ...(node.artifacts ?? [])]) assert(nodes.has(id), 'Unknown reference: ' + node.id + ' -> ' + id)
+  for (const source of node.evidence ?? []) {
+    assert(source.path.startsWith('ship-maintenance/phase2-demo/'), 'Unexpected evidence path')
+    const local = path.join(appRoot, source.path.slice('ship-maintenance/phase2-demo/'.length))
+    const content = await readFile(local, 'utf8')
+    assert(source.line > 0 && source.line <= content.split('\n').length, 'Invalid evidence line: ' + source.path)
+  }
 }
-for (const id of ['step-alarm-find', 'step-warning-find']) {
-  assert.equal(nodes.get(id).layer, 'event', `Pre-dispatch event formation cannot be a task: ${id}`)
-}
-// No measurement-backed scene can bypass the standardized mapped-point result.
+for (const id of Object.keys(taskTypes)) assert.deepEqual(nodes.get(id).sources, ['triage-dispatch'], 'Task bypasses confirmed dispatch: ' + id)
+// A report can return to decision; repair never starts merely by submitting it.
+assert(!nodes.get('investigation-report').outputs.includes('task-repair'))
+assert(!nodes.get('plan-draft').outputs.some(id => Object.hasOwn(taskTypes, id)))
 function hasUnmappedSensorPath(id, seen = new Set()) {
   if (id === 'sample') return true
   if (id === 'mapped-samples' || seen.has(id)) return false
   seen.add(id)
-  return (nodes.get(id)?.sources ?? []).some((source) => hasUnmappedSensorPath(source, seen))
-}
-const oldPageContainers = new Set(['ship-page', 'device-page', 'device-health', 'ship-assessment', 'todo-board', 'knowledge-view', 'health-track', 'plan-relation'])
-for (const node of nodes.values()) {
-  for (const id of [...node.sources, ...(node.related ?? []), ...(node.outputs ?? [])]) {
-    assert(nodes.has(id), `Unknown node reference ${node.id} -> ${id}`)
-  }
+  return nodes.get(id).sources.some(source => hasUnmappedSensorPath(source, seen))
 }
 for (const view of views.values()) {
-  assert.deepEqual(view.columns.map((column) => column.layer), layers, `Wrong layer order in ${view.id}`)
-  for (const column of view.columns) {
-    for (const group of column.groups) {
-      for (const id of group.ids) {
-        assert(nodes.has(id), `Unknown displayed node ${id}`)
-        const node = nodes.get(id)
-        assert.equal(node.layer, column.layer, `${view.id}: ${id} is in the wrong information layer`)
-        if (column.layer === 'scenario') {
-          assert(!node.sources.some((source) => nodes.get(source)?.layer === 'raw'), `${id} directly reads raw sources`)
-          assert(!hasUnmappedSensorPath(id), `${id} bypasses mapped sensor data`)
-        }
-        if (column.layer === 'result') assert(!oldPageContainers.has(id), `Old page container in result layer: ${id}`)
-      }
-    }
+  const displayed = new Set(view.columns.flatMap(column => column.groups.flatMap(group => group.ids)))
+  if (view.id !== 'pages') assert.deepEqual(view.columns.map(column => column.layer), layers)
+  for (const column of view.columns) for (const group of column.groups) for (const id of group.ids) {
+    assert(nodes.has(id), 'Unknown displayed node: ' + id)
+    assert.equal(nodes.get(id).layer, view.id === 'pages' ? 'page' : column.layer)
+    if (column.layer === 'scenario') assert(!hasUnmappedSensorPath(id), 'Scenario bypasses mapped samples: ' + id)
   }
-  const reaches = (from, target, seen = new Set()) => {
-    if (from === target) return true
+  for (const edge of view.edges) assert(displayed.has(edge.from) && displayed.has(edge.to), 'Invisible edge endpoint in ' + view.id)
+  if (displayed.has('effect-observation')) {
+    assert(view.edges.some(edge => edge.from === 'sample' && edge.to === 'effect-observation'), view.id + ': missing sensor relationship')
+    assert(view.edges.some(edge => edge.from === 'mapped-samples' && edge.to === 'effect-observation'), view.id + ': missing standardized sensor input')
+  }
+  const reaches = (from, to, seen = new Set()) => {
+    if (from === to) return true
     if (seen.has(from)) return false
     seen.add(from)
-    return (view.edges ?? []).filter((edge) => edge.from === from).some((edge) => reaches(edge.to, target, seen))
+    return view.edges.filter(edge => edge.from === from).some(edge => reaches(edge.to, to, seen))
   }
-  if (['overview', 'states'].includes(view.id)) {
-    for (const type of ['alarm', 'warning', 'tracking']) assert(reaches(type, 'triage'), `${view.id}: visible ${type} -> triage path is broken`)
-  }
-  if (['alarm', 'warning'].includes(view.id)) assert(reaches(view.id, `step-${view.id}-decision`), `${view.id}: visible decision path is broken`)
-  assert(reaches('sample', 'mapped-samples'), `${view.id}: raw input bypasses preprocessing`)
-  assert(reaches('mapped-samples', 'sample-quality'), `${view.id}: preprocessing to quality path is broken`)
-  assert(reaches('sample-quality', 'time-features'), `${view.id}: quality to statistics path is broken`)
-  const types = ['alarm', 'warning', 'tracking'].includes(view.id) ? [view.id] : ['alarm', 'warning', 'tracking']
-  for (const type of types) {
-    const gate = types.length === 1 ? `branch-${type}-dispatch` : 'triage-dispatch'
-    assert(reaches(type, gate), `${view.id}: ${type} cannot reach a dispatch confirmation`)
-    assert(reaches(gate, `task-${type}`), `${view.id}: confirmed dispatch cannot create ${type} task`)
-    assert(reaches(`task-${type}`, 'task-progress'), `${view.id}: task cannot reach merged progress record`)
-    assert(reaches(`task-${type}`, `result-${type}`), `${view.id}: task result is disconnected`)
-  }
-  if (view.id === 'tracking') {
-    assert(reaches('tracking', 'branch-maintenance-dispatch'))
-    assert(reaches('branch-maintenance-dispatch', 'task-maintenance'))
-    assert(reaches('task-maintenance', 'result-maintenance'))
-  }
+  const paths = view.id === 'pages' ? [['page-home', 'page-event'], ['page-todo', 'page-event'], ['page-issues', 'page-event'], ['page-event', 'page-reports']] : [
+    ['sample', 'mapped-samples'], ['mapped-samples', 'sample-quality'], ['sample-quality', 'time-features'],
+    ['triage', 'triage-dispatch'], ['triage-dispatch', 'task-investigation'], ['task-investigation', 'investigation-report'],
+    ['investigation-report', 'decision-review'], ['decision-review', 'triage-dispatch'], ['triage-dispatch', 'task-repair'],
+    ['task-repair', 'repair-report'], ['repair-report', 'effect-observation'], ['effect-observation', 'result-review'],
+    ['result-review', 'task-recheck'], ['task-recheck', 'investigation-report'], ['result-review', 'closure-report'],
+  ]
+  // The status view intentionally condenses observation into its task/result ownership cards.
+  for (const [from, to] of paths) if (displayed.has(from) && displayed.has(to)) assert(reaches(from, to), view.id + ': broken path ' + from + ' -> ' + to)
+  if (['alarm', 'warning', 'tracking'].includes(view.id)) assert(reaches(view.id, 'triage-dispatch'))
 }
 for (const flow of data.branchFlows) {
-  const view = views.get(flow.id)
-  const displayed = new Set(view.columns.flatMap((column) => column.groups.flatMap((group) => group.ids)))
+  const displayed = new Set(views.get(flow.id).columns.flatMap(column => column.groups.flatMap(group => group.ids)))
   for (const group of flow.groups) {
-    assert(displayed.has(group.stageId), `Stage is not displayed: ${group.stageId}`)
+    assert(displayed.has(group.stageId), 'Missing stage: ' + group.stageId)
     for (const branch of group.branches) {
-      assert(displayed.has(branch.id), `Branch is not displayed: ${branch.id}`)
-      for (const id of [...(branch.next ?? []), ...(branch.products ?? [])]) {
-        assert(nodes.has(id), `Unknown branch target ${id}`)
-      }
+      assert(displayed.has(branch.id), 'Missing branch: ' + branch.id)
+      for (const id of [...branch.products, ...branch.next]) assert(nodes.has(id), 'Unknown branch target: ' + id)
     }
   }
 }
+const currentCaseIds = ['real-alarm-0430', 'real-warning-0523', 'real-tracking-exhaust-baseline', 'real-health-c4-baseline']
+assert.deepEqual(cases.map(item => item.id), currentCaseIds)
 for (const item of cases) {
-  assert(['alarm', 'warning', 'tracking'].includes(item.viewId), `Unsupported event type ${item.viewId}`)
+  assert(['alarm', 'warning', 'tracking'].includes(item.viewId))
   for (const step of item.steps) {
-    assert(nodes.has(step.stageId), `Unknown case stage ${step.stageId}`)
-    if (step.selectedBranchId) assert(nodes.has(step.selectedBranchId), `Unknown case branch ${step.selectedBranchId}`)
-    for (const id of step.productIds ?? []) assert(nodes.has(id), `Unknown case product after node merge: ${id}`)
+    assert(nodes.has(step.stageId), 'Unknown case stage: ' + step.stageId)
+    if (step.selectedBranchId) assert(nodes.has(step.selectedBranchId))
+    for (const id of step.productIds ?? []) assert(nodes.has(id), 'Unknown case product: ' + id)
   }
 }
 assert.equal(template.split('__MAP_DATA__').length, 2, 'Template must contain one data placeholder')
@@ -152,15 +142,18 @@ assert(!/<(?:script|img|iframe|audio|video)\b[^>]*\bsrc\s*=/i.test(html), 'Map u
 assert(!/<link\b[^>]*\bhref\s*=/i.test(html), 'Map unexpectedly loads external styles')
 if (process.argv.includes('--check')) {
   assert.equal(await readFile(output, 'utf8'), html, 'Published map is stale: run node scripts/build-information-map.mjs')
+  assert.equal(await readFile(repositoryDoc, 'utf8'), html, 'Repository documentation map is stale')
   if (process.argv.includes('--sync-workspace-doc')) assert.equal(await readFile(workspaceDoc, 'utf8'), html, 'Workspace documentation map is stale')
 } else {
   await mkdir(path.dirname(output), { recursive: true })
   await writeFile(output, html, 'utf8')
+  await writeFile(repositoryDoc, html, 'utf8')
   if (process.argv.includes('--sync-workspace-doc')) await writeFile(workspaceDoc, html, 'utf8')
 }
 console.log(JSON.stringify({
   mode: process.argv.includes('--check') ? 'verified' : 'generated',
   file: output,
+  repositoryDoc,
   nodes: nodes.size,
   views: views.size,
   cases: cases.length,
