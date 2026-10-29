@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "source": "cc-switch",
+  "providerId": "0a032ef9-8898-4498-94d5-8071c3545ddd",
+  "model": "",
+  "baseUrl": "",
+  "protocol": "anthropic",
+  "maxTokens": 4096,
+  "timeoutMs": 120000,
+  "taskMaxTokens": 8192,
+  "taskTimeoutMs": 180000,
+  "knowledgeEnabled": true
+}

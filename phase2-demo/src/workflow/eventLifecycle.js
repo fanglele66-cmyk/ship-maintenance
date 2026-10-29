@@ -2,6 +2,12 @@ import {workflowCases, workflowIssues, composeRepair} from '../mock/fourStoryWor
 import {eventBriefingFor} from '../mock/eventBriefings.js'
 import {trackingProcessReference} from '../mock/trackingProcessReferences.js'
 import {adviceDetails,reportAnalysis,reportAnalysisSummary} from './lifecycleAnalysis.js'
+import {lifecycleDecisionOptions,dispatchAction,hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
+import {ensurePlanDraft,taskPlanKey} from './taskPlanning.js'
+import {detailedRepairSteps,presetRecheckSteps,upgradeAssignedRepair,repairProcedureVersion} from './repairPlanning.js'
+import {closureContent,closurePresentationVersion} from './closureReport.js'
+import {groupRepairSteps,compactAssignedRepair} from './repairStepGroups.js'
+export {hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
 
 export const people = {captain:'陈志远（轮机长）',engineer:'李建国（大管轮）'}
 export const eventNumbers = {'real-alarm-0430':'CBY-EVT-20260430-001','real-warning-0523':'CBY-EVT-20260523-001','real-tracking-exhaust-baseline':'CBY-EVT-20260812-001','real-health-c4-baseline':'CBY-EVT-20260812-002'}
@@ -51,11 +57,17 @@ export function currentTask(event){return event.tasks.find(t=>t.id===event.curre
 export function pendingDecision(event){return ['reminder','decision','review'].includes(event.phase)}
 export function visibleEvents(state){return Object.values(state.events).filter(e=>state.role==='captain'||e.participants.includes(people.engineer))}
 export function activeTask(event){const t=currentTask(event);return t?.status==='assigned'?t:null}
-export function decisionOptions(event){
- if(event.phase==='closed')return []
- if(event.phase==='reminder')return [{value:'investigate',label:'派发排查'},{value:'false',label:'确认误报'}]
- if(activeTask(event))return [{value:'shore',label:'同步岸端'}]
- return [{value:'investigate',label:'继续排查'},event.tracking?{value:'maintenance',label:'关联维保单'}:{value:'repair',label:'派发维修'},{value:'close',label:'关闭闭环'},{value:'shore',label:'同步岸端'}]
+export const decisionOptions=lifecycleDecisionOptions
+export function ensureTaskPlan(event){
+ const action=dispatchAction(event);if(!action)return null
+ const report=event.reports.at(-1),prior=currentTask(event)
+ const steps=action==='investigate'?checkSteps(event.id):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
+ const scope=action==='recheck'?`依据${report?.title||'本轮作业报告'}，复核实际维修措施、剩余事项、修后数据和原异常是否再现，提交现场复查结果。`:action==='investigate'?event.brief.dispatchReason:`依据${report?.title||'现场记录'}，处理本轮登记的异常：${prior?.records.filter(r=>/发现异常|读数不一致|偏离仍存在/.test(r.result)).map(r=>r.label).join('、')||'已批准部位'}。保留实际措施、隔离与复测记录。`
+ const draft=ensurePlanDraft(event,{steps,scope,procedureVersion:repairProcedureVersion,rationale:report?`依据《${report.title}》：${report.summary}`:event.brief.conclusion})
+ if(action==='repair'&&draft.source==='existing'&&draft.procedureVersion!==repairProcedureVersion){draft.steps=steps;draft.procedureVersion=repairProcedureVersion;draft.version++}
+ if(['repair','maintenance'].includes(action)&&draft.steps.length>4){draft.steps=groupRepairSteps(draft.steps);draft.version++}
+ if(action==='recheck'&&!draft.steps.length){draft.steps=steps;draft.scope=scope;draft.source='preset'}
+ return draft
 }
 const planClean=text=>String(text||'').replaceAll('提交验收','提交维修报告').replaceAll('提交现场验收','提交维修报告').replaceAll('验收通过后','轮机长确认后').replaceAll('现场验收','结果核对')
 export function maintenancePlan(event){
@@ -70,33 +82,34 @@ export function proposedPlan(event){
  let tasks=keys.length?composeRepair(data,keys).tasks:[]
  // Notes remain verbatim evidence; they never become an unverified replacement diagnosis.
  tasks=tasks.map(t=>({...t,guide:planClean(t.guide),checks:(t.checks||[]).map(planClean),recordHint:planClean(t.recordHint)}))
- if(!tasks.length)tasks=[{label:'核对获批处理范围与作业条件',guide:'依据排查报告及轮机长批准范围，核对具体部位、作业许可、隔离和所需材料。'},{label:'实施本次批准的处理项目',guide:'按本机维修作业单实施批准范围，记录实际部位、措施、用料和未完成项目。'},{label:'恢复系统并记录复测结果',guide:'复核接口与防护，按批准工况复测，将结果及剩余问题交轮机长处置。'}]
- return copy(tasks).map(t=>({...t,options:['已完成','未完成','不适用']}))
+ return detailedRepairSteps(event,copy(tasks))
 }
 export function makeReport(event,task,reportId){
  const kind=task.kind==='investigation'?'排查报告':task.kind==='maintenance'?'维保作业报告':'维修报告'
- const id=reportId||uid('report'),title=`${event.title} · 第${task.round}轮${kind}`
+ const id=reportId||uid('report'),title=`${event.title} · 第${task.round}轮${task.purpose==='recheck'?'复查报告':kind}`
+ const priorRows=[...(task.procedureHistory||[]),...(task.feedbackHistory||[])].map(h=>'### 步骤调整前的原填写记录\n\n'+h.draft.records.filter(r=>r.result||r.note).map(r=>`- ${r.label} · ${r.result||'未选结果'}：${r.note||'未填备注'}`).join('\n')).join('\n\n')
  const rows=task.records.map(r=>`### ${r.label}\n\n结果：${r.result}\n\n${r.note||'未填写备注。'}`).join('\n\n')
  const analysis=reportAnalysisSummary(event,task),analysisMarkdown=reportAnalysis(event,task)
- const markdown=`# ${title}\n\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'原因判断与排查结论':'处理结果与剩余事项'}\n\n${task.summary}\n\n## AI分析\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}\n\n## ${task.kind==='investigation'?'现场排查记录':'实际作业记录'}\n\n${rows}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
+ const markdown=`# ${title}\n\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'原因判断与排查结论':'处理结果与剩余事项'}\n\n${task.summary}\n\n## AI分析\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}\n\n## ${task.kind==='investigation'?'现场排查记录':'实际作业记录'}\n\n${rows}${priorRows?'\n\n'+priorRows:''}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
  return {id,title,kind,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：'),analysis,analysisMarkdown,summary:task.summary,presentationVersion:3}
 }
 export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
   event.number=eventNumbers[event.id]||event.number
+  upgradeAssignedRepair(event,()=>proposedPlan(event))
+  for(const task of event.tasks)compactAssignedRepair(task)
+  if(['repair','maintenance'].includes(event.pendingPlan?.action)&&event.pendingPlan.steps.length>4){event.pendingPlan.steps=groupRepairSteps(event.pendingPlan.steps);event.pendingPlan.version++}
   for(const task of event.tasks)if(task.kind!=='investigation'&&task.status==='submitted'&&!task.observationEndedAt){const next=event.tasks.find(t=>Date.parse(t.assignedAt)>Date.parse(task.submittedAt));task.observationEndedAt=next?.assignedAt||event.closedAt||null}
   for(const report of event.reports){const task=event.tasks.find(t=>t.id===report.taskId);if(task?.status==='submitted'&&report.presentationVersion!==3)Object.assign(report,makeReport(event,task,report.id))}
-  for(const report of event.reports)if(report.kind==='闭环报告'&&report.presentationVersion!==3){const decision=event.decisions.findLast(d=>['close','false'].includes(d.action));Object.assign(report,makeClosureReport(event,decision?.action||'close',report.summary,report.at,report.id))}
+  for(const report of event.reports)if(report.kind==='闭环报告'&&report.presentationVersion!==closurePresentationVersion){const decision=event.decisions.findLast(d=>['close','false'].includes(d.action));Object.assign(report,makeClosureReport(event,decision?.action||'close',report.summary,report.at,report.id))}
   for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==2){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=2;message.basisLabel='分析过程与依据'}
  }
  return state
 }
 export function makeClosureReport(event,action,reason,at,id=uid('report')){
- const reports=event.reports.filter(r=>r.kind!=='闭环报告'),investigation=reports.findLast(r=>r.kind==='排查报告'),work=reports.findLast(r=>['维修报告','维保作业报告'].includes(r.kind))
- const analysisMarkdown=`### 原因与实际处理的对应关系\n\n${investigation?'排查报告记录：'+investigation.summary:'本次未派发现场排查任务；闭环依据为轮机长提交的核实说明，不增加部件故障判断。'}\n\n${work?'作业报告记录：'+work.summary:'本次没有维修或维保作业报告，不将核实结束表述为已经维修。'}\n\n### 结论范围与后续观察\n\n${action==='false'?'本次决定结束的是该提醒的核实，不代表其他部位或后续工况已经验证正常。':'本次闭环覆盖上述已提交的排查与作业范围。原始提醒、各轮记录与未纳入处理的部位继续保留，后续新异常需按新的发生窗口核实。'}\n\n后续安排以轮机长的闭环说明为准：${reason}`
- const markdown=`# ${event.title} · 闭环报告\n\n- 确认人：${people.captain}\n- 确认时间：${timeText(at)}\n- 处置方式：${action==='false'?'确认误报':'关闭闭环'}\n\n## 闭环结论与后续安排\n\n${reason}\n\n## AI分析\n\n${analysisMarkdown}\n\n${event.maintenance?'## 关联维保安排\n\n- 船管工单：'+event.maintenance.number+'\n- 负责人：'+event.maintenance.owner+'\n- 计划窗口：'+event.maintenance.window+'\n\n'+event.maintenance.scope+'\n\n':''}## 现场记录与过程报告索引\n\n${reports.map(r=>'- '+r.title+' · '+timeText(r.at)).join('\n')||'未派发现场任务。'}\n\n各轮报告保留提交人的逐项结果、备注、实际措施及附件索引。`
- return {id,kind:'闭环报告',title:event.title+' · 闭环报告',eventId:event.id,eventNumber:event.number,owner:people.captain,at,summary:reason,analysisMarkdown,markdown:markdown.replace('- 确认人：','- 事件编号：'+event.number+'\n- 确认人：'),presentationVersion:3}
+ return {id,kind:'闭环报告',title:event.title+' · 闭环报告',eventId:event.id,eventNumber:event.number,owner:people.captain,at,summary:reason,...closureContent(event,action,reason,at,people.captain)}
 }
+
 export function analyzeFindings(task){
  const abnormal=task.records.filter(r=>['发现异常','读数不一致','工况可比，偏离仍存在'].includes(r.result))
  const unknown=task.records.filter(r=>/无法确认|受限/.test(r.result))
@@ -108,28 +121,30 @@ export function decide(state,id,form){
  required(decisionOptions(e).some(x=>x.value===form.action),'当前阶段不能执行此决定，请核对最新任务状态。')
  required(form.reason?.trim(),'请填写决定依据或本次安排。')
  const at=new Date().toISOString(),action=form.action
- if(['investigate','repair','maintenance'].includes(action)){
+ if(['investigate','repair','maintenance','recheck'].includes(action)){
   required(form.owner===people.engineer,'请选择任务负责人。')
   required(Number.isFinite(Date.parse(form.deadline))&&Date.parse(form.deadline)>Date.now(),'要求完成时间应晚于当前时间。')
   if(action==='maintenance')required(form.order?.trim()&&form.window?.trim(),'请选择维保工单及计划窗口。')
+  const plan=ensureTaskPlan(e)
+  required(plan?.key===taskPlanKey(e)&&plan.status==='ready'&&plan.steps.length,'待派任务尚未生成完成，请先查看任务草稿。')
   const prior=currentTask(e);if(prior?.status==='submitted'&&prior.kind!=='investigation')prior.observationEndedAt=at
-  const kind=action==='investigate'?'investigation':action
+  const kind=['investigate','recheck'].includes(action)?'investigation':action
   const round=e.tasks.filter(t=>t.kind===kind).length+1
-  const task={id:uid(kind),kind,round,owner:form.owner,deadline:form.deadline,scope:form.reason.trim(),assignedAt:at,status:'assigned',steps:kind==='investigation'?checkSteps(id):kind==='maintenance'?maintenancePlan(e):proposedPlan(e),records:[],summary:'',attachments:[],sourceReportId:e.reports.at(-1)?.id||null}
+  const task={id:uid(kind),kind,procedureVersion:repairProcedureVersion,purpose:action==='recheck'?'recheck':kind,round,owner:form.owner,deadline:form.deadline,scope:form.reason.trim(),assignedAt:at,status:'assigned',steps:copy(plan.steps),plan:copy(plan),records:[],summary:'',attachments:[],sourceReportId:plan.sourceReportId}
   task.draft={records:task.steps.map(t=>({label:t.label,package:t.package,result:'',note:''})),summary:'',attachments:[]}
   e.tasks.push(task);e.currentTask=task.id
   if(!e.participants.includes(task.owner))e.participants.push(task.owner)
-  const p=phase(e,kind,`第${round}轮${kind==='investigation'?'排查':kind==='repair'?'维修':'维保'}`,{taskId:task.id});p.id=task.id
-  e.status=kind==='investigation'?'排查中':kind==='repair'?'维修中':'维保执行中'
+  const p=phase(e,kind,`第${round}轮${taskName(task)}`,{taskId:task.id});p.id=task.id
+  e.status=task.purpose==='recheck'?'复查中':kind==='investigation'?'排查中':kind==='repair'?'维修中':'维保执行中'
   if(kind==='maintenance')e.maintenance={number:form.order,window:form.window,owner:form.owner,scope:task.scope,at,taskId:task.id}
   e.unread.engineer=true;e.unread.captain=false
-  notify(state,e,'engineer',kind==='investigation'?'收到新的排查任务':kind==='maintenance'?'收到新的维保任务':'收到新的维修任务',`${people.captain}已派发“${e.title}”，要求 ${timeText(task.deadline)} 前完成。`)
-  say(e,'captain','user',`${kind==='investigation'?'派发排查':kind==='repair'?'派发维修':'关联维保工单 '+form.order} · ${task.owner} · 要求 ${timeText(task.deadline)} 前完成。\n${task.scope}`)
+  notify(state,e,'engineer',`收到新的${taskName(task)}任务`,`${people.captain}已派发“${e.title}”，要求 ${timeText(task.deadline)} 前完成。`)
+  say(e,'captain','user',`派发${taskName(task)} · ${task.owner} · 要求 ${timeText(task.deadline)} 前完成。\n${task.scope}`)
   advice(e,'captain','任务已派发，当前等待执行人员提交报告。','可以在当前阶段查看排查/作业步骤及提交进度；报告回交后继续作出处置决定。')
-  advice(e,'engineer',`轮机长已派发${kind==='investigation'?'排查任务':kind==='repair'?'维修任务':'维保任务'}：${task.scope}`,kind==='investigation'?'先查看数据，再逐项核查；记录原因、依据及未确认项，提交排查报告。':'按已批准范围逐项执行，填写实际措施和复测结果，完成后提交报告给轮机长。')
+  advice(e,'engineer',`轮机长已派发${taskName(task)}任务：${task.scope}`,kind==='investigation'?'先查看数据，再逐项核查；记录原因、依据及未确认项，提交排查报告。':'按已批准范围逐项执行，填写实际措施和复测结果，完成后提交报告给轮机长。')
  }else if(action==='shore'){
-  const record={id:uid('shore'),at,reason:form.reason,reportId:e.reports.at(-1)?.id||null,status:'待岸端接收'};e.shore.push(record)
-  say(e,'captain','user','提交岸端同步：'+form.reason);advice(e,'captain','已整理事件及关联报告，加入岸端同步记录。','当前状态为待岸端接收，可继续处理船上任务。')
+  const record={id:uid('shore'),at,reason:form.reason,reportId:e.reports.at(-1)?.id||null,status:'待岸基接收',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,brief:e.brief,tasks:e.tasks,reports:e.reports,decisions:e.decisions,at})};e.shore.push(record)
+  say(e,'captain','user','提交岸基同步：'+form.reason);advice(e,'captain','已整理事件及关联报告，加入岸基同步记录。','当前状态为待岸基接收，可继续处理船上任务。')
  }else{
   const prior=currentTask(e);if(prior?.status==='submitted'&&prior.kind!=='investigation')prior.observationEndedAt=at
   e.status='已闭环';phase(e,'closed','闭环归档');e.closedAt=at;e.closeReason=form.reason;e.unread.captain=false
@@ -148,16 +163,18 @@ export function submitTask(state,id){
  required(draft.records.length===task.steps.length&&draft.records.every((r,i)=>task.steps[i].options.includes(r.result)),'请为每个步骤选择实际结果；备注可以不填。')
  required(draft.summary?.trim(),task.kind==='investigation'?'请填写原因判断、排查结论及仍需核实的事项。':'请填写实际措施、复测结果及剩余事项。')
  task.records=copy(draft.records);task.summary=draft.summary.trim();task.attachments=copy(draft.attachments);task.submittedAt=new Date().toISOString();task.status='submitted'
- const report=makeReport(e,task);e.reports.push(report);phase(e,task.kind==='investigation'?'decision':'review',task.kind==='investigation'?'排查后决策':'结果处置',{taskId:task.id,reportId:report.id});e.status=task.kind==='investigation'?'待处置决策':'待结果处置';e.unread.captain=true;e.unread.engineer=false
+ const report=makeReport(e,task);e.reports.push(report)
+ const needsDecision=task.kind==='investigation'&&!(task.purpose==='recheck'&&!hasAbnormalFindings(task))
+ phase(e,needsDecision?'decision':'review',needsDecision?'排查后决策':'结果处置',{taskId:task.id,reportId:report.id});e.status=needsDecision?'待处置决策':'待结果处置';e.unread.captain=true;e.unread.engineer=false
  notify(state,e,'captain',report.kind+'已回交，待您决策',`${task.owner}已提交“${e.title}”的${report.kind}。${report.summary}`)
  say(e,'engineer','receipt',report.summary,{reportId:report.id,title:report.kind+'已提交'})
  advice(e,'engineer',report.analysis,'本轮记录已形成'+report.kind+'并交轮机长处置。如发现遗漏，可在会话补充说明；新的排查或作业安排由轮机长派发。')
  say(e,'captain','receipt',`${task.owner}已提交${report.kind}。${report.summary}`,{reportId:report.id,title:'AI检修助手 · 执行结果回交'})
- advice(e,'captain',report.analysis,e.tracking?'请审阅排查/作业报告，决定继续排查、关联维保单、同步岸端或关闭闭环。':'请审阅报告，决定继续排查、派发维修、同步岸端或关闭闭环。')
+ advice(e,'captain',report.analysis,e.phase==='review'?'请结合处理后观察与复测记录决定闭环或派发复查，复查任务可在 Tab 中提前查看。':hasAbnormalFindings(task)?'本轮已登记异常，先审阅待派发维修任务，明确处理范围后派发维修。':'本轮未登记异常，AI 将根据已排除的问题与剩余线索预生成下一轮排查任务，请审阅后派发。')
  return report
 }
-export function askAssistant(state,id,text){
- const e=state.events[id],role=state.role;required(text.trim(),'请先输入问题。');say(e,role,'user',text.trim())
+export function askAssistant(state,id,text,{skipUser=false}={}){
+ const e=state.events[id],role=state.role;required(text.trim(),'请先输入问题。');if(!skipUser)say(e,role,'user',text.trim())
  const report=e.reports.at(-1),task=currentTask(e)
  let analysis=report?`${report.kind}中的已提交结论：${report.summary}`:e.brief.conclusion
  let recommendation=role==='captain'?(pendingDecision(e)?'请结合已有依据选择处置方式，并明确负责人、范围和完成时间。':'当前任务由'+task?.owner+'负责，要求完成时间为'+timeText(task?.deadline)+'，提交后将生成报告供您处置。'):(activeTask(e)?'请按当前步骤记录实际结果；如果原因还未确定，可以选“无法确认”并在结论中说明缺口。':'本轮已提交，等待轮机长安排后续任务。')

@@ -1,7 +1,7 @@
 <template>
  <div class="captain-workbench">
   <section class="captain-twin">
-   <header><strong>长航碧玉</strong><span class="ship-scope">主机 · 辅机态势</span><button type="button" class="daily-report-entry" @click="openReports"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 2.5h7l3 3v12H5zM12 2.5V6h3M8 9h4M8 12h4M8 15h3"/></svg>日检报告</button></header>
+   <header><strong>长航碧玉</strong><span class="ship-scope">主机 · 辅机态势</span></header>
    <div ref="twinRef" class="twin-viewport">
     <div class="twin-scene" :style="sceneStyle">
      <img src="/ship-situation-engines.png" alt="船舶俯视态势图，设备入口位置为示意" decoding="async" fetchpriority="high" width="941" height="1672"/>
@@ -21,7 +21,7 @@
     </section>
    </div>
   </section>
-  <div class="captain-right" aria-label="24小时运行与轮机工作台">
+  <div class="captain-right" aria-label="24小时运行与风险处置">
    <section class="captain-analysis">
     <ModuleHeader title="工况态势"><span class="analysis-window">近24小时 · AIS 航迹回放</span></ModuleHeader>
     <div class="lc-home-chronology"><section v-for="period in chronology.periods" :key="period.start" class="lc-home-period"><time>{{period.time}}</time><strong class="lc-operation-status" :class="'operation-'+period.tone">{{period.status}}</strong><p>{{period.detail}}</p><p class="lc-ais-line">AIS · {{period.ais}}</p><small class="lc-ais-position">时段末位置 {{period.position}}</small></section></div>
@@ -32,7 +32,6 @@
 </template>
 <script setup>
 import {computed,ref} from 'vue'
-import {useRouter} from 'vue-router'
 import {useElementSize} from '@vueuse/core'
 import {useDeviceStore} from '@/stores/deviceStore'
 import {useSensorStore} from '@/stores/sensorStore'
@@ -52,8 +51,6 @@ import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const lifecycle=useEventLifecycleStore(),workbench=ref(null)
 const emit=defineEmits(['selectDevice','selectItem']),store=usePhase2DemoStore(),deviceStore=useDeviceStore(),twinRef=ref(null)
 const sensorStore=useSensorStore()
-const router=useRouter()
-function openReports(){router.push('/reports/navigation-24h')}
 function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return point?Number(point.value).toFixed(1):'—'}
 const auxiliaryRpmPoints=computed(()=>sensorStore.allSensors.filter(s=>s.deviceId.startsWith('aux-engine-')&&s.unit==='rpm'))
 const runningAuxiliaries=computed(()=>auxiliaryRpmPoints.value.filter(s=>s.value>0).length)
@@ -121,7 +118,7 @@ const devices=computed(()=>{
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.twin-running{background:#123348}}
 </style>
 <style scoped>
-.captain-twin header{gap:10px;flex-wrap:wrap}.captain-twin header strong{white-space:nowrap}.captain-twin .ship-scope{font-size:var(--wb-label)}.daily-report-entry{margin-left:auto;display:flex;align-items:center;gap:5px;border:1px solid #5d859a70;border-radius:5px;background:#193e52a6;color:#d3e5ef;font:inherit;font-size:var(--wb-label);white-space:nowrap;padding:6px 8px;cursor:pointer}.daily-report-entry svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}.daily-report-entry:hover{background:#2b5269}.daily-report-entry:focus-visible{outline:2px solid #9ad6ee;outline-offset:3px}@media(max-width:1600px) and (min-width:761px){.captain-twin .ship-scope{display:none}}@media(max-width:760px){.captain-twin header{padding:16px}.daily-report-entry{font-size:var(--wb-label)}}
+.captain-twin header{gap:10px;flex-wrap:wrap}.captain-twin header strong{white-space:nowrap}.captain-twin .ship-scope{font-size:var(--wb-label)}@media(max-width:1600px) and (min-width:761px){.captain-twin .ship-scope{display:none}}@media(max-width:760px){.captain-twin header{padding:16px}}
 </style>
 
 <style scoped>

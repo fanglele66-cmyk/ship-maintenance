@@ -1,0 +1,87 @@
+import {isAbnormalResult} from './lifecycleDecisions.js'
+import {groupRepairSteps} from './repairStepGroups.js'
+
+export const repairProcedureVersion=2
+const workOptions=['已完成','未完成','不适用']
+const step=(label,guide,checks,recordHint)=>({label,guide,checks,recordHint,options:[...workOptions]})
+const clone=value=>JSON.parse(JSON.stringify(value))
+
+// These are work-card requirements, not completed work or manufacturer settings.
+// Sources: wiki_rt-flex50/concepts/RT-flex故障排查方法论.md:111-137;
+// 长航碧玉主机2缸ICU伺服油液压活塞卡阻故障案例.md:32-62.
+export function detailedRepairSteps(event,methods=[]){
+ const investigation=[...event.tasks].reverse().find(t=>t.kind==='investigation'&&t.status==='submitted')
+ const findings=(investigation?.records||[]).filter(isAbnormalResult)
+ const target=findings.map(r=>r.label).join('、')||'本轮报告中已确认并获批的部位'
+ const evidence=findings.map(r=>`${r.label}：${r.note||r.result}`).join('；')
+ const report=event.reports.findLast(r=>r.taskId===investigation?.id)
+ const icu=/ICU|液压活塞/.test(evidence),air=/空气|减压|气路/.test(evidence)
+ const supplies=icu?'与本机型号、接口和序列号匹配的 ICU 备用总成（仅在换件获批时领用）、对应密封件、堵头、接油容器、无绒布及认可清洁剂':air?'与已确认损坏部位匹配的减压阀维修包或总成、密封件、堵头、检漏用品和经校验压力表':'与已确认部位匹配的备件、密封或接线材料、清洁用品及经校验的独立测量工具'
+ const start=[
+  step('核对异常、批准范围与作业工单',`对照《${report?.title||'本轮排查报告'}》逐项确认 ${target}，由轮机长明确本次处理范围。`,[
+   `已提交依据：${evidence||'具体异常位置、现象和检查方法须从报告核对后填写。'}`,
+   '逐项标注允许清洁、连接修复、送修或换件的部位；未见异常、无法确认的部位不自动纳入更换。',
+   '核对本机适用的厂家作业卡及版本，落实负责人、监护人、作业窗口、停止条件；缺少工艺或超出批准范围时暂停相应项目并回报。'
+  ],'记录工单/作业卡号、批准部位、处理方式、执行人与监护人；待补资料及未批准项目单列。'),
+  step('准备备件、耗材与检修工具',`按获批范围准备：${supplies}。`,[
+   '核对零件图号、适用机型、数量、合格证明和包装状态；无法确认适配的备件不得装机。仅准备备用件不代表必须更换。',
+   '准备对应专用工具、已校验扭矩工具与测量仪表，查明厂家规定的装配顺序、力矩和验收值；本页不补写未提供的参数。',
+   '分区放置清洁备件、拆下件与废弃耗材，落实防污染、接液和零件标识；备件或专用工具不足时登记受限项目。'
+  ],'填写备件名称/图号/批号/数量、工具编号与校验状态、实际领用和缺件情况。'),
+  step('落实停机隔离与零能量确认','取得作业许可后，按本船程序与驾驶台协调停机窗口，由执行人与监护人共同确认隔离。',[
+   '落实防意外启动、相关控制电源和介质隔离、锁定与标识；记录隔离点及责任人。',
+   icu?'燃油和伺服油分别隔离卸压，依据厂家程序核实残余压力及温度；未确认安全前不得松动高压连接。':air?'确认控制空气相关用户和备用供气安排；隔离待修支路并卸除储压，核实零压后作业，不中断未获批的安全用气。':'按目标部位确认电、气、液压和热能已处于许可状态；不得以停机或画面零值代替现场核实。',
+   '设置作业区域、防护与接液措施，记录隔离复核；隔离无法确认时停止拆卸。'
+  ],'记录许可、隔离点、现场确认方法/读数、确认时刻及监护复核。'),
+  step('标识连接并保存处理前状态',`在 ${target} 的获批范围内保留原始状态，然后依适用作业卡拆卸或解除连接。`,[
+   '标记插头、线束、管路、安装方向和紧固位置，保存原始照片及已有异常；未拍摄的照片不记为附件。',
+   '拆下部件按位置编号，敞口及时封堵，检查密封面与连接件并记录实际发现；新增损坏先回报确认范围。',
+   icu?'涉及 ICU 内部检修时由 Wärtsilä 认可的车间实施，船端按获批工单完成拆装、封存和送修交接。历史案例不能替代本机维修工艺。':'按厂家允许的拆装层级作业；没有对应作业卡时不继续解体。'
+  ],'记录部位、原接线/管路标识、拆下件编号、处理前现象、实际附件及送修交接。')
+ ]
+ const middle=methods.length?methods.map(t=>step(t.label,t.guide,[...(t.checks||[]),icu?'ICU 内部清洁或精密偶件检修仅由厂家认可车间按工艺实施，不使用砂纸；工艺参数以适用厂家作业卡为准。':'仅实施获批且已有现场依据的项目；新增换件需轮机长确认。'],t.recordHint||'逐项记录实际部位、措施、用料、检查结果和未完成项。')):[
+  step(icu?'按授权完成 ICU 修复或总成交接':air?'处理已确认的气路损坏部位':'实施已批准部位的修复',icu?'根据批准方式完成送修交接或适配总成更换；收到认可车间的检查和修复记录后核对回装条件。':`依据作业卡处理 ${target}，逐项登记实际措施。`,[
+   icu?'记录活塞卡阻等已提交现象；积碳、划痕或磨损原因须由实际检验确认，不照搬历史案例。精密偶件不得用砂纸修磨。':air?'仅对确认异常的密封、阀件、滤器或接头实施对应修复；记录拆下件状态，不把双测点低压直接当作减压阀损坏。':'按照批准的连接修复、清洁、校准或换件方式处理，保留处理前后对照及独立验证方法。',
+   '清洁后是否可复用、是否需要换件，按厂家判据和批准范围决定；不能达标或缺少工艺条件时记录未完成并上报。',
+   '记录实装备件图号/序列号/数量及旧件去向；未更换、未实施和不适用项目如实填写。'
+  ],'提交实际修复措施、材料记录、厂家/车间检验单及剩余问题；区分已完成与拟采取措施。')
+ ]
+ return groupRepairSteps([...start,...middle,
+  step('复装连接并复核密封与防护','按适用作业卡恢复原连接、安装方向、支撑和防护，由另一人员复核关键连接。',[
+   '核对密封件适配、安装方向、接口清洁和线束标识，按厂家顺序与规定力矩装配并填写实际值及依据。',
+   '清点工具与拆下件，确认堵头已按要求移除、防护复位、泄漏监测和相关报警连接恢复。',
+   '按批准程序恢复介质并检查泄漏；复装或密封验证不合格时停止后续试验，保留隔离并回报。'
+  ],'记录接口复核、实际力矩及作业卡引用、工具清点、密封试验结果和复核人。'),
+  step('分阶段试验并核对原异常','取得试验许可，按本船与厂家程序恢复运行；由操作人员执行许可工况，维修人员记录同步结果。',[
+   icu?'对齐二缸喷射指令、流量活塞反馈、二缸与其余各缸排温及主机转速，记录原流量活塞报警或减速是否再现。':air?'记录现场阀前后压力、两个进口监测值及用气状态，核对调压稳定性、接头泄漏和原低压报警是否再现。':'对齐处理部位的独立测量、系统通道及运行工况，核对原异常和处理后变化。',
+   '记录试验时间、操作阶段、读数单位、判定依据和持续时长；负荷或工况不同的结果分别标注，不直接相互替代。',
+   '出现泄漏、动作异常、原报警再现或试验条件不足时停止相应试验并上报，不填写通过。'
+  ],'逐项记录试验条件、数据、原报警复现情况、判据、实际结果与未验证项。'),
+  step('整理作业记录并交接效果观察','将实际处理、用料和复测证据整理为本轮维修报告，明确后续复查对象。',[
+   '汇总批准范围与实际完成情况，列出新增发现、未完成项、临时措施及其责任人。',
+   '关联实际取得的照片、检验单、材料记录与试验数据；确定恢复运行状态和后续观察测点。',
+   '交接观察时段、需关注的原报警及异常再现时的报告安排，完成交接后提交轮机长处置。'
+  ],'填写实际措施、备件使用、复测结论、剩余事项、交接对象与后续观察要求。')])
+}
+
+export function presetRecheckSteps(event){
+ const work=[...event.tasks].reverse().find(t=>t.kind!=='investigation'&&t.status==='submitted')
+ const report=event.reports.findLast(r=>r.taskId===work?.id)
+ const result=[
+  step('核对维修记录与剩余事项',`对照《${report?.title||'本轮作业报告'}》核实实际处理：${report?.summary||work?.summary||'以已提交作业记录为准'}。`,['逐项核对实际处理部位、备件使用和试验记录，区分完成、未完成及不适用项目。','先列出报告中的剩余问题、缺少证据和限制条件，确定本次复查范围。'],'记录所依据的报告版本、已完成措施和待核实事项。'),
+  step('复核处理部位与系统恢复状态','在许可的检查条件下复核维修部位及恢复状态。',['核实连接、防护、密封与泄漏情况；只记录现场已检查的项目。','对未完成项目登记原因；需要拆卸或再次维修时先回报轮机长，不在复查中擅自扩大处理。'],'记录具体位置、方法、发现及未检查范围。'),
+  step('对齐修后数据与原异常','按本事件原异常测点核对处理后的采样与独立复测。',[`关注测点：${(event.brief.facts||[]).map(f=>f.label).join('、')}。`,'记录同刻转速、运行阶段及独立读数；在可比工况内比较，说明缺测或观察时长不足。','核对原报警是否再现及发生时刻；趋势改善本身不替代现场检查结论。'],'提交观察起止时间、测点/单位、工况、原报警复现情况及数据缺口。'),
+  step('汇总复查结果并提出处置建议','逐项登记发现异常、未见异常或无法确认，将证据交轮机长判断。',['将原异常、实际措施和复查结果逐项对应；明确剩余风险及后续观察要求。','有异常时说明建议处理部位；无异常时说明已验证范围，证据不足时保留未确认项。'],'提交复查结论、验证范围、实际附件及后续建议。')
+ ]
+ return result.map(s=>({...s,options:['发现异常','未见异常','无法确认']}))
+}
+
+export function upgradeAssignedRepair(event,build){
+ for(const task of event.tasks){
+  if(task.kind!=='repair'||task.status!=='assigned'||task.procedureVersion===repairProcedureVersion)continue
+  if(task.steps.length>3||!task.steps.some(s=>s.label==='实施本次批准的处理项目'))continue
+  // Preserve the original partially filled work card, never infer completion of new steps.
+  task.procedureHistory=[...(task.procedureHistory||[]),{at:new Date().toISOString(),steps:clone(task.steps),draft:clone(task.draft)}]
+  task.steps=build();task.draft={...task.draft,stepIndex:0,records:task.steps.map(s=>({label:s.label,result:'',note:''}))};task.procedureVersion=repairProcedureVersion
+ }
+}

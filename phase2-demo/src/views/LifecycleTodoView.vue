@@ -5,7 +5,7 @@
    <div class="lc-todo-copy"><p>{{summary}}</p><h3>执行优先级</h3><ol><li v-for="e in items.slice(0,3)" :key="e.id"><b>{{e.title}}</b>：{{nextStep(e)}}</li></ol><p v-if="!items.length">当前没有待处理事项。</p><h3>任务执行与提交进度</h3><p>{{progress}}</p><h3>负责人和时限</h3><p v-for="e in items.filter(e=>currentTask(e))" :key="e.id"><b>{{e.title}}</b>：{{currentTask(e).owner}}；安排时限 {{timeText(currentTask(e).deadline)}}。</p><p v-if="!items.some(e=>currentTask(e))">待轮机长明确排查范围、负责人和完成时间。</p></div>
   </details>
   <template v-for="group in groups" :key="group.title"><section v-if="group.items.length"><div class="p2-list-intro"><strong>{{group.title}}</strong><span>{{group.items.length}} 项</span></div><div class="p2-todo-grid">
-   <button v-for="e in group.items" :key="e.id" class="p2-todo-card" :class="{'is-priority':group.title==='优先处理'}" @click="open(e)"><div class="p2-card-top"><span class="p2-badge" :class="['报警事件','预警事件'].includes(e.type)?'red':'blue'">{{e.type}}</span><span class="p2-card-state"><i v-if="e.unread[store.state.role]" class="todo-unread-dot"/>{{e.status}}</span></div><small class="lc-event-number">{{e.number}}</small><strong>{{e.title}}</strong><p>{{e.reports.at(-1)?.summary||e.brief.conclusion}}</p><p class="todo-owner">负责人：{{pendingDecision(e)?people.captain:currentTask(e)?.owner}}</p><div class="p2-card-foot"><span>{{e.device}}</span><span>{{captain&&pendingDecision(e)?'查看并决策':'继续处理'}} →</span></div></button>
+   <button v-for="e in group.items" :key="e.id" class="p2-todo-card" :class="{'is-priority':group.title==='优先处理'}" @click="open(e)"><div class="p2-card-top"><span class="lc-todo-identity"><span class="p2-badge" :class="['报警事件','预警事件'].includes(e.type)?'red':'blue'">{{e.type}}</span><small class="lc-event-number">{{e.number}}</small></span><span class="p2-card-state"><i v-if="e.unread[store.state.role]" class="todo-unread-dot"/>{{e.status}}</span></div><strong>{{e.title}}</strong><p>{{e.reports.at(-1)?.summary||e.brief.conclusion}}</p><p class="todo-owner">负责人：{{pendingDecision(e)?people.captain:currentTask(e)?.owner}}</p><div class="p2-card-foot"><span>{{e.device}}</span><span>{{captain&&pendingDecision(e)?'查看并决策':'继续处理'}} →</span></div></button>
   </div></section></template>
   <p v-if="!filtered.length" class="p2-empty">当前没有符合条件的待办任务。已提交或闭环的事项可在事件中心回看。</p><div class="p2-list-jump"><button class="p2-secondary" @click="router.push('/issues')">查看事件与处置记录 →</button></div>
  </div></div>
@@ -58,3 +58,7 @@ function open(e){router.push({path:'/situation/issue/'+e.id,query:{from:'tasks'}
 </style>
 
 <style scoped>.lc-todo-copy{color:#657b95;font-size:14px;line-height:1.85}.lc-todo-copy h3{color:#344b65;font-size:15px;margin:14px 0 7px}.lc-todo-copy p{margin:7px 0}.lc-todo-copy ol{padding-left:24px}.p2-todo-card>p{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}.p2-todo-list{box-sizing:border-box;background:white;margin:12px;border-radius:8px;width:calc(100% - 24px)}</style>
+
+<style scoped>
+.p2-card-top{flex-wrap:wrap;gap:7px}.lc-todo-identity{display:inline-flex;align-items:center;gap:8px;min-width:0}.lc-todo-identity .p2-badge{flex:none}.lc-todo-identity .lc-event-number{display:inline;margin:0;font-size:11px;line-height:1.4;white-space:nowrap}.p2-card-top .p2-card-state{margin-left:auto;white-space:nowrap}
+</style>

@@ -3,11 +3,11 @@
   <header><button @click="goBack">← {{route.params.reportId?'返回全部报告':'返回首页报告'}}</button><span>{{report?.kind||'报告中心'}}</span></header>
   <article v-if="report"><LifecycleReport :report="report"/></article>
   <section v-else-if="!route.params.reportId" class="lc-report-library">
-   <div class="lc-library-heading"><div><h1>全部报告</h1><p>按事件归集排查、维修、维保与闭环报告，工况报告独立留存。</p></div><span>{{filtered.length}} 份报告</span></div>
+   <div class="lc-library-heading"><div><h1>全部报告</h1><p>按事件归集排查、维修、维保与闭环报告。</p></div><span>{{filtered.length}} 份报告</span></div>
    <div class="lc-report-filters"><nav aria-label="报告类型"><button v-for="name in kinds" :key="name" :class="{active:kind===name}" :aria-pressed="kind===name" @click="kind=name">{{name}}</button></nav><label><span>搜索报告</span><input v-model="search" type="search" placeholder="搜索事件名称或编号" aria-label="搜索事件名称或编号"/></label></div>
    <div class="lc-report-cards"><article v-for="r in filtered" :key="r.id" class="lc-report-card" role="link" tabindex="0" :aria-label="r.title" @click="open(r)" @keydown.enter.self="open(r)">
-    <div class="lc-report-card-meta"><span :class="'report-type-'+category(r)">{{r.kind}}</span><small>{{r.eventNumber||'全船工况'}}</small></div>
-    <h2>{{r.title}}</h2><p>{{r.summary}}</p><dl><dt>所属事件</dt><dd>{{r.eventId?store.state.events[r.eventId]?.title:'长航碧玉 · 航行与机舱运行记录'}}</dd><dt>负责人</dt><dd>{{r.owner}}</dd></dl>
+    <div class="lc-report-card-meta"><span :class="'report-type-'+category(r)">{{r.kind}}</span><small>{{r.eventNumber||'—'}}</small></div>
+    <h2>{{r.title}}</h2><p>{{r.summary}}</p><dl><dt>所属事件</dt><dd>{{store.state.events[r.eventId]?.title||'—'}}</dd><dt>负责人</dt><dd>{{r.owner}}</dd></dl>
     <footer><time>{{timeText(r.at)}}</time><button @click.stop="open(r)">查看详情 →</button></footer>
    </article></div>
    <div v-if="!filtered.length" class="lc-report-empty"><strong>没有符合条件的报告</strong><p>可调整报告类型，或输入事件名称、编号重新查找。</p><button @click="kind='全部';search=''">清除筛选</button></div>
@@ -19,16 +19,13 @@
 import {computed,ref} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
-import {useSensorStore} from '../stores/sensorStore'
-import {navigationChronology} from '../workflow/navigationChronology'
 import LifecycleReport from '../components/LifecycleReport.vue'
 import {timeText} from '../workflow/eventLifecycle'
-const route=useRoute(),router=useRouter(),store=useEventLifecycleStore(),sensors=useSensorStore()
-const kinds=['全部','工况','排查','维修','维保','闭环'],kind=ref(kinds.includes(route.query.kind)?route.query.kind:'全部'),search=ref(String(route.query.q||''))
-const dailyReport=computed(()=>({id:'navigation-24h',kind:'工况报告',owner:'AI运行记录汇总',summary:'按航行状态变化汇总过去24小时的主机、辅机运行与对应 AIS 航迹信息。',at:new Date(sensors.sampledAt).toISOString(),title:'长航碧玉 · 24小时工况态势报告',markdown:navigationChronology(sensors,Math.floor(sensors.sampledAt/3600000)*3600000).markdown}))
-const report=computed(()=>route.params.reportId==='navigation-24h'?dailyReport.value:store.reports.find(r=>r.id===route.params.reportId))
+const route=useRoute(),router=useRouter(),store=useEventLifecycleStore()
+const kinds=['全部','排查','维修','维保','闭环'],kind=ref(kinds.includes(route.query.kind)?route.query.kind:'全部'),search=ref(String(route.query.q||''))
+const report=computed(()=>store.reports.find(r=>r.id===route.params.reportId&&r.kind!=='工况报告'))
 const category=r=>kinds.find(k=>k!=='全部'&&r.kind.startsWith(k))||r.kind
-const filtered=computed(()=>[dailyReport.value,...store.reports].filter(r=>{
+const filtered=computed(()=>store.reports.filter(r=>r.kind!=='工况报告').filter(r=>{
  const text=[r.title,r.eventNumber,store.state.events[r.eventId]?.title].filter(Boolean).join(' ').toLocaleLowerCase()
  return (kind.value==='全部'||category(r)===kind.value)&&text.includes(search.value.trim().toLocaleLowerCase())
 }))

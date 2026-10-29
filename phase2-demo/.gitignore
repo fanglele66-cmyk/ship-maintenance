@@ -7,3 +7,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+.local-ai/
+wiki_rt-flex50/.obsidian/

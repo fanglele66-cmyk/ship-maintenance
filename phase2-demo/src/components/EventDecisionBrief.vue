@@ -3,7 +3,7 @@
     <div class="brief-origin"><span>{{ brief.discovery.label }}</span><time>{{ brief.discovery.at }}</time></div>
     <section class="brief-conclusion"><h3>{{ eventType==='异动跟踪'?'跟踪现象':'异常现象' }}</h3><p>{{ brief.discovery.text }}</p><p class="brief-judgement">{{ brief.conclusion }}</p></section>
     <slot name="before-decisions"/>
-    <div class="brief-decisions">
+    <div v-if="showDecisions" class="brief-decisions">
       <section><h3>决策要点</h3><p>{{ brief.captainDecision }}</p></section>
       <section><h3>派发依据</h3><p>{{ brief.dispatchReason }}</p></section>
     </div>
@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-defineProps({brief:{type:Object,required:true},eventType:{type:String,default:''}})
+defineProps({brief:{type:Object,required:true},eventType:{type:String,default:''},showDecisions:{type:Boolean,default:true}})
 </script>
 
 <style scoped>

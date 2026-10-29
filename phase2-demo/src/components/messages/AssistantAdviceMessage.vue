@@ -1,9 +1,7 @@
 <template>
  <section class="assistant-advice" :class="{'is-current-advice':message.currentAdvice,'is-streaming':streaming}" :data-streaming="streaming" aria-label="AI检修助手建议" aria-live="off" :aria-busy="streaming">
   <div class="assistant-advice-label"><span aria-hidden="true">✦</span>AI检修助手建议</div>
-  <p v-if="message.analysis" class="assistant-advice-analysis">{{visibleAnalysis}}</p>
-  <div v-if="visibleRecommendation" class="assistant-advice-next"><strong>建议您</strong><p>{{visibleRecommendation}}</p></div>
-  <details v-if="!streaming && (message.detailsMarkdown || message.basis?.length)" class="assistant-advice-basis">
+  <details v-if="!streaming && (message.detailsMarkdown || message.basis?.length)" class="assistant-advice-basis assistant-thinking">
    <summary><span>{{message.basisLabel||'分析依据'}}</span><span class="assistant-basis-chevron" aria-hidden="true">⌄</span></summary>
    <div class="assistant-basis-content">
     <MarkdownContent v-if="message.detailsMarkdown" :content="message.detailsMarkdown" />
@@ -11,6 +9,8 @@
     <p v-if="message.boundary" class="assistant-advice-boundary">{{message.boundary}}</p>
    </div>
   </details>
+  <p v-if="message.analysis" class="assistant-advice-analysis">{{visibleAnalysis}}</p>
+  <div v-if="visibleRecommendation" class="assistant-advice-next"><strong>建议您</strong><p>{{visibleRecommendation}}</p></div>
   <button v-if="!streaming && message.currentAdvice && !message.historical && message.actionLabel" type="button" class="assistant-advice-action" @click="$emit('action','workflow:focus')">{{message.actionLabel}} <span aria-hidden="true">↓</span></button>
  </section>
 </template>
@@ -55,3 +55,17 @@ onMounted(()=>{
 })
 onUnmounted(clearAnimation)
 </script>
+<style scoped>
+.assistant-advice .assistant-thinking{font-size:12px!important;line-height:1.65;color:#788391;margin:0 0 12px!important}
+.assistant-advice .assistant-thinking>summary{display:flex;align-items:center;gap:8px;justify-content:space-between;list-style:none;font-size:12px!important;font-weight:400;color:#788391;padding:5px 0!important;border:0!important;cursor:pointer}
+.assistant-thinking>summary::-webkit-details-marker{display:none}
+.assistant-thinking>summary:focus-visible{outline:2px solid #b7935a;outline-offset:3px}
+.assistant-thinking[open] .assistant-basis-chevron{transform:rotate(180deg)}
+.assistant-advice .assistant-thinking .assistant-basis-content{font-size:12px;line-height:1.65;color:#788391;border-left:1px solid #e1e5e9;padding-left:12px;margin:8px 0 10px}
+.assistant-advice .assistant-thinking :deep(.markdown-content){--wb-body:12px;font-size:12px!important;line-height:1.65;color:inherit}
+.assistant-advice .assistant-thinking :deep(.markdown-content :is(p,li,h2,h3,h4,h5,strong)),.assistant-thinking :is(dt,dd){font-size:12px!important;line-height:1.65!important;color:inherit}
+.assistant-thinking :deep(.markdown-content :is(h2,h3,h4,h5)){font-weight:500;margin:12px 0 5px!important}
+.assistant-thinking :deep(.markdown-content :is(p,ul)){margin:6px 0}
+.assistant-thinking :deep(.markdown-content li){margin:4px 0}
+.assistant-thinking :deep(.markdown-content strong){font-weight:500}
+</style>
