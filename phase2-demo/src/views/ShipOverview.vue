@@ -21,9 +21,9 @@
     </section>
    </div>
   </section>
-  <div class="captain-right" aria-label="24小时运行与风险处置">
+  <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
-    <ModuleHeader title="工况态势"><span class="analysis-window">近24小时 · AIS 航迹回放</span></ModuleHeader>
+    <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span></ModuleHeader>
     <div class="lc-home-chronology"><section v-for="period in chronology.periods" :key="period.start" class="lc-home-period"><time>{{period.time}}</time><strong class="lc-operation-status" :class="'operation-'+period.tone">{{period.status}}</strong><p>{{period.detail}}</p><p class="lc-ais-line">AIS · {{period.ais}}</p><small class="lc-ais-position">时段末位置 {{period.position}}</small></section></div>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
