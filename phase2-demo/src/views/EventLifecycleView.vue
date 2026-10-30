@@ -1,7 +1,7 @@
 <template>
  <div v-if="event&&allowed" class="lc-workspace">
   <main class="lc-main" :class="{'lc-repair-execution':repairExecution}">
-   <header class="lc-event-header"><div class="lc-title"><BackButton class="lc-back" label="返回列表" @click="router.push(route.query.from==='tasks'?'/event':'/issues')"/><div><small>{{event.type}} · {{event.device}} <span class="lc-event-number">{{event.number}}</span></small><h1>{{event.title}}</h1></div></div><div class="lc-header-facts"><button v-if="captain&&event.phase==='closed'" type="button" class="lc-shore-button" @click="assistant?.openShore()">同步岸基</button><span v-if="task">负责人 <b>{{task.owner}}</b></span><span v-if="task">要求完成 <b>{{timeText(task.deadline)}}</b></span><span class="lc-status">{{event.status}}</span></div></header>
+   <header class="lc-event-header"><div class="lc-title"><BackButton class="lc-back" label="返回列表" @click="router.push(route.query.from==='tasks'?{path:'/event',query:route.query.returnView?{view:route.query.returnView}:{}}:'/issues')"/><div><small>{{event.type}} · {{event.device}} <span class="lc-event-number">{{event.number}}</span></small><h1>{{event.title}}</h1></div></div><div class="lc-header-facts"><button v-if="captain&&event.phase==='closed'" type="button" class="lc-shore-button" @click="assistant?.openShore()">同步岸基</button><span v-if="task">负责人 <b>{{task.owner}}</b></span><span v-if="task">要求完成 <b>{{timeText(task.deadline)}}</b></span><span class="lc-status">{{event.status}}</span></div></header>
    <nav class="lc-stage-strip" aria-label="事件阶段"><button v-for="p in visiblePhases" :key="p.id" :class="{active:selected===p.id}" @click="choosePhase(p.id)"><span>{{p.kind==='reminder'&&event.tasks.length?'已派发 · ':''}}{{p.label}}</span><small v-if="p.taskId">{{event.tasks.find(t=>t.id===p.taskId)?.status==='assigned'?'执行中':'已提交'}}</small></button></nav>
    <nav v-if="tabs.length>1" class="lc-tabs" aria-label="阶段内容"><button v-for="t in tabs" :key="t" :class="{active:tab===t}" @click="tab=t">{{t}}</button></nav>
    <section class="lc-content" :class="{'lc-decision-content':['处置决策','效果观察'].includes(tab)}">
@@ -10,14 +10,14 @@
     <template v-else-if="tab==='效果观察'"><LifecycleEffectObservation v-if="observationTask" :event="event" :task="observationTask" :key="observationTask.id"/><LifecycleObservationAdvice v-if="isCurrent&&captain&&observationTask" :event="event" :task="observationTask" :phase-id="phase.id" :key="phase.id"/><section class="lc-decision" v-if="isCurrent&&captain"><LifecycleActionForm :event="event" @submitted="afterSubmit"/></section><p v-else class="lc-muted">{{isCurrent?'观察记录与作业报告已关联，等待轮机长处置。':'本轮观察与决定已留存，可通过阶段条回看后续安排。'}}</p></template>
     <LifecycleTaskPlan v-else-if="captain&&pendingTab&&tab===pendingTab" :event="event" @edit="assistant?.editTask()"/>
     <Phase2DataOverview v-else-if="tab==='数据观测'" :key="event.id" :scenario="event.id"/>
-    <template v-else-if="['排查步骤','复查步骤','维修方案','维保安排','维修步骤','维保步骤'].includes(tab)"><div class="lc-task-summary"><strong>第{{task?.round}}轮{{taskName(task)}}任务</strong><p>{{task?.scope}}</p><small>派发于 {{timeText(task?.assignedAt)}} · {{task?.status==='assigned'?'等待执行人员提交':'已提交报告'}}</small></div><div v-if="task?.sourceReportId" class="lc-plan-source">方案依据：{{event.reports.find(r=>r.id===task.sourceReportId)?.title}}<p>{{event.reports.find(r=>r.id===task.sourceReportId)?.summary}}</p></div><LifecycleTaskSteps v-if="!captain&&isCurrent&&task?.status==='assigned'" :event="event" :task="task" :key="task.id" @submitted="afterSubmit"/><template v-else><ol class="lc-step-list"><li v-for="(step,i) in task?.steps" :key="i"><span class="lc-step-number">{{i+1}}</span><div><h3>{{step.label}}</h3><LifecycleStepInstructions :step="step"/><p class="lc-muted" v-if="task?.status==='submitted'">结果：{{task.records[i]?.result}} {{task.records[i]?.note}}</p></div></li></ol><p v-if="task?.status==='assigned'" class="lc-muted">由 {{task.owner}} 执行并提交报告。轮机长可以查看步骤、安排和进度。</p></template></template>
+    <template v-else-if="['排查步骤','复查步骤','维修方案','维保安排','维修步骤','维保步骤'].includes(tab)"><div class="lc-task-summary"><strong>第{{task?.round}}轮{{taskName(task)}}任务</strong><p>{{task?.scope}}</p><small>派发于 {{timeText(task?.assignedAt)}} · {{task?.status==='assigned'?'等待执行人员提交':task?.status==='reporting'?'报告生成中':task?.status==='report-error'?'报告待生成':'已提交报告'}}</small></div><div v-if="task?.sourceReportId" class="lc-plan-source">方案依据：{{event.reports.find(r=>r.id===task.sourceReportId)?.title}}<p>{{event.reports.find(r=>r.id===task.sourceReportId)?.summary}}</p></div><div v-if="!captain&&isCurrent&&['assigned','reporting','report-error'].includes(task?.status)" class="lc-task-entry"><p>本次执行任务已独立建档，请进入任务页面填写本轮结果。</p><button class="lc-primary" @click="router.push('/tasks/'+task.id)">进入{{taskName(task)}}任务 →</button></div><template v-else><ol class="lc-step-list"><li v-for="(step,i) in task?.steps" :key="i"><span class="lc-step-number">{{i+1}}</span><div><h3>{{step.label}}</h3><LifecycleStepInstructions :step="step"/><p class="lc-muted" v-if="task?.status==='submitted'">结果：{{task.records[i]?.result}} {{task.records[i]?.note}}</p></div></li></ol><p v-if="task?.status==='assigned'" class="lc-muted">由 {{task.owner}} 执行并提交报告。轮机长可以查看步骤、安排和进度。</p></template></template>
     <LifecycleReport v-else-if="tab==='阶段报告'&&report" :report="report"/>
     <LifecycleEvidence v-else-if="tab==='证据资料'" :event="event"/>
     <template v-else-if="tab==='维保任务'"><h2>{{event.maintenance?.number}}</h2><dl class="lc-definition"><dt>负责人</dt><dd>{{event.maintenance?.owner}}</dd><dt>计划窗口</dt><dd>{{event.maintenance?.window}}</dd><dt>维保范围</dt><dd>{{event.maintenance?.scope}}</dd><dt>处理情况</dt><dd>{{maintenanceTask?.status==='submitted'?maintenanceTask.summary:'待执行人员提交维保作业报告'}}</dd></dl><LifecycleReport v-if="maintenanceReport" :report="maintenanceReport"/></template>
     <template v-else-if="tab==='闭环结果'"><h2>闭环归档</h2><p>{{event.closeReason}}</p><small>轮机长 {{people.captain}} · {{timeText(event.closedAt)}}</small><LifecycleReport v-if="closeReport" :report="closeReport"/></template>
    </section>
   </main>
-  <LifecycleAssistant ref="assistant" :event="event" @submitted="afterSubmit" @report="openReport" @plan="openPlan"/>
+  <LifecycleAssistant ref="assistant" :event="event" :historical="!isCurrent" @submitted="afterSubmit" @report="openReport" @plan="openPlan" @task="router.push('/tasks/'+$event)"/>
  </div>
  <main v-else class="lc-access"><h2>{{event?'此事件尚未分派给大管轮':'未找到该事件'}}</h2><p>当前身份仅展示本人参与的事件。可在右上角切换轮机长视角。</p><button @click="router.push('/event')">返回待办中心</button></main>
 </template>
@@ -33,7 +33,6 @@ import LifecycleActionForm from '../components/LifecycleActionForm.vue'
 import LifecycleAssistant from '../components/LifecycleAssistant.vue'
 import LifecycleReport from '../components/LifecycleReport.vue'
 import LifecycleEvidence from '../components/LifecycleEvidence.vue'
-import LifecycleTaskSteps from '../components/LifecycleTaskSteps.vue'
 import LifecycleEffectObservation from '../components/LifecycleEffectObservation.vue'
 import LifecycleObservationAdvice from '../components/LifecycleObservationAdvice.vue'
 import BackButton from '../components/BackButton.vue'
@@ -69,9 +68,10 @@ function openReport(id){const p=event.value.phases.find(p=>p.reportId===id);if(p
 function openPlan(){choosePhase(event.value.phases.at(-1).id);if(pendingTab.value)tab.value=pendingTab.value}
 watch(()=>event.value?taskPlanKey(event.value):'',()=>{if(event.value)void store.prepareTaskPlan(event.value.id).catch(()=>{})},{immediate:true})
 watch(tabs,list=>{if(!list.includes(tab.value))tab.value=list[0]||''})
-watch(()=>[event.value?.id,store.state.role],()=>{afterSubmit();if(route.query.report)openReport(route.query.report)},{immediate:true})
+function restorePhase(){afterSubmit();if(route.query.phase&&event.value)choosePhase(route.query.phase);if(route.query.report&&event.value)openReport(route.query.report)}
+watch(()=>[event.value?.id,store.state.role,route.query.phase,route.query.report],restorePhase,{immediate:true})
 watch(()=>event.value?.phases.at(-1)?.id,(id,previous)=>{if(id&&(!selected.value||selected.value===previous))choosePhase(id)})
-onActivated(()=>{afterSubmit();if(route.query.report)openReport(route.query.report)})
+onActivated(restorePhase)
 </script>
 
 <style scoped>.lc-shore-button{border:1px solid #dac8a8;border-radius:4px;padding:6px 10px;color:#96723e;background:#fffaf2;font:inherit;font-size:12px;cursor:pointer}</style>

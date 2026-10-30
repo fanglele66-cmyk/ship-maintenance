@@ -3,6 +3,7 @@
   <small class="model-caption">AI检修助手</small>
   <MarkdownContent v-if="message.text" :content="message.text"/>
   <small v-if="message.status==='streaming'" class="generation-status" role="status"><span class="generation-dot"/>{{message.progress?.label||'正在生成内容…'}}</small>
+  <section v-if="message.generatedReport" class="report-proposal"><strong>{{message.status==='complete'?'本轮报告':message.status==='streaming'?'本轮报告 · 生成中':'本轮报告 · 生成中断'}}</strong><MarkdownContent :content="generatedPreview(message.generatedReport)"/><button v-if="message.reportId" type="button" @click="$emit('report',message.reportId)">查看完整报告 →</button></section>
   <details v-if="message.progressLog?.length" class="processing-summary"><summary>分析摘要与处理进度</summary><ol><li v-for="(item,i) in message.progressLog" :key="i">{{item.label}}<p v-if="item.summary">{{item.summary}}</p></li></ol></details>
   <section v-if="message.taskDraft||message.taskChange" class="report-proposal task-change">
    <strong>{{message.taskChange?'待派任务已更新':message.status==='streaming'?'任务修改中':'任务修改中断'}}</strong>
@@ -30,6 +31,7 @@
 import MarkdownContent from './MarkdownContent.vue'
 import {computed} from 'vue'
 import {revisionAnalysis} from '../workflow/reportRevisions'
+import {generatedPreview} from '../workflow/generatedReport'
 const props=defineProps({message:{type:Object,required:true}})
 const reportContent=computed(()=>props.message.proposal||props.message.draft)
 const draftSections=computed(()=>[['evidence','证据与范围核对'],['interpretation','原因解释与措施判断'],['unverified','待核实事项'],['next','建议处置']].map(([key,label])=>({key,label,text:props.message.draft?.patch.analysis?.[key]})).filter(section=>section.text))

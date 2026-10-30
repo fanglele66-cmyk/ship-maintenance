@@ -6,6 +6,7 @@ const routes = [
   {path:'/real-cases',redirect:'/situation'},
   {path:'/reports/:reportId?',name:'LifecycleReport',component:()=>import('@/views/LifecycleReportView.vue'),meta:{title:'报告'}},
   {path:'/issues',name:'SituationIssues',component:()=>import('@/views/LifecycleListView.vue'),meta:{title:'事件中心'}},
+  {path:'/tasks/:taskId',name:'LifecycleTask',component:()=>import('@/views/LifecycleTaskView.vue'),meta:{title:'任务详情'}},
   {path:'/situation/issue/warning-history',redirect:'/issues'},
   {path:'/situation/issue/:attentionId(real-alarm-0430|real-warning-0523|real-tracking-exhaust-baseline|real-health-c4-baseline)',name:'EventLifecycle',component:()=>import('@/views/EventLifecycleView.vue'),meta:{title:'事件中心'}},
   {path:'/situation/issues',redirect:to=>({path:'/issues',query:to.query,hash:to.hash})},

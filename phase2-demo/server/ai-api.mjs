@@ -3,7 +3,7 @@ import {configStore,resolveProvider} from './ai-config.mjs'
 import {createKnowledge} from './knowledge.mjs'
 import {invokeModel,parseReportPatch} from './model.mjs'
 import {previewReportPatch,previewTaskPlan} from './report-preview.mjs'
-import {dispatchAction,lifecycleDecisionOptions} from '../src/workflow/lifecycleDecisions.js'
+import {dispatchAction,lifecycleDecisionOptions,hasAbnormalFindings} from '../src/workflow/lifecycleDecisions.js'
 import {normalizeTaskPlan} from '../src/workflow/taskPlanning.js'
 import {taskEditContract,applyTaskEditOperations} from '../src/workflow/taskEdits.js'
 
@@ -28,7 +28,9 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    if(busy>=2)return send(429,{error:'模型正在处理其他请求，请稍后重试。'})
    const text=input.text?.trim()
    if(!text||text.length>12000)return send(400,{error:'请输入 1—12000 字的问题或补充内容。'})
-   const revision=input.mode==='report',planning=input.mode==='plan',observing=input.mode==='observation',editing=planning&&input.planMode==='edit',report=input.report
+   const revision=input.mode==='report',generating=input.mode==='submit-report',structuredReport=revision||generating,planning=input.mode==='plan',observing=input.mode==='observation',editing=planning&&input.planMode==='edit',report=input.report
+   const submittedTask=input.event?.tasks?.find(t=>t.id===input.taskId)
+   if(generating&&(input.role!=='engineer'||!submittedTask||submittedTask.owner!==input.actor||submittedTask.status!=='reporting'||input.event.currentTask!==submittedTask.id||input.event.phase==='closed'||!['investigation','repair','maintenance'].includes(submittedTask.kind)||!submittedTask.summary?.trim()||!submittedTask.records?.length||submittedTask.records.length!==submittedTask.steps?.length||submittedTask.records.some((r,i)=>!submittedTask.steps[i].options?.includes(r.result))))return send(400,{error:'只能根据本人当前任务的完整执行反馈生成报告。'})
    if(observing&&(input.role!=='captain'||input.event?.phase!=='review'))return send(400,{error:'只有轮机长可以获取当前效果观察建议。'})
    if(planning&&(input.role!=='captain'||!input.event||!Array.isArray(input.event.tasks)||!dispatchAction(input.event)||input.plan?.action!==dispatchAction(input.event)))return send(400,{error:'当前阶段或身份不能修改待派任务。'})
    if(revision&&(input.role!=='engineer'||!report?.id||!report.taskId||!['排查报告','维修报告','维保作业报告'].includes(report.kind)||report.eventId!==input.event?.id||report.owner!==input.actor||input.event?.phase==='closed'))return send(400,{error:'只能补充本人已提交且尚未闭环的排查或作业报告。'})
@@ -43,11 +45,13 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    if(!config.enabled)return send(503,{error:'真实模型已停用，请联系管理员检查后台配置。'})
    const provider=await resolveProvider(config)
    if(streaming)emit('progress',{stage:'retrieval',label:config.knowledgeEnabled?'正在检索本地知识库':'正在整理已提交的事件资料'})
-   const sources=config.knowledgeEnabled?await knowledge.search(planning?[input.event.title,input.event.reports?.at(-1)?.summary,text].filter(Boolean).join(' '):text):[]
+   const sources=config.knowledgeEnabled?await knowledge.search(planning||generating?[input.event.title,generating?submittedTask.summary:input.event.reports?.at(-1)?.summary,text].filter(Boolean).join(' '):text):[]
    if(streaming){emit('meta',{sources});emit('progress',{stage:'evidence',label:`已整理事件资料${sources.length?'，检索到 '+sources.length+' 处参考资料':''}`,summary:input.event?.reports?.at(-1)?.summary?'最近报告：'+input.event.reports.at(-1).summary.slice(0,300):input.event?.brief?.discovery?.text||'将依据本次问题生成回答。'})}
-   const data={question:text,event:input.event?{title:input.event.title,phase:input.event.phase,number:input.event.number,brief:input.event.brief,reports:input.event.reports?.map(r=>({kind:r.kind,summary:r.summary,...(planning?{markdown:r.markdown}: {})})),tasks:input.event.tasks}:null,history:(input.history||[]).slice(-8),knowledge:sources.map(({id,file,title,startLine,endLine,text})=>({id,file,title,startLine,endLine,text})),...(revision?{report:{kind:report.kind,owner:report.owner,summary:report.summary,markdown:report.markdown}}: {}),...(planning?{pendingTask:input.plan,decision:dispatchAction(input.event),observations:input.observations}: {})}
-   const instruction=revision?system+`\n本次是报告修订。正文直接叙述事实和判断，不写“修订后结论”、内部 ID、重复的元数据或自我合规声明。结论控制在 300 字以内，每个分析小节控制在 250 字以内。将用户补充并入已有结论和分析，保留原事实和未确认项。矛盾内容明确记为待核实，不擅自消除。用户补充按“执行人补充”标明，知识只作参考。不要改动报告编号、人员、时刻、任务范围、逐项记录或报告类型。仅返回 JSON，不要代码围栏：{"summary":"修订后的完整原因或处理结论","analysis":{"evidence":"证据与范围核对","interpretation":"原因或措施解释","unverified":"待核实事项及冲突","next":"建议处置"}}。每个字段必须非空；只输出这五个文本字段，不增加字段。`:observing?system+'\n本次输出修后观察建议，严格执行本产品的两小时闭环建议规则：已满两小时、采样有效、指标平稳且无实际异常时直接推荐本轮闭环；未满两小时且数据良好、无异常时，提示等到本轮满两小时后推荐闭环；只有数据质量不足或实际异常、未完成项才建议补齐或复查。不要用缺正常基线、尚未验证高负荷或本轮范围外未维修的部件增加闭环条件，也不要再等待下一周期。建议闭环不等于自动闭环，最终由轮机长决定。仅用一段80—120字说明当前情况与下一步，不另列依据、待核实事项或长篇限制。':system+'\n回答时先给结论；有技术判断时附简短的“依据与待核实事项”。'
-   if(Array.isArray(input.event?.tasks))data.availableDecisions=lifecycleDecisionOptions(input.event)
+   const data={question:text,event:input.event?{title:input.event.title,tracking:input.event.tracking,phase:input.event.phase,number:input.event.number,brief:input.event.brief,reports:input.event.reports?.map(r=>({kind:r.kind,summary:r.summary,...(planning?{markdown:r.markdown}: {})})),tasks:input.event.tasks,...(input.event.taskContext?{taskContext:input.event.taskContext}:{})}:null,history:(input.history||[]).slice(-8),knowledge:sources.map(({id,file,title,startLine,endLine,text})=>({id,file,title,startLine,endLine,text})),...(revision?{report:{kind:report.kind,owner:report.owner,summary:report.summary,markdown:report.markdown}}: {}),...(planning?{pendingTask:input.plan,decision:dispatchAction(input.event),observations:input.observations}: {})}
+   const generationInstruction=system+'\n本次是执行人员提交后首次生成报告。只依据本次任务逐项结果、原始备注、汇总结论和所选维保计划整理，不套用历史结论、不补造检查。逐项记录、人员、时间、范围由系统固定保留。仅返回 JSON，顺序为 summary、analysis：{"summary":"本轮完整结论，300字以内","analysis":{"evidence":"本次记录与依据","interpretation":"原因或措施判断","unverified":"未完成及待核实事项，无则说明仅覆盖本轮范围","next":"根据可用决定给出建议"}}。五个文本字段均非空，每个分析字段250字以内。异动跟踪中现场与系统一致且信息已记录表示异动已核实，可建议选定计划和靠港时间提前维保；不将其归为未见异常，也不等同于部件已损坏。未完成的维保项目必须保留；汇报不等于自动闭环。'
+   const instruction=generating?generationInstruction:revision?system+`\n本次是报告修订。正文直接叙述事实和判断，不写“修订后结论”、内部 ID、重复的元数据或自我合规声明。结论控制在 300 字以内，每个分析小节控制在 250 字以内。将用户补充并入已有结论和分析，保留原事实和未确认项。矛盾内容明确记为待核实，不擅自消除。用户补充按“执行人补充”标明，知识只作参考。不要改动报告编号、人员、时刻、任务范围、逐项记录或报告类型。仅返回 JSON，不要代码围栏：{"summary":"修订后的完整原因或处理结论","analysis":{"evidence":"证据与范围核对","interpretation":"原因或措施解释","unverified":"待核实事项及冲突","next":"建议处置"}}。每个字段必须非空；只输出这五个文本字段，不增加字段。`:observing?system+'\n本次输出修后观察建议，严格执行本产品的两小时闭环建议规则：已满两小时、采样有效、指标平稳且无实际异常时直接推荐本轮闭环；未满两小时且数据良好、无异常时，提示等到本轮满两小时后推荐闭环；只有数据质量不足或实际异常、未完成项才建议补齐或复查。不要用缺正常基线、尚未验证高负荷或本轮范围外未维修的部件增加闭环条件，也不要再等待下一周期。建议闭环不等于自动闭环，最终由轮机长决定。仅用一段80—120字说明当前情况与下一步，不另列依据、待核实事项或长篇限制。':system+'\n回答时先给结论；有技术判断时附简短的“依据与待核实事项”。'
+   if(Array.isArray(input.event?.tasks))data.availableDecisions=input.event.taskContext?[]:lifecycleDecisionOptions(input.event)
+   if(generating)data.availableDecisions=lifecycleDecisionOptions({...input.event,phase:submittedTask.kind==='investigation'&&!(submittedTask.purpose==='recheck'&&!hasAbnormalFindings(submittedTask))?'decision':'review',tasks:input.event.tasks.map(t=>({...t,status:'submitted'}))})
    if(planning){
     data.event.brief={conclusion:input.event.brief?.conclusion,facts:input.event.brief?.facts,boundary:input.event.brief?.boundary}
     data.event.reports=data.event.reports.map((r,i)=>i>=data.event.reports.length-2?r:{kind:r.kind,summary:r.summary})
@@ -63,14 +67,14 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
     if(input.stream===true){
      emit('progress',{stage:'model',label:'资料已就绪，正在请求 AI 分析'})
      let firstText=true
-     onDelta=(delta,fullText)=>{if(firstText){emit('progress',{stage:'writing',label:planning?'正在逐步生成任务内容':revision?'正在逐步生成报告修订稿':'正在逐步生成回答'});firstText=false}emit(planning?'plan':revision?'report':'text',planning?{plan:previewTaskPlan(fullText)}:revision?{patch:previewReportPatch(fullText)}:{delta})}
+     onDelta=(delta,fullText)=>{if(firstText){emit('progress',{stage:'writing',label:planning?'正在逐步生成任务内容':generating?'正在逐步生成本轮报告':revision?'正在逐步生成报告修订稿':'正在逐步生成回答'});firstText=false}emit(planning?'plan':structuredReport?'report':'text',planning?{plan:previewTaskPlan(fullText)}:structuredReport?{patch:previewReportPatch(fullText)}:{delta})}
 
     }
     const modelConfig=planning?{...config,maxTokens:config.taskMaxTokens||8192,timeoutMs:config.taskTimeoutMs||180000}:config
-    const result=await invokeModel(provider,modelConfig,editing?editInstruction:planning?planInstruction+'\n正文不要出现 investigate、repair 等内部类型标识，也不重复说明未派发。':instruction+'\n讨论流程时以 availableDecisions 为当前可用决定；未见异常继续排查，有异常先维修，效果观察阶段决定闭环或复查。',JSON.stringify(data),fetcher,{onDelta,signal:controller.signal,onActivity:()=>{if(streaming)emit('progress',{stage:'analysis',label:'AI 已开始分析资料，正在形成结论'})}})
+    const result=await invokeModel(provider,modelConfig,editing?editInstruction:planning?planInstruction+'\n正文不要出现 investigate、repair 等内部类型标识，也不重复说明未派发。':instruction+(input.event?.taskContext?'\n当前是已派发任务的独立视图。只解释本任务范围、步骤和本任务报告；不提供事件处置表单，不改变任务，不引用其他轮次执行内容。':'\n讨论流程时以 availableDecisions 为当前可用决定；异动已核实可提前维保；未见异常继续排查，有部件异常先维修，效果观察阶段可决定闭环、复查或继续由系统观察。'),JSON.stringify(data),fetcher,{onDelta,signal:controller.signal,onActivity:()=>{if(streaming)emit('progress',{stage:'analysis',label:'AI 已开始分析资料，正在形成结论'})}})
     let plan,editResult
     if(planning){let value;try{value=JSON.parse(result.text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''))}catch{throw Error('待派任务格式不完整，请重新生成。')};if(editing){editResult=applyTaskEditOperations(input.plan,editContract,value.operations,input.plan.action);plan=editResult.plan}else plan=normalizeTaskPlan(value,input.plan.action)}
-    const output={...(planning?{plan,...editResult}:revision?{patch:parseReportPatch(result.text)}:{answer:result.text}),sources,model:result.model,usage:result.usage,provider:provider.name}
+    const output={...(planning?{plan,...editResult}:structuredReport?{patch:parseReportPatch(result.text)}:{answer:result.text}),sources,model:result.model,usage:result.usage,provider:provider.name}
     if(streaming){emit('done',output);return res.end()}
     return send(200,output)
    }finally{res.off?.('close',disconnect)}

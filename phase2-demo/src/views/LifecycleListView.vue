@@ -27,7 +27,7 @@
       <p v-if="item.continuation" class="continuation">{{item.continuation}}</p>
       <footer class="card-footer">
        <span class="event-time">{{item.firstObserved || '保留原事件记录'}}</span>
-       <div><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看待办</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'查看闭环结果':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
+       <div><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看任务</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'查看闭环结果':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
       </footer>
      </article>
     </div>
@@ -47,15 +47,15 @@ import FormSelect from '../components/forms/FormSelect.vue'
 import IssueFilterToolbar from '../components/IssueFilterToolbar.vue'
 const store=useEventLifecycleStore(),router=useRouter(),device=ref(''),type=ref(''),status=ref('')
 const history=historicalDecisions.filter(e=>!e.parentIssueId).map(e=>({...e,rank:1,summary:e.reason,eventState:'已闭环',firstObserved:e.at,reference:true}))
-const rows=computed(()=>[...store.events.map(e=>({...e,rank:['报警事件','预警事件','异动跟踪'].indexOf(e.type),summary:e.brief.conclusion,eventState:e.status,stage:stageNames[e.phase],taskOwner:currentTask(e)?.owner,progressNote:e.tasks.length?e.tasks.length+' 项关联任务 · '+e.tasks.filter(t=>t.status==='submitted').length+' 项已提交':'尚未建立人工执行任务',firstObserved:timeText(e.brief.discovery.at),actionTaskId:activeTask(e)?.id,continuation:['decision','review'].includes(e.phase)?'执行结果已回交，等待轮机长审阅报告并决定后续安排。':''})),...(store.state.role==='captain'?history:[])])
+const rows=computed(()=>[...store.events.map(e=>({...e,rank:['报警事件','预警事件','异动跟踪'].indexOf(e.type),summary:e.brief.conclusion,eventState:e.status,stage:stageNames[e.phase],taskOwner:currentTask(e)?.owner,progressNote:e.tasks.length?e.tasks.length+' 项关联任务 · '+e.tasks.filter(t=>t.status==='submitted').length+' 项已提交':'尚未建立人工执行任务',firstObserved:timeText(e.brief.discovery.at),actionTaskId:activeTask(e)?.id,continuation:e.phases.at(-1)?.observationWaiting?'系统持续观察中，本周期结束后再提醒轮机长确认。':['decision','review'].includes(e.phase)?'执行结果已回交，等待轮机长审阅报告并决定后续安排。':''})),...(store.state.role==='captain'?history:[])])
 const deviceOptions=computed(()=>[{value:'',label:'全部设备'},...[...new Set(rows.value.map(e=>e.device))].map(value=>({value,label:value}))])
 const typeOptions=[{value:'',label:'全部类型'},...['报警事件','预警事件','异动跟踪'].map(value=>({value,label:value}))]
-const eventStatusOptions=[{value:'',label:'全部事件状态'},...['待决策','排查中','待处置决策','维修中','维保执行中','待结果处置','已闭环'].map(value=>({value,label:value}))]
+const eventStatusOptions=[{value:'',label:'全部事件状态'},...['待决策','排查中','待处置决策','维修中','维保执行中','待结果处置','效果观察中','待观察确认','已闭环'].map(value=>({value,label:value}))]
 const filtered=computed(()=>rows.value.filter(e=>(!device.value||e.device===device.value)&&(!type.value||e.type===type.value)&&(!status.value||e.eventState===status.value))),visible=filtered
 const closedCount=computed(()=>rows.value.filter(e=>e.eventState==='已闭环').length),hasFilters=computed(()=>Boolean(device.value||type.value||status.value))
 function clearFilters(){device.value='';type.value='';status.value=''}
 function open(e){router.push({path:'/situation/issue/'+e.id,query:{from:'issues'}})}
-function openTask(e){router.push({path:'/situation/issue/'+e.id,query:{from:'tasks'}})}
+function openTask(e){router.push({path:'/tasks/'+e.actionTaskId})}
 </script>
 <style scoped>
 .issues-page{height:100%;width:100%;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;padding:22px 24px 16px;background:#f3f5f8;box-sizing:border-box;overflow:hidden}

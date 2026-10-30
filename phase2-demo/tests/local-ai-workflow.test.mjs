@@ -50,6 +50,18 @@ test('config is stored locally and public response excludes key',async()=>{
  const root=await mkdtemp(join(tmpdir(),'engine-config-'))
  try{const store=configStore(root);await store.write({source:'manual',model:'demo',baseUrl:'https://example.test',apiKey:'private-key'});assert.equal((await store.read()).apiKey,'private-key');assert.equal(publicProvider(await store.read()).apiKey,undefined);await assert.rejects(store.write({timeoutMs:1}),/超出范围/)}finally{await rm(root,{recursive:true,force:true})}
 })
+
+test('task-scoped chat reaches the model with only its supplied task context and no event decision actions',async()=>{
+ let sent,code,result
+ const configuration={read:async()=>({source:'manual',baseUrl:'https://example.test',apiKey:'test-key',model:'test',protocol:'anthropic',maxTokens:1000,timeoutMs:5000,enabled:true,knowledgeEnabled:false})}
+ const handler=createAiHandler(process.cwd(),{configuration,fetcher:async(url,options)=>{sent=JSON.parse(options.body);return {ok:true,json:async()=>({content:[{type:'text',text:'请核对本次任务记录。'}],usage:{input_tokens:10,output_tokens:10}})}}})
+ const req=Readable.from([Buffer.from(JSON.stringify({text:'本次任务需要注意什么？',role:'engineer',mode:'chat',event:{id:'task-event',phase:'review',currentTask:'task-one',tasks:[{id:'task-one',status:'submitted',scope:'本轮范围'}],reports:[],taskContext:{title:'本轮排查',scope:'本轮范围'}}}))])
+ Object.assign(req,{url:'/api/ai/chat',method:'POST',socket:{remoteAddress:'127.0.0.1'},headers:{host:'localhost:5173','x-engine-room-client':'local-ui'}})
+ await handler(req,{set statusCode(v){code=v},setHeader(){},end(text){result=JSON.parse(text)}},()=>assert.fail())
+ assert.equal(code,200);assert.match(sent.system,/已派发任务的独立视图/);assert.match(result.answer,/本次任务/)
+ const data=JSON.parse(sent.messages.at(-1).content)
+ assert.deepEqual(data.availableDecisions,[]);assert.deepEqual(data.event.tasks.map(t=>t.id),['task-one']);assert.equal(data.event.taskContext.scope,'本轮范围')
+})
 test('knowledge retrieval retains exact document line provenance without reading images',async()=>{
  const root=await mkdtemp(join(tmpdir(),'engine-kb-'))
  try{await writeFile(join(root,'ICU.md'),'# 喷射控制单元ICU\n\n伺服油液压活塞卡滞需要检查反馈。');await writeFile(join(root,'image.jpg'),'not text');const kb=createKnowledge(root);assert.equal((await kb.status()).documents,1);const sources=await kb.search('ICU伺服油活塞');assert.equal(sources[0].file,'ICU.md');assert.equal(sources[0].startLine,1);assert.ok(sources[0].text.includes('卡滞'))}finally{await rm(root,{recursive:true,force:true})}

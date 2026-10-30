@@ -22,7 +22,7 @@ for(const results of [['未见异常','未见异常'],['无法确认','未见异
  assert.deepEqual(decisionOptions(event).map(o=>o.value),['investigate','shore']);assert.equal(ensureTaskPlan(event).steps.length,0)
  assert.throws(()=>dispatch(state,'repair'),/当前阶段/);assert.throws(()=>dispatch(state,'investigate'),/尚未生成/)
  const plan=accept(state);assert.notDeepEqual(plan.steps,first.steps);dispatch(state,'investigate')
- assert.equal(currentTask(event).round,2);assert.equal(currentTask(event).sourceReportId,report.id);assert.deepEqual(event.tasks[0],first);assert.deepEqual(event.reports[0],report)
+ assert.equal(currentTask(event).round,2);assert.equal(currentTask(event).sourceReportId,report.id);assert.deepEqual({...event.tasks[0],goalStatus:first.goalStatus,reviewedAt:undefined},{...first,reviewedAt:undefined});assert.equal(event.tasks[0].goalStatus,results.includes('无法确认')?'unresolved':'completed');assert.deepEqual(event.reports[0],report)
 })
 test('one abnormal finding wins over normal and unknown findings and forbids repeat investigation',()=>{
  for(const other of ['未见异常','无法确认']){
@@ -30,11 +30,11 @@ test('one abnormal finding wins over normal and unknown findings and forbids rep
   assert.deepEqual(decisionOptions(event).map(o=>o.value),['repair','shore']);assert.equal(ensureTaskPlan(event).action,'repair');assert.throws(()=>dispatch(state,'investigate'),/当前阶段/);dispatch(state,'repair');assert.equal(currentTask(event).kind,'repair')
  }
 })
-test('effect observation offers only closure or recheck; normal recheck returns to observation',()=>{
+test('effect observation offers closure, recheck or continued observation; normal recheck returns to observation',()=>{
  const state=createLifecycleState();dispatch(state,'investigate');submit(state);dispatch(state,'repair');submit(state);const event=state.events[id],repair=currentTask(event)
- assert.deepEqual(decisionOptions(event).map(o=>o.value),['close','recheck','shore']);assert.equal(ensureTaskPlan(event).action,'recheck');assert.throws(()=>dispatch(state,'recheck'),/尚未生成/)
+ assert.deepEqual(decisionOptions(event).map(o=>o.value),['close','recheck','observe','shore']);assert.equal(ensureTaskPlan(event).action,'recheck');assert.throws(()=>dispatch(state,'recheck'),/尚未生成/)
  accept(state);dispatch(state,'recheck');assert.equal(currentTask(event).purpose,'recheck');assert.ok(repair.observationEndedAt)
- submit(state,['未见异常']);assert.equal(event.phase,'review');assert.deepEqual(decisionOptions(event).map(o=>o.value),['close','recheck','shore'])
+ submit(state,['未见异常']);assert.equal(event.phase,'review');assert.deepEqual(decisionOptions(event).map(o=>o.value),['close','recheck','observe','shore'])
  state.role='captain';decide(state,id,{action:'close',reason:'结合复查和观察记录确认闭环。'});assert.equal(event.phase,'closed');assert.equal(ensureTaskPlan(event),null)
 })
 test('a recheck with an abnormal result returns to repair',()=>{

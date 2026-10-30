@@ -30,7 +30,7 @@ export function closureContent(event,action,reason,at,captain){
  const reports=event.reports.filter(r=>r.kind!=='闭环报告'&&Date.parse(r.at)<=Date.parse(at))
  const facts=(event.brief.facts||[]).map(f=>`- **${f.label}**：${f.value} ${f.unit||''}（${date(f.at)}）。${f.meaning||''}`).join('\n')
  const sources=(event.brief.sources||[]).map(s=>`- ${s.title} · ${s.date||'时段未记录'}：${s.summary||''}`).join('\n')
- const timeline=[...event.decisions.filter(d=>Date.parse(d.at)<=Date.parse(at)).map(d=>({at:d.at,text:`${({investigate:'派发排查',repair:'派发维修',maintenance:'安排维保',recheck:'派发复查',shore:'同步岸基',close:'确认闭环',false:'确认误报'})[d.action]||d.action} · ${d.owner}：${d.reason}`})),...tasks.map(t=>({at:t.submittedAt,text:`${t.owner}提交${taskTitle(t)}报告。`}))]
+ const timeline=[...event.decisions.filter(d=>Date.parse(d.at)<=Date.parse(at)).map(d=>({at:d.at,text:`${({investigate:'派发排查',repair:'派发维修',maintenance:'安排维保',recheck:'派发复查',observe:'进入效果观察',shore:'同步岸基',close:'确认闭环',false:'确认误报'})[d.action]||d.action} · ${d.owner}：${d.reason}`})),...tasks.map(t=>({at:t.submittedAt,text:`${t.owner}提交${taskTitle(t)}报告。`}))]
  if(!timeline.some(t=>t.at===at&&/确认闭环|确认误报/.test(t.text)))timeline.push({at,text:`${captain}${action==='false'?'确认误报':'确认闭环'}：${reason}`})
  timeline.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at))
  const analysisMarkdown=`### 原因、措施与效果的对应关系\n\n${investigations.length?'原因判断以各轮排查报告及执行人补充为据，逐项核查结果与未确认项见下文。':'未提交现场排查报告，原因核实以轮机长说明为限。'}${work.length?'实际维修仅采用已提交作业记录，计划中的步骤不视为已完成。':'未提交维修或维保作业报告，不记为已维修。'}\n\n${rechecks.length?'复查结果、未完成项和观察数据一并保留。':'尚无独立复查报告，效果证据范围以实际保存的复测与观察为限。'}`
@@ -65,7 +65,7 @@ ${investigations.map(t=>taskSection(event,t)).join('\n\n')||'本事件未提交�
 ## 四、维修措施、备件与作业记录
 
 ${work.map(t=>taskSection(event,t)).join('\n\n')||'本事件未提交维修或维保作业报告。'}
-${event.maintenance?'\n关联工单：'+event.maintenance.number+'；计划窗口：'+event.maintenance.window+'；负责人：'+event.maintenance.owner+'。\n':''}
+${event.maintenance?'\n维保计划：'+event.maintenance.number+'；计划窗口：'+event.maintenance.window+'；负责人：'+event.maintenance.owner+'。\n':''}
 ## 五、维修后的效果观察与复查反馈
 
 ${work.map(t=>observationSection(t,at)).join('\n\n')||'未发生维修后观察。'}

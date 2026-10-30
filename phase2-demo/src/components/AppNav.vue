@@ -23,8 +23,8 @@
           v-if="item.path === '/event' && totalUnread > 0"
           class="nav-badge"
           :class="{ 'nav-badge-pulse': recentlyBumpedTotal }"
-          :title="`${totalUnread} 项待办未查看`"
-          :aria-label="`${totalUnread} 项待办未查看`"
+          :title="`${totalUnread} 项待办待处理`"
+          :aria-label="`${totalUnread} 项待办待处理`"
         ></span>
       </router-link>
     </div>
@@ -47,6 +47,7 @@ const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.total
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {
+  if(route.path.startsWith('/tasks/'))return path==='/event'
   const detail=route.path.startsWith('/situation/issue/')
   if(detail){if(route.query.from==='tasks')return path==='/event';if(route.query.from==='workbench')return path==='/situation';return path==='/issues'}
   if(route.path.startsWith('/reports'))return path==='/situation'

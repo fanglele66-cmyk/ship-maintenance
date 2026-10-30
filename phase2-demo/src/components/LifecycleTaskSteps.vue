@@ -33,7 +33,7 @@ const repair=computed(()=>['repair','maintenance'].includes(props.task.kind))
 function go(i){error.value='';index.value=i}
 function next(){if(!record.value.result){error.value='请选择本步骤的实际结果。';return}go(index.value+1)}
 function review(){const missing=props.task.draft.records.findIndex(r=>!r.result);if(missing>=0){go(missing);error.value='请先选择本步骤的实际结果，备注可以不填。'}else go(props.task.steps.length)}
-function submit(){try{store.submit(props.event.id);emit('submitted')}catch(e){error.value=e.message}}
+async function submit(){try{await store.submit(props.event.id,props.task.id);emit('submitted')}catch(e){error.value=e.message}}
 </script>
 <style scoped>
 .lc-procedure-history{font-size:12px;background:#faf8f3;padding:12px;margin-bottom:14px;color:#8d744e}.lc-procedure-history summary{cursor:pointer}

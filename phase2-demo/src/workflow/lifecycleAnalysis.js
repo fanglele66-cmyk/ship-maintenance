@@ -1,6 +1,6 @@
 // User-facing evidence summaries. These describe source records and submitted
 // findings; they do not claim access to hidden model reasoning or new readings.
-import {hasAbnormalFindings} from './lifecycleDecisions.js'
+import {hasAbnormalFindings,confirmedTracking} from './lifecycleDecisions.js'
 const context = {
  'real-alarm-0430': {
   comparison:'先对齐 23:27 的排温偏差、SLOW DOWN 与 23:33 的二缸流量活塞报警。二缸排温和其他气缸应使用同一采样时刻，并保留重新启动的工况背景。',
@@ -46,7 +46,7 @@ function findings(task){
 export function reportAnalysis(event,task){
  const c=context[event.id],f=findings(task),isCheck=task.kind==='investigation',text=evidenceText(task)
  const scope=isCheck
-  ? (f.abnormal.length?`现场结果中 ${f.abnormal.length} 项登记异常或持续偏离：${f.abnormal.map(r=>r.label+'（'+r.result+'）').join('；')}。`:'本轮未在逐项结果中登记明确异常部件，结论需结合实际备注与已检查范围审阅。')
+  ? (confirmedTracking(event,task)?'本轮现场与系统一致、背景信息已记录，支持异动成立；具体部件原因仍以检查证据为准。':f.abnormal.length?`现场结果中 ${f.abnormal.length} 项登记异常或持续偏离：${f.abnormal.map(r=>r.label+'（'+r.result+'）').join('；')}。`:'本轮未在逐项结果中登记明确异常部件，结论需结合实际备注与已检查范围审阅。')
   : `本轮 ${f.records.length} 项作业中，${f.records.filter(r=>r.result==='已完成').length} 项已完成，${f.records.filter(r=>r.result==='未完成').length} 项未完成，${f.records.filter(r=>r.result==='不适用').length} 项不适用。逐项完成状态与总结果一起作为回交依据。`
  const interpretation=isCheck?(c?.match.test(text)?c.interpretation:c?.branches):`将本轮措施与批准范围逐项对应，再核对复测条件和剩余问题。${c?.retest||''}“已完成”表示该项工作被登记完成，设备恢复与闭环仍需轮机长结合复测记录确认。`
  const missing=nonempty([
@@ -54,11 +54,12 @@ export function reportAnalysis(event,task){
   f.unnoted.length?`以下异常项未填写单项备注：${f.unnoted.map(r=>r.label).join('、')}。应从总论或附件确认具体部位与检查依据，派发维修前核清具体部位，未核准部分不得施工。`:'',
   task.attachments?.length?`本轮关联 ${task.attachments.length} 份附件，按文件名保留索引；附件有效性由审阅人核对。`:'本轮未关联附件；分析依据为已提交的文字记录，未增加未上传的照片或检测读数。'
  ])
- const next=isCheck?(f.abnormal.length?'本轮已登记异常，优先派发维修。维修前核对异常具体部位、隔离条件与批准范围，未定位的部件不随同换件。':task.purpose==='recheck'?'本轮复查未登记异常，结合处理后观察和复测依据决定闭环；仍有待核实事项时再次复查。':'本轮未登记异常，继续排查。AI 依据本轮已核实范围、排除项和剩余资料缺口预生成下一轮任务，避免重复相同检查。'):'对照本轮实际措施、处理后采样和现场复测，决定闭环或派发复查。未完成项与异常再现情况应纳入复查范围。'
+ const next=isCheck?(confirmedTracking(event,task)?'异动已核实，可选择适用维保计划和靠港时间，派发提前维保任务。':f.abnormal.length?'本轮已登记异常，优先派发维修。维修前核对异常具体部位、隔离条件与批准范围，未定位的部件不随同换件。':task.purpose==='recheck'?'本轮复查未登记异常，结合处理后观察和复测依据决定闭环；仍有待核实事项时再次复查。':'本轮未登记异常，继续排查。AI 依据本轮已核实范围、排除项和剩余资料缺口预生成下一轮任务，避免重复相同检查。'):'对照本轮实际措施、处理后采样和现场复测，决定闭环或派发复查。未完成项与异常再现情况应纳入复查范围。'
  return `### 证据与范围核对\n\n${scope}\n\n### ${isCheck?'原因解释与检查方向':'措施对应与复测判断'}\n\n${interpretation}\n\n### 待核实事项\n\n${missing}\n\n### 建议处置\n\n${next}`
 }
 export function reportAnalysisSummary(event,task){
  const f=findings(task)
+ if(confirmedTracking(event,task))return `本轮现场核实支持异动成立。${task.summary} 可选择维保计划和靠港时间安排提前维保。`
  if(task.kind==='investigation')return `本轮排查已回交${f.records.length}项结果，${f.abnormal.length}项登记异常或持续偏离${f.unknown.length?'，'+f.unknown.length+'项仍待核实':''}。${task.summary} 建议对照具体检查依据确认下一步范围。`
  return `本轮已提交${f.records.filter(r=>r.result==='已完成').length}/${f.records.length}项完成记录。${task.summary} ${f.unknown.length?'仍有未完成项目，请明确接续安排。':'请核对复测条件、剩余事项及设备安全影响后决定闭环。'}`
 }
@@ -69,6 +70,7 @@ const briefChecks={
  'real-health-c4-baseline':'对照端子连接、独立校验和调整履历，区分测温链路问题与真实燃烧变化。'
 }
 export function decisionAnalysisItems(event,task,report){
+ if(confirmedTracking(event,task))return [{label:'异动已核实',text:'本轮现场与系统一致，背景信息已记录，支持异动成立。可选择适用维保计划和靠港时间提前执行；具体部件原因仍以现场检查为准。'},{label:'本轮提交结论',text:task.summary}]
  if(!report?.analysisMarkdown)return [{label:'本轮判断',text:report?.analysis||event.brief.conclusion}]
  return report.analysisMarkdown.split(/(?:^|\n)### /).filter(Boolean).map(section=>{
   const [label,...lines]=section.split('\n');return {label,text:lines.filter(Boolean).join(' ')}
@@ -84,11 +86,11 @@ export function decisionBasis(event,action){
  const points={
   investigate:`${check} 针对剩余缺口安排补查，指定负责人和回交时限。`,
   repair:'按排查确认的具体部位批准维修，明确隔离、材料和复测要求；未定位的部件不随同换件。',
-  maintenance:'将已确认的检查和处理范围关联到维保工单，落实负责人、靠港窗口及复测要求。',
+  maintenance:'选择适用维保计划和靠港检修窗口，提前派发给轮机员按计划执行，汇报后审阅闭环。',
   shore:'明确需要岸基提供的技术、备件或计划支持，附上关联报告及船上当前措施。',
   close:'核对原因、实际措施和复测结果是否对应，说明设备安全影响及后续监测安排。',
   recheck:'根据维修结果、剩余事项和处理后趋势复查，记录原异常是否再现；复查任务可提前审阅并通过对话修改。'
- }[action]||(event.phase==='review'?'对照作业报告、处理后采样与现场复测，确认原异常是否再现，决定闭环或派发复查。':hasAbnormalFindings(task)?'本轮已有异常，先维修。请审阅待派发维修任务，确认处理对象、隔离与复测要求。':'本轮未登记异常，继续排查。AI 根据已排除的问题点和剩余线索预生成后续任务，审阅后再派发。')
+ }[action]||(event.phase==='review'?'对照作业报告、处理后采样与现场复测，确认原异常是否再现，决定闭环或派发复查。':confirmedTracking(event,task)?'异动已核实，可提前维保。选择适用维保计划、靠港检修时间与执行人，汇报后由轮机长审阅闭环。':hasAbnormalFindings(task)?'本轮已有异常，先维修。请审阅待派发维修任务，确认处理对象、隔离与复测要求。':'本轮未登记异常，继续排查。AI 根据已排除的问题点和剩余线索预生成后续任务，审阅后再派发。')
  return {points,reason:source}
 }
 function timestamp(value){

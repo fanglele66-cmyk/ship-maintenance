@@ -1,20 +1,25 @@
 import {defineStore} from 'pinia'
 import {reactive,computed,watch} from 'vue'
-import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,submitTask,askAssistant,people,refreshLifecyclePresentation,ensureTaskPlan} from '../workflow/eventLifecycle.js'
+import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,askAssistant,people,refreshLifecyclePresentation,ensureTaskPlan} from '../workflow/eventLifecycle.js'
 import {useSensorStore} from './sensorStore'
 import {syncLifecycleObservations} from '../workflow/lifecycleObservation.js'
 import {aiStreamRequest} from '../services/aiClient'
 import {supplementaryReports,applyReportSupplement} from '../workflow/reportRevisions'
 import {acceptTaskPlan} from '../workflow/taskPlanning.js'
 import {updateObservationAdvice} from '../workflow/observationAdvice.js'
+import {lifecycleWorkItems,lifecycleNotifications,canViewTask,taskConversation,taskTitle} from '../workflow/lifecycleWorkItems.js'
+import {generateTaskReport,recoverTaskReportGeneration} from '../workflow/taskReportGeneration.js'
 const storageKey='engine-room-captain-workflow-v1',roleKey='engine-room-current-role'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
+ let reportSession=crypto.randomUUID();try{reportSession=sessionStorage.getItem('engine-room-report-session')||reportSession;sessionStorage.setItem('engine-room-report-session',reportSession)}catch{}
  let initial=createLifecycleState()
  try{const saved=JSON.parse(localStorage.getItem(storageKey));if(saved?.version===1&&Object.keys(initial.events).every(id=>saved.events?.[id]))initial=saved;const role=sessionStorage.getItem(roleKey);if(['captain','engineer'].includes(role))initial.role=role}catch{}
  refreshLifecyclePresentation(initial)
+ recoverTaskReportGeneration(initial,reportSession)
  for(const event of Object.values(initial.events))for(const messages of Object.values(event.conversations))for(const message of messages)if(message.status==='streaming'){
   message.status='interrupted';message.text='';message.modelError='上次生成已中断，请重新发送。原报告未修改。'
  }
+ for(const event of Object.values(initial.events))for(const task of event.tasks)for(const messages of Object.values(task.conversations||{}))for(const message of messages)if(message.status==='streaming'&&(!message.generatedReport||task.status!=='reporting')){message.status='interrupted';message.modelError='上次生成已中断，请重新发送。原报告未修改。';delete message.draft}
  initial.notices||=[];initial.role||='captain'
  for(const event of Object.values(initial.events))if(['generating','updating'].includes(event.pendingPlan?.status))event.pendingPlan.status=event.pendingPlan.source==='preset'?'pending':event.pendingPlan.steps?.length?'ready':'pending'
  const state=reactive(initial)
@@ -32,14 +37,15 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   }catch{}
  })
  const events=computed(()=>visibleEvents(state)),pending=computed(()=>events.value.filter(pendingDecision)),tasks=computed(()=>events.value.filter(e=>activeTask(e))),reports=computed(()=>events.value.flatMap(e=>e.reports).sort((a,b)=>b.at.localeCompare(a.at)))
- const unread=computed(()=>events.value.filter(e=>e.unread[state.role]).length)
+ const workItems=computed(()=>lifecycleWorkItems(state)),notifications=computed(()=>lifecycleNotifications(state))
+ const unread=computed(()=>workItems.value.pending.length)
  const notices=computed(()=>state.notices.filter(n=>n.recipient===state.role&&!n.read))
  function setRole(role){if(['captain','engineer'].includes(role)){state.role=role;try{sessionStorage.setItem(roleKey,role)}catch{}}}
  function markRead(id){if(state.events[id])state.events[id].unread[state.role]=false}
  function acknowledge(id){markRead(id);state.notices.filter(n=>n.eventId===id&&n.recipient===state.role).forEach(n=>n.read=true)}
  const pendingRequests=reactive({})
  const planRequests=new Map()
- function modelEvent(event){return {id:event.id,title:event.title,phase:event.phase,currentTask:event.currentTask,number:event.number,brief:event.brief,reports:event.reports.map(r=>({id:r.id,kind:r.kind,summary:r.summary,markdown:r.markdown})),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records}))}}
+ function modelEvent(event){return {id:event.id,title:event.title,tracking:event.tracking,phase:event.phase,currentTask:event.currentTask,number:event.number,brief:event.brief,reports:event.reports.map(r=>({id:r.id,kind:r.kind,summary:r.summary,markdown:r.markdown})),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance}))}}
  function prepareTaskPlan(id,{retry=false,editText='',onProgress}={}){
   const event=state.events[id],draft=event&&ensureTaskPlan(event)
   if(!draft)return Promise.resolve(null)
@@ -87,18 +93,21 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   }catch(error){const m=reply();if(m){m.status='interrupted';m.modelError=error.message+(error.message.includes('原待派任务未修改')?'':' 原待派任务未修改。');delete m.taskDraft}}
   finally{delete pendingRequests[key]}
  }
- async function ask(id,text,{mode='chat',reportId}={}){
+ async function ask(id,text,{mode='chat',reportId,taskId}={}){
+  if(taskId&&mode==='plan')throw Error('任务已派发，不能在执行页面修改派发范围。')
   if(mode==='plan')return askPlan(id,text)
-  const event=state.events[id],role=state.role,key=id+':'+role
+  const event=state.events[id],role=state.role,key=id+':'+role+(taskId?':'+taskId:'')
   if(!event||pendingRequests[key]||!text.trim())return
   if(role!=='captain'&&!event.participants.includes(people.engineer))throw Error('当前身份无权访问该事件。')
-  const editable=supplementaryReports(event,role),report=editable.find(r=>r.id===reportId)||editable.at(-1)
+  const task=taskId?event.tasks.find(t=>t.id===taskId):null
+  if(taskId&&!canViewTask(role,task))throw Error('当前身份无权访问该任务。')
+  const editable=supplementaryReports(event,role).filter(r=>!taskId||r.taskId===taskId),report=editable.find(r=>r.id===reportId)||editable.at(-1)
   if(mode==='report'&&!report)throw Error('没有可补充的本人已提交报告。')
-  const at=new Date().toISOString(),requestId='chat-'+crypto.randomUUID(),conversation=event.conversations[role]
+  const at=new Date().toISOString(),requestId='chat-'+crypto.randomUUID(),conversation=task?taskConversation(task,role):event.conversations[role]
   conversation.push({id:requestId,kind:'user',text:text.trim(),at})
   const baseMarkdown=report?.markdown
   const history=conversation.slice(-9,-1).map(m=>({role:m.kind==='user'?'user':'assistant',text:m.text||m.analysis||''}))
-  const replyId='reply-'+requestId,reply=()=>state.events[id]?.conversations[role].find(m=>m.id===replyId)
+  const replyId='reply-'+requestId,reply=()=>{const current=state.events[id],messages=taskId?current?.tasks.find(t=>t.id===taskId)?.conversations?.[role]:current?.conversations[role];return messages?.find(m=>m.id===replyId)}
   conversation.push({id:replyId,kind:'model',text:'',at,status:'streaming',progress:{label:'正在提交请求'},progressLog:[],...(mode==='report'?{draft:{reportTitle:report.title,baseMarkdown,patch:{summary:'',analysis:{}}}}:{})})
   pendingRequests[key]=true
   let queuedText='',queuedPatch=null,progressTimer
@@ -109,7 +118,9 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
    if(queuedPatch){message.draft.patch=queuedPatch;queuedPatch=null}
   }
   try{
-   const result=await aiStreamRequest({text,mode,role,actor:people[role],event:modelEvent(event),history,...(mode==='report'?{report:{id:report.id,taskId:report.taskId,eventId:report.eventId,kind:report.kind,owner:report.owner,summary:report.summary,markdown:baseMarkdown}}:{})},(kind,data)=>{
+   const context=modelEvent(event)
+   if(task){context.currentTask=task.id;context.tasks=context.tasks.filter(t=>t.id===task.id).map(t=>({...t,records:task.status==='assigned'?task.draft.records:task.records}));context.reports=context.reports.filter(r=>r.id===task.sourceReportId||event.reports.find(x=>x.id===r.id)?.taskId===task.id);context.taskContext={title:taskTitle(task),scope:task.scope,owner:task.owner,instruction:'仅回答本任务的范围、步骤与结果，不改写其他轮次任务或代替轮机长决策。'}}
+   const result=await aiStreamRequest({text,mode,role,actor:people[role],event:context,history,...(mode==='report'?{report:{id:report.id,taskId:report.taskId,eventId:report.eventId,kind:report.kind,owner:report.owner,summary:report.summary,markdown:baseMarkdown}}:{})},(kind,data)=>{
     const message=reply();if(!message)return
     if(kind==='meta')message.sources=data.sources
     if(kind==='progress'){message.progress=data;message.progressLog.push(data)}
@@ -126,9 +137,10 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
    flushProgress()
    const message=reply()
    if(message){message.status='interrupted';message.modelError=error.message+(mode==='report'?' 原报告未修改，补充原文已保留在会话中。':' 回答尚未完成，请重试。')}
-   if(mode!=='report'&&!message?.text){const messages=state.events[id]?.conversations[role];if(message)messages.splice(messages.indexOf(message),1);askAssistant({...state,role},id,text,{skipUser:true});messages.at(-1).modelError=error.message+' 以下为现有规则建议。'}
+   if(mode!=='report'&&!message?.text){if(task&&message){message.text='本次任务范围：'+task.scope+' 请按本次步骤记录实际结果，未确认内容保留在备注中。';message.modelError=error.message+' 以下为已派发任务信息。'}else{const messages=state.events[id]?.conversations[role];if(message)messages.splice(messages.indexOf(message),1);askAssistant({...state,role},id,text,{skipUser:true});messages.at(-1).modelError=error.message+' 以下为现有规则建议。'}}
   }finally{clearTimeout(progressTimer);delete pendingRequests[key]}
  }
- function applySupplement(id,messageId){const message=state.events[id]?.conversations.engineer.find(m=>m.id===messageId);if(!message?.proposal)throw Error('找不到修订稿。');return applyReportSupplement(state,id,message.proposal)}
- return {state,events,pending,tasks,reports,unread,notices,people,pendingRequests,prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit:(id)=>{const report=submitTask(state,id);syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}}
+ function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.engineer:event?.conversations.engineer)?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
+ async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
+ return {state,events,pending,tasks,reports,workItems,notifications,unread,notices,people,pendingRequests,prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

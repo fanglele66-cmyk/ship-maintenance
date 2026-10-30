@@ -27,4 +27,11 @@ export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=fal
   if(!update.pending?.sampleCount&&previous?.pending?.sampleCount&&update.pending?.windowStart===previous.pending.windowStart)update.pending={...update.pending,values:previous.pending.values,channels:previous.pending.channels,sampleCount:previous.pending.sampleCount,covered:false}
   task.observation={...update,records:[...saved.values()].sort((a,b)=>a.windowEnd.localeCompare(b.windowEnd)),...(demo?{samples:channels.map(c=>c.trendData)}:{})}
  }
+ for(const event of Object.values(state.events)){
+  const phase=event.phases.at(-1)
+  if(event.phase!=='review'||!phase?.observationWaiting||now<Date.parse(phase.observationDueAt))continue
+  phase.observationWaiting=false;phase.observationReview=true;phase.observationCompletedAt=new Date(now).toISOString()
+  event.status='待观察确认';event.unread.captain=true
+  // The new work item is derived from this phase, so reloads do not duplicate it.
+ }
 }

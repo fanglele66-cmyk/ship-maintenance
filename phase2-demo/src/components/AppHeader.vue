@@ -47,7 +47,7 @@ import { useRoute, useRouter } from 'vue-router'
 const eventStore = useEventStore()
 const route = useRoute()
 const router = useRouter()
-const displayShipName=computed(()=>route.path.startsWith('/situation')||route.path.startsWith('/reports')||['/issues','/event'].includes(route.path)?'长航碧玉':shipInfo.name)
+const displayShipName=computed(()=>route.path.startsWith('/situation')||route.path.startsWith('/reports')||route.path.startsWith('/tasks/')||['/issues','/event'].includes(route.path)?'长航碧玉':shipInfo.name)
 const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
 const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')?(route.query.from==='tasks'?'待办中心':'事件中心'):route.meta.title || '船舶设备检修助手')
 const detailTitle = computed(() => {
