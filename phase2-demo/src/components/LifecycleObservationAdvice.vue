@@ -2,9 +2,9 @@
  <div v-if="dismissed" class="lc-observation-advice-hidden"><button type="button" @click="setDismissed(false)">显示 AI 观察建议</button></div>
  <section v-else class="lc-observation-advice" aria-label="AI 观察建议">
   <header><div><h2><span aria-hidden="true">✦</span> AI 观察建议</h2><span class="lc-observation-badge" :class="advice.status">{{advice.label}}</span></div><button class="lc-observation-dismiss" type="button" aria-label="关闭 AI 观察建议" title="关闭建议，不影响事件处置" @click="setDismissed(true)">×</button></header>
-  <div v-if="!modelText" class="lc-observation-advice-grid"><div><h3>当前观察</h3><p>{{advice.summary}}</p></div><div><h3>闭环时机</h3><p>{{advice.timing}}</p></div></div>
+  <div v-if="!modelText" class="lc-observation-advice-grid"><div><h3>当前观察</h3><p>{{advice.summary}}</p></div><div><h3>{{advice.verification?'后续建议':'闭环时机'}}</h3><p>{{advice.timing}}</p></div></div>
   <div v-else class="lc-observation-model"><p>{{modelText}}</p></div>
-  <footer><span>{{loading?'AI 正在结合维修反馈分析…':modelText?'建议仅供参考，轮机长可直接选择闭环或复查。':'已根据观察记录生成即时建议，轮机长可直接处置。'}}</span><button v-if="!loading" type="button" @click="generate(true)">{{error?'重试 AI 分析':'更新 AI 分析'}}</button></footer>
+  <footer><span>{{loading?(advice.verification?'AI 正在结合核实报告与观察数据分析…':'AI 正在结合维修反馈分析…'):modelText?(advice.verification?'建议仅供参考，轮机长可选择维修、复查或闭环。':'建议仅供参考，轮机长可直接选择闭环或复查。'):'已根据观察记录生成即时建议，轮机长可直接处置。'}}</span><button v-if="!loading" type="button" @click="generate(true)">{{error?'重试 AI 分析':'更新 AI 分析'}}</button></footer>
  </section>
 </template>
 <script setup>

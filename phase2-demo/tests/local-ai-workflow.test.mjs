@@ -10,7 +10,7 @@ import {lifecycleSampling} from '../src/mock/lifecycleSampling.js'
 import {observationSettings} from '../src/workflow/lifecycleObservation.js'
 import {parseReportPatch,invokeModel} from '../server/model.mjs'
 import {createAiHandler} from '../server/ai-api.mjs'
-import {configStore,publicProvider} from '../server/ai-config.mjs'
+import {configStore,publicProvider,maxOutputTokens} from '../server/ai-config.mjs'
 import {createKnowledge} from '../server/knowledge.mjs'
 const patch={summary:'执行人补充：插接件复核未见松动，液压活塞仍需拆检定位。',analysis:{evidence:'保留原始检查记录和执行人补充。',interpretation:'连接正常不能排除液压机构异常。',unverified:'液压活塞具体位置尚未确认。',next:'交由轮机长审阅后安排。'}}
 function submitted(kind='investigation'){
@@ -49,6 +49,19 @@ test('provider adapter uses only display text, reports usage and never returns r
 test('config is stored locally and public response excludes key',async()=>{
  const root=await mkdtemp(join(tmpdir(),'engine-config-'))
  try{const store=configStore(root);await store.write({source:'manual',model:'demo',baseUrl:'https://example.test',apiKey:'private-key'});assert.equal((await store.read()).apiKey,'private-key');assert.equal(publicProvider(await store.read()).apiKey,undefined);await assert.rejects(store.write({timeoutMs:1}),/超出范围/)}finally{await rm(root,{recursive:true,force:true})}
+})
+test('configured DeepSeek output ceiling survives persistence and reaches the provider unchanged',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'engine-output-limit-'))
+ try{
+  const store=configStore(root),settings=await store.write({maxTokens:maxOutputTokens,taskMaxTokens:maxOutputTokens})
+  assert.equal(settings.maxTokens,393216);assert.equal((await store.read()).taskMaxTokens,393216)
+  for(const key of ['maxTokens','taskMaxTokens'])await assert.rejects(store.write({[key]:maxOutputTokens+1}),/超出范围/)
+  let sent
+  await invokeModel({baseUrl:'https://example.test',apiKey:'test-key',model:'test',protocol:'anthropic'},settings,'s','u',async(url,options)=>{
+   sent=JSON.parse(options.body);return {ok:true,json:async()=>({content:[{type:'text',text:'已完成'}]})}
+  })
+  assert.equal(sent.max_tokens,maxOutputTokens)
+ }finally{await rm(root,{recursive:true,force:true})}
 })
 
 test('task-scoped chat reaches the model with only its supplied task context and no event decision actions',async()=>{

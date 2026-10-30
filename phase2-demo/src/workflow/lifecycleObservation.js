@@ -2,13 +2,14 @@ import {workflowCases} from '../mock/fourStoryWorkflow.js'
 import {automaticObservation} from '../mock/automaticObservation.js'
 import {repairObservationSource} from '../mock/repairObservationSource.js'
 import {lifecycleSampling} from '../mock/lifecycleSampling.js'
+import {hasObservation,observationStart} from './observationContext.js'
 
 export function observationCase(event){return event.tracking?(event.id.includes('c4')?'real-maintenance-c4-baseline':'real-maintenance-c1-baseline'):event.id}
 export function observationSettings(event){return workflowCases[observationCase(event)]?.observation}
 export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=false}={}){
  for(const event of Object.values(state.events))for(const task of event.tasks){
-  if(task.kind==='investigation'||task.status!=='submitted')continue
-  const config=observationSettings(event),start=Date.parse(task.submittedAt),end=Math.min(now,task.observationEndedAt?Date.parse(task.observationEndedAt):now)
+  if(!hasObservation(task)||task.status!=='submitted')continue
+  const config=observationSettings(event),start=Date.parse(observationStart(task)),end=Math.min(now,task.observationEndedAt?Date.parse(task.observationEndedAt):now)
   if(!config||!Number.isFinite(start)||end<start)continue
   const previous=task.observation
   if(task.observationEndedAt&&previous&&Date.parse(previous.checkedAt)>=end&&(!demo||previous.samples))continue

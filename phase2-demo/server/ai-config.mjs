@@ -5,7 +5,9 @@ import {homedir} from 'node:os'
 // 原 GLM（众数个人用，glm-5.3-flash）配置暂时停用，保留以便恢复：
 // const defaultProviderId='34515a36-dd04-47f2-a976-cdbc98f0f19a'
 const defaultProviderId='0a032ef9-8898-4498-94d5-8071c3545ddd' // CC Switch: DeepSeek
-export const defaults={enabled:true,source:'cc-switch',providerId:defaultProviderId,model:'',baseUrl:'',protocol:'anthropic',maxTokens:4096,timeoutMs:120000,taskMaxTokens:8192,taskTimeoutMs:180000,knowledgeEnabled:true}
+// DeepSeek /models reports a maximum of 393216 output tokens (384K).
+export const maxOutputTokens=393216
+export const defaults={enabled:true,source:'cc-switch',providerId:defaultProviderId,model:'',baseUrl:'',protocol:'anthropic',maxTokens:maxOutputTokens,timeoutMs:180000,taskMaxTokens:maxOutputTokens,taskTimeoutMs:180000,knowledgeEnabled:true}
 export function configStore(root){
  const directory=join(root,'.local-ai'),file=join(directory,'config.json')
  return {
@@ -18,9 +20,9 @@ export function configStore(root){
    if(typeof next.enabled!=='boolean'||typeof next.knowledgeEnabled!=='boolean')throw Error('开关配置无效。')
    for(const key of ['model','baseUrl','providerId'])if(typeof next[key]!=='string'||next[key].length>500)throw Error('模型配置字段无效。')
    next.maxTokens=Number(next.maxTokens);next.timeoutMs=Number(next.timeoutMs)
-   if(!Number.isInteger(next.maxTokens)||next.maxTokens<512||next.maxTokens>12000||!Number.isInteger(next.timeoutMs)||next.timeoutMs<5000||next.timeoutMs>180000)throw Error('输出上限或超时配置超出范围。')
+   if(!Number.isInteger(next.maxTokens)||next.maxTokens<512||next.maxTokens>maxOutputTokens||!Number.isInteger(next.timeoutMs)||next.timeoutMs<5000||next.timeoutMs>180000)throw Error('输出上限或超时配置超出范围。')
    next.taskMaxTokens=Number(next.taskMaxTokens);next.taskTimeoutMs=Number(next.taskTimeoutMs)
-   if(!Number.isInteger(next.taskMaxTokens)||next.taskMaxTokens<512||next.taskMaxTokens>12000||!Number.isInteger(next.taskTimeoutMs)||next.taskTimeoutMs<5000||next.taskTimeoutMs>180000)throw Error('任务输出上限或超时配置超出范围。')
+   if(!Number.isInteger(next.taskMaxTokens)||next.taskMaxTokens<512||next.taskMaxTokens>maxOutputTokens||!Number.isInteger(next.taskTimeoutMs)||next.taskTimeoutMs<5000||next.taskTimeoutMs>180000)throw Error('任务输出上限或超时配置超出范围。')
    if(next.baseUrl){const url=new URL(next.baseUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw Error('接口地址格式不正确。')}
    if(next.source==='manual'&&(!next.model||!next.baseUrl||!next.apiKey))throw Error('手动配置需要接口地址、模型和密钥。')
    await mkdir(directory,{recursive:true});await writeFile(file+'.tmp',JSON.stringify(next,null,2),'utf8');await rename(file+'.tmp',file);return next

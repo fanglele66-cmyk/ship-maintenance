@@ -1,4 +1,5 @@
 import {taskName} from './lifecycleDecisions.js'
+import {observationStart,isVerificationObservation} from './observationContext.js'
 
 export const closurePresentationVersion=4
 const noValue=value=>value===undefined||value===null||value===''?'未记录':String(value)
@@ -21,7 +22,7 @@ function observationSection(task,closedAt){
   const channels=(w.channels||[]).map(c=>`- ${c.name}：有效采样 ${c.sampleCount||0} 条；范围 ${noValue(c.min)}—${noValue(c.max)} ${c.unit||''}；均值 ${typeof c.mean==='number'?c.mean.toFixed(2):'未记录'} ${c.unit||''}；末值 ${noValue(c.value)} ${c.unit||''}；${c.covered?'采样间隔满足配置要求':'存在缺测或采样间隔不足'}。`).join('\n')
   return `#### ${date(w.windowStart)} — ${date(w.windowEnd)}\n\n${w.complete?'已结束的观察窗口':'闭环前保存的部分观察窗口'}；共 ${w.sampleCount||0} 条有效采样。\n\n${channels||'未记录有效通道读数。'}`
  }).join('\n\n')
- return `### ${taskTitle(task)}后的观察\n\n- 开始：${date(task.submittedAt)}\n- 截止：${date(task.observationEndedAt||closedAt)}\n\n${content||'截至闭环时尚无已保存的有效观察窗口。'}\n\n采样变化用于与现场复测交叉核对；是否工况可比、原报警是否再现，以本次作业、复查及轮机长确认记录为准。未记录的验证项目保留为未确认。`
+ return `### ${taskTitle(task)}后的观察\n\n- 观察类型：${isVerificationObservation(task)?'核实后继续观察，本轮暂未处置':'处理后效果观察'}\n- 开始：${date(observationStart(task))}\n- 截止：${date(task.observationEndedAt||closedAt)}\n\n${content||'截至闭环时尚无已保存的有效观察窗口。'}\n\n采样变化用于与现场复测交叉核对；是否工况可比、原报警是否再现，以本次核实、作业、复查及轮机长确认记录为准。未记录的验证项目保留为未确认。`
 }
 
 export function closureContent(event,action,reason,at,captain){
@@ -66,9 +67,9 @@ ${investigations.map(t=>taskSection(event,t)).join('\n\n')||'本事件未提交�
 
 ${work.map(t=>taskSection(event,t)).join('\n\n')||'本事件未提交维修或维保作业报告。'}
 ${event.maintenance?'\n维保计划：'+event.maintenance.number+'；计划窗口：'+event.maintenance.window+'；负责人：'+event.maintenance.owner+'。\n':''}
-## 五、维修后的效果观察与复查反馈
+## 五、${tasks.some(isVerificationObservation)?'持续观察':'维修后的效果观察'}与复查反馈
 
-${work.map(t=>observationSection(t,at)).join('\n\n')||'未发生维修后观察。'}
+${tasks.filter(t=>t.kind!=='investigation'||isVerificationObservation(t)).map(t=>observationSection(t,at)).join('\n\n')||'未发生持续观察。'}
 
 ${rechecks.map(t=>taskSection(event,t)).join('\n\n')||'未提交独立复查报告。'}
 

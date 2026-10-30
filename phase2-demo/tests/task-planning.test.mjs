@@ -19,7 +19,7 @@ test('a pre-dispatch preview is not an assigned task; edited steps are the dispa
 })
 for(const results of [['未见异常','未见异常'],['无法确认','未见异常']])test(`no abnormal result requires a new generated investigation: ${results}`,()=>{
  const state=createLifecycleState();dispatch(state,'investigate');submit(state,results);const event=state.events[id],first=structuredClone(event.tasks[0]),report=structuredClone(event.reports[0])
- assert.deepEqual(decisionOptions(event).map(o=>o.value),['investigate','shore']);assert.equal(ensureTaskPlan(event).steps.length,0)
+ assert.deepEqual(decisionOptions(event).map(o=>o.value),['investigate','observe','close','shore']);assert.equal(ensureTaskPlan(event).steps.length,0)
  assert.throws(()=>dispatch(state,'repair'),/当前阶段/);assert.throws(()=>dispatch(state,'investigate'),/尚未生成/)
  const plan=accept(state);assert.notDeepEqual(plan.steps,first.steps);dispatch(state,'investigate')
  assert.equal(currentTask(event).round,2);assert.equal(currentTask(event).sourceReportId,report.id);assert.deepEqual({...event.tasks[0],goalStatus:first.goalStatus,reviewedAt:undefined},{...first,reviewedAt:undefined});assert.equal(event.tasks[0].goalStatus,results.includes('无法确认')?'unresolved':'completed');assert.deepEqual(event.reports[0],report)
@@ -27,7 +27,7 @@ for(const results of [['未见异常','未见异常'],['无法确认','未见异
 test('one abnormal finding wins over normal and unknown findings and forbids repeat investigation',()=>{
  for(const other of ['未见异常','无法确认']){
   const state=createLifecycleState();dispatch(state,'investigate');submit(state,['发现异常',other]);const event=state.events[id]
-  assert.deepEqual(decisionOptions(event).map(o=>o.value),['repair','shore']);assert.equal(ensureTaskPlan(event).action,'repair');assert.throws(()=>dispatch(state,'investigate'),/当前阶段/);dispatch(state,'repair');assert.equal(currentTask(event).kind,'repair')
+  assert.deepEqual(decisionOptions(event).map(o=>o.value),['repair','observe','close','shore']);assert.equal(ensureTaskPlan(event).action,'repair');assert.throws(()=>dispatch(state,'investigate'),/当前阶段/);dispatch(state,'repair');assert.equal(currentTask(event).kind,'repair')
  }
 })
 test('effect observation offers closure, recheck or continued observation; normal recheck returns to observation',()=>{
@@ -38,7 +38,7 @@ test('effect observation offers closure, recheck or continued observation; norma
  state.role='captain';decide(state,id,{action:'close',reason:'结合复查和观察记录确认闭环。'});assert.equal(event.phase,'closed');assert.equal(ensureTaskPlan(event),null)
 })
 test('a recheck with an abnormal result returns to repair',()=>{
- const state=createLifecycleState();dispatch(state,'investigate');submit(state);dispatch(state,'repair');submit(state);accept(state);dispatch(state,'recheck');submit(state,['发现异常']);assert.deepEqual(decisionOptions(state.events[id]).map(o=>o.value),['repair','shore'])
+ const state=createLifecycleState();dispatch(state,'investigate');submit(state);dispatch(state,'repair');submit(state);accept(state);dispatch(state,'recheck');submit(state,['发现异常']);assert.deepEqual(decisionOptions(state.events[id]).map(o=>o.value),['repair','observe','close','shore'])
 })
 test('late AI output cannot overwrite edited drafts, revised reports, dispatched tasks or closed events',()=>{
  for(const change of ['draft','report','dispatched','closed']){

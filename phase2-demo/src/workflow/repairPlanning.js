@@ -1,5 +1,6 @@
 import {isAbnormalResult} from './lifecycleDecisions.js'
 import {groupRepairSteps} from './repairStepGroups.js'
+import {isVerificationReview,observationTaskFor} from './observationContext.js'
 
 export const repairProcedureVersion=2
 const workOptions=['已完成','未完成','不适用']
@@ -65,6 +66,14 @@ export function detailedRepairSteps(event,methods=[]){
 }
 
 export function presetRecheckSteps(event){
+ if(isVerificationReview(event)){
+  const task=observationTaskFor(event),report=event.reports.findLast(r=>r.taskId===task?.id)
+  return [
+   step('复核现场核实范围与剩余疑点',`对照《${report?.title||'排查报告'}》及本轮观察记录，明确原异常、已核实范围与仍需确认的位置。`,['核对原始读数、采样时间和现场反馈，保留未确认事项。','本轮暂未维修，不填写维修完成或修复有效。'],'记录报告版本、复查对象和已有证据。'),
+   step('核对同工况读数与异常变化','在许可条件下核对原异常测点、独立读数和相关运行状态。',['记录同刻转速、负荷与测点，区分持续、扩大、回落与复发。','核对报警复现及现场异常；读数不一致时检查测点对应和采集链路，不擅自维修。'],'记录时间、工况、测点、读数及异常发生位置。'),
+   step('汇总复查结论与后续建议','将观察趋势与现场证据对应，交轮机长决定下一步。',['明确已定位的问题、未查范围与证据缺口。','有处理依据时建议维修；未见异常时说明验证范围与后续观察条件。'],'提交复查结论、证据和仍需确认事项。')
+  ].map(s=>({...s,options:['发现异常','未见异常','无法确认']}))
+ }
  const work=[...event.tasks].reverse().find(t=>t.kind!=='investigation'&&t.status==='submitted')
  const report=event.reports.findLast(r=>r.taskId===work?.id)
  const result=[

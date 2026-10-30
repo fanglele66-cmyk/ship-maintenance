@@ -1,10 +1,10 @@
 {
   "graph": {
     "title": "智能机舱 · 用户动线与信息产物",
-    "description": "事件信息与排查建议 → 待派任务 → 人工派发 → 步骤反馈 → 处置报告 → 再次决策；传感器信息支持效果观察，按生命周期阶段接续并人工闭环。",
+    "description": "事件保留问题全过程，任务承载本轮执行，待办连接当前需要处理的人；建议草稿、人工反馈、AI报告与人员决策分别留存。",
     "meta": {
-      "date": "2026-10-29",
-      "presentationRevision": "initial-event-followup-lifecycle",
+      "date": "2026-10-30",
+      "presentationRevision": "independent-task-advice-decisions",
       "scope": "船端四个当前事件；岸基仅同步边界"
     },
     "entities": [
@@ -31,6 +31,24 @@
         "description": "测量事实的最小入口",
         "examples": "温度、压力、流量、转速、振动",
         "note": "读数、时序与工况比较"
+      },
+      {
+        "title": "事件",
+        "description": "持续跟踪同一个问题档案",
+        "examples": "二缸报警、四缸相对排温变化",
+        "note": "关联历轮任务、报告、决定与观察"
+      },
+      {
+        "title": "任务",
+        "description": "人员确认派发的一次独立工作",
+        "examples": "排查、维修、复查、提前维保",
+        "note": "独立任务卡片与详情；关联事件是基础信息"
+      },
+      {
+        "title": "待办",
+        "description": "当前需要本人处理的工作入口",
+        "examples": "执行任务、审阅结果并决定下一步",
+        "note": "角色视图引用同一业务记录，不复制任务"
       }
     ],
     "informationLayers": [
@@ -67,44 +85,44 @@
     ],
     "rules": [
       {
-        "title": "当前流程以代码为准",
-        "text": "2026-10-29 核对四个当前事件的路由、决策菜单、状态和报告；旧脚本的关联维保、独立验收表与单一任务推进不再作为当前主线。"
+        "title": "事件、任务、待办分开",
+        "text": "事件是问题档案；任务有独立目标、执行人和时限；决策待办进入事件本轮工作区，执行待办进入任务详情。"
       },
       {
-        "title": "每轮单独确认派发",
-        "text": "待派任务是草稿；轮机长确认后才新建任务。排查提交回交决策，不能自动开始维修。"
+        "title": "建议不是已派任务",
+        "text": "初始提供AI排查建议；后续选定继续排查、维修、维保或复查后才展示相应建议，确认派工后才创建执行任务。"
       },
       {
-        "title": "人工反馈与处置报告分开",
-        "text": "排查/复查反馈与维修反馈是人工提交；AI 整理处置报告，补充修订并入同一产物。报告回交后由轮机长再次决策。"
+        "title": "派发人跟进、执行人处理",
+        "text": "派发后从轮机长待我处理中移出，在我派发的跟进；执行人待我处理展示任务，报告回交产生轮机长审阅与决定待办。"
       },
       {
-        "title": "现场复测写入作业报告",
-        "text": "无独立验收表；效果观察关联本轮维修报告，人工关闭依据和机器窗口覆盖状态分别保留。"
+        "title": "反馈、报告与完成分开",
+        "text": "本轮原始反馈先保留，大模型流式整理报告；完整校验后交轮机长。报告失败可重试，提交、任务完成、事件闭环分别表达。"
       },
       {
-        "title": "事件类别与工作类型分开",
-        "text": "只有报警、预警、异动跟踪三类；当前菜单统一派发维修，维保仅兼容历史任务与报告。"
+        "title": "按实际业务问题判断",
+        "text": "报警核对原报警及现场表现；预警核对趋势与现场压力；异动跟踪先判断同工况相对变化是否成立，不用部件无异常代替趋势结论。"
       },
       {
-        "title": "实际状态与筛选不同",
-        "text": "待决策、排查中、待处置决策、维修中、复查中、待结果处置、已闭环等按阶段显示；事件筛选尚未单列复查中。"
+        "title": "观察有两种来源",
+        "text": "排查后轮机长可选择暂不处置继续观察；维修或维保后的采样结合已做措施与复测。观察不创建人员执行任务。"
       },
       {
-        "title": "历史证据与演示动作分开",
-        "text": "四案例保留原测量、来源、限制；流转演示不作为真实维修证据，当前效果观察为演示采样。"
+        "title": "每轮人员确认",
+        "text": "排查、维修、复查、提前维保均须确认派工；闭环由轮机长填写依据，报告提交与时间到达都不自动关闭事件。"
       },
       {
-        "title": "本地同步与岸基边界",
-        "text": "同源浏览器保存角色会话、任务和报告；同步岸基只形成待接收快照，不声称实际送达。"
+        "title": "来源与当前能力",
+        "text": "历史测量保留原始来源；当前自动采样使用内置数据源，不能据此宣称已接入船端实时采集。"
       },
       {
-        "title": "事件产物与生命周期步骤",
-        "text": "报警事件、预警事件、异动跟踪均为 AI 产物；派发、回交、补充、闭环通知归流程步骤，衔接阶段与接续角色。"
+        "title": "正式工单与岸基边界",
+        "text": "维保计划作为本轮任务快照；尚未接通正式船管工单写入。岸基同步为待接收快照，不代表实际送达。"
       },
       {
-        "title": "初始事件与后续生命周期分列",
-        "text": "左侧只展示初始信息、首次分流与首次派发；排查后的再次决策、后续草稿和确认派发合并在右侧派发 / 回交 / 补充 / 闭环通知中。"
+        "title": "实现差异明确保留",
+        "text": "已完成检查的即时完成判定、正式观察开始门槛、受阻原任务等待和恢复等仍需补齐；见状态视图中的流程对照。"
       }
     ],
     "nodes": [
@@ -119,7 +137,7 @@
         "fields": [
           {
             "name": "来源边界",
-            "description": "真实案例引用共享历史资料；当前设备实时读数与效果观察使用演示采样。"
+            "description": "真实案例引用共享历史资料；当前设备实时读数与效果观察使用内置采样。"
           }
         ],
         "sources": [],
@@ -624,7 +642,7 @@
         "fields": [
           {
             "name": "不创建任务",
-            "description": "仅查看、生成待派任务、取消表单均不创建任务。"
+            "description": "仅查看、生成AI建议草稿、取消表单均不创建任务。"
           },
           {
             "name": "误报",
@@ -655,24 +673,24 @@
       },
       {
         "id": "plan-draft",
-        "title": "待派任务草稿",
+        "title": "AI排查建议",
         "layer": "event",
         "kind": "ai",
         "scope": "船舶 → 设备 → 事件",
         "stage": "轮机长审阅与决定",
-        "summary": "事件初始阶段的待派排查草稿；轮机长核对排查范围、依据与步骤后进行首次派发。",
+        "summary": "初始风险提醒下可先审阅AI排查建议，草稿不等于已决定派发。",
         "fields": [
           {
-            "name": "初始排查",
-            "description": "事件信息、建议排查范围、检查步骤及生成状态。"
+            "name": "建议内容",
+            "description": "检查目的、范围、依据和1—4个步骤，可通过对话调整。"
           },
           {
-            "name": "首次派发门槛",
-            "description": "草稿就绪且有步骤，由轮机长确认负责人、未来完成时限和范围。"
+            "name": "人工确认",
+            "description": "去派工打开右侧表单；确认执行人、时限与范围后创建任务。"
           },
           {
-            "name": "后续接续",
-            "description": "排查报告回交后的草稿、再次决策与新一轮派发统一归右侧生命周期步骤。"
+            "name": "后续建议",
+            "description": "排查回交或效果观察阶段，只有选定派发动作才显示AI排查／维修／维保／复查建议。"
           }
         ],
         "sources": [
@@ -682,7 +700,7 @@
           "triage-dispatch"
         ],
         "related": [],
-        "page": "初始风险提醒 → 待派发排查",
+        "page": "风险提醒 → AI排查建议 → 去派工",
         "notes": [],
         "evidence": [
           {
@@ -740,6 +758,14 @@
           {
             "name": "身份",
             "description": "事件 ID + 独立任务 ID + 排查轮次。"
+          },
+          {
+            "name": "角色视图",
+            "description": "执行人从待我处理进入；轮机长在我派发的查看同一任务。"
+          },
+          {
+            "name": "历史保留",
+            "description": "后续新任务不覆盖本轮步骤、原始反馈与报告。"
           }
         ],
         "sources": [
@@ -750,7 +776,7 @@
           "task-feedback"
         ],
         "related": [],
-        "page": "大管轮 · 排查步骤",
+        "page": "独立任务详情 /#/tasks/:taskId",
         "notes": [],
         "evidence": [
           {
@@ -772,6 +798,14 @@
           {
             "name": "范围",
             "description": "只处理本轮已核实且批准的对象；未实施选未完成或不适用。"
+          },
+          {
+            "name": "角色视图",
+            "description": "执行人从待我处理进入；轮机长在我派发的查看同一任务。"
+          },
+          {
+            "name": "历史保留",
+            "description": "后续新任务不覆盖本轮步骤、原始反馈与报告。"
           }
         ],
         "sources": [
@@ -781,7 +815,7 @@
           "task-feedback"
         ],
         "related": [],
-        "page": "大管轮 · 维修步骤",
+        "page": "独立任务详情 /#/tasks/:taskId",
         "notes": [],
         "evidence": [
           {
@@ -798,11 +832,19 @@
         "kind": "derived",
         "scope": "船舶 → 设备 → 事件",
         "stage": "按本轮任务保存",
-        "summary": "结果处置阶段重新派发；检查原异常、剩余事项与修后响应。",
+        "summary": "选定派发复查后审阅建议，确认后新建独立任务。核实后观察复查原变化，维修后复查才核对已实施措施。",
         "fields": [
           {
             "name": "数据关系",
             "description": "内部为排查任务、purpose 为 recheck；独立任务 ID 与轮次保留。"
+          },
+          {
+            "name": "角色视图",
+            "description": "执行人从待我处理进入；轮机长在我派发的查看同一任务。"
+          },
+          {
+            "name": "历史保留",
+            "description": "后续新任务不覆盖本轮步骤、原始反馈与报告。"
           }
         ],
         "sources": [
@@ -812,7 +854,7 @@
           "task-feedback"
         ],
         "related": [],
-        "page": "大管轮 · 复查步骤",
+        "page": "独立任务详情 /#/tasks/:taskId",
         "notes": [],
         "evidence": [
           {
@@ -848,7 +890,8 @@
           "task-investigation",
           "task-repair",
           "task-recheck",
-          "human-input"
+          "human-input",
+          "maintenance-compat"
         ],
         "outputs": [
           "investigation-report",
@@ -957,6 +1000,10 @@
         "summary": "AI 汇总人工排查/复查反馈、维修反馈与依据，形成含结论、原因分析、待核实项和后续建议的处置报告；补充修订并入同一产物。",
         "fields": [
           {
+            "name": "真实模型生成",
+            "description": "原填写记录先保存；模型流式返回结论和四个分析章节，完整校验后写入本轮报告。失败保留反馈并允许重试。"
+          },
+          {
             "name": "输入",
             "description": "本轮批准范围、步骤结果、人工结论、实际措施、复测记录和附件索引。"
           },
@@ -1008,31 +1055,32 @@
         "kind": "derived",
         "scope": "船舶 → 设备 → 事件",
         "stage": "按本轮任务保存",
-        "summary": "结合本轮维修反馈与处理后的传感器信息，查看曲线、窗口汇总、缺测和工况可比性，支持结果处置。",
+        "summary": "核实后继续观察与处理后效果观察共用事件观察区，保留曲线、窗口、AI建议与后续决定。",
         "fields": [
           {
-            "name": "传感器信息",
-            "description": "原始测点经标准化与质量、工况核验进入观察；保留测点身份、采样时间与单位，沿来源连线回查。"
+            "name": "核实后继续观察",
+            "description": "轮机长决定暂不处置，包括异常自行回落后的跟踪；判断变化是否持续、扩大、恢复或复发。"
           },
           {
-            "name": "保存内容",
-            "description": "样本、窗口起止、通道值、样本数、覆盖状态、下次汇总时间。"
+            "name": "处理后观察",
+            "description": "当前维修／维保报告回交即开始采样；正式观察等待轮机长确认的门槛尚需补齐。"
           },
           {
-            "name": "停止与留存",
-            "description": "后续任务派发或闭环后冻结该轮观察，阶段条可回查。"
+            "name": "AI观察建议",
+            "description": "仅轮机长可见，可关闭建议栏，仍由人员决定闭环、复查或继续观察；核实后观察还可派发维修。"
           },
           {
-            "name": "当前数据",
-            "description": "eventLifecycleStore 明确使用 demo:true 的演示采样，不能当作实船修后验证。"
+            "name": "周期与提醒",
+            "description": "两小时汇总；明确继续观察后暂不产生人员待办，窗口结束提醒审阅。"
           },
           {
-            "name": "闭环边界",
-            "description": "窗口状态供人员审阅；当前闭环代码并未硬性要求完整窗口达标。"
+            "name": "数据与条件",
+            "description": "当前使用内置采样；待适用工况、缺测和现场条件恢复尚未完整接入，不将时间经过视为验证通过。"
           }
         ],
         "sources": [
           "repair-report",
+          "investigation-report",
           "mapped-samples",
           "sample-quality"
         ],
@@ -1040,7 +1088,8 @@
           "result-review"
         ],
         "related": [
-          "sample"
+          "sample",
+          "branch-observe"
         ],
         "page": "结果处置 · 效果观察",
         "notes": [],
@@ -1059,15 +1108,19 @@
         "kind": "stage",
         "scope": "船舶 → 设备 → 事件",
         "stage": "结果处置与回查",
-        "summary": "轮机长结合报告和效果观察选择闭环、派发复查或同步岸基。",
+        "summary": "在同一事件审阅报告和观察结果，决定闭环、复查、继续观察或同步岸基；核实后观察另可派发维修。",
         "fields": [
           {
-            "name": "复查回路",
-            "description": "复查无异常回结果处置；复查发现异常回处置决策，可再派维修。"
+            "name": "人工决定",
+            "description": "选择派发复查等动作后才展示建议；派工另行确认。"
           },
           {
-            "name": "闭环门槛",
-            "description": "当前结果处置阶段由轮机长填写依据确认；不是自动恢复判定。"
+            "name": "闭环依据",
+            "description": "首轮报告回交后即可说明依据后人工闭环，不强制维修；事件闭环与设备长期状态分开。"
+          },
+          {
+            "name": "观察条件",
+            "description": "当前两小时作为汇总与建议节奏，不能用来替代适用工况与足够现场证据。"
           }
         ],
         "sources": [
@@ -1133,35 +1186,27 @@
         "kind": "stage",
         "scope": "船舶 → 设备 → 事件",
         "stage": "事件生命周期阶段衔接",
-        "summary": "承接派发后的整个生命周期：接收处置报告、排查后再次决策、确认后续任务、补充复核与闭环通知。初次分流留在左侧，后续继续排查、维修和复查在此接续。",
+        "summary": "每轮派发、反馈、报告补充与闭环衔接接续人员；任务独立建档，审阅与下一步决定合并为同一待办。",
         "fields": [
           {
-            "name": "派发 → 执行",
-            "description": "轮机长确认派发后，进入排查中、维修中或复查中，接续大管轮执行任务。"
+            "name": "报告回交",
+            "description": "排查报告交轮机长判断趋势、异常表现及原因；维修／维保报告交轮机长审阅实际措施与效果。"
           },
           {
-            "name": "回交 → 再次决策",
-            "description": "人工反馈形成处置报告并回交：排查后进入待处置决策，维修或无异常复查后进入待结果处置。"
+            "name": "选择后才显示建议",
+            "description": "继续排查、维修、维保或复查选择确定后显示相应AI建议；建议可修改，确认派工才产生新任务。"
           },
           {
-            "name": "无异常结果",
-            "description": "提供“继续排查”；审阅新草稿后重新派发。"
+            "name": "按业务分流",
+            "description": "已定位问题可维修；异动核实可提前维保；线索不足可继续排查，亦可继续观察或说明依据后闭环。"
           },
           {
-            "name": "有异常结果",
-            "description": "提供“派发维修”；由本轮 result 字段匹配异常规则，备注不能自动改变分支。"
+            "name": "补充复核",
+            "description": "执行人核对补充稿后更新同一报告并提醒轮机长，保留原始记录和版本。"
           },
           {
-            "name": "后续任务草稿与确认派发",
-            "description": "审阅继续排查、维修或复查的当前草稿；确认负责人、未来完成时限及范围后才创建新一轮任务。生成失败或取消均不创建任务，旧轮反馈和报告继续保留。"
-          },
-          {
-            "name": "补充 → 复核",
-            "description": "处置报告确认补充后通知轮机长复核，保留当前业务阶段与原任务关系，不重建事件。"
-          },
-          {
-            "name": "闭环 → 归档",
-            "description": "轮机长确认后进入已闭环，保留报告与历轮记录并通知参与人员。"
+            "name": "角色入口",
+            "description": "派发人跟进同一任务，执行人处理本人任务；普通观察更新不反复创建待办。"
           }
         ],
         "sources": [
@@ -1176,7 +1221,10 @@
           "task-investigation",
           "task-repair",
           "task-recheck",
-          "shore-packet"
+          "shore-packet",
+          "maintenance-compat",
+          "effect-observation",
+          "work-item"
         ],
         "related": [
           "result-review"
@@ -1239,26 +1287,34 @@
       },
       {
         "id": "maintenance-compat",
-        "title": "维保兼容资料与旧任务",
+        "title": "本轮提前维保任务",
         "layer": "task",
-        "kind": "view",
+        "kind": "derived",
         "scope": "船舶 → 设备 → 事件",
         "stage": "按本轮任务保存",
-        "summary": "保留维保报告、任务类型与历史资料的兼容展示。",
+        "summary": "异动由现场核实后，可选择维保计划及适合的靠港时间，派发独立维保任务。",
         "fields": [
           {
-            "name": "当前可达性",
-            "description": "决策菜单未开放 maintenance 动作；不能把旧“关联维保单”脚本画成当前必经路线。"
+            "name": "派发条件",
+            "description": "现场与系统一致、背景已记录且无相反结论；选择适用计划、可用靠港窗口、执行人和时限。"
           },
           {
-            "name": "产品类别",
-            "description": "仍归异动跟踪，不成为第四类事件。"
+            "name": "执行与回交",
+            "description": "本轮任务保存计划版本与步骤快照；轮机员按计划提前执行，提交实际措施与未完成项。"
+          },
+          {
+            "name": "外部工单",
+            "description": "当前未接入船管工单，不自动更新外部审批或完工状态。"
           }
         ],
-        "sources": [],
-        "outputs": [],
+        "sources": [
+          "notification"
+        ],
+        "outputs": [
+          "task-feedback"
+        ],
         "related": [],
-        "page": "历史维保任务 / 报告筛选",
+        "page": "AI维保建议 → 独立维保任务 → 维保报告",
         "notes": [],
         "evidence": [
           {
@@ -1291,7 +1347,7 @@
           },
           {
             "name": "维修中 / 维保执行中",
-            "description": "当前执行任务；维保仅兼容已有任务。"
+            "description": "已确认派发维修或提前维保，执行人处理本轮独立任务。"
           },
           {
             "name": "待结果处置",
@@ -1304,6 +1360,10 @@
           {
             "name": "筛选差异",
             "description": "事件中心当前筛选项尚未单列复查中，但卡片可显示该状态。"
+          },
+          {
+            "name": "效果观察中",
+            "description": "明确继续观察后，AI跟踪本轮变化，暂不形成执行任务。"
           }
         ],
         "sources": [],
@@ -1321,30 +1381,34 @@
       },
       {
         "id": "state-task",
-        "title": "任务草稿、已派发与已提交",
+        "title": "任务执行、报告生成与完成",
         "layer": "task",
         "kind": "view",
         "scope": "船舶 → 设备 → 事件",
         "stage": "按本轮任务保存",
-        "summary": "pendingPlan 与任务分离；派发后 status=assigned，提交后 status=submitted。",
+        "summary": "建议草稿与任务分开；任务状态和目标完成状态分别保存。",
         "fields": [
           {
-            "name": "草稿",
-            "description": "就绪前不能派发；更改来源报告或阶段时重新校验。"
+            "name": "执行状态",
+            "description": "已派发、报告生成中、报告待生成、反馈已提交。"
           },
           {
-            "name": "轮次",
-            "description": "每次确认派发创建独立任务，旧轮报告可回查。"
+            "name": "完成状态",
+            "description": "当前提交后仍待轮机长后续决定更新为已完成或目标未完成；并非所有已提交都进已完成。"
           },
           {
-            "name": "待办",
-            "description": "轮机长：待我决策 + 执行中；大管轮：当前执行任务。已提交任务不继续充当执行待办。"
+            "name": "待办视图",
+            "description": "派发后轮机长仅跟进；执行人当前任务待处理。回交后轮机长审阅并决定下一步。"
+          },
+          {
+            "name": "尚未实现",
+            "description": "按要求完成排查后立即进入已完成；未做完检查的等待条件、同任务恢复与终止记录。"
           }
         ],
         "sources": [],
         "outputs": [],
         "related": [],
-        "page": "待办中心 / 事件详情",
+        "page": "待办中心／独立任务详情",
         "notes": [],
         "evidence": [
           {
@@ -1361,7 +1425,7 @@
         "kind": "view",
         "scope": "船舶 → 设备 → 事件",
         "stage": "结果处置与回查",
-        "summary": "报告关联事件和任务；观察关联具体维修轮次；同步记录是当时快照。",
+        "summary": "报告关联独立任务和事件；观察可来自现场核实后的跟踪，也可来自维修／维保后反馈。",
         "fields": [
           {
             "name": "报告目录",
@@ -1373,7 +1437,7 @@
           },
           {
             "name": "数据边界",
-            "description": "历史案例证据、演示作业记录、模型分析、人工决定分别保留。"
+            "description": "原始资料、现场反馈、模型分析与人工决定分别留存；报告修订不覆盖原始执行记录。"
           }
         ],
         "sources": [],
@@ -1391,24 +1455,24 @@
       },
       {
         "id": "page-home",
-        "title": "首页 · 工况与风险处置",
+        "title": "首页 · 工况态势与值得关注",
         "layer": "page",
         "kind": "view",
         "scope": "页面入口",
         "stage": "/#/situation",
-        "summary": "近24小时工况态势（AIS 回放）、设备总览、风险处置工作台。",
+        "summary": "近24小时工况以从左向右的时间线呈现；值得关注按角色展示待决策、处置中或我的任务及报告。",
         "fields": [
           {
-            "name": "轮机长",
-            "description": "待决策 / 处置中 / 报告。"
+            "name": "工况态势",
+            "description": "近期航行阶段、航速、转速、负荷与相关异常。"
           },
           {
-            "name": "大管轮",
-            "description": "我的任务 / 报告。"
+            "name": "值得关注",
+            "description": "事件卡进入事件工作区；执行任务进入独立任务详情。"
           },
           {
-            "name": "下一步",
-            "description": "设备卡→健康与传感器；事件卡→事件阶段；报告卡→独立全文。"
+            "name": "查看全部待办",
+            "description": "跳转待办中心；全部报告仍进入报告目录。"
           }
         ],
         "sources": [],
@@ -1497,32 +1561,28 @@
       },
       {
         "id": "page-event",
-        "title": "事件详情 · 阶段工作区",
+        "title": "事件详情 · 本轮决策与完整过程",
         "layer": "page",
         "kind": "view",
         "scope": "页面入口",
         "stage": "/#/situation/issue/:id",
-        "summary": "轮机长查看事件信息与排查建议、确认派发；大管轮逐项反馈；处置报告回交后再次决策，维修后观察并闭环。",
+        "summary": "保留风险提醒和历轮阶段；轮机长审阅报告、AI建议和观察并决定下一步，执行人员通过关联入口进入独立任务。",
         "fields": [
           {
-            "name": "派发前",
-            "description": "风险提醒 / 数据观测 / 证据资料；另可查看待派任务草稿。"
+            "name": "初始提醒",
+            "description": "风险提醒、数据观测、证据资料、AI排查建议；大管轮仅能查看已参与事件，隐藏派发与决策依据。"
+          },
+          {
+            "name": "本轮决策",
+            "description": "同一工作区审阅结果并决定下一步，不额外创建审阅待办。未选派发时，不显示下一轮任务建议。"
           },
           {
             "name": "执行中",
-            "description": "大管轮填写步骤；轮机长查看安排与进度。"
+            "description": "查看本轮任务范围、进度与进入任务详情的入口，不在事件页填写执行表。"
           },
           {
-            "name": "回交后",
-            "description": "处置决策或效果观察 + 阶段报告 + 本轮步骤；单项内容不显示页签栏。"
-          },
-          {
-            "name": "四个当前事件",
-            "description": "二缸报警与喷射控制核实、控制空气双测点低压核实、一缸排温长期基线抬升、四缸排温相对基线下移。前三项从风险提醒进入；四缸预置首轮排查反馈，进入时已待处置决策。"
-          },
-          {
-            "name": "反馈与报告",
-            "description": "人工提交排查/复查反馈、维修反馈；AI 整理处置报告。补充修订保留在同一报告，不单设产物。"
+            "name": "观察与历史",
+            "description": "保留本轮报告、观察曲线与AI建议；阶段条回看历轮决定、任务与闭环。"
           }
         ],
         "sources": [],
@@ -1540,11 +1600,9 @@
         "artifacts": [
           "risk-brief",
           "plan-draft",
-          "task-feedback",
-          "investigation-report",
-          "repair-report",
           "report-analysis",
-          "effect-observation"
+          "effect-observation",
+          "notification"
         ]
       },
       {
@@ -1554,15 +1612,23 @@
         "kind": "view",
         "scope": "页面入口",
         "stage": "/#/event",
-        "summary": "轮机长可筛选待我决策和执行中；大管轮处理当前已派发任务。",
+        "summary": "默认仅显示当前需本人处理的工作；我派发的、已完成和全部记录用于跟进回查。",
         "fields": [
           {
-            "name": "下一步",
-            "description": "查看并决策 / 继续处理进入事件阶段工作区；报告回交后重新成为轮机长待办。"
+            "name": "待我处理",
+            "description": "轮机长看到当前决策／确认；执行人看到本人当前执行任务，报告生成失败可重试。"
           },
           {
-            "name": "接续关系",
-            "description": "派发通知带大管轮进入执行步骤；处置报告回交后，轮机长从待办重新进入决策。"
+            "name": "我派发的",
+            "description": "仅轮机长可见；引用同一任务，筛选执行中、反馈待审阅等派发记录。"
+          },
+          {
+            "name": "已完成／全部记录",
+            "description": "按角色查看历史任务与决定；当前已完成筛选仍依赖goalStatus，检查交付后的完成判定见流程对照。"
+          },
+          {
+            "name": "跳转",
+            "description": "决策／确认进入原事件本轮工作区；执行任务进入独立任务详情。"
           }
         ],
         "sources": [],
@@ -1578,10 +1644,11 @@
           }
         ],
         "artifacts": [
-          "plan-draft",
+          "work-item",
           "task-investigation",
           "task-repair",
-          "task-recheck"
+          "task-recheck",
+          "maintenance-compat"
         ]
       },
       {
@@ -1761,20 +1828,20 @@
       },
       {
         "id": "branch-continue",
-        "title": "无异常结果，继续排查",
+        "title": "保留疑点，继续排查",
         "layer": "task",
         "kind": "branch",
         "scope": "船舶 → 设备 → 事件",
         "stage": "报告回交后的再次决策",
-        "summary": "新任务与旧报告同属原事件；无法确认不写成已修复",
+        "summary": "依据本轮未解释的变化或缺失资料安排下一轮核实，不把原因未明等同于已发现部件故障。",
         "fields": [
           {
             "name": "条件",
-            "description": "已提交报告未匹配异常结果"
+            "description": "原报警、预警或相对变化仍需解释，当前没有足够的具体维修依据。"
           },
           {
             "name": "动作",
-            "description": "审阅下一轮待派排查，重新确认派发"
+            "description": "选定继续排查 → 查看AI排查建议 → 核对范围、负责人及时间 → 确认派工。"
           }
         ],
         "sources": [
@@ -1934,13 +2001,186 @@
             "note": "本次按当前实现核对；历史证据见案例资料"
           }
         ]
+      },
+      {
+        "id": "page-task",
+        "title": "独立任务详情 · 本轮执行与报告",
+        "layer": "page",
+        "kind": "view",
+        "scope": "页面入口",
+        "stage": "/#/tasks/:taskId",
+        "summary": "只围绕本轮目标、批准范围、逐项执行反馈与报告组织信息，事件关联放在基础信息中。",
+        "fields": [
+          {
+            "name": "任务头部",
+            "description": "任务名称／编号、状态、派发人、执行人、要求完成时间、关联事件。"
+          },
+          {
+            "name": "执行反馈",
+            "description": "左侧逐步填写与右侧表单共享草稿；1—4个反馈步骤，不再单设证据资料或执行步骤页签。"
+          },
+          {
+            "name": "报告与会话",
+            "description": "提交后由大模型流式生成报告；左侧并排查看报告、通过对话补充报告，补充稿经本人核对后写入。"
+          },
+          {
+            "name": "访问范围",
+            "description": "执行人操作本人任务，轮机长查看已派发任务；历次任务独立留存。"
+          }
+        ],
+        "sources": [],
+        "outputs": [],
+        "related": [],
+        "page": "/#/tasks/:taskId",
+        "notes": [],
+        "evidence": [
+          {
+            "path": "ship-maintenance/phase2-demo/src/views/LifecycleTaskView.vue",
+            "line": 1,
+            "note": "2026-10-30 按当前实现核对"
+          }
+        ],
+        "artifacts": [
+          "task-investigation",
+          "task-repair",
+          "task-recheck",
+          "maintenance-compat",
+          "task-feedback",
+          "report-analysis"
+        ]
+      },
+      {
+        "id": "work-item",
+        "title": "面向人员的待办入口",
+        "layer": "task",
+        "kind": "view",
+        "scope": "船舶 → 设备 → 事件",
+        "stage": "本轮工作与后续安排",
+        "summary": "决策待办和执行待办引用事件／任务；派发、回交和观察结束驱动当前入口变化，不复制业务记录。",
+        "fields": [
+          {
+            "name": "决策入口",
+            "description": "事件出现后待轮机长处理；报告回交后，同一条待办承载审阅和下一步决定。"
+          },
+          {
+            "name": "执行入口",
+            "description": "仅已确认派发的任务进入执行人待我处理。"
+          },
+          {
+            "name": "提醒",
+            "description": "未决策事项持续保留铃铛提醒；弹窗显示最新一条，关闭弹窗不等于完成工作。"
+          },
+          {
+            "name": "AI观察期间",
+            "description": "明确继续观察后暂无线下执行待办；窗口结束产生轮机长审阅观察结果的待办。"
+          }
+        ],
+        "sources": [],
+        "outputs": [],
+        "related": [
+          "notification",
+          "task-investigation",
+          "task-repair",
+          "task-recheck"
+        ],
+        "page": "待办中心／右上角提醒",
+        "notes": [],
+        "evidence": [
+          {
+            "path": "ship-maintenance/phase2-demo/src/workflow/lifecycleWorkItems.js",
+            "line": 1,
+            "note": "2026-10-30 按当前实现核对"
+          }
+        ]
+      },
+      {
+        "id": "branch-observe",
+        "title": "核实后继续观察",
+        "layer": "task",
+        "kind": "branch",
+        "scope": "船舶 → 设备 → 事件",
+        "stage": "本轮工作与后续安排",
+        "summary": "轮机长依据现场核实决定暂不处置，包括异常自行回落后的跟踪；不新增执行任务。",
+        "fields": [
+          {
+            "name": "观察目标",
+            "description": "变化是否持续、扩大、恢复或复发。"
+          },
+          {
+            "name": "下一步",
+            "description": "在原事件审阅观察结果，可派发维修、复查、继续观察或闭环。"
+          }
+        ],
+        "sources": [
+          "notification"
+        ],
+        "outputs": [
+          "effect-observation"
+        ],
+        "related": [],
+        "page": "本次处置 → 继续观察",
+        "notes": [],
+        "evidence": [
+          {
+            "path": "ship-maintenance/phase2-demo/src/workflow/observationContext.js",
+            "line": 1,
+            "note": "2026-10-30 按当前实现核对"
+          }
+        ]
+      },
+      {
+        "id": "workflow-gaps",
+        "title": "流程文档对照 · 待补齐",
+        "layer": "result",
+        "kind": "view",
+        "scope": "船舶 → 设备 → 事件",
+        "stage": "本轮工作与后续安排",
+        "summary": "2026-10-30 主线能够从事件到独立任务、报告、观察和闭环；以下要求尚未完整实现。",
+        "fields": [
+          {
+            "name": "排查任务完成",
+            "description": "已按要求检查并交付后，应即时进入已完成；当前仍等待轮机长下一步决定。"
+          },
+          {
+            "name": "正式观察安排",
+            "description": "文档要求轮机长先确认；当前维修／维保报告回交后已开始采样。"
+          },
+          {
+            "name": "受阻原任务",
+            "description": "等待条件、保留原任务继续、调整范围或执行人及终止，尚未提供完整操作。"
+          },
+          {
+            "name": "等待适用工况",
+            "description": "暂缺运行／负荷条件门槛与恢复提醒；不得仅按两小时推定设备验证通过。"
+          },
+          {
+            "name": "事件稳定总览",
+            "description": "已保留阶段条与历史；当前情况／当前安排／完整过程的固定总览还未统一。"
+          },
+          {
+            "name": "外部与新事件",
+            "description": "实时报警接入、闭环后再发关联判定、正式船管工单和岸基回执仍待接入。"
+          }
+        ],
+        "sources": [],
+        "outputs": [],
+        "related": [],
+        "page": "",
+        "notes": [],
+        "evidence": [
+          {
+            "path": "ship-maintenance/phase2-demo/src/workflow/eventLifecycle.js",
+            "line": 1,
+            "note": "2026-10-30 按当前实现核对"
+          }
+        ]
       }
     ],
     "views": [
       {
         "id": "overview",
         "title": "信息总览",
-        "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
+        "description": "按当前页面核对：风险提醒 → AI建议草稿 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
         "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
         "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
@@ -2033,7 +2273,10 @@
                   "repair-report",
                   "report-analysis",
                   "effect-observation",
-                  "notification"
+                  "notification",
+                  "work-item",
+                  "maintenance-compat",
+                  "branch-observe"
                 ]
               }
             ]
@@ -2306,7 +2549,7 @@
             "from": "repair-report",
             "to": "effect-observation",
             "type": "output",
-            "label": ""
+            "label": "当前回交即采样，正式确认门槛待补齐"
           },
           {
             "from": "repair-report",
@@ -2421,13 +2664,55 @@
             "to": "notification",
             "type": "flow",
             "label": "后续复查与生命周期接续"
+          },
+          {
+            "from": "notification",
+            "to": "work-item",
+            "label": "更新接续人员入口",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "maintenance-compat",
+            "label": "异动核实后确认提前维保",
+            "type": "flow"
+          },
+          {
+            "from": "maintenance-compat",
+            "to": "task-feedback",
+            "label": "独立任务反馈",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "branch-observe",
+            "label": "核实后决定暂不处置",
+            "type": "flow"
+          },
+          {
+            "from": "branch-observe",
+            "to": "effect-observation",
+            "label": "正式开始核实后观察",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "closure-report",
+            "label": "报告回交后说明依据可闭环",
+            "type": "flow"
+          },
+          {
+            "from": "result-review",
+            "to": "effect-observation",
+            "label": "决定继续观察",
+            "type": "flow"
           }
         ]
       },
       {
         "id": "alarm",
         "title": "报警事件",
-        "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
+        "description": "按当前页面核对：风险提醒 → AI建议草稿 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
         "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
         "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
@@ -2521,7 +2806,9 @@
                   "effect-observation",
                   "notification",
                   "branch-continue",
-                  "branch-repair"
+                  "branch-repair",
+                  "work-item",
+                  "branch-observe"
                 ]
               }
             ]
@@ -2743,7 +3030,7 @@
             "from": "repair-report",
             "to": "effect-observation",
             "type": "output",
-            "label": ""
+            "label": "当前回交即采样，正式确认门槛待补齐"
           },
           {
             "from": "repair-report",
@@ -2845,7 +3132,7 @@
             "from": "notification",
             "to": "branch-continue",
             "type": "flow",
-            "label": "已提交报告未匹配异常结果"
+            "label": "剩余疑点或资料缺口"
           },
           {
             "from": "notification",
@@ -2972,13 +3259,43 @@
             "to": "notification",
             "type": "flow",
             "label": "后续复查与生命周期接续"
+          },
+          {
+            "from": "notification",
+            "to": "work-item",
+            "label": "更新接续人员入口",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "branch-observe",
+            "label": "核实后决定暂不处置",
+            "type": "flow"
+          },
+          {
+            "from": "branch-observe",
+            "to": "effect-observation",
+            "label": "正式开始核实后观察",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "closure-report",
+            "label": "报告回交后说明依据可闭环",
+            "type": "flow"
+          },
+          {
+            "from": "result-review",
+            "to": "effect-observation",
+            "label": "决定继续观察",
+            "type": "flow"
           }
         ]
       },
       {
         "id": "warning",
         "title": "预警事件",
-        "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
+        "description": "按当前页面核对：风险提醒 → AI建议草稿 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。",
         "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
         "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
@@ -3072,7 +3389,9 @@
                   "effect-observation",
                   "notification",
                   "branch-continue",
-                  "branch-repair"
+                  "branch-repair",
+                  "work-item",
+                  "branch-observe"
                 ]
               }
             ]
@@ -3294,7 +3613,7 @@
             "from": "repair-report",
             "to": "effect-observation",
             "type": "output",
-            "label": ""
+            "label": "当前回交即采样，正式确认门槛待补齐"
           },
           {
             "from": "repair-report",
@@ -3396,7 +3715,7 @@
             "from": "notification",
             "to": "branch-continue",
             "type": "flow",
-            "label": "已提交报告未匹配异常结果"
+            "label": "剩余疑点或资料缺口"
           },
           {
             "from": "notification",
@@ -3523,13 +3842,43 @@
             "to": "notification",
             "type": "flow",
             "label": "后续复查与生命周期接续"
+          },
+          {
+            "from": "notification",
+            "to": "work-item",
+            "label": "更新接续人员入口",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "branch-observe",
+            "label": "核实后决定暂不处置",
+            "type": "flow"
+          },
+          {
+            "from": "branch-observe",
+            "to": "effect-observation",
+            "label": "正式开始核实后观察",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "closure-report",
+            "label": "报告回交后说明依据可闭环",
+            "type": "flow"
+          },
+          {
+            "from": "result-review",
+            "to": "effect-observation",
+            "label": "决定继续观察",
+            "type": "flow"
           }
         ]
       },
       {
         "id": "tracking",
         "title": "异动跟踪",
-        "description": "按当前页面核对：风险提醒 → 待派任务 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。 当前异动跟踪也使用派发维修；维保仅保留兼容资料。",
+        "description": "按当前页面核对：风险提醒 → AI建议草稿 → 人工派发 → 逐项反馈 → 报告回交 → 再次决策；维修后观察，必要时复查，最后人工闭环。 异动核实后可选择维保计划和靠港窗口，派发独立的提前维保任务。",
         "subtitle": "来源 → 场景 → 初始事件分流 → 本轮任务与生命周期接续 → 结果处置",
         "note": "左侧事件列只保留事件开始时的信息与操作；处置报告回交后的再次决策和后续派发归右侧生命周期步骤。每次派发保留独立任务及旧轮报告。",
         "columns": [
@@ -3623,7 +3972,10 @@
                   "effect-observation",
                   "notification",
                   "branch-continue",
-                  "branch-repair"
+                  "branch-repair",
+                  "work-item",
+                  "maintenance-compat",
+                  "branch-observe"
                 ]
               }
             ]
@@ -3839,7 +4191,7 @@
             "from": "repair-report",
             "to": "effect-observation",
             "type": "output",
-            "label": ""
+            "label": "当前回交即采样，正式确认门槛待补齐"
           },
           {
             "from": "repair-report",
@@ -3941,7 +4293,7 @@
             "from": "notification",
             "to": "branch-continue",
             "type": "flow",
-            "label": "已提交报告未匹配异常结果"
+            "label": "剩余疑点或资料缺口"
           },
           {
             "from": "notification",
@@ -4068,6 +4420,48 @@
             "to": "notification",
             "type": "flow",
             "label": "后续复查与生命周期接续"
+          },
+          {
+            "from": "notification",
+            "to": "work-item",
+            "label": "更新接续人员入口",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "maintenance-compat",
+            "label": "异动核实后确认提前维保",
+            "type": "flow"
+          },
+          {
+            "from": "maintenance-compat",
+            "to": "task-feedback",
+            "label": "独立任务反馈",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "branch-observe",
+            "label": "核实后决定暂不处置",
+            "type": "flow"
+          },
+          {
+            "from": "branch-observe",
+            "to": "effect-observation",
+            "label": "正式开始核实后观察",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "closure-report",
+            "label": "报告回交后说明依据可闭环",
+            "type": "flow"
+          },
+          {
+            "from": "result-review",
+            "to": "effect-observation",
+            "label": "决定继续观察",
+            "type": "flow"
           }
         ]
       },
@@ -4168,7 +4562,8 @@
                   "repair-report",
                   "maintenance-compat",
                   "state-event",
-                  "notification"
+                  "notification",
+                  "work-item"
                 ]
               }
             ]
@@ -4185,7 +4580,8 @@
                   "result-review",
                   "closure-report",
                   "shore-packet",
-                  "state-report"
+                  "state-report",
+                  "workflow-gaps"
                 ]
               }
             ]
@@ -4479,6 +4875,24 @@
             "to": "state-event",
             "type": "flow",
             "label": "记录当前生命周期阶段"
+          },
+          {
+            "from": "notification",
+            "to": "work-item",
+            "label": "更新接续人员入口",
+            "type": "flow"
+          },
+          {
+            "from": "notification",
+            "to": "maintenance-compat",
+            "label": "异动核实后确认提前维保",
+            "type": "flow"
+          },
+          {
+            "from": "maintenance-compat",
+            "to": "task-feedback",
+            "label": "独立任务反馈",
+            "type": "flow"
           }
         ]
       },
@@ -4486,7 +4900,7 @@
         "id": "pages",
         "title": "用户动线",
         "subtitle": "从哪里进入 → 看什么 → 产生什么 → 去哪里继续",
-        "description": "围绕四个当前事件，按轮机长决策—大管轮执行反馈—处置报告回交—效果观察与闭环的顺序查看入口和产物。",
+        "description": "决策入口进入事件本轮工作区；执行入口进入独立任务详情；原事件和历轮任务均可回查。",
         "note": "四个当前事件共用阶段工作区；四缸事件从已有首轮排查后的待决策状态接续。岸基同步仍为待接收快照。",
         "columns": [
           {
@@ -4525,7 +4939,8 @@
               {
                 "title": "处理工作区",
                 "ids": [
-                  "page-event"
+                  "page-event",
+                  "page-task"
                 ]
               }
             ]
@@ -4555,7 +4970,7 @@
           {
             "from": "page-home",
             "to": "page-event",
-            "label": "风险处置卡片",
+            "label": "值得关注 · 事件卡片",
             "type": "flow"
           },
           {
@@ -4579,7 +4994,7 @@
           {
             "from": "page-todo",
             "to": "page-event",
-            "label": "按角色进入决策 / 步骤反馈",
+            "label": "决策／确认待办",
             "type": "flow"
           },
           {
@@ -4598,6 +5013,42 @@
             "from": "page-event",
             "to": "page-issues",
             "label": "返回列表 / 闭环回查",
+            "type": "flow"
+          },
+          {
+            "from": "page-home",
+            "to": "page-todo",
+            "label": "查看全部待办",
+            "type": "flow"
+          },
+          {
+            "from": "page-home",
+            "to": "page-task",
+            "label": "我的执行任务",
+            "type": "flow"
+          },
+          {
+            "from": "page-todo",
+            "to": "page-task",
+            "label": "执行待办／我派发的／任务历史",
+            "type": "flow"
+          },
+          {
+            "from": "page-event",
+            "to": "page-task",
+            "label": "进入关联本轮任务",
+            "type": "flow"
+          },
+          {
+            "from": "page-task",
+            "to": "page-event",
+            "label": "关联事件与报告回交",
+            "type": "flow"
+          },
+          {
+            "from": "page-task",
+            "to": "page-reports",
+            "label": "查看本轮报告",
             "type": "flow"
           }
         ]
@@ -4660,9 +5111,9 @@
             "branches": [
               {
                 "id": "branch-continue",
-                "title": "无异常结果，继续排查",
-                "condition": "已提交报告未匹配异常结果",
-                "action": "审阅下一轮待派排查，重新确认派发，确认负责人、未来时限与范围后创建本轮任务",
+                "title": "保留疑点，继续排查",
+                "condition": "原变化仍有疑点或比较资料缺口",
+                "action": "选定继续排查后审阅AI排查建议，核对执行人、时限与范围后确认派工",
                 "result": "新任务与旧报告同属原事件；无法确认不写成已修复",
                 "products": [
                   "notification"
@@ -4683,6 +5134,30 @@
                 "next": [
                   "task-repair"
                 ]
+              },
+              {
+                "id": "branch-observe",
+                "title": "核实后继续观察",
+                "condition": "现场核实后暂不处置或原异常自行回落",
+                "action": "轮机长说明依据后确认继续观察",
+                "result": "事件继续，无新增人员执行任务",
+                "products": [
+                  "effect-observation"
+                ],
+                "next": [
+                  "effect-observation"
+                ]
+              },
+              {
+                "id": "branch-close",
+                "title": "说明依据后闭环",
+                "condition": "轮机长认可本轮核实已足以解释并结束事件",
+                "action": "填写闭环依据，保留尚有的限制与后续跟踪安排",
+                "result": "归档历轮材料，不补造维修事实",
+                "products": [
+                  "closure-report"
+                ],
+                "next": []
               }
             ],
             "layer": "task"
@@ -4791,9 +5266,9 @@
             "branches": [
               {
                 "id": "branch-continue",
-                "title": "无异常结果，继续排查",
-                "condition": "已提交报告未匹配异常结果",
-                "action": "审阅下一轮待派排查，重新确认派发，确认负责人、未来时限与范围后创建本轮任务",
+                "title": "保留疑点，继续排查",
+                "condition": "原变化仍有疑点或比较资料缺口",
+                "action": "选定继续排查后审阅AI排查建议，核对执行人、时限与范围后确认派工",
                 "result": "新任务与旧报告同属原事件；无法确认不写成已修复",
                 "products": [
                   "notification"
@@ -4814,6 +5289,30 @@
                 "next": [
                   "task-repair"
                 ]
+              },
+              {
+                "id": "branch-observe",
+                "title": "核实后继续观察",
+                "condition": "现场核实后暂不处置或原异常自行回落",
+                "action": "轮机长说明依据后确认继续观察",
+                "result": "事件继续，无新增人员执行任务",
+                "products": [
+                  "effect-observation"
+                ],
+                "next": [
+                  "effect-observation"
+                ]
+              },
+              {
+                "id": "branch-close",
+                "title": "说明依据后闭环",
+                "condition": "轮机长认可本轮核实已足以解释并结束事件",
+                "action": "填写闭环依据，保留尚有的限制与后续跟踪安排",
+                "result": "归档历轮材料，不补造维修事实",
+                "products": [
+                  "closure-report"
+                ],
+                "next": []
               }
             ],
             "layer": "task"
@@ -4922,9 +5421,9 @@
             "branches": [
               {
                 "id": "branch-continue",
-                "title": "无异常结果，继续排查",
-                "condition": "已提交报告未匹配异常结果",
-                "action": "审阅下一轮待派排查，重新确认派发，确认负责人、未来时限与范围后创建本轮任务",
+                "title": "保留疑点，继续排查",
+                "condition": "原变化仍有疑点或比较资料缺口",
+                "action": "选定继续排查后审阅AI排查建议，核对执行人、时限与范围后确认派工",
                 "result": "新任务与旧报告同属原事件；无法确认不写成已修复",
                 "products": [
                   "notification"
@@ -4945,6 +5444,43 @@
                 "next": [
                   "task-repair"
                 ]
+              },
+              {
+                "id": "branch-observe",
+                "title": "核实后继续观察",
+                "condition": "现场核实后暂不处置或原异常自行回落",
+                "action": "轮机长说明依据后确认继续观察",
+                "result": "事件继续，无新增人员执行任务",
+                "products": [
+                  "effect-observation"
+                ],
+                "next": [
+                  "effect-observation"
+                ]
+              },
+              {
+                "id": "maintenance-compat",
+                "title": "异动核实，提前维保",
+                "condition": "现场与系统对应、背景记录支持异动且无相反结论",
+                "action": "选择维保计划和靠港窗口，审阅AI维保建议后确认派工",
+                "result": "产生独立维保任务，按所选计划提前执行",
+                "products": [
+                  "maintenance-compat"
+                ],
+                "next": [
+                  "task-feedback"
+                ]
+              },
+              {
+                "id": "branch-close",
+                "title": "说明依据后闭环",
+                "condition": "轮机长认可本轮核实已足以解释并结束事件",
+                "action": "填写闭环依据，保留尚有的限制与后续跟踪安排",
+                "result": "归档历轮材料，不补造维修事实",
+                "products": [
+                  "closure-report"
+                ],
+                "next": []
               }
             ],
             "layer": "task"
@@ -5003,11 +5539,11 @@
   "casePresentation": {
     "metadata": {
       "version": 1,
-      "generatedAt": "2026-10-29",
+      "generatedAt": "2026-10-30",
       "title": "四个当前事件：真实资料与页面流转",
       "sourceRoot": "D:/zstech/ship_sop",
       "timezone": "Asia/Shanghai（按来源文献及数据库无时区文本使用，未转换为UTC）",
-      "description": "0430 报警、0523 预警、一缸基线抬升、四缸相对基线下移；历史证据原样保留，步骤按当前页面演示。",
+      "description": "四个当前事件：来源资料、独立任务、报告回交与人员决策的对应关系。",
       "boundaries": [
         "只读SQLite，未重新运行检测/诊断模型。",
         "统计由本次脚本从真实数据库计算，不代表phase2-demo已具有这些实时统计能力。",
@@ -5077,80 +5613,80 @@
               "id": "current-0",
               "stageId": "triage",
               "title": "风险提醒与本轮决策",
-              "summary": "查看风险提醒、数据观测与证据资料，审阅待派排查。",
+              "summary": "查看风险提醒、数据观测与证据资料，审阅AI排查建议。",
               "productIds": [
                 "risk-brief",
                 "plan-draft"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-1",
               "stageId": "triage-dispatch",
               "title": "确认派发，形成独立任务",
-              "summary": "轮机长填写负责人、未来时限和批准范围；本步为产品操作演示。",
+              "summary": "轮机长选定派发动作，审阅AI建议，确认执行人、完成时间和范围后产生独立任务。",
               "productIds": [
                 "task-investigation",
                 "notification"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-2",
               "stageId": "task-feedback",
               "title": "逐项反馈与报告回交",
-              "summary": "大管轮按实际选择结果并填写结论，提交后生成报告；不预填为已完成。",
+              "summary": "执行人在任务详情填写本轮记录，提交后大模型流式生成报告，完整写入后交轮机长审阅。",
               "productIds": [
                 "task-feedback",
                 "investigation-report",
                 "report-analysis"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-3",
               "stageId": "notification",
               "title": "轮机长再次决策",
-              "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
+              "summary": "在同一决策工作区决定下一步：有具体异常可维修，异动核实可提前维保，尚有疑点可补查，也可继续观察或说明依据后闭环。",
               "productIds": [
                 "notification",
                 "task-repair"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-4",
               "stageId": "repair-report",
               "title": "提交实际措施与复测",
-              "summary": "维修步骤与整表共享草稿；提交报告后进入结果处置，无独立验收表。",
+              "summary": "维修／维保任务提交实际措施、复测结果与未完成项，AI整理本轮报告；当前回交即采样，正式观察确认门槛仍待补齐。",
               "productIds": [
                 "repair-report",
                 "effect-observation"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-5",
               "stageId": "result-review",
               "title": "观察、复查与人工闭环",
-              "summary": "结合报告与演示采样决定复查或闭环；流转末步不代表真实案例已维修、已验证或已正式关闭。",
+              "summary": "结合报告、采样与AI建议决定后续安排，人员确认后闭环；观察结果不替代现场验证。",
               "productIds": [
                 "task-recheck",
                 "closure-report",
                 "shore-packet"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             }
           ]
@@ -5206,80 +5742,80 @@
               "id": "current-0",
               "stageId": "triage",
               "title": "风险提醒与本轮决策",
-              "summary": "查看风险提醒、数据观测与证据资料，审阅待派排查。",
+              "summary": "查看风险提醒、数据观测与证据资料，审阅AI排查建议。",
               "productIds": [
                 "risk-brief",
                 "plan-draft"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-1",
               "stageId": "triage-dispatch",
               "title": "确认派发，形成独立任务",
-              "summary": "轮机长填写负责人、未来时限和批准范围；本步为产品操作演示。",
+              "summary": "轮机长选定派发动作，审阅AI建议，确认执行人、完成时间和范围后产生独立任务。",
               "productIds": [
                 "task-investigation",
                 "notification"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-2",
               "stageId": "task-feedback",
               "title": "逐项反馈与报告回交",
-              "summary": "大管轮按实际选择结果并填写结论，提交后生成报告；不预填为已完成。",
+              "summary": "执行人在任务详情填写本轮记录，提交后大模型流式生成报告，完整写入后交轮机长审阅。",
               "productIds": [
                 "task-feedback",
                 "investigation-report",
                 "report-analysis"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-3",
               "stageId": "notification",
               "title": "轮机长再次决策",
-              "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
+              "summary": "在同一决策工作区决定下一步：有具体异常可维修，异动核实可提前维保，尚有疑点可补查，也可继续观察或说明依据后闭环。",
               "productIds": [
                 "notification",
                 "task-repair"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-4",
               "stageId": "repair-report",
               "title": "提交实际措施与复测",
-              "summary": "维修步骤与整表共享草稿；提交报告后进入结果处置，无独立验收表。",
+              "summary": "维修／维保任务提交实际措施、复测结果与未完成项，AI整理本轮报告；当前回交即采样，正式观察确认门槛仍待补齐。",
               "productIds": [
                 "repair-report",
                 "effect-observation"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-5",
               "stageId": "result-review",
               "title": "观察、复查与人工闭环",
-              "summary": "结合报告与演示采样决定复查或闭环；流转末步不代表真实案例已维修、已验证或已正式关闭。",
+              "summary": "结合报告、采样与AI建议决定后续安排，人员确认后闭环；观察结果不替代现场验证。",
               "productIds": [
                 "task-recheck",
                 "closure-report",
                 "shore-packet"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             }
           ]
@@ -5322,80 +5858,80 @@
               "id": "current-0",
               "stageId": "triage",
               "title": "风险提醒与本轮决策",
-              "summary": "查看风险提醒、数据观测与证据资料，审阅待派排查。",
+              "summary": "查看风险提醒、数据观测与证据资料，审阅AI排查建议。",
               "productIds": [
                 "risk-brief",
                 "plan-draft"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-1",
               "stageId": "triage-dispatch",
               "title": "确认派发，形成独立任务",
-              "summary": "轮机长填写负责人、未来时限和批准范围；本步为产品操作演示。",
+              "summary": "轮机长选定派发动作，审阅AI建议，确认执行人、完成时间和范围后产生独立任务。",
               "productIds": [
                 "task-investigation",
                 "notification"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-2",
               "stageId": "task-feedback",
               "title": "逐项反馈与报告回交",
-              "summary": "大管轮按实际选择结果并填写结论，提交后生成报告；不预填为已完成。",
+              "summary": "执行人在任务详情填写本轮记录，提交后大模型流式生成报告，完整写入后交轮机长审阅。",
               "productIds": [
                 "task-feedback",
                 "investigation-report",
                 "report-analysis"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-3",
               "stageId": "notification",
               "title": "轮机长再次决策",
-              "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
+              "summary": "在同一决策工作区决定下一步：有具体异常可维修，异动核实可提前维保，尚有疑点可补查，也可继续观察或说明依据后闭环。",
               "productIds": [
                 "notification",
                 "task-repair"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-4",
               "stageId": "repair-report",
               "title": "提交实际措施与复测",
-              "summary": "维修步骤与整表共享草稿；提交报告后进入结果处置，无独立验收表。",
+              "summary": "维修／维保任务提交实际措施、复测结果与未完成项，AI整理本轮报告；当前回交即采样，正式观察确认门槛仍待补齐。",
               "productIds": [
                 "repair-report",
                 "effect-observation"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-5",
               "stageId": "result-review",
               "title": "观察、复查与人工闭环",
-              "summary": "结合报告与演示采样决定复查或闭环；流转末步不代表真实案例已维修、已验证或已正式关闭。",
+              "summary": "结合报告、采样与AI建议决定后续安排，人员确认后闭环；观察结果不替代现场验证。",
               "productIds": [
                 "task-recheck",
                 "closure-report",
                 "shore-packet"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             }
           ]
@@ -5441,80 +5977,80 @@
               "id": "current-0",
               "stageId": "notification",
               "title": "回看首轮报告，继续排查",
-              "summary": "当前原型预置首轮报告，进入时已待处置决策；从阶段条回看首轮，再继续排查。",
+              "summary": "首轮趋势与背景核实已回交；先判断相对基线下移是否获得支持，再决定是否补查、继续观察或闭环。",
               "productIds": [
                 "investigation-report",
                 "notification"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-1",
               "stageId": "notification",
               "title": "确认派发，形成独立任务",
-              "summary": "轮机长填写负责人、未来时限和批准范围；本步为产品操作演示。",
+              "summary": "轮机长选定派发动作，审阅AI建议，确认执行人、完成时间和范围后产生独立任务。",
               "productIds": [
                 "task-investigation",
                 "notification"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-2",
               "stageId": "task-feedback",
               "title": "逐项反馈与报告回交",
-              "summary": "大管轮按实际选择结果并填写结论，提交后生成报告；不预填为已完成。",
+              "summary": "执行人在任务详情填写本轮记录，提交后大模型流式生成报告，完整写入后交轮机长审阅。",
               "productIds": [
                 "task-feedback",
                 "investigation-report",
                 "report-analysis"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-3",
               "stageId": "notification",
               "title": "轮机长再次决策",
-              "summary": "无异常结果则继续排查，有异常结果则派发维修；审阅草稿后另建本轮任务。",
+              "summary": "在同一决策工作区决定下一步：有具体异常可维修，异动核实可提前维保，尚有疑点可补查，也可继续观察或说明依据后闭环。",
               "productIds": [
                 "notification",
                 "task-repair"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-4",
               "stageId": "repair-report",
               "title": "提交实际措施与复测",
-              "summary": "维修步骤与整表共享草稿；提交报告后进入结果处置，无独立验收表。",
+              "summary": "维修／维保任务提交实际措施、复测结果与未完成项，AI整理本轮报告；当前回交即采样，正式观察确认门槛仍待补齐。",
               "productIds": [
                 "repair-report",
                 "effect-observation"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             },
             {
               "id": "current-5",
               "stageId": "result-review",
               "title": "观察、复查与人工闭环",
-              "summary": "结合报告与演示采样决定复查或闭环；流转末步不代表真实案例已维修、已验证或已正式关闭。",
+              "summary": "结合报告、采样与AI建议决定后续安排，人员确认后闭环；观察结果不替代现场验证。",
               "productIds": [
                 "task-recheck",
                 "closure-report",
                 "shore-packet"
               ],
               "isSimulation": true,
-              "action": "对应当前页面的可选操作；本地图不写回应用。",
+              "action": "查看当前节点的输入、人员操作与关联产物。",
               "result": "保留原始证据与来源限制，由人员据实际记录决定。"
             }
           ]

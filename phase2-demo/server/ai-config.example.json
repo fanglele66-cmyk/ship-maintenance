@@ -5,9 +5,9 @@
   "model": "",
   "baseUrl": "",
   "protocol": "anthropic",
-  "maxTokens": 4096,
-  "timeoutMs": 120000,
-  "taskMaxTokens": 8192,
+  "maxTokens": 393216,
+  "timeoutMs": 180000,
+  "taskMaxTokens": 393216,
   "taskTimeoutMs": 180000,
   "knowledgeEnabled": true
 }

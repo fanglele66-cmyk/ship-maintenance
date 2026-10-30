@@ -6,10 +6,10 @@
   <section v-if="message.generatedReport" class="report-proposal"><strong>{{message.status==='complete'?'本轮报告':message.status==='streaming'?'本轮报告 · 生成中':'本轮报告 · 生成中断'}}</strong><MarkdownContent :content="generatedPreview(message.generatedReport)"/><button v-if="message.reportId" type="button" @click="$emit('report',message.reportId)">查看完整报告 →</button></section>
   <details v-if="message.progressLog?.length" class="processing-summary"><summary>分析摘要与处理进度</summary><ol><li v-for="(item,i) in message.progressLog" :key="i">{{item.label}}<p v-if="item.summary">{{item.summary}}</p></li></ol></details>
   <section v-if="message.taskDraft||message.taskChange" class="report-proposal task-change">
-   <strong>{{message.taskChange?'待派任务已更新':message.status==='streaming'?'任务修改中':'任务修改中断'}}</strong>
+   <strong>{{message.taskChange?'AI任务建议已更新':message.status==='streaming'?'任务修改中':'任务修改中断'}}</strong>
    <p class="report-prose">{{(message.taskChange||message.taskDraft).scope}}</p><p class="proposal-hint">{{(message.taskChange||message.taskDraft).rationale}}</p>
    <ol v-if="message.taskChange"><li v-for="step in message.taskChange.steps" :key="step.label">{{step.label}}</li></ol>
-   <button v-if="message.taskChange" type="button" @click="$emit('plan')">查看待派任务 →</button>
+   <button v-if="message.taskChange" type="button" @click="$emit('plan')">查看AI任务建议 →</button>
   </section>
   <details v-if="message.sources?.length" class="model-sources"><summary>参考资料 · {{message.sources.length}} 处</summary><article v-for="source in message.sources" :key="source.id"><b>[{{source.id}}] {{source.title}}</b><small>{{source.file}} · L{{source.startLine}}—{{source.endLine}}</small><p>{{source.text}}</p></article></details>
   <section v-if="reportContent" class="report-proposal" :aria-busy="message.status==='streaming'">

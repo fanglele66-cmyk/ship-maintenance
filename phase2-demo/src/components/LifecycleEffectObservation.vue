@@ -1,11 +1,11 @@
 <template>
  <section class="lc-effect-observation">
-  <header><h2>处理后效果观察</h2><span>{{task.observationEndedAt?'本轮观察已留存':'自动采样中'}}</span></header>
-  <div class="lc-effect-meta"><span>第{{task.round}}轮{{task.kind==='maintenance'?'维保':'维修'}} · {{task.owner}}</span><span>开始：{{timeText(task.submittedAt)}}<template v-if="!task.observationEndedAt"> · 下次汇总：{{timeText(observation?.nextUpdateAt)}}</template></span></div>
+  <header><h2>{{verification?'核实后继续观察':'处理后效果观察'}}</h2><span>{{task.observationEndedAt?'本轮观察已留存':'自动采样中'}}</span></header>
+  <div class="lc-effect-meta"><span>第{{task.round}}轮{{verification?'排查':task.kind==='maintenance'?'维保':'维修'}} · {{task.owner}}</span><span>开始：{{timeText(observationStart(task))}}<template v-if="!task.observationEndedAt"> · 下次汇总：{{timeText(observation?.nextUpdateAt)}}</template></span></div>
   <div class="lc-effect-metrics"><span v-for="(name,i) in config.names" :key="name"><i :style="{background:colors[i]}"/>{{name}} <b>{{windows.at(-1)?.values?.[i]??'—'}}</b> {{config.units[i]}}</span></div>
-  <div ref="chartEl" class="lc-effect-chart" role="img" :aria-label="'第'+task.round+'轮处理后传感器观测趋势'"/>
-  <p v-if="!windows.some(w=>w.sampleCount)" class="lc-effect-status">等待处理后首批采样，已提交的作业报告可在“阶段报告”中查看。</p>
-  <p v-else class="lc-effect-status">已保留 {{observation?.records.length||0}} 个两小时观察窗口。{{missingNames.length?'未取得：'+missingNames.join('、')+'。':''}}结合运行工况、原异常与现场复测记录判断处理效果。</p>
+  <div ref="chartEl" class="lc-effect-chart" role="img" :aria-label="'第'+task.round+(verification?'轮核实后':'轮处理后')+'传感器观测趋势'"/>
+  <p v-if="!windows.some(w=>w.sampleCount)" class="lc-effect-status">{{verification?'等待核实后首批采样，已提交的排查报告可在“阶段报告”中查看。':'等待处理后首批采样，已提交的作业报告可在“阶段报告”中查看。'}}</p>
+  <p v-else class="lc-effect-status">已保留 {{observation?.records.length||0}} 个两小时观察窗口。{{missingNames.length?'未取得：'+missingNames.join('、')+'。':''}}{{verification?'本轮暂未处置，结合现场核实记录判断变化是否持续、扩大、恢复或复发。':'结合运行工况、原异常与现场复测记录判断处理效果。'}}</p>
   <details v-if="windows.length" class="lc-effect-records"><summary>观察记录 · {{windows.length}} 个窗口</summary><div v-for="window in windows" :key="window.id"><time>{{timeText(window.windowStart)}} — {{timeText(window.windowEnd)}}</time><p>{{config.names.map((name,i)=>name+' '+(window.values[i]??'未取得')+' '+config.units[i]).join('；')}}</p><small>{{window.complete?'已汇总':'当前窗口'}} · {{window.sampleCount}} 条采样{{window.complete&&!window.covered?' · 存在未覆盖时段':''}}</small></div></details>
  </section>
 </template>
@@ -15,7 +15,9 @@ import * as echarts from 'echarts'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {timeText} from '../workflow/eventLifecycle'
 import {observationSettings} from '../workflow/lifecycleObservation'
+import {observationStart,isVerificationObservation} from '../workflow/observationContext'
 const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}})
+const verification=computed(()=>isVerificationObservation(props.task))
 const observation=computed(()=>props.task.observation),config=computed(()=>observationSettings(props.event)||{names:[],units:[]})
 const windows=computed(()=>[...(observation.value?.records||[]),...(observation.value?.pending?[observation.value.pending]:[])])
 const missingNames=computed(()=>config.value.names.filter((name,i)=>!Number.isFinite(windows.value.at(-1)?.values?.[i])))
@@ -25,9 +27,9 @@ function startSampling(){clearInterval(timer);store.refreshObservations();timer=
 function stopSampling(){clearInterval(timer)}
 function render(){
  if(!chart)return
- const units=[...new Set(config.value.units)],start=Math.max(Date.parse(props.task.submittedAt),samples.value[0]?.[0]?.timestamp||0),end=Date.parse(observation.value?.checkedAt)||Date.now()
+ const units=[...new Set(config.value.units)],start=Math.max(Date.parse(observationStart(props.task)),samples.value[0]?.[0]?.timestamp||0),end=Date.parse(observation.value?.checkedAt)||Date.now()
  const span=Math.max(120000,Math.ceil((end-start)/120000)*120000)
- chart.setOption({animation:false,color:colors,tooltip:{trigger:'axis',confine:true},grid:{left:45,right:units.length>1?45:20,top:25,bottom:30},xAxis:{type:'time',min:start,max:start+span,axisLabel:{fontSize:10,hideOverlap:true,formatter:value=>new Date(value).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',...((Date.parse(observation.value?.checkedAt)-Date.parse(props.task.submittedAt))<600000?{second:'2-digit'}:{}),hour12:false})},splitNumber:5},yAxis:units.map((unit,i)=>({type:'value',name:unit,position:i?'right':'left',axisLabel:{fontSize:10},splitLine:{show:!i,lineStyle:{color:'#edf1f6',type:'dashed'}}})),series:config.value.names.map((name,i)=>({name,type:'line',yAxisIndex:units.indexOf(config.value.units[i]),connectNulls:false,showSymbol:false,symbolSize:5,data:samples.value[i]?.length?samples.value[i].map(p=>[p.timestamp,p.value]):windows.value.flatMap(w=>{const c=w.channels?.[i],end=Date.parse(w.windowEnd);if(!c?.lastAt||!Number.isFinite(c.value))return [[end,null]];const point=[Date.parse(c.lastAt),c.value];return !c.covered&&point[0]<end?[point,[end,null]]:[point]})}))},true)
+ chart.setOption({animation:false,color:colors,tooltip:{trigger:'axis',confine:true},grid:{left:45,right:units.length>1?45:20,top:25,bottom:30},xAxis:{type:'time',min:start,max:start+span,axisLabel:{fontSize:10,hideOverlap:true,formatter:value=>new Date(value).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',...((Date.parse(observation.value?.checkedAt)-Date.parse(observationStart(props.task)))<600000?{second:'2-digit'}:{}),hour12:false})},splitNumber:5},yAxis:units.map((unit,i)=>({type:'value',name:unit,position:i?'right':'left',axisLabel:{fontSize:10},splitLine:{show:!i,lineStyle:{color:'#edf1f6',type:'dashed'}}})),series:config.value.names.map((name,i)=>({name,type:'line',yAxisIndex:units.indexOf(config.value.units[i]),connectNulls:false,showSymbol:false,symbolSize:5,data:samples.value[i]?.length?samples.value[i].map(p=>[p.timestamp,p.value]):windows.value.flatMap(w=>{const c=w.channels?.[i],end=Date.parse(w.windowEnd);if(!c?.lastAt||!Number.isFinite(c.value))return [[end,null]];const point=[Date.parse(c.lastAt),c.value];return !c.covered&&point[0]<end?[point,[end,null]]:[point]})}))},true)
 }
 onMounted(()=>{startSampling();chart=echarts.init(chartEl.value,null,{renderer:'svg'});render();observer=new ResizeObserver(()=>chart?.resize());observer.observe(chartEl.value)})
 watch(()=>observation.value,()=>nextTick(render),{deep:true})

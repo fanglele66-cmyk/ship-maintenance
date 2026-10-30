@@ -1,7 +1,7 @@
 <template>
  <section v-if="plan" class="lc-pending-plan" :aria-busy="busy">
-  <header><div><h2>{{planTabLabel(plan.action)}}</h2><small>{{busy?'AI 正在整理任务…':plan.status==='ready'?'待派发 · 轮机长确认后交执行人':'待生成'}}<template v-if="plan.steps.length"> · 共 {{plan.steps.length}} 项</template></small></div><button type="button" :disabled="plan.status!=='ready'" @click="$emit('edit')">通过对话修改任务</button></header>
-  <p class="lc-plan-note">{{plan.action==='recheck'?'复查用于核对维修效果、剩余事项及原异常是否再现。':'请先审阅任务范围与执行步骤，再在处置表单中指定负责人和完成时间。'}}</p>
+  <header><div><h2>{{planTabLabel(plan.action)}}</h2><small>{{busy?'AI 正在整理建议…':plan.status==='ready'?'建议草稿 · 确认派工后才创建执行任务':'建议待生成'}}<template v-if="plan.steps.length"> · 共 {{plan.steps.length}} 项</template></small></div><div class="lc-plan-actions"><button type="button" :disabled="plan.status!=='ready'" @click="$emit('edit')">通过对话修改任务</button><button type="button" class="lc-dispatch-button" :disabled="plan.status!=='ready'" @click="$emit('dispatch')">去派工 <span aria-hidden="true">↗</span></button></div></header>
+  <p class="lc-plan-note">{{plan.action==='recheck'?'根据本轮报告与观察记录，建议复核尚待确认的现象、已做措施与原异常是否再现；不预设已经维修。':'请先审阅建议范围与步骤，再通过“去派工”指定执行人和完成时间。'}}</p>
   <p v-if="sourceReport" class="lc-plan-source">任务依据：{{sourceReport.title}}</p>
   <section v-if="plan.preview?.scope||plan.scope"><h3>本轮任务范围</h3><p>{{plan.source==='preset'?plan.scope:plan.preview?.scope||plan.scope}}</p></section>
   <section v-if="plan.preview?.rationale||plan.rationale"><h3>安排依据与检查方向</h3><p>{{plan.source==='preset'?plan.rationale:plan.preview?.rationale||plan.rationale}}</p></section>
@@ -18,10 +18,13 @@ import LifecycleStepInstructions from './LifecycleStepInstructions.vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {planTabLabel} from '../workflow/taskPlanning'
 const props=defineProps({event:{type:Object,required:true}})
-defineEmits(['edit'])
+defineEmits(['edit','dispatch'])
 const store=useEventLifecycleStore(),plan=computed(()=>props.event.pendingPlan),busy=computed(()=>['pending','generating','updating'].includes(plan.value?.status)),sourceReport=computed(()=>props.event.reports.find(r=>r.id===plan.value?.sourceReportId))
 function retry(){void store.prepareTaskPlan(props.event.id,{retry:true}).catch(()=>{})}
 </script>
 <style scoped>
 .lc-pending-plan>header{display:flex;align-items:center;justify-content:space-between;gap:16px}.lc-pending-plan h2{margin:0 0 8px}.lc-pending-plan small,.lc-plan-note{color:#8996a5;font-size:12px}.lc-pending-plan button{border:1px solid #d9c6a6;background:#fffaf1;color:#94733f;border-radius:5px;padding:8px 12px;cursor:pointer;font:inherit;font-size:12px}.lc-pending-plan button:disabled{opacity:.5;cursor:wait}.lc-pending-plan>section{margin:20px 0}.lc-pending-plan>section h3{font-size:14px}.lc-pending-plan>section p{white-space:pre-line}.lc-plan-progress{font-size:12px;color:#957441}.lc-plan-error{background:#fcf5ec;padding:12px;font-size:12px;color:#9e6b39}.lc-pending-plan details{font-size:12px;color:#8795a6;overflow-wrap:anywhere}.lc-pending-plan summary{cursor:pointer}@media(max-width:700px){.lc-pending-plan>header{align-items:flex-start;flex-direction:column}}
+</style>
+<style scoped>
+.lc-plan-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lc-pending-plan .lc-dispatch-button{display:flex;align-items:center;gap:14px;background:#292d2b;color:#fff;border-color:#292d2b;box-shadow:0 2px 4px #18251d12}.lc-pending-plan .lc-dispatch-button:hover:not(:disabled){background:#3f4842}.lc-dispatch-button span{font-size:16px;line-height:1}
 </style>

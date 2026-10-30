@@ -24,7 +24,7 @@
   <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
     <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span></ModuleHeader>
-    <div class="lc-home-chronology"><section v-for="period in chronology.periods" :key="period.start" class="lc-home-period"><time>{{period.time}}</time><strong class="lc-operation-status" :class="'operation-'+period.tone">{{period.status}}</strong><p>{{period.detail}}</p><p class="lc-ais-line">AIS · {{period.ais}}</p><small class="lc-ais-position">时段末位置 {{period.position}}</small></section></div>
+    <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
@@ -46,6 +46,7 @@ import ModuleHeader from '@/components/ModuleHeader.vue'
 
 
 import LifecycleWorkbench from '@/components/LifecycleWorkbench.vue'
+import NavigationVoyage from '@/components/NavigationVoyage.vue'
 import {navigationChronology} from '../workflow/navigationChronology'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const lifecycle=useEventLifecycleStore(),workbench=ref(null)
@@ -124,7 +125,7 @@ const devices=computed(()=>{
 <style scoped>
 @media(min-width:761px){
 .captain-workbench{height:100%;overflow:hidden;grid-template-columns:clamp(250px,25vw,420px) minmax(0,1fr);gap:12px}
-.captain-right{display:grid;grid-template-rows:max-content minmax(0,1fr);align-content:start;overflow:hidden;gap:12px}
+.captain-right{display:grid;grid-template-rows:max-content max-content;align-content:start;overflow:auto;gap:12px}
 .captain-analysis{min-height:0;max-height:none;overflow:visible}
 .captain-analysis-body{padding:0 18px 14px;max-width:none;font-size:clamp(14px,.65vw,16px);line-height:1.65}
 .captain-analysis :deep(.module-header){padding:12px 18px;min-height:40px}

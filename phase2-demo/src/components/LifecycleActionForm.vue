@@ -31,11 +31,12 @@ import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {currentTask,decisionOptions,ensureTaskPlan,people} from '../workflow/eventLifecycle'
 import {maintenancePlans,availableMaintenanceWindows} from '../workflow/maintenancePlans'
 import {planTabLabel} from '../workflow/taskPlanning'
+import {suggestionAction} from '../workflow/lifecycleDecisions'
 import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
 const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,deadline:'',maintenancePlanId:'',window:''}))
-const plan=computed(()=>captain.value?ensureTaskPlan(props.event):null)
+const plan=computed(()=>captain.value&&suggestionAction(props.event)?ensureTaskPlan(props.event):null)
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))
 const reason=computed({get:()=>dispatch.value?plan.value?.scope||'':decision.value.action==='shore'?decision.value.shoreReason||'':decision.value.reason,set:value=>{if(dispatch.value&&plan.value){plan.value.scope=value;plan.value.version++}else if(decision.value.action==='shore')decision.value.shoreReason=value;else decision.value.reason=value}})
 watch(options,list=>{if(props.shoreOnly){decision.value.action=list.some(o=>o.value==='shore')?'shore':'';return}if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})

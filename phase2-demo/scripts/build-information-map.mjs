@@ -49,7 +49,7 @@ const data = {
 const nodes = new Map(data.nodes.map(node => [node.id, node]))
 const views = new Map(data.views.map(view => [view.id, view]))
 const layers = ['raw', 'processing', 'scenario', 'event', 'task', 'result']
-const taskTypes = { 'task-investigation': 'investigation', 'task-repair': 'repair', 'task-recheck': 'recheck' }
+const taskTypes = { 'task-investigation': 'investigation', 'task-repair': 'repair', 'task-recheck': 'recheck', 'maintenance-compat': 'maintenance' }
 assert.equal(nodes.size, data.nodes.length, 'Duplicate map node IDs')
 assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'states', 'pages'])
 assert.deepEqual(data.informationLayers.map(layer => layer.id), layers)
@@ -76,7 +76,7 @@ for (const node of nodes.values()) {
     assert(source.line > 0 && source.line <= content.split('\n').length, 'Invalid evidence line: ' + source.path)
   }
 }
-const taskGates = { 'task-investigation': ['triage-dispatch', 'notification'], 'task-repair': ['notification'], 'task-recheck': ['notification'] }
+const taskGates = { 'task-investigation': ['triage-dispatch', 'notification'], 'task-repair': ['notification'], 'task-recheck': ['notification'], 'maintenance-compat': ['notification'] }
 for (const [id, gates] of Object.entries(taskGates)) assert.deepEqual(nodes.get(id).sources, gates, 'Task bypasses initial or follow-up confirmation: ' + id)
 assert.deepEqual(nodes.get('plan-draft').sources, ['triage'], 'Initial task draft must not receive follow-up decisions')
 assert.equal(nodes.get('notification').layer, 'task')
@@ -109,12 +109,13 @@ for (const view of views.values()) {
     seen.add(from)
     return view.edges.filter(edge => edge.from === from).some(edge => reaches(edge.to, to, seen))
   }
-  const paths = view.id === 'pages' ? [['page-home', 'page-event'], ['page-todo', 'page-event'], ['page-issues', 'page-event'], ['page-event', 'page-reports']] : [
+  const paths = view.id === 'pages' ? [['page-home', 'page-event'], ['page-home','page-todo'], ['page-todo', 'page-event'], ['page-todo','page-task'], ['page-event','page-task'], ['page-task','page-event'], ['page-task','page-reports'], ['page-issues', 'page-event'], ['page-event', 'page-reports']] : [
     ['sample', 'mapped-samples'], ['mapped-samples', 'sample-quality'], ['sample-quality', 'time-features'],
     ['triage', 'triage-dispatch'], ['triage-dispatch', 'task-investigation'], ['task-investigation', 'investigation-report'],
     ['investigation-report', 'notification'], ['notification', 'task-investigation'], ['notification', 'task-repair'],
     ['task-repair', 'repair-report'], ['repair-report', 'effect-observation'], ['effect-observation', 'result-review'],
     ['result-review', 'task-recheck'], ['task-recheck', 'investigation-report'], ['result-review', 'closure-report'],
+    ['notification','maintenance-compat'], ['maintenance-compat','task-feedback'], ['notification','work-item'], ['notification','branch-observe'], ['branch-observe','effect-observation'],
   ]
   // The status view intentionally condenses observation into its task/result ownership cards.
   for (const [from, to] of paths) if (displayed.has(from) && displayed.has(to)) assert(reaches(from, to), view.id + ': broken path ' + from + ' -> ' + to)

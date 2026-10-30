@@ -20,7 +20,7 @@ test('first report streams real response fields before final handoff and preserv
  finish(model);const report=await pending
  assert.equal(calls,1);assert.equal(task.status,'submitted');assert.equal(event.phase,'decision');assert.equal(report.summary,patch.summary);assert.deepEqual(report.usage,model.usage);assert.deepEqual(task.records,original.records);assert.equal(task.summary,original.summary)
  assert.match(report.markdown,/现场原始记录 0/);assert.match(report.markdown,/具体部件原因待计划内检查确认/)
- assert.deepEqual(decisionOptions(event).map(o=>o.value),['maintenance','shore'])
+ assert.deepEqual(decisionOptions(event).map(o=>o.value),['maintenance','observe','close','shore'])
  assert.equal(task.conversations.engineer.filter(m=>m.kind==='user').length,1)
  refreshLifecyclePresentation(state);assert.equal(report.summary,patch.summary)
 })
@@ -78,5 +78,5 @@ test('submission API invokes provider, streams report previews and validates com
   const original=globalThis.fetch;globalThis.fetch=async()=>new Response(wire,{headers:{'content-type':'text/event-stream'}})
   try{return await aiStreamRequest(body,on)}finally{globalThis.fetch=original}
  })
- assert.equal(calls,1);assert.match(sent.system,/首次生成报告/);assert.equal(JSON.parse(sent.messages.at(-1).content).availableDecisions[0].value,'maintenance');assert.equal(report.usage.inputTokens,12);assert.equal(report.usage.outputTokens,24);assert.equal(report.summary,patch.summary)
+ assert.equal(calls,1);assert.match(sent.system,/首次生成报告/);assert.deepEqual(JSON.parse(sent.messages.at(-1).content).availableDecisions.map(o=>o.value),['maintenance','observe','close','shore']);assert.equal(report.usage.inputTokens,12);assert.equal(report.usage.outputTokens,24);assert.equal(report.summary,patch.summary)
 })

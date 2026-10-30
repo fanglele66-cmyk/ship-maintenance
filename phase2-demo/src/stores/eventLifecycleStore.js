@@ -9,6 +9,8 @@ import {acceptTaskPlan} from '../workflow/taskPlanning.js'
 import {updateObservationAdvice} from '../workflow/observationAdvice.js'
 import {lifecycleWorkItems,lifecycleNotifications,canViewTask,taskConversation,taskTitle} from '../workflow/lifecycleWorkItems.js'
 import {generateTaskReport,recoverTaskReportGeneration} from '../workflow/taskReportGeneration.js'
+import {observationTaskFor} from '../workflow/observationContext.js'
+import {suggestionAction} from '../workflow/lifecycleDecisions.js'
 const storageKey='engine-room-captain-workflow-v1',roleKey='engine-room-current-role'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let reportSession=crypto.randomUUID();try{reportSession=sessionStorage.getItem('engine-room-report-session')||reportSession;sessionStorage.setItem('engine-room-report-session',reportSession)}catch{}
@@ -45,9 +47,9 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  function acknowledge(id){markRead(id);state.notices.filter(n=>n.eventId===id&&n.recipient===state.role).forEach(n=>n.read=true)}
  const pendingRequests=reactive({})
  const planRequests=new Map()
- function modelEvent(event){return {id:event.id,title:event.title,tracking:event.tracking,phase:event.phase,currentTask:event.currentTask,number:event.number,brief:event.brief,reports:event.reports.map(r=>({id:r.id,kind:r.kind,summary:r.summary,markdown:r.markdown})),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance}))}}
+ function modelEvent(event){return {id:event.id,title:event.title,tracking:event.tracking,phase:event.phase,phases:event.phases.slice(-1),decisionDraft:{action:event.decisionDraft?.action},currentTask:event.currentTask,number:event.number,brief:event.brief,reports:event.reports.map(r=>({id:r.id,kind:r.kind,summary:r.summary,markdown:r.markdown})),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt}))}}
  function prepareTaskPlan(id,{retry=false,editText='',onProgress}={}){
-  const event=state.events[id],draft=event&&ensureTaskPlan(event)
+  const event=state.events[id],draft=event&&suggestionAction(event)&&ensureTaskPlan(event)
   if(!draft)return Promise.resolve(null)
   const requestKey=draft.key
   if(planRequests.has(requestKey))return planRequests.get(requestKey)
@@ -58,7 +60,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   draft.status=editText?'updating':'generating';draft.error='';draft.preview=null;draft.requestId=requestId
   const run=(async()=>{
    try{
-    const work=[...event.tasks].reverse().find(t=>t.kind!=='investigation'&&t.status==='submitted')
+    const work=observationTaskFor(event)
     const result=await aiStreamRequest({mode:'plan',planMode:editText?'edit':'generate',role:'captain',actor:people.captain,text:editText||'请依据已提交的逐项记录与历轮报告预生成下一步任务，说明已经排除的方向、尚存疑点和验证方法。',event:modelEvent(event),plan:{action:draft.action,...before},observations:work?.observation?{records:work.observation.records.slice(-3),pending:work.observation.pending}:null},(kind,data)=>{
      const current=state.events[id]?.pendingPlan
      if(current?.requestId!==requestId||current.key!==expected.key)return
@@ -79,7 +81,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   planRequests.set(requestKey,run);return run
  }
  async function askPlan(id,text){
-  const event=state.events[id],draft=event&&ensureTaskPlan(event),key=id+':captain'
+  const event=state.events[id],draft=event&&suggestionAction(event)&&ensureTaskPlan(event),key=id+':captain'
   if(state.role!=='captain'||!draft)throw Error('当前身份或阶段不能修改待派任务。')
   if(pendingRequests[key])return
   if(draft.status!=='ready')throw Error('请等待待派任务生成完成后再修改。')

@@ -17,7 +17,7 @@ export function ensurePlanDraft(event,seed){
  const preset=action==='recheck'
  event.pendingPlan={key,action,version:0,status:needsModel?'pending':'ready',source:preset?'preset':needsModel?'':'existing',scope:needsModel&&!preset?'':savedScope||seed.scope,rationale:seed.rationale,steps:needsModel&&!preset?[]:seed.steps,procedureVersion:seed.procedureVersion,sourceReportId:event.reports.at(-1)?.id||null,usage:null,sources:[],error:''}
  // A saved choice from an earlier gate must not survive a changed decision branch.
- if(event.decisionDraft){event.decisionDraft.action='';event.decisionDraft.reason=''}
+ if(event.decisionDraft&&event.decisionDraft.action!==action&&['investigate','repair','maintenance','recheck'].includes(event.decisionDraft.action)){event.decisionDraft.action='';event.decisionDraft.reason=''}
  return event.pendingPlan
 }
 export function normalizeTaskPlan(value,action){
@@ -43,4 +43,4 @@ export function acceptTaskPlan(event,expected,result){
  Object.assign(draft,patch,{status:'ready',source:edit?.source||'model',version:draft.version+1,error:'',preview:null,generatedAt:new Date().toISOString(),usage:result.usage,sources:result.sources||[]})
  return draft
 }
-export const planTabLabel=action=>({investigate:'待派发排查',repair:'待派发维修',maintenance:'待派发维保',recheck:'复查任务'}[action]||'待派任务')
+export const planTabLabel=action=>({investigate:'AI排查建议',repair:'AI维修建议',maintenance:'AI维保建议',recheck:'AI复查建议'}[action]||'AI任务建议')
