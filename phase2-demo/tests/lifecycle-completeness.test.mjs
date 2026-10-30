@@ -24,14 +24,14 @@ test('repair without package metadata has concrete preparation, execution and ve
  assert.ok(plan.steps.every(s=>s.guide&&(s.checks.length>=2||s.substeps?.every(c=>c.checks.length>=2))&&s.recordHint));dispatch(state,'repair');assert.deepEqual(currentTask(event).steps,plan.steps)
 })
 
-test('legacy partially completed repair keeps original entries and does not auto-complete detailed steps',()=>{
+test('legacy dispatched three-step repair retains its steps and feedback across reload',()=>{
  const state=repairState();dispatch(state,'repair');const task=currentTask(state.events[id])
- task.procedureVersion=undefined;task.steps=[{label:'核对获批处理范围与作业条件'},{label:'实施本次批准的处理项目'},{label:'恢复系统并记录复测结果'}]
+ task.procedureVersion=undefined;task.steps=['核对获批处理范围与作业条件','实施本次批准的处理项目','恢复系统并记录复测结果'].map(label=>({label,options:['已完成','未完成','不适用']}))
  task.draft={records:task.steps.map((s,i)=>({label:s.label,result:i===0?'已完成':'',note:i===0?'原隔离记录：燃油与伺服油已卸压确认。':''})),summary:'原总结内容',attachments:[{name:'原照片.jpg'}],stepIndex:1}
  const original=structuredClone(task.draft);refreshLifecyclePresentation(state)
- assert.deepEqual(task.procedureHistory[0].draft,original);assert.equal(task.draft.summary,original.summary);assert.deepEqual(task.draft.attachments,original.attachments);assert.ok(task.draft.records.every(r=>!r.result));assert.equal(task.steps.length,4)
+ assert.deepEqual(task.draft,original);assert.equal(task.procedureHistory,undefined);assert.equal(task.steps.length,3)
  const snapshot=structuredClone(task);refreshLifecyclePresentation(state);assert.deepEqual(task,snapshot)
- const report=submit(state,'已完成复装，复测记录另附。');assert.match(report.markdown,/原隔离记录/)
+ state.role='engineer';task.draft.records.forEach(r=>r.result='已完成');task.draft.summary='已完成复装，复测记录另附。';const report=submitTask(state,id);assert.match(report.markdown,/原隔离记录/)
 })
 
 test('recheck has a usable full preset while awaiting AI and accepts only a complete current revision',()=>{

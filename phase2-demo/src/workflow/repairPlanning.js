@@ -85,12 +85,5 @@ export function presetRecheckSteps(event){
  return result.map(s=>({...s,options:['发现异常','未见异常','无法确认']}))
 }
 
-export function upgradeAssignedRepair(event,build){
- for(const task of event.tasks){
-  if(task.kind!=='repair'||task.status!=='assigned'||task.procedureVersion===repairProcedureVersion)continue
-  if(task.steps.length>3||!task.steps.some(s=>s.label==='实施本次批准的处理项目'))continue
-  // Preserve the original partially filled work card, never infer completion of new steps.
-  task.procedureHistory=[...(task.procedureHistory||[]),{at:new Date().toISOString(),steps:clone(task.steps),draft:clone(task.draft)}]
-  task.steps=build();task.draft={...task.draft,stepIndex:0,records:task.steps.map(s=>({label:s.label,result:'',note:''}))};task.procedureVersion=repairProcedureVersion
- }
-}
+// Dispatched work cards are snapshots. Template upgrades must never replace
+// their steps or clear feedback, including when the same task is resumed.

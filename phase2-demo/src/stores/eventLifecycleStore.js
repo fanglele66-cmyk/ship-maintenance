@@ -1,3 +1,5 @@
+import {refreshTaskReport} from '../workflow/reportRefresh.js'
+import {currentReportContext,reportTask,submissionContext,submissionSnapshot} from '../workflow/reportSubmissions.js'
 import {defineStore} from 'pinia'
 import {reactive,computed,watch} from 'vue'
 import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,askAssistant,people,refreshLifecyclePresentation,ensureTaskPlan} from '../workflow/eventLifecycle.js'
@@ -47,7 +49,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  function acknowledge(id){markRead(id);state.notices.filter(n=>n.eventId===id&&n.recipient===state.role).forEach(n=>n.read=true)}
  const pendingRequests=reactive({})
  const planRequests=new Map()
- function modelEvent(event){return {id:event.id,title:event.title,tracking:event.tracking,phase:event.phase,phases:event.phases.slice(-1),decisionDraft:{action:event.decisionDraft?.action},currentTask:event.currentTask,number:event.number,brief:event.brief,reports:event.reports.map(r=>({id:r.id,kind:r.kind,summary:r.summary,markdown:r.markdown})),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt}))}}
+ function modelEvent(event){return {id:event.id,title:event.title,tracking:event.tracking,phase:event.phase,phases:event.phases.slice(-1),decisionDraft:{action:event.decisionDraft?.action},currentTask:event.currentTask,number:event.number,brief:event.brief,reports:currentReportContext(event),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt}))}}
  function prepareTaskPlan(id,{retry=false,editText='',onProgress}={}){
   const event=state.events[id],draft=event&&suggestionAction(event)&&ensureTaskPlan(event)
   if(!draft)return Promise.resolve(null)
@@ -122,7 +124,8 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   try{
    const context=modelEvent(event)
    if(task){context.currentTask=task.id;context.tasks=context.tasks.filter(t=>t.id===task.id).map(t=>({...t,records:task.status==='assigned'?task.draft.records:task.records}));context.reports=context.reports.filter(r=>r.id===task.sourceReportId||event.reports.find(x=>x.id===r.id)?.taskId===task.id);context.taskContext={title:taskTitle(task),scope:task.scope,owner:task.owner,instruction:'仅回答本任务的范围、步骤与结果，不改写其他轮次任务或代替轮机长决策。'}}
-   const result=await aiStreamRequest({text,mode,role,actor:people[role],event:context,history,...(mode==='report'?{report:{id:report.id,taskId:report.taskId,eventId:report.eventId,kind:report.kind,owner:report.owner,summary:report.summary,markdown:baseMarkdown}}:{})},(kind,data)=>{
+   if(mode==='report'){const source=reportTask(event,report);context.currentTask=source.id;context.tasks=[{...submissionSnapshot(source),status:'submitted'}];context.reports=currentReportContext(event,{excludeTaskId:source.id});context.submissionContext=submissionContext(event,source,report.id)}
+   const result=await aiStreamRequest({text,mode,role,actor:people[role],event:context,history:mode==='report'?[]:history,...(mode==='report'?{report:{id:report.id,taskId:report.taskId,eventId:report.eventId,kind:report.kind,owner:report.owner,summary:report.summary,markdown:baseMarkdown}}:{})},(kind,data)=>{
     const message=reply();if(!message)return
     if(kind==='meta')message.sources=data.sources
     if(kind==='progress'){message.progress=data;message.progressLog.push(data)}
@@ -144,5 +147,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.engineer:event?.conversations.engineer)?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
  async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
- return {state,events,pending,tasks,reports,workItems,notifications,unread,notices,people,pendingRequests,prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
+ return {state,events,pending,tasks,reports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

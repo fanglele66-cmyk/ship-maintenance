@@ -1,3 +1,4 @@
+import {currentReportContext,submissionContext,submissionSnapshot} from './reportSubmissions.js'
 import {beginTaskReport,submitTask,people} from './eventLifecycle.js'
 import {validateGeneratedReport} from './generatedReport.js'
 const copy=value=>JSON.parse(JSON.stringify(value))
@@ -7,11 +8,11 @@ export async function generateTaskReport(state,eventId,taskId,request,{ownerSess
  const messageId='report-'+requestId
  task.conversations.engineer.push({id:messageId,kind:'model',text:'',at:new Date().toISOString(),status:'streaming',progress:task.reportGeneration.progress,progressLog:[],generatedReport:{summary:'',analysis:{}}})
  const current=()=>{const e=state.events[eventId],t=e?.tasks.find(t=>t.id===taskId);return e?.currentTask===taskId&&t?.reportGeneration?.requestId===requestId?{event:e,task:t,message:t.conversations.engineer.find(m=>m.id===messageId)}:null}
- const context=copy({id:event.id,title:event.title,number:event.number,tracking:event.tracking,phase:event.phase,currentTask:task.id,brief:event.brief,reports:event.reports.map(r=>({id:r.id,kind:r.kind,summary:r.summary})),tasks:[task],taskContext:{title:task.title,scope:task.scope,owner:task.owner}})
+ const context=copy({id:event.id,title:event.title,number:event.number,tracking:event.tracking,phase:event.phase,currentTask:task.id,brief:event.brief,reports:currentReportContext(event,{excludeTaskId:task.id}),submissionContext:submissionContext(event,task),tasks:[task],taskContext:{title:task.title,scope:task.scope,owner:task.owner}})
  // Only original feedback and the dispatched plan are sent, never UI drafts or chat state.
- context.tasks=context.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,owner:t.owner,status:t.status,scope:t.scope,steps:t.steps,records:t.records,summary:t.summary,attachments:t.attachments,maintenance:t.maintenance}))
+ context.tasks=context.tasks.map(t=>({...submissionSnapshot(t),status:t.status}))
  try{
-  const result=await request({mode:'submit-report',role:'engineer',actor:people.engineer,text:'根据本次已提交的逐项现场记录与汇总结论生成本轮报告。保留未完成项与待核实事项。',event:context,taskId},(kind,data)=>{
+  const result=await request({mode:'submit-report',role:'engineer',actor:people.engineer,text:'根据本次已提交的逐项现场记录与汇总结论生成本轮报告。分别写清做过什么、发现什么、尚不能确认什么。现场事实和AI分析建议分开。明确区分：不适用是本项无需执行，按已反馈流转，不列入待恢复；未完成或实施条件受阻才保留补做项目。恢复后以本次记录为准，历史未完成现已完成属于状态更新，不是矛盾。',event:context,taskId},(kind,data)=>{
    const c=current();if(!c||c.task.status!=='reporting')return
    if(kind==='progress'){c.task.reportGeneration.progress=data;c.message.progress=data;c.message.progressLog.push(data)}
    if(kind==='report'){c.task.reportGeneration.patch=data.patch;c.message.generatedReport=data.patch}

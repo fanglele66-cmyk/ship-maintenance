@@ -1,3 +1,4 @@
+import {submissionNumber,submissionTitle,submissionSnapshot,refreshSubmissionLabels,reportTask,taskReports,reportContextVersion} from './reportSubmissions.js'
 import {workflowCases, workflowIssues, composeRepair} from '../mock/fourStoryWorkflow.js'
 import {eventBriefingFor} from '../mock/eventBriefings.js'
 import {trackingProcessReference} from '../mock/trackingProcessReferences.js'
@@ -6,10 +7,11 @@ import {lifecycleDecisionOptions,dispatchAction,hasAbnormalFindings,confirmedTra
 import {maintenancePlans,maintenanceSelection} from './maintenancePlans.js'
 import {generatedAnalysis,validateGeneratedReport} from './generatedReport.js'
 import {ensurePlanDraft,taskPlanKey} from './taskPlanning.js'
-import {detailedRepairSteps,presetRecheckSteps,upgradeAssignedRepair,repairProcedureVersion} from './repairPlanning.js'
+import {detailedRepairSteps,presetRecheckSteps,repairProcedureVersion} from './repairPlanning.js'
 import {closureContent,closurePresentationVersion} from './closureReport.js'
 import {groupRepairSteps,compactAssignedRepair} from './repairStepGroups.js'
-import {hasObservation,observationStart,observationTaskFor,isVerificationObservation,isVerificationReview} from './observationContext.js'
+import {hasObservation,observationStart,observationTaskFor,isVerificationObservation,isVerificationReview,observationPolicy} from './observationContext.js'
+import {taskExecution,executionFacts,carryForwardSteps} from './taskExecution.js'
 export {hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
 
 export const people = {captain:'陈志远（轮机长）',engineer:'李建国（大管轮）'}
@@ -50,7 +52,7 @@ export function createLifecycleState(){
   e.phases.push({id:task.id,kind:'investigation',label:'第1轮排查',at,taskId:task.id})
   say(e,'captain','user',`已派发排查给${task.owner}。${task.scope}`,{at});advice(e,'engineer',task.scope,'请提交已核实范围、现场发现和资料缺口。',at)
   const report=makeReport(e,task);e.reports.push(report)
- task.goalStatus='awaiting-review'
+ task.goalStatus=taskExecution(task).incomplete?'unresolved':'awaiting-review'
  task.conversations||={captain:[],engineer:[]}
  task.conversations.engineer.push({id:uid('message'),kind:'user',title:'本轮反馈已提交',text:task.summary,at:task.submittedAt},{id:uid('message'),kind:'receipt',title:'反馈已收录，等待轮机长审阅',text:'本次逐项记录及汇总结论已归入关联事件。可继续补充本任务报告；提交不代表事件闭环或效果验证通过。',reportId:report.id,at:task.submittedAt})
   say(e,'engineer','receipt',prior.summary,{at:task.submittedAt,reportId:report.id,title:'排查报告已提交'})
@@ -60,7 +62,7 @@ export function createLifecycleState(){
  return {version:1,role:'captain',events,notices:[]}
 }
 export function currentTask(event){return event.tasks.find(t=>t.id===event.currentTask)}
-export function pendingDecision(event){return ['reminder','decision','review'].includes(event.phase)&&!event.phases.at(-1)?.observationWaiting}
+export function pendingDecision(event){return ['reminder','decision','review'].includes(event.phase)&&!event.phases.at(-1)?.observationWaiting&&currentTask(event)?.status!=='waiting'}
 export function visibleEvents(state){return Object.values(state.events).filter(e=>state.role==='captain'||e.participants.includes(people.engineer))}
 export function activeTask(event){const t=currentTask(event);return t?.status==='assigned'?t:null}
 export const decisionOptions=lifecycleDecisionOptions
@@ -84,6 +86,8 @@ export function maintenancePlan(event){
  return copy(maintenancePlans(event)[0]?.steps||[])
 }
 export function proposedPlan(event){
+ const remaining=carryForwardSteps(event)
+ if(remaining.length)return remaining
  const investigation=[...event.tasks].reverse().find(t=>t.kind==='investigation'&&t.status==='submitted')
  if(!investigation)return []
  const keys=[...new Set(investigation.records.filter(r=>r.result==='发现异常').map(r=>r.package).filter(Boolean))]
@@ -95,26 +99,25 @@ export function proposedPlan(event){
 }
 export function makeReport(event,task,reportId){
  const kind=task.kind==='investigation'?'排查报告':task.kind==='maintenance'?'维保作业报告':'维修报告'
- const id=reportId||uid('report'),title=`${event.title} · 第${task.round}轮${task.purpose==='recheck'?'复查报告':kind}`
- const priorRows=[...(task.procedureHistory||[]),...(task.feedbackHistory||[])].map(h=>'### 步骤调整前的原填写记录\n\n'+h.draft.records.filter(r=>r.result||r.note).map(r=>`- ${r.label} · ${r.result||'未选结果'}：${r.note||'未填备注'}`).join('\n')).join('\n\n')
- const rows=task.records.map(r=>`### ${r.label}\n\n结果：${r.result}\n\n${r.note||'未填写备注。'}`).join('\n\n')
+ const id=reportId||uid('report'),number=submissionNumber(event,task,reportId),title=submissionTitle(event,task,number)
+ const priorRows=[...(task.procedureHistory||[]),...(task.feedbackHistory||[])].map(h=>'### 历史阶段的原填写记录\n\n'+h.draft.records.filter(r=>r.result||r.note).map(r=>`- ${r.label} · ${r.result||'未选结果'}：${r.note||'未填备注'}`).join('\n')).join('\n\n')
  const generated=task.generatedReport,analysis=generated?.patch.summary||reportAnalysisSummary(event,task),analysisMarkdown=generated?generatedAnalysis(generated.patch):reportAnalysis(event,task)
- const markdown=`# ${title}\n\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'原因判断与排查结论':'处理结果与剩余事项'}\n\n${generated?.patch.summary||task.summary}\n\n## AI分析\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}\n\n## ${task.kind==='investigation'?'现场排查记录':'实际作业记录'}\n\n${rows}${priorRows?'\n\n'+priorRows:''}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
- const maintenanceText=task.maintenance?`\n\n## 提前维保安排\n\n- 维保计划：${task.maintenance.plan.id} · ${task.maintenance.plan.title}\n- 计划版本：${task.maintenance.plan.revision}\n- 靠港时间：${task.maintenance.window.label}\n- 执行方式：按选定维保计划提前执行，实际措施见逐项记录。`:''
- return {id,title,kind,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：')+maintenanceText+(generated?'\n\n## 执行人原始汇总\n\n'+task.summary:''),analysis,analysisMarkdown,summary:generated?.patch.summary||task.summary,presentationVersion:4,...(generated?{generatedBy:generated.model,usage:generated.usage,sources:generated.sources,generatedAt:generated.at}:{})}
+ const markdown=`# ${title}\n\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'检查结果摘要':'处理结果与剩余事项'}\n\n${generated?.patch.summary||task.summary}\n\n${executionFacts(task)}\n\n## AI分析与建议（不作为现场事实）\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}${priorRows?'\n\n'+priorRows:''}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
+ const maintenanceText=task.maintenance?`\n\n## 提前维保安排\n\n- 维保计划：${task.maintenance.plan.id} · ${task.maintenance.plan.title}\n- 计划版本：${task.maintenance.plan.revision}\n- 关联正式工单：${task.maintenance.plan.workOrder?.number||'未关联'} · ${task.maintenance.plan.workOrder?.status||'待核实'}\n- 工单状态独立管理，本次报告不自动确认正式工单完工。\n- 靠港时间：${task.maintenance.window.label}\n- 执行方式：按选定维保计划提前执行，实际措施见逐项记录。`:''
+ return {id,title,kind,submissionNumber:number,submissionSnapshot:submissionSnapshot(task),analysisContextVersion:reportContextVersion,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：')+maintenanceText+(generated?'\n\n## 执行人原始汇总\n\n'+task.summary:''),analysis,analysisMarkdown,summary:generated?.patch.summary||task.summary,presentationVersion:5,...(generated?{generatedBy:generated.model,usage:generated.usage,sources:generated.sources,generatedAt:generated.at}:{})}
 }
 export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
   event.number=eventNumbers[event.id]||event.number
   if(event.id==='real-warning-0523'){event.type='预警事件';event.brief.discovery.kind='ai-warning';event.brief.discovery.label='AI预警 → 关联研判'}
-  upgradeAssignedRepair(event,()=>proposedPlan(event))
   for(const task of event.tasks)compactAssignedRepair(task)
   if(['repair','maintenance'].includes(event.pendingPlan?.action)&&event.pendingPlan.steps.length>4){event.pendingPlan.steps=groupRepairSteps(event.pendingPlan.steps);event.pendingPlan.version++}
   for(const task of event.tasks)if(hasObservation(task)&&task.status==='submitted'&&!task.observationEndedAt){const next=event.tasks.find(t=>Date.parse(t.assignedAt)>Date.parse(task.observationResumedAt||observationStart(task)));task.observationEndedAt=next?.assignedAt||event.closedAt||null}
+  refreshSubmissionLabels(event)
   for(const report of event.reports){
-   const task=event.tasks.find(t=>t.id===report.taskId)
+   const task=reportTask(event,report)
    // Refresh only built-in presentation; preserve model output and human revisions.
-   if(task?.status==='submitted'&&report.presentationVersion!==4&&!report.generatedBy&&!task.generatedReport&&!report.revisions?.length&&!report.original){
+   if(task?.status==='submitted'&&taskReports(event,task.id).length===1&&report.presentationVersion!==5&&!report.generatedBy&&!task.generatedReport&&!report.revisions?.length&&!report.original){
     const oldAnalysis=report.analysis;Object.assign(report,makeReport(event,task,report.id))
     for(const messages of Object.values(event.conversations))for(const message of messages)if(message.kind==='advice'&&message.analysis===oldAnalysis){message.analysis=report.analysis;if(event.tracking&&task.kind==='investigation')message.recommendation=trackingAssessment(event,task).next}
    }
@@ -166,13 +169,37 @@ export function decide(state,id,form){
   say(e,'captain','user',`派发${taskName(task)} · ${task.owner} · 要求 ${timeText(task.deadline)} 前完成。\n${task.scope}`)
   advice(e,'captain','任务已派发，当前等待执行人员提交报告。','可以在当前阶段查看排查/作业步骤及提交进度；报告回交后继续作出处置决定。')
   advice(e,'engineer',`轮机长已派发${taskName(task)}任务：${task.scope}`,kind==='investigation'?'先查看数据，再逐项核查；记录原因、依据及未确认项，提交排查报告。':'按已批准范围逐项执行，填写实际措施和复测结果，完成后提交报告给轮机长。')
+ }else if(action==='wait'){
+  const task=currentTask(e)
+  required(task?.status==='submitted'&&taskExecution(task).incomplete,'只有存在未完成或受阻项目的任务可以等待条件。')
+  task.status='waiting';task.goalStatus='unresolved';task.waiting={reason:form.reason,at};task.observationEndedAt=at
+  e.status='等待执行条件';e.unread.captain=false
+  say(e,'captain','user','保留原任务，等待条件：'+form.reason)
+  task.conversations||={captain:[],engineer:[]}
+  task.conversations.engineer.push({id:uid('message'),kind:'receipt',title:'等待执行条件',text:form.reason+' 已完成的步骤和阶段报告保留，条件具备后恢复原任务。',at})
+ }else if(action==='resume'){
+  const task=currentTask(e)
+  required(task?.status==='waiting','当前任务不在等待条件状态。')
+  required(Number.isFinite(Date.parse(form.deadline))&&Date.parse(form.deadline)>Date.now(),'请设置恢复执行后的完成时限。')
+  task.feedbackHistory||=[];task.feedbackHistory.push({at:task.submittedAt,observation:task.observation?copy(task.observation):null,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id,draft:{records:copy(task.records),summary:task.summary}})
+  task.draft={records:copy(task.records),summary:task.summary,attachments:copy(task.attachments||[])}
+  task.status='assigned';task.deadline=form.deadline;task.resumedAt=at;task.waiting={...task.waiting,resumedAt:at,resumeReason:form.reason}
+  delete task.generatedReport;delete task.reportGeneration;delete task.observation;delete task.observationEndedAt;delete task.observationStartedAt;delete task.observationMode
+  phase(e,task.kind,'恢复原任务',{taskId:task.id});e.status='任务执行中';e.unread.engineer=true;e.unread.captain=false
+  say(e,'captain','user','条件已确认，恢复原任务：'+form.reason)
+ }else if(action==='terminate'){
+  const task=currentTask(e)
+  required(task&&['waiting','submitted'].includes(task.status),'当前任务不能终止。')
+  task.status='terminated';task.goalStatus='terminated';task.terminatedAt=at;task.terminationReason=form.reason;task.observationEndedAt=at
+  phase(e,'review','未执行部分已终止',{taskId:task.id,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id});e.status='待后续决策'
+  say(e,'captain','user','终止未执行部分：'+form.reason+'；事件仍保留，需单独作出后续决定。')
  }else if(action==='observe'){
   const task=currentTask(e),work=e.phase==='decision'&&task?.purpose!=='recheck'?task:observationTaskFor(e)||task
   required(work?.status==='submitted'&&work.submittedAt,'尚无已提交的现场核实或作业报告，不能开始观察。')
   if(work.kind==='investigation'&&!work.observationStartedAt){work.observationMode='verification';work.observationStartedAt=at}
   if(work.observationEndedAt){work.observationResumedAt=at;work.observationEndedAt=null}
-  const start=Date.parse(observationStart(work)),elapsed=Math.max(0,Date.parse(at)-start),dueAt=new Date(start+(Math.floor(elapsed/7200000)+1)*7200000).toISOString()
-  phase(e,'review',isVerificationObservation(work)?'核实后继续观察':'效果观察',{taskId:task.id,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id,observationWaiting:true,observationDueAt:dueAt,observationTaskId:work.id})
+  const interval=observationPolicy(e).intervalMs,start=Date.parse(observationStart(work)),elapsed=Math.max(0,Date.parse(at)-start),dueAt=new Date(start+(Math.floor(elapsed/interval)+1)*interval).toISOString()
+  phase(e,'review',isVerificationObservation(work)?'核实后继续观察':'效果观察',{taskId:task.id,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id,observationWaiting:true,observationIntervalMs:interval,observationDueAt:dueAt,observationTaskId:work.id})
   e.status='效果观察中';e.unread.captain=false
   say(e,'captain','user',(isVerificationObservation(work)?'核实后继续观察：':'进入效果观察：')+form.reason)
   advice(e,'captain',`本轮由系统继续观察，下一次汇总时间为 ${timeText(dueAt)}。`,'观察期间没有新的人员执行任务；本阶段结束后再提醒您审阅结果。')
@@ -188,7 +215,7 @@ export function decide(state,id,form){
   if(e.participants.length){advice(e,'engineer','轮机长已确认本事件闭环。',form.reason);e.unread.engineer=true;notify(state,e,'engineer','轮机长已确认闭环',e.title+'：'+form.reason)}
  }
  const reviewed=e.tasks.find(t=>t.id===e.phases.find(p=>p.id===sourcePhaseId)?.taskId)
- if(action!=='shore'&&reviewed?.status==='submitted'){reviewed.reviewedAt=at;reviewed.goalStatus=reviewed.records.some(r=>/未完成|无法确认|受限/.test(r.result))?'unresolved':'completed'}
+ if(action!=='shore'&&reviewed?.status==='submitted'){reviewed.reviewedAt=at;reviewed.goalStatus=taskExecution(reviewed).incomplete?'unresolved':'completed'}
  e.decisions.push({id:uid('decision'),action,reason:form.reason,at,owner:people.captain,taskId:e.currentTask,sourcePhaseId,resultPhaseId:e.phases.at(-1)?.id})
 }
 export function beginTaskReport(state,id,taskId,requestId){
@@ -224,12 +251,12 @@ export function submitTask(state,id,taskId,generation){
  task.status='submitted'
  if(generation)task.reportGeneration.status='complete'
  const report=makeReport(e,task);e.reports.push(report)
- task.goalStatus='awaiting-review'
+ task.goalStatus=taskExecution(task).incomplete?'unresolved':'awaiting-review'
  task.conversations||={captain:[],engineer:[]}
  if(!generation)task.conversations.engineer.push({id:uid('message'),kind:'user',title:'本轮反馈已提交',text:task.summary,at:task.submittedAt})
  task.conversations.engineer.push({id:uid('message'),kind:'receipt',title:'反馈已收录，等待轮机长审阅',text:'本次逐项记录及汇总结论已归入关联事件。可继续补充本任务报告；提交不代表事件闭环或效果验证通过。',reportId:report.id,at:task.submittedAt})
  const needsDecision=task.kind==='investigation'&&!(task.purpose==='recheck'&&!hasAbnormalFindings(task))
- phase(e,needsDecision?'decision':'review',needsDecision?'排查后决策':'结果处置',{taskId:task.id,reportId:report.id});e.status=needsDecision?'待处置决策':'待结果处置';e.unread.captain=true;e.unread.engineer=false
+ phase(e,needsDecision?'decision':'review',`${needsDecision?'排查后决策':'结果处置'} · 第${report.submissionNumber}次`,{taskId:task.id,reportId:report.id});e.status=needsDecision?'待处置决策':'待结果处置';e.unread.captain=true;e.unread.engineer=false
  notify(state,e,'captain',report.kind+'已回交，待您决策',`${task.owner}已提交“${e.title}”的${report.kind}。${report.summary}`)
  say(e,'engineer','receipt',report.summary,{reportId:report.id,title:report.kind+'已提交'})
  advice(e,'engineer',report.analysis,'本轮记录已形成'+report.kind+'并交轮机长处置。如发现遗漏，可在会话补充说明；新的排查或作业安排由轮机长派发。')

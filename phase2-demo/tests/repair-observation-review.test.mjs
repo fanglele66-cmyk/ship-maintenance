@@ -51,7 +51,7 @@ test('automatic repair observations accept only human reinspection or closure an
    assert.equal(store.submitObservationReview(id,'incomplete',manual),false)
    assert.equal(store.observationRecords[id].length,0)
    const html=await render()
-   assert.match(html,/无需人工填报传感器读数/)
+   assert.match(html,/class="automatic-status"/) // Status remains visible after explanatory copy was removed.
    assert.match(html,/aria-label="人工处置"/)
    assert.match(html,/>异常复查\s*</)
    assert.match(html,/>确认闭环\s*</)

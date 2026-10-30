@@ -1,21 +1,21 @@
 <template>
  <div v-if="event&&allowed" class="lc-workspace task-workspace">
   <main class="lc-main task-main">
-   <header class="task-detail-head"><div class="task-heading"><BackButton label="返回待办中心" @click="back"/><div><small>{{taskName(task)}}任务 · {{taskNumber(event,task)}}</small><h1>{{taskTitle(task)}}</h1></div></div><span class="task-state" :class="{done:task.status==='submitted'}">{{task.status==='submitted'?(task.goalStatus==='completed'?'已完成':'反馈已提交'):task.status==='reporting'?'报告生成中':task.status==='report-error'?'报告待生成':executable?'待我执行':'执行中'}}</span></header>
+   <header class="task-detail-head"><div class="task-heading"><BackButton label="返回待办中心" @click="back"/><div><small>{{taskName(task)}}任务 · {{taskNumber(event,task)}}</small><h1>{{taskTitle(task)}}</h1></div></div><span class="task-state" :class="{done:task.status==='submitted'}">{{task.status==='submitted'?(task.goalStatus==='completed'?'已完成':'反馈已提交'):task.status==='waiting'?'等待条件':task.status==='terminated'?'已终止':task.status==='reporting'?'报告生成中':task.status==='report-error'?'报告待生成':executable?'待我执行':'执行中'}}</span></header>
    <dl class="task-basics"><div class="task-event-info"><dt>关联事件</dt><dd><button @click="router.push({path:'/situation/issue/'+event.id,query:{from:'tasks'}})">{{event.title}} <span aria-hidden="true">↗</span></button><small>{{event.type}} · {{event.number}}</small></dd></div><div><dt>执行人</dt><dd>{{task.owner}}</dd></div><div><dt>派发人</dt><dd>{{task.assignedBy||people.captain}}</dd></div><div><dt>派发时间</dt><dd>{{timeText(task.assignedAt)}}</dd></div><div><dt>要求完成</dt><dd>{{timeText(task.deadline)}}</dd></div></dl>
    <section class="task-scope"><h2>本次任务范围</h2><p>{{task.scope}}</p></section>
-   <div v-if="task.status==='submitted'" class="task-submitted"><div class="task-submitted-status" role="status"><strong>本次任务已提交</strong><span>{{timeText(task.submittedAt)}} · 结果已归入关联事件</span></div><div class="task-report-actions"><button @click="tab='提交记录'">查看{{taskName(task)}}报告 <span aria-hidden="true">→</span></button><button v-if="canSupplement" class="task-supplement" @click="assistant?.supplementReport(report.id)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg>通过对话补充报告</button></div></div>
-   <section v-if="task.maintenance" class="task-scope"><h2>提前维保安排</h2><p>{{task.maintenance.plan.id}} · {{task.maintenance.plan.title}}<br/>{{task.maintenance.window.label}}</p></section>
+   <section v-if="task.status==='waiting'||task.status==='terminated'" class="task-scope"><h2>{{task.status==='waiting'?'等待执行条件':'未执行部分已终止'}}</h2><p>{{task.status==='waiting'?task.waiting.reason:task.terminationReason}}<br/>已完成记录与阶段报告保留。{{task.status==='waiting'?'请将条件变化告知轮机长，确认后恢复原任务。':'事件闭环由轮机长另行确认。'}}</p></section><div v-if="['submitted','waiting','terminated'].includes(task.status)" class="task-submitted"><div class="task-submitted-status" role="status"><strong>本次任务已提交</strong><span>{{timeText(task.submittedAt)}} · 结果已归入关联事件</span></div><div class="task-report-actions"><button @click="openReport(latestReport?.id)">查看{{taskName(task)}}报告 <span aria-hidden="true">→</span></button><button v-if="canSupplement" class="task-supplement" @click="assistant?.supplementReport(latestReport.id)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg>通过对话补充报告</button></div></div>
+   <section v-if="task.maintenance" class="task-scope"><h2>提前维保安排</h2><p>{{task.maintenance.plan.id}} · {{task.maintenance.plan.title}}<br/>正式工单：{{task.maintenance.plan.workOrder?.number||'未关联'}} · {{task.maintenance.plan.workOrder?.status||'待核实'}}<br/>{{task.maintenance.window.label}}<br/>本次回交不自动确认正式工单完工。</p></section>
    <TaskReportGeneration v-if="['reporting','report-error'].includes(task.status)" :event="event" :task="task" @submitted="submitted"/>
    <section class="task-detail-content">
     <template v-if="tab!=='提交记录'">
      <LifecycleTaskSteps v-if="executable" :event="event" :task="task" :key="task.id" @submitted="submitted"/>
      <template v-else><div class="task-progress"><strong>{{task.status==='submitted'?'本轮执行记录':'执行进度'}}</strong><span>{{records.filter(r=>r.result).length}} / {{task.steps.length}} 项{{task.status==='submitted'?'已提交':'已填写'}}{{task.status==='assigned'?' · 等待执行人提交':''}}</span></div><ol class="lc-step-list"><li v-for="(step,i) in task.steps" :key="i"><span class="lc-step-number">{{i+1}}</span><div><h3>{{step.label}}</h3><LifecycleStepInstructions :step="step" :compact="task.kind!=='investigation'"/><p class="task-record"><strong>{{records[i]?.result||'尚未填写'}}</strong><span v-if="records[i]?.note">{{records[i].note}}</span></p></div></li></ol></template>
     </template>
-    <template v-else><button class="task-record-back" @click="tab='任务步骤'">← 返回本轮执行记录</button><LifecycleReport v-if="report" :report="report"/></template>
+    <template v-else><button class="task-record-back" @click="tab='任务步骤'">← 返回本轮执行记录</button><nav v-if="taskReports.length>1" class="report-submissions" aria-label="任务报告提交记录"><button v-for="item in taskReports" :key="item.id" :aria-pressed="report?.id===item.id" @click="selectedReportId=item.id">第{{item.submissionNumber}}次提交{{item.submissionNumber>1?'（恢复后）':''}} · {{timeText(item.at)}}</button></nav><LifecycleReport v-if="report" :report="report"/></template>
    </section>
   </main>
-  <LifecycleAssistant ref="assistant" :event="event" :task-id="task.id" :key="task.id" @submitted="submitted" @report="tab='提交记录'"/>
+  <LifecycleAssistant ref="assistant" :event="event" :task-id="task.id" :key="task.id" @submitted="submitted" @report="openReport"/>
  </div>
  <main v-else class="lc-access"><h2>{{task?'当前身份无权查看此任务':'未找到该任务'}}</h2><p>执行人只能查看分派给本人的任务。</p><button @click="back">返回待办中心</button></main>
 </template>
@@ -38,13 +38,16 @@ watch(()=>route.params.taskId,id=>{if(typeof id==='string')taskId.value=id})
 const entry=computed(()=>findTask(store.state,taskId.value)),event=computed(()=>entry.value?.event),task=computed(()=>entry.value?.task)
 const allowed=computed(()=>canViewTask(store.state.role,task.value)),executable=computed(()=>event.value&&canExecuteTask(store.state,event.value,task.value))
 const records=computed(()=>task.value?.status!=='assigned'?task.value?.records||[]:task.value?.draft?.records||[])
-const report=computed(()=>event.value?.reports.find(r=>r.taskId===task.value?.id))
-const canSupplement=computed(()=>report.value&&supplementaryReports(event.value,store.state.role).some(r=>r.id===report.value.id))
+const selectedReportId=ref(null),taskReports=computed(()=>event.value?.reports.filter(r=>r.taskId===task.value?.id)||[]),latestReport=computed(()=>taskReports.value.at(-1))
+const report=computed(()=>taskReports.value.find(r=>r.id===selectedReportId.value)||latestReport.value)
+function openReport(id){selectedReportId.value=id;tab.value='提交记录'}
+const canSupplement=computed(()=>latestReport.value&&supplementaryReports(event.value,store.state.role).some(r=>r.id===latestReport.value.id))
 watch(()=>[task.value?.id,store.state.role],()=>{tab.value='任务步骤';if(event.value&&allowed.value&&route.name==='LifecycleTask')store.acknowledge(event.value.id)},{immediate:true})
-function submitted(){tab.value='提交记录'}
+function submitted(){openReport(latestReport.value?.id)}
 function back(){router.push({path:'/event',query:route.query.returnView&&route.query.returnView!=='pending'?{view:route.query.returnView}:{}})}
 </script>
 <style scoped>
+.report-submissions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.report-submissions button{border:1px solid #e2e4dd;background:#fff;padding:8px 12px;border-radius:6px;color:#637583;cursor:pointer;font-size:12px}.report-submissions button[aria-pressed=true]{background:#f4f0e7;border-color:#bca878;color:#806638}
 .task-submitted-status{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;width:100%}
 .task-report-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .task-submitted .task-report-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin:0;min-height:34px;padding:6px 12px;border:1px solid #dedfd5;border-radius:7px;background:linear-gradient(#fff,#fafaf7);color:#876c3e;box-shadow:0 1px 2px #25302606;transition:background .15s,border-color .15s}

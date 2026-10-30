@@ -1,3 +1,4 @@
+import {reportTask} from './reportSubmissions.js'
 import {makeReport,people} from './eventLifecycle.js'
 const fields=['evidence','interpretation','unverified','next']
 const copy=value=>JSON.parse(JSON.stringify(value))
@@ -17,7 +18,7 @@ export function applyReportSupplement(state,eventId,proposal){
  if(report.markdown!==proposal.baseMarkdown)throw Error('报告已有更新，请重新生成修订稿，避免覆盖他人补充。')
  const patch=proposal.patch
  if(typeof patch?.summary!=='string'||!patch.summary.trim()||fields.some(k=>typeof patch.analysis?.[k]!=='string'||!patch.analysis[k].trim()))throw Error('修订内容不完整，原报告未修改。')
- const task=event.tasks.find(t=>t.id===report.taskId),at=new Date().toISOString(),before=copy({summary:report.summary,analysis:report.analysis,analysisMarkdown:report.analysisMarkdown,markdown:report.markdown,updatedAt:report.updatedAt||null})
+ const task=reportTask(event,report),at=new Date().toISOString(),before=copy({summary:report.summary,analysis:report.analysis,analysisMarkdown:report.analysisMarkdown,markdown:report.markdown,updatedAt:report.updatedAt||null})
  const revision={id:proposal.id,at,actor:people.engineer,text:proposal.text,model:proposal.model,sources:proposal.sources||[],before}
  const revisions=[...(report.revisions||[]),revision]
  const updated=makeReport(event,{...task,generatedReport:undefined,summary:prose(patch.summary)},report.id)

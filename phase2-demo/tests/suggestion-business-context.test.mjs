@@ -52,7 +52,7 @@ test('seed tracking analysis discusses baseline evidence; refresh never overwrit
  assert.match(reportAnalysis(event,task),/四缸相对排温基线下移/)
  report.analysisMarkdown='旧的通用分析';report.presentationVersion=3
  refreshLifecyclePresentation(state)
- assert.equal(report.presentationVersion,4);assert.match(report.analysisMarkdown,/四缸/)
+ assert.equal(report.presentationVersion,5);assert.match(report.analysisMarkdown,/四缸/)
  for(const protectedFields of [{generatedBy:'DeepSeek'},{revisions:[{text:'人工核对的补充'}]},{original:{summary:'旧版本'}}]){
   Object.assign(report,{analysisMarkdown:'须保留的报告内容',presentationVersion:3,...protectedFields})
   refreshLifecyclePresentation(state);assert.equal(report.analysisMarkdown,'须保留的报告内容')

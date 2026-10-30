@@ -1,7 +1,7 @@
 <template>
  <section class="lc-task-wizard" :class="{'lc-repair-wizard':repair}" aria-label="横向分步填写">
   <details v-if="task.procedureHistory?.length" class="lc-procedure-history"><summary>作业步骤已细化，原填写记录已保留；请按新增步骤核对并填写结果。</summary><section v-for="(history,i) in task.procedureHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
-  <details v-if="task.feedbackHistory?.length" class="lc-procedure-history"><summary>维修反馈已合并为最多 4 项，原逐项填写已保留并汇入对应备注。</summary><section v-for="(history,i) in task.feedbackHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
+  <details v-if="task.feedbackHistory?.length" class="lc-procedure-history"><summary>历史填写与阶段报告已保留，可对照本次继续执行的范围。</summary><section v-for="(history,i) in task.feedbackHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
   <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :class="{active:index===i,complete:task.draft.records[i].result}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{step.short||step.label}}</button><button :class="{active:index===task.steps.length}" @click="review"><span>{{['repair','maintenance'].includes(task.kind)?'✓':task.steps.length+1}}</span>汇总提交</button></nav>
   <form v-if="step" class="lc-step-editor" @submit.prevent="next">
    <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :step="step" :compact="repair"/><p v-if="repair&&step.recordHint" class="lc-repair-record-hint"><strong>记录要求：</strong>{{compactRepairRecordHint(step)}}</p><aside v-else-if="step.recordHint"><strong>提交记录</strong><p>{{step.recordHint}}</p></aside></div>
@@ -13,7 +13,7 @@
   <form v-else class="lc-step-editor" @submit.prevent="submit">
    <h3>{{task.kind==='investigation'?'原因判断与排查结论':'实际措施、复测结果与剩余事项'}}</h3>
    <div class="lc-step-review"><div v-for="(r,i) in task.draft.records" :key="i"><strong>{{r.label}}</strong><span>{{r.result||'待填写'}}</span><button type="button" @click="go(i)">修改</button><p v-if="r.note">{{r.note}}</p></div></div>
-   <label class="lc-step-note">{{task.kind==='investigation'?'排查结论':'作业结论'}}<textarea v-model="task.draft.summary" required rows="5" :placeholder="task.kind==='investigation'?'明确原因、对应证据、未确认事项及建议处理范围。':'写明实际处理部位、措施、复测结果与剩余问题。'"/></label>
+   <label class="lc-step-note">{{task.kind==='investigation'?'排查结论':'作业结论'}}<textarea v-model="task.draft.summary" required rows="5" :placeholder="task.kind==='investigation'?'记录做过什么、发现什么及尚不能确认什么；原因未明如实填写，分析建议与事实分开。':'写明实际处理部位、措施、复测结果与剩余问题。'"/></label>
    <p v-if="task.draft.attachments.length" class="lc-muted">已关联：{{task.draft.attachments.map(a=>a.name).join('、')}}</p>
    <p v-if="error" role="alert" class="lc-error">{{error}}</p>
    <footer><button type="button" @click="go(task.steps.length-1)">上一步</button><small>提交后交轮机长决策</small><button type="submit" class="lc-primary">提交{{taskName(task)}}报告</button></footer>

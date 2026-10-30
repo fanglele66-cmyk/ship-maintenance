@@ -1,3 +1,4 @@
+import {carryForwardSteps} from './taskExecution.js'
 import {dispatchAction} from './lifecycleDecisions.js'
 import {groupRepairSteps} from './repairStepGroups.js'
 import {verifyTaskEdit} from './taskEdits.js'
@@ -39,6 +40,7 @@ export function acceptTaskPlan(event,expected,result){
  if(!draft||taskPlanKey(event)!==expected.key||draft.key!==expected.key||draft.version!==expected.version||draft.action!==dispatchAction(event))throw Error('事件或待派任务已有变化，本次生成结果未覆盖当前任务。')
  const edit=expected.editText?verifyTaskEdit(expected.plan,expected.editText,result,draft.action):null
  const patch=edit?.plan||normalizeTaskPlan(result.plan,draft.action)
+ if(draft.action==='repair'){const missing=carryForwardSteps(event).filter(step=>!patch.steps.some(next=>next.label===step.label||next.substeps?.some(child=>child.label===step.label)));if(missing.length)throw Error('上轮未执行项目必须保留：'+missing.map(s=>s.label).join('、')+'。如需取消，应先由轮机长终止未执行部分。')}
  if(edit)draft.editHistory=[...(draft.editHistory||[]),{at:new Date().toISOString(),text:expected.editText,before:JSON.parse(JSON.stringify(expected.plan)),after:JSON.parse(JSON.stringify(patch)),summary:edit.editSummary}]
  Object.assign(draft,patch,{status:'ready',source:edit?.source||'model',version:draft.version+1,error:'',preview:null,generatedAt:new Date().toISOString(),usage:result.usage,sources:result.sources||[]})
  return draft

@@ -9,7 +9,7 @@ export function maintenancePlans(event){
  return [
   {id:'CBY-MP-TEMP-'+code,revision:'1',title:cylinder+'排温测量链路校验与保养',steps:[preparation,measurement,restore]},
   {id:'CBY-MP-BALANCE-'+code,revision:'1',title:cylinder+'测温与燃烧平衡专项维保',steps:[preparation,measurement,combustion,restore]},
- ]
+ ].map(plan=>({...plan,workOrder:{number:plan.id.replace('MP','WO'),title:plan.title,source:'船管维保计划',status:'待执行',revision:plan.revision,content:plan.steps.map(s=>s.label)}}))
 }
 // Planned port calls; elapsed windows are never offered for a new dispatch.
 export const maintenancePortCalls=[

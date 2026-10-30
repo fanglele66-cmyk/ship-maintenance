@@ -19,7 +19,7 @@ export async function aiStreamRequest(body,onProgress,{signal}={}){
   let data;try{data=JSON.parse(frame.data)}catch{throw Error('流式内容格式异常，请重新生成。')}
   if(frame.event==='error')throw Error(data.error||'生成中断，请重试。')
   if(frame.event==='done'){
-   if(body.mode==='plan'?!data.plan:['report','submit-report'].includes(body.mode)?!data.patch:typeof data.answer!=='string')throw Error('生成结果不完整，请重试。')
+   if(body.mode==='plan'?!data.plan:['report','submit-report','refresh-report'].includes(body.mode)?!data.patch:typeof data.answer!=='string')throw Error('生成结果不完整，请重试。')
    return data
   }
   onProgress(frame.event,data)

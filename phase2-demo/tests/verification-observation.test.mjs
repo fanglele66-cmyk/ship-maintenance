@@ -40,7 +40,7 @@ for(const id of [alarm,'real-warning-0523','real-tracking-exhaust-baseline','rea
  assert.deepEqual(decisionOptions(f.event).map(o=>o.value),['close','recheck','repair','shore'])
  assert.ok(!pendingDecision(f.event));assert.ok(!lifecycleWorkItems(f.state).pending.some(i=>i.eventId===id))
  const due=Date.parse(f.event.phases.at(-1).observationDueAt)
- assert.equal(due-Date.parse(f.task.observationStartedAt),7200000)
+ assert.equal(due-Date.parse(f.task.observationStartedAt),f.event.tracking?7*86400000:7200000)
  syncLifecycleObservations(f.state,{},due-1000,{demo:true})
  assert.ok(f.task.observation.pending.sampleCount>0);assert.ok(!pendingDecision(f.event))
  syncLifecycleObservations(f.state,{},due,{demo:true})
@@ -80,10 +80,10 @@ test('verification recheck returns to the same observation context; old task dra
  assert.equal(f.task.observationEndedAt,null);assert.ok(f.task.observationResumedAt)
 })
 test('verification advice distinguishes a persistent trend from a repaired and restored component',()=>{
- const f=observe(verified('real-tracking-exhaust-baseline')),end=Date.parse(f.task.observationStartedAt)+7200000
+ const f=observe(verified('real-tracking-exhaust-baseline')),end=Date.parse(f.task.observationStartedAt)+7*86400000
  syncLifecycleObservations(f.state,{},end,{demo:true})
  const advice=observationAdvice(f.event,f.task),request=observationAdviceRequest(f.event,f.task,advice)
- assert.ok(advice.verification);assert.equal(advice.label,'请审阅观察结果')
+ assert.ok(advice.verification);assert.equal(advice.label,'原偏差仍需核实')
  assert.match(advice.summary,/平稳本身不表示原偏差已消失/);assert.match(request.text,/未实施维修/);assert.match(request.text,/持续、扩大、恢复或复发/)
  assert.ok(f.task.observation.samples[0].at(-1).value>8)
  ;(f.task.observation.pending||f.task.observation.records.at(-1)).channels[0].covered=false

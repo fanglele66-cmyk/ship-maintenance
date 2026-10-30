@@ -1,10 +1,10 @@
 // Deterministic local demonstration source. Never use this adapter for live telemetry.
 // UI wording follows the normal automatic-sampling flow; provenance stays on each channel.
-import {observationStart,isVerificationObservation} from '../workflow/observationContext.js'
+import {observationStart,isVerificationObservation,observationPolicy} from '../workflow/observationContext.js'
 export function lifecycleSampling(event,task,config,now){
  const start=Date.parse(observationStart(task)),end=Math.min(now,task.observationEndedAt?Date.parse(task.observationEndedAt):now)
  if(!Number.isFinite(start)||end<=start)return []
- const begin=Math.max(start,end-72*3600000),step=Math.max(2000,Math.ceil((end-begin)/4000/2000)*2000)
+ const begin=Math.max(start,end-observationPolicy(event).maxWindowMs),step=Math.max(2000,Math.ceil((end-begin)/4000/2000)*2000)
  const seed=Array.from(event.id+' '+task.id).reduce((n,c)=>(n*31+c.charCodeAt(0))%997,0)/997
  return config.names.map((name,index)=>{
   const pressure=config.units[index]==='MPa',relative=/偏差/.test(name)

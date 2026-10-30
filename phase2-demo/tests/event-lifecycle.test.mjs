@@ -16,11 +16,11 @@ test('role scoped visibility, notices, optional notes and validation',()=>{const
 test('shore is an audited pending handoff, not a silent closure',()=>{const s=createLifecycleState();assign(s,alarm);s.role='captain';decide(s,alarm,{action:'shore',reason:'请岸端提供 ICU 适配备件资料。'});assert.equal(s.events[alarm].phase,'investigation');assert.equal(s.events[alarm].shore[0].status,'待岸基接收');assert.throws(()=>assign(s,alarm),/当前阶段/)})
 test('notifications route each handoff to the receiving role',()=>{const s=createLifecycleState();assign(s,alarm);assert.equal(s.notices.length,1);assert.equal(s.notices[0].recipient,'engineer');assert.equal(s.notices[0].eventId,alarm);finish(s,alarm);assert.equal(s.notices.length,2);assert.equal(s.notices[1].recipient,'captain');assert.match(s.notices[1].title,/排查报告/);const ids=s.notices.map(n=>n.id);assert.equal(new Set(ids).size,2)})
 test('24h AIS chronology follows unequal state boundaries and contains operations only',()=>{const end=Date.now(),s={allSensors:[{id:'aux',deviceId:'aux-engine-1',unit:'rpm'}],getSimulationTrend:id=>[{value:id==='s-012'?94:id==='main-load'?70:id==='ship-speed'?10:750}]};const r=navigationChronology(s,end);assert.equal(r.end-r.start,86400000);assert.equal(r.periods.length,6);assert.ok(new Set(r.periods.map(p=>p.end-p.start)).size>1);for(let i=1;i<r.periods.length;i++)assert.equal(r.periods[i].start,r.periods[i-1].end);assert.ok(r.periods.some(p=>p.navigation==='锚泊'));assert.ok(r.periods.every(p=>p.position&&p.ais));assert.doesNotMatch(r.markdown,/待决策|风险|报警|预警|异动/)})
-test('reports lead with conclusion and analysis, preserve submitted evidence at the bottom',()=>{
+test('reports separate original facts and unresolved work from AI analysis',()=>{
  const s=createLifecycleState();assign(s,warning);const report=finish(s,warning),text=report.markdown
- assert.ok(text.indexOf('## 原因判断与排查结论')<text.indexOf('## AI分析'))
- assert.ok(text.indexOf('## AI分析')<text.indexOf('## 现场排查记录'))
- assert.ok(text.indexOf('## 现场排查记录')<text.indexOf('## 附件索引'))
+ for(const heading of ['## 检查结果摘要','## 现场事实（执行人原始记录）','## 未执行与待核实事项','## AI分析与建议（不作为现场事实）'])assert.ok(text.includes(heading))
+ assert.ok(text.indexOf('## 现场事实')<text.indexOf('## AI分析'))
+ assert.ok(text.indexOf('## AI分析')<text.indexOf('## 附件索引'))
  assert.doesNotMatch(text,/AI报告摘要/);assert.match(report.analysisMarkdown,/减压阀密封缺陷/)
  const before=structuredClone(s.events[warning].tasks[0]),id=report.id
  report.presentationVersion=1;report.markdown='旧版内容'

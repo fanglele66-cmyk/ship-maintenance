@@ -60,17 +60,18 @@ function describeWindow(channels,complete,source){
  * data, never healthy/normal. Missing channels remain null without carry-forward.
  * recordedAt is the actual supplied calculation time, not a backdated receipt.
  */
-export function automaticObservation({sensors=[],executedAt,now,intervalMs=automaticObservationIntervalMs,gapThresholdMs=120000}={}){
+export function automaticObservation({sensors=[],executedAt,now,intervalMs=automaticObservationIntervalMs,gapThresholdMs=120000,maxWindowMs=automaticObservationMaxWindowMs}={}){
   const start=automaticObservationTime(executedAt),end=automaticObservationTime(now)
   const inputs=Array.isArray(sensors)?sensors:[],origin=provenance(inputs)
   const empty={records:[],pending:null,...origin,executedAt:Number.isFinite(start)?iso(start):null,checkedAt:Number.isFinite(end)?iso(end):null,nextUpdateAt:null,truncated:false,range:null,error:null}
   if(!Number.isFinite(start)||!Number.isFinite(end))return {...empty,error:'执行时间和当前检查时间必须有效。'}
   if(start>end)return {...empty,error:'执行时间晚于当前检查时间，尚无修后观察窗口。'}
+  if(!Number.isFinite(maxWindowMs)||maxWindowMs<intervalMs)return {...empty,error:'保留时段不得短于观察周期。'}
   if(!Number.isFinite(intervalMs)||intervalMs<=0||!Number.isFinite(gapThresholdMs)||gapThresholdMs<0)return {...empty,error:'观察间隔须为正数，缺测间隔须为非负数。'}
   const completed=Math.floor((end-start)/intervalMs)
   // Keep whole, execution-aligned windows within the latest 72 hours. A second
   // count bound also prevents pathological tiny intervals allocating millions.
-  const firstIndex=Math.max(0,Math.ceil((end-start-automaticObservationMaxWindowMs)/intervalMs),completed-1000)
+  const firstIndex=Math.max(0,Math.ceil((end-start-maxWindowMs)/intervalMs),completed-1000)
   const firstStart=start+Math.min(firstIndex,completed)*intervalMs
   const normalized=inputs.map((sensor,index)=>({
     channelId:sensor.channelId||sensor.id||`channel-${index+1}`,name:sensor.name||sensor.nameCn||sensor.channelId||`通道${index+1}`,unit:sensor.unit||'',sourceKind:sensor.sourceKind||'unknown',
@@ -96,6 +97,6 @@ export function automaticObservation({sensors=[],executedAt,now,intervalMs=autom
   const omittedCompletedWindows=Math.min(firstIndex,completed)
   const truncated=omittedCompletedWindows>0
   return {...empty,records,pending,truncated,nextUpdateAt:iso(pendingStart+intervalMs),
-    range:{start:iso(firstStart),end:iso(end),omittedCompletedWindows,maxWindowHours:72},
-    truncationNote:truncated?`本次仅汇总最近 72 小时内的完整观察窗口（最多 1000 个），更早的 ${omittedCompletedWindows} 个窗口未纳入本次计算；已保存的历史记录应继续保留。`:''}
+    range:{start:iso(firstStart),end:iso(end),omittedCompletedWindows,maxWindowHours:maxWindowMs/3600000},
+    truncationNote:truncated?`本次仅汇总最近 ${maxWindowMs/3600000} 小时内的完整观察窗口（最多 1000 个），更早的 ${omittedCompletedWindows} 个窗口未纳入本次计算；已保存的历史记录应继续保留。`:''}
 }

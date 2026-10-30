@@ -1,3 +1,4 @@
+import {taskExecution} from './taskExecution.js'
 // User-facing evidence summaries. These describe source records and submitted
 // findings; they do not claim access to hidden model reasoning or new readings.
 import {hasAbnormalFindings,confirmedTracking,trackingNotSupported} from './lifecycleDecisions.js'
@@ -72,9 +73,10 @@ export function reportAnalysis(event,task){
  const missing=nonempty([
   f.unknown.length?`仍需落实：${f.unknown.map(r=>r.label+'（'+r.result+'）').join('；')}。这些项目不能视为已检查通过。`: '逐项结果未登记未完成或无法确认事项；这一状态仅覆盖本轮提交范围。',
   f.unnoted.length?`以下异常项未填写单项备注：${f.unnoted.map(r=>r.label).join('、')}。应从总论或附件确认具体部位与检查依据，派发维修前核清具体部位，未核准部分不得施工。`:'',
+  taskExecution(task).summaryBlocked?'汇总记录实施条件受限：'+task.summary+'；需明确受阻项目与恢复条件。':'',
   task.attachments?.length?`本轮关联 ${task.attachments.length} 份附件，按文件名保留索引；附件有效性由审阅人核对。`:'本轮未关联附件；分析依据为已提交的文字记录，未增加未上传的照片或检测读数。'
  ])
- const next=isCheck?(f.abnormal.length&&!confirmedTracking(event,task)?'本轮记录了具体异常表现，先核对问题部位及处理依据；需要维修时，选择派发维修并审阅 AI 建议，未定位的部件不随同换件。':tracking?.next||(task.purpose==='recheck'?'本轮复查未记录原异常再现，结合观察和复测依据决定闭环；仍有待核实事项时再明确复查范围。':'本轮检查尚未定位原因。原报警／预警仍有疑点时可选择继续排查，AI 再据已查范围与剩余线索整理建议；原现象已回落时也可继续观察或说明依据后闭环。')):'对照本轮实际措施、处理后采样和现场复测，决定闭环、继续观察或派发复查。未完成项与异常再现情况应纳入后续安排。'
+ const next=!isCheck&&taskExecution(task).incomplete?'本轮仍有未执行或条件受限项目。可保留原任务等待条件，条件具备后恢复执行；另派维修时须带入未执行项目。若终止，写明原因与剩余安排，不作为已完成。':isCheck?(f.abnormal.length&&!confirmedTracking(event,task)?'本轮记录了具体异常表现，先核对问题部位及处理依据；需要维修时，选择派发维修并审阅 AI 建议，未定位的部件不随同换件。':tracking?.next||(task.purpose==='recheck'?'本轮复查未记录原异常再现，结合观察和复测依据决定闭环；仍有待核实事项时再明确复查范围。':'本轮检查尚未定位原因。原报警／预警仍有疑点时可选择继续排查，AI 再据已查范围与剩余线索整理建议；原现象已回落时也可继续观察或说明依据后闭环。')):'对照本轮实际措施、处理后采样和现场复测，决定闭环、继续观察或派发复查。未完成项与异常再现情况应纳入后续安排。'
  return `### 证据与范围核对\n\n${scope}\n\n### ${isCheck?'原因解释与检查方向':'措施对应与复测判断'}\n\n${interpretation}\n\n### 待核实事项\n\n${missing}\n\n### 建议处置\n\n${next}${isCheck?' 轮机长也可说明暂不处置的依据，选择核实后继续观察，跟踪变化是否持续、扩大、恢复或复发。':''}`
 }
 export function reportAnalysisSummary(event,task){
@@ -95,7 +97,7 @@ export function decisionAnalysisItems(event,task,report){
  if(!report?.analysisMarkdown)return [{label:'本轮判断',text:report?.analysis||event.brief.conclusion}]
  return report.analysisMarkdown.split(/(?:^|\n)### /).filter(Boolean).map(section=>{
   const [label,...lines]=section.split('\n');return {label,text:lines.filter(Boolean).join(' ')}
- }).filter(item=>item.label!=='待核实事项')
+ })
 }
 export function decisionBasis(event,action){
  if(event.phase==='reminder')return {points:event.brief.captainDecision,reason:event.brief.dispatchReason}
@@ -105,14 +107,17 @@ export function decisionBasis(event,action){
  const conclusion=event.tracking?report?.summary||task?.summary||'':(task?.kind==='investigation'?sentences[0]:sentences.findLast(sentence=>/复测|稳定|原报警|原低压|偏差|恢复/.test(sentence)))||sentences[0]||''
  const source=report?`第${task.round}轮${report.kind}已回交。${conclusion}`:task?.status==='assigned'?`${task.owner}正在执行本轮任务，报告尚未回交。`:'以原始提醒及已有轮次记录为依据。'
  const points={
+  wait:'保留原任务及已完成记录，写明受阻项目、原因和需要具备的条件；等待期间不重复催办。',
+  resume:'确认备件、停机和作业许可等条件已具备，设置新的完成时限，在原任务上补充剩余反馈。',
+  terminate:'说明终止未执行部分的依据、残余风险和后续安排；终止任务不等于事件闭环。',
   observe:'结合现场核实结果，说明暂不处置的依据与后续关注点；持续跟踪变化是否扩大、恢复或复发，观察期内可重新决定下一步。',
   investigate:`${check} 针对剩余缺口安排补查，指定负责人和回交时限。`,
   repair:'按排查确认的具体部位批准维修，明确隔离、材料和复测要求；未定位的部件不随同换件。',
-  maintenance:'选择适用维保计划和靠港检修窗口，提前派发给轮机员按计划执行，汇报后审阅闭环。',
+  maintenance:'选择关联正式工单的适用维保计划和靠港检修窗口，提前派发给轮机员按计划执行，汇报后审阅闭环。',
   shore:'明确需要岸基提供的技术、备件或计划支持，附上关联报告及船上当前措施。',
   close:event.tracking?'对照原相对排温变化与本轮核实结论，说明提醒是否已得到解释、仍有哪些限制和后续跟踪安排；无需把未发生的维修写入闭环依据。':'核对原报警／预警、本轮检查及实际措施是否对应，说明结束依据与后续监测安排；未实施维修时如实保留。',
   recheck:isVerificationReview(event)?'根据已核实范围和持续观察记录，复查变化是否持续、扩大、恢复或复发；本轮暂未处置，不预设维修已完成。':'根据维修结果、剩余事项和处理后趋势复查，记录原异常是否再现；复查任务可提前审阅并通过对话修改。'
- }[action]||(isVerificationReview(event)?'对照排查报告与观察变化，有处理依据可派发维修，需要补证可派发复查；原异常回落且无复发可确认闭环，也可继续观察。':event.phase==='review'?'对照作业报告、处理后采样与现场复测，确认原异常是否再现，决定闭环或派发复查。':trackingAssessment(event,task)?.next||(hasAbnormalFindings(task)?'本轮已有异常，优先核对处理范围并维修；若决定暂不处置，可说明依据后继续观察。':'本轮尚未定位原报警／预警的具体原因，可针对剩余线索继续排查，或说明依据后继续观察；有结束依据时人工闭环。'))
+ }[action]||(task?.status==='waiting'?'原任务等待实施条件。条件具备后恢复原任务并保留已完成反馈；如需终止，应说明剩余事项的接续安排。':taskExecution(task).incomplete?'核对未执行项目、原因及恢复条件，选择等待、接续派工或终止未执行部分。':isVerificationReview(event)?'对照排查报告与观察变化，有处理依据可派发维修，需要补证可派发复查；原异常回落且无复发可确认闭环，也可继续观察。':event.phase==='review'?'对照作业报告、处理后采样与现场复测，确认原异常是否再现，决定闭环或派发复查。':trackingAssessment(event,task)?.next||(hasAbnormalFindings(task)?'本轮已有异常，优先核对处理范围并维修；若决定暂不处置，可说明依据后继续观察。':'本轮尚未定位原报警／预警的具体原因，可针对剩余线索继续排查，或说明依据后继续观察；有结束依据时人工闭环。'))
  return {points,reason:source}
 }
 function timestamp(value){

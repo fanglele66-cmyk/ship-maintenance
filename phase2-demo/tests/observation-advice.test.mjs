@@ -19,7 +19,7 @@ test('two hours of valid stable observation recommends manual closure without an
  assert.equal(advice.status,'review');assert.equal(advice.label,'推荐闭环');assert.match(advice.summary,/指标平稳/);assert.match(advice.timing,/推荐本轮闭环/)
  assert.ok(advice.evidence.completeWindow);assert.equal(JSON.stringify(event),before)
  const prompt=observationAdviceRequest(event,task,advice)
- assert.equal(prompt.mode,'observation');assert.match(prompt.text,/不要要求再等一个完整周期/);assert.match(prompt.text,/不作为本轮闭环的新增前置条件/);assert.ok(prompt.text.includes(task.observation.pending.channels[0].value.toString()))
+ assert.equal(prompt.mode,'observation');assert.match(prompt.text,/先核对数据时效、缺测和工况/);assert.match(prompt.text,/停机、非稳态或无工况数据/);assert.ok(prompt.text.includes(task.observation.pending.channels[0].value.toString()))
 })
 test('fresh partial windows and missing channels never inherit a previous complete window decision',()=>{
  const {event,task}=fixture(1);assert.equal(observationAdvice(event,task).status,'waiting');assert.match(observationAdvice(event,task).summary,/数据质量良好/);assert.match(observationAdvice(event,task).timing,/未满两小时/)
@@ -34,7 +34,7 @@ test('the first two-hour boundary is sufficient and existing old-rule advice is 
  const advice=observationAdvice(exact.event,exact.task)
  assert.equal(advice.status,'review');assert.equal(advice.evidence.reachedTwoHours,true)
  assert.equal(nextTick.task.observation.pending.sampleCount,0);assert.equal(observationAdvice(nextTick.event,nextTick.task).status,'review')
- assert.equal(exact.task.observation.records.length,1);assert.equal(JSON.parse(advice.key)[0],2)
+ assert.equal(exact.task.observation.records.length,1);assert.equal(JSON.parse(advice.key)[0],4)
  assert.equal(Date.parse(advice.evidence.targetAt)-Date.parse(exact.task.submittedAt),7200000)
 })
 test('elapsed time alone never recommends closure for an unstable or empty trend',()=>{
@@ -68,11 +68,11 @@ test('dismissal persists per review, is captain-only, and never blocks manual cl
  decide(state,id,{action:'close',reason:'轮机长核实后人工闭环。'})
  assert.equal(event.phase,'closed');assert.throws(()=>updateObservationAdvice(state,id,phaseId,{answer:'late response'}),/当前观察/)
 })
-test('observation API enforces the two-hour instruction without appending generic waiting conditions',async()=>{
+test('observation API enforces cycle, operating-condition and evidence gates',async()=>{
  const {event,task}=fixture(),body=observationAdviceRequest(event,task,observationAdvice(event,task));let sent,code,result
  const configuration={read:async()=>({source:'manual',baseUrl:'https://example.test',apiKey:'test-key',model:'test',protocol:'anthropic',maxTokens:1000,timeoutMs:5000,enabled:true,knowledgeEnabled:false})}
  const handler=createAiHandler(process.cwd(),{configuration,fetcher:async(url,options)=>{sent=JSON.parse(options.body);return {ok:true,json:async()=>({content:[{type:'text',text:'已满两小时，数据平稳，推荐本轮闭环。'}],usage:{input_tokens:10,output_tokens:10}})}}})
  async function call(role){const req=Readable.from([Buffer.from(JSON.stringify({...body,role}))]);Object.assign(req,{url:'/api/ai/chat',method:'POST',socket:{remoteAddress:'127.0.0.1'},headers:{host:'localhost:5173','x-engine-room-client':'local-ui'}});await handler(req,{set statusCode(v){code=v},setHeader(){},end(text){result=JSON.parse(text)}},()=>assert.fail())}
  await call('engineer');assert.equal(code,400);assert.equal(sent,undefined)
- await call('captain');assert.equal(code,200);assert.match(sent.system,/直接推荐本轮闭环/);assert.match(sent.system,/不要再等待下一周期/);assert.ok(!sent.system.includes('有技术判断时附简短的'));assert.match(result.answer,/推荐本轮闭环/)
+ await call('captain');assert.equal(code,200);assert.match(sent.system,/推荐人工闭环/);assert.match(sent.system,/不因到期推荐闭环/);assert.ok(!sent.system.includes('有技术判断时附简短的'));assert.match(result.answer,/推荐本轮闭环/)
 })
