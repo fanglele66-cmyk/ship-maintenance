@@ -2,7 +2,7 @@ import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,newEvent,decide,submitTask,currentTask,ensureTaskPlan,people,pendingDecision,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
-import {lifecycleWorkItems,lifecycleNotifications,taskNumber,findTask,canViewTask} from '../src/workflow/lifecycleWorkItems.js'
+import {lifecycleWorkItems,lifecycleNotifications,workItemPresentation,taskNumber,findTask,canViewTask} from '../src/workflow/lifecycleWorkItems.js'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 const id='real-alarm-0430'
 function assign(state,action='investigate'){
@@ -109,3 +109,16 @@ test('observation resumed after a recheck survives reload and ends when the even
  test('restricted feedback remains unresolved after captain review and is never labeled completed',()=>{
  const state=createLifecycleState(),task=assign(state);state.role='engineer';task.draft.records.forEach((r,i)=>r.result=task.steps[i].options.includes('无法确认')?'无法确认':task.steps[i].options[0]);task.draft.summary='现场条件受限，保留待核实项。';submitTask(state,id,task.id);assert.equal(task.goalStatus,'unresolved');assert.equal(task.conversations.engineer.at(-1).reportId,state.events[id].reports.at(-1).id);state.role='captain';const next=ensureTaskPlan(state.events[id]);next.scope='补充核实受限项目';next.steps=structuredClone(task.steps);assign(state,'investigate');assert.equal(task.goalStatus,'unresolved');assert.ok(!lifecycleWorkItems(state).completed.some(i=>i.taskId===task.id));
  })
+
+test('待办卡片使用具体名称和进展，历史决策保留当时动作',()=>{
+ const state=createLifecycleState(),event=state.events[id]
+ const pending=lifecycleWorkItems(state).pending.find(i=>i.eventId===id)
+ assert.equal(workItemPresentation(pending,event).title,event.title+'（待决策）')
+ const task=assign(state),assigned=lifecycleWorkItems(state).assigned.find(i=>i.taskId===task.id)
+ assert.match(workItemPresentation(assigned,event).title,/第1轮排查任务.*（待执行）/)
+ const history=lifecycleWorkItems(state).completed.find(i=>i.title==='派发排查')
+ assert.equal(workItemPresentation(history,event).title,event.title+'（派发排查）')
+ submit(state);state.role='captain'
+ const review=lifecycleWorkItems(state).pending.find(i=>i.eventId===id)
+ assert.equal(workItemPresentation(review,event).title,event.title+'（排查待审阅）')
+})

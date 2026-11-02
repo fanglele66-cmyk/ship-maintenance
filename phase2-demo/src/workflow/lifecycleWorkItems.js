@@ -51,17 +51,19 @@ export function lifecycleWorkItems(state){
 
 // Reading an event or dismissing a popup never resolves a pending decision.
 // Stable work-item IDs keep reminders across reloads without making new notices.
-export function notificationPresentation(item,event,supplement){
+export function workItemPresentation(item,event,supplement){
+ if(item.kind==='decision'&&item.done)return {name:item.eventTitle,progress:item.title,title:item.eventTitle+'（'+item.title+'）',text:'负责人：'+item.owner+' · '+item.status}
  const phase=event.phases.at(-1),task=event.tasks.find(t=>t.id===event.currentTask)
  const name=item.kind==='task'?item.title:item.eventTitle
  const progress=supplement?'报告补充待审阅':item.kind==='task'?item.status:event.phase==='reminder'?'待决策':phase?.observationReview?'观察待确认':task?.kind==='investigation'?'排查待审阅':'作业待审阅'
  const detail=item.kind==='task'?`${item.progress} / ${item.total} 项已填写` :phase?.observationReview?'观察周期已完成':event.phase==='reminder'?'风险提醒待评估':`${taskName(task)}报告已提交`
  return {name,progress,title:name+'（'+progress+'）',text:'负责人：'+item.owner+' · '+detail}
 }
+export const notificationPresentation=workItemPresentation
 export function lifecycleNotifications(state){
  const work=lifecycleWorkItems(state),pending=work.pending.filter(item=>!item.waiting).map(item=>{
   const supplement=item.kind==='decision'?(state.notices||[]).filter(n=>n.recipient===state.role&&n.eventId===item.eventId&&n.title==='报告已补充'&&timestamp(n.at)>=timestamp(item.at)).sort(newest)[0]:null
-  return {id:item.id+(item.kind==='task'&&state.events[item.eventId].tasks.find(t=>t.id===item.taskId)?.resumedAt?':'+item.at:'')+(supplement?':'+supplement.id:''),eventId:item.eventId,taskId:item.taskId,...notificationPresentation(item,state.events[item.eventId],supplement),at:supplement?.at||item.at,location:item.location,pending:true}
+  return {id:item.id+(item.kind==='task'&&state.events[item.eventId].tasks.find(t=>t.id===item.taskId)?.resumedAt?':'+item.at:'')+(supplement?':'+supplement.id:''),eventId:item.eventId,taskId:item.taskId,...workItemPresentation(item,state.events[item.eventId],supplement),at:supplement?.at||item.at,location:item.location,pending:true}
  })
  const covered=new Set(pending.map(n=>n.eventId))
  const updates=(state.notices||[]).filter(n=>n.recipient===state.role&&!n.read&&!covered.has(n.eventId)).flatMap(n=>{

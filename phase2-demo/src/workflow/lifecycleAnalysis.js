@@ -101,7 +101,7 @@ export function decisionAnalysisItems(event,task,report){
 }
 export function decisionBasis(event,action){
  if(event.phase==='reminder')return {points:event.brief.captainDecision,reason:event.brief.dispatchReason}
- const task=event.tasks.find(t=>t.id===event.currentTask),report=event.reports.findLast(r=>r.taskId===task?.id)
+ const task=event.tasks.find(t=>t.id===event.currentTask)||event.observationSource?.task,report=event.reports.findLast(r=>r.taskId===task?.id)
  const check=briefChecks[event.sourceEventId||event.id]||'核对实际发现、处理范围与复测条件。'
  const sentences=report?.summary?.split(/(?<=[。！？])/).filter(Boolean)||[]
  const conclusion=event.tracking?report?.summary||task?.summary||'':(task?.kind==='investigation'?sentences[0]:sentences.findLast(sentence=>/复测|稳定|原报警|原低压|偏差|恢复/.test(sentence)))||sentences[0]||''

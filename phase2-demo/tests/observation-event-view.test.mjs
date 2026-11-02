@@ -14,6 +14,7 @@ test('独立观察页、来源事件及闭环报告均可完整渲染',async()=>
  try{
   const {useEventLifecycleStore}=await server.ssrLoadModule('/src/stores/eventLifecycleStore.js')
   const {default:View}=await server.ssrLoadModule('/src/views/EventLifecycleView.vue')
+  const {routes}=await server.ssrLoadModule('/src/router/routes.js')
   globalThis.window={addEventListener(){}}
   const state=createLifecycleState(),parent=state.events['real-alarm-0430']
   decide(state,parent.id,{action:'investigate',owner:people.engineer,deadline:new Date(Date.now()+86400000).toISOString(),reason:ensureTaskPlan(parent).scope})
@@ -22,11 +23,14 @@ test('独立观察页、来源事件及闭环报告均可完整渲染',async()=>
   const child=state.events[parent.observationEventIds[0]]
   child.observationAdvice={[child.phases.at(-1).id]:{dismissed:true}}
   const store=useEventLifecycleStore();store.state.events=state.events;store.state.role='captain'
-  const router=createRouter({history:createMemoryHistory(),routes:[{name:'EventLifecycle',path:'/situation/issue/:attentionId',component:View}]})
+  const router=createRouter({history:createMemoryHistory(),routes})
+  assert.equal(router.resolve('/situation/issue/'+child.id).name,'EventLifecycle')
+  assert.equal(router.resolve('/situation/issue/'+parent.id).name,'EventLifecycle')
+  assert.equal(router.resolve('/situation/issue/aux-health').name,'Situation')
   async function render(id){await router.push('/situation/issue/'+id);const app=createSSRApp({render:()=>h(View)});app.use(pinia);app.use(router);return renderToString(app)}
   const parentHtml=await render(parent.id);assert.match(parentHtml,/效果观察已独立建档/);assert.match(parentHtml,new RegExp(child.title))
-  const childHtml=await render(child.id);assert.match(childHtml,/关联原事件/);assert.match(childHtml,/效果观察/);assert.match(childHtml,/事件助手/);assert.match(childHtml,/>决策<\/button>/);assert.doesNotMatch(childHtml,/<select/)
+  const childHtml=await render(child.id);assert.match(childHtml,/关联事件/);assert.match(childHtml,/关联任务/);assert.match(childHtml,/来源报告/);assert.match(childHtml,new RegExp('/tasks/'+task.id));assert.match(childHtml,/lc-effect-chart/);assert.match(childHtml,/观察条件/);assert.match(childHtml,/效果观察/);assert.match(childHtml,/事件助手/);assert.match(childHtml,/>决策<\/button>/);assert.doesNotMatch(childHtml,/<select/)
   decide(store.state,child.id,{action:'close',reason:'核对本轮观察记录后确认结束。'})
-  const closedHtml=await render(child.id);assert.match(closedHtml,/闭环归档/);assert.match(closedHtml,/关联原事件/)
+  const closedHtml=await render(child.id);assert.match(closedHtml,/闭环归档/);assert.match(closedHtml,/关联事件/)
  }finally{disposePinia(pinia);await server.close();if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow}
 })

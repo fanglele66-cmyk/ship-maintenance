@@ -3,7 +3,7 @@
   <template v-if="captain">
    <LifecycleDecisionBasis v-if="showBasis&&!shoreOnly" :event="event" :action="decision.action"/>
    <p v-if="shoreOnly" class="lc-muted">将事件与闭环报告发送岸基，事件保持已闭环。</p>
-   <fieldset v-if="!shoreOnly" class="decision-options"><legend>选择本次决策</legend><label v-for="o in options" :key="o.value" :class="{selected:decision.action===o.value}"><input type="radio" name="decision-action" v-model="decision.action" :value="o.value" @change="changeAction"/>{{o.label}}</label></fieldset>
+   <div v-if="!shoreOnly" class="decision-choice-bar"><fieldset class="decision-options"><legend>选择本次决策</legend><label v-for="o in options" :key="o.value" :class="{selected:decision.action===o.value}"><input type="radio" name="decision-action" v-model="decision.action" :value="o.value" @change="changeAction"/>{{o.label}}</label></fieldset><button v-if="dispatch" type="button" class="decision-plan-link" @click="$emit('plan',decision.action)">查看{{planTabLabel(decision.action)}} ↗</button></div>
    <template v-if="decision.action"><label v-if="decision.action==='shore'" class="shore-editor"><span class="shore-title">{{latestReport?.title}}</span><textarea aria-label="编辑同步报告" v-model="decision.shoreMarkdown" required rows="15"/></label>
     <label>{{dispatch?'安排范围与依据':decision.action==='shore'?'同步内容与岸基支持需求':'决定依据与后续安排'}}<textarea v-model="reason" :disabled="dispatch&&plan?.status!=='ready'" required rows="3" :placeholder="dispatch?'明确检查/处理对象、已确认原因及本轮要求':'说明判断依据、设备安全影响与后续安排'"/></label>
     <label v-if="decision.action==='resume'">恢复后的完成时限<input type="datetime-local" v-model="decision.deadline" required/></label><template v-if="dispatch">
@@ -34,7 +34,7 @@ import {planTabLabel} from '../workflow/taskPlanning'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {latestShoreReport} from '../workflow/shoreReports.js'
 import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
-const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded'])
+const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded','plan'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,deadline:'',maintenancePlanId:'',window:''}))
 const latestReport=computed(()=>latestShoreReport(props.event))
