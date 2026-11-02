@@ -51,9 +51,10 @@ const views = new Map(data.views.map(view => [view.id, view]))
 const layers = ['raw', 'processing', 'scenario', 'event', 'task', 'result']
 const taskTypes = { 'task-investigation': 'investigation', 'task-repair': 'repair', 'task-recheck': 'recheck', 'maintenance-compat': 'maintenance' }
 assert.equal(nodes.size, data.nodes.length, 'Duplicate map node IDs')
-assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'states', 'pages'])
+assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'observation', 'states', 'pages'])
 assert.deepEqual(data.informationLayers.map(layer => layer.id), layers)
-assert.deepEqual(data.branchFlows.map(flow => flow.id), ['alarm', 'warning', 'tracking'])
+assert.deepEqual(data.branchFlows.map(flow => flow.id), ['alarm', 'warning', 'tracking', 'observation'])
+assert.equal(data.meta.baselineCommit, '98ce7fc')
 const expectedTitles = {
   crew: '角色与权限', 'risk-brief': '事件信息与排查建议',
   'report-analysis': '处置报告', 'investigation-report': '排查/复查反馈',
@@ -67,6 +68,12 @@ for (const id of ['report-revision', 'role-conversation', 'page-logs', 'decision
 assert.equal(views.get('pages').title, '用户动线')
 assert(nodes.get('effect-observation').sources.includes('mapped-samples'))
 assert(nodes.get('effect-observation').related.includes('sample'))
+assert.equal(nodes.get('effect-observation').layer, 'event', 'Observation must remain an independent event')
+assert(nodes.get('branch-observe').outputs.includes('event-transferred'), 'Transfer must end handling on the source event')
+assert(!nodes.get('event-transferred').outputs.includes('closure-report'), 'Transfer must not silently archive the event')
+assert(!nodes.get('repair-report').outputs.includes('effect-observation'), 'A submitted report must not bypass the observation decision')
+assert(nodes.get('chain-closure').outputs.includes('closure-report'))
+assert(!nodes.has('branch-shore'), 'Initial risk has no generated report to sync')
 for (const node of nodes.values()) {
   for (const id of [...node.sources, ...node.outputs, ...node.related, ...(node.artifacts ?? [])]) assert(nodes.has(id), 'Unknown reference: ' + node.id + ' -> ' + id)
   for (const source of node.evidence ?? []) {
@@ -112,20 +119,27 @@ for (const view of views.values()) {
     seen.add(from)
     return view.edges.filter(edge => edge.from === from).some(edge => reaches(edge.to, to, seen))
   }
-  const paths = view.id === 'pages' ? [['page-home', 'page-event'], ['page-home','page-todo'], ['page-todo', 'page-event'], ['page-todo','page-task'], ['page-event','page-task'], ['page-task','page-event'], ['page-task','page-reports'], ['page-issues', 'page-event'], ['page-event', 'page-reports']] : [
+  const paths = view.id === 'pages' ? [['page-home', 'page-event'], ['page-home','page-todo'], ['page-todo', 'page-event'], ['page-todo','page-task'], ['page-event','page-task'], ['page-task','page-event'], ['page-task','page-reports'], ['page-issues', 'page-event'], ['page-event', 'page-reports'], ['page-event','page-observation'], ['page-observation','page-event'], ['page-observation','page-task'], ['page-observation','page-reports']] : [
     ['sample', 'mapped-samples'], ['mapped-samples', 'sample-quality'], ['sample-quality', 'time-features'],
     ['triage', 'triage-dispatch'], ['triage-dispatch', 'task-investigation'], ['task-investigation', 'investigation-report'],
     ['investigation-report', 'notification'], ['notification', 'task-investigation'], ['notification', 'task-repair'],
     ['task-repair', 'repair-report'], ['repair-report', 'effect-observation'], ['effect-observation', 'result-review'],
     ['result-review', 'task-recheck'], ['task-recheck', 'investigation-report'], ['result-review', 'closure-report'],
     ['notification','maintenance-compat'], ['maintenance-compat','task-feedback'], ['notification','work-item'], ['notification','branch-observe'], ['branch-observe','effect-observation'],
+    ['branch-observe','event-transferred'], ['result-review','branch-chain-close'], ['branch-chain-close','chain-closure'], ['chain-closure','closure-report'], ['observation-continue','effect-observation'],
   ]
-  // The status view intentionally condenses observation into its task/result ownership cards.
+  // Observation owns its next cycle; source transfer is a distinct, non-closure result.
   for (const [from, to] of paths) if (displayed.has(from) && displayed.has(to)) assert(reaches(from, to), view.id + ': broken path ' + from + ' -> ' + to)
   if (view.id !== 'pages') {
     for (const initial of ['triage', 'plan-draft', 'triage-dispatch']) assert(!reaches('notification', initial), view.id + ': lifecycle incorrectly returns to the initial event column')
   }
   if (['alarm', 'warning', 'tracking'].includes(view.id)) assert(reaches(view.id, 'triage-dispatch'))
+  if (view.id === 'observation') {
+    assert(!displayed.has('triage'), 'Observation must not return to the source event initial decision')
+    assert(reaches('result-review', 'observation-continue'))
+    assert(reaches('effect-observation', 'task-recheck'))
+    assert(!view.edges.some(edge => edge.from === 'event-transferred' && edge.type === 'flow'), 'Transferred source must not resume handling')
+  }
 }
 for (const flow of data.branchFlows) {
   const displayed = new Set(views.get(flow.id).columns.flatMap(column => column.groups.flatMap(group => group.ids)))
