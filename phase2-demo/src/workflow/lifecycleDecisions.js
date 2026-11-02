@@ -1,3 +1,4 @@
+import {latestShoreReport} from './shoreReports.js'
 import {isVerificationReview} from './observationContext.js'
 import {taskExecution} from './taskExecution.js'
 export const isAbnormalResult=record=>/发现异常|读数不一致|偏离仍存在/.test(record.result||'')
@@ -18,17 +19,18 @@ export function confirmedTracking(event,task){
   ||rows.some(r=>/偏离仍存在/.test(r.result))))
 }
 export function lifecycleDecisionOptions(event){
- const shore={value:'shore',label:'同步岸基'}
- if(event.phase==='closed')return [shore]
- if(event.phase==='reminder')return [{value:'investigate',label:'派发排查'},{value:'false',label:'确认误报'},shore]
+ const shore=latestShoreReport(event)?[{value:'shore',label:'同步岸基'}]:[]
+ if(event.phase==='transferred')return shore
+ if(event.phase==='closed')return shore
+ if(event.phase==='reminder')return [{value:'investigate',label:'派发排查'},{value:'false',label:'确认误报'},...shore]
  const task=event.tasks.find(t=>t.id===event.currentTask)
- if(task?.status==='waiting')return [{value:'resume',label:'条件具备，恢复原任务'},{value:'terminate',label:'终止未执行部分'},shore]
- if(['assigned','reporting','report-error'].includes(task?.status))return [shore]
- if(task?.status==='submitted'&&taskExecution(task).incomplete&&(task.kind!=='investigation'||taskExecution(task).summaryBlocked||task.records.some(r=>/未完成|受限/.test(r.result))))return [{value:task.kind==='investigation'&&!hasAbnormalFindings(task)?'investigate':'repair',label:task.kind==='investigation'&&!hasAbnormalFindings(task)?'继续排查':'派发剩余维修'},{value:'wait',label:'等待条件，保留原任务'},{value:'terminate',label:'终止未执行部分'},{value:'close',label:'说明剩余事项并闭环'},shore]
- if(task?.status==='terminated')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},shore]
- if(event.phase==='review')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},...(isVerificationReview(event)?[{value:'repair',label:'派发维修'}]:[]),...(!event.phases?.at(-1)?.observationWaiting?[{value:'observe',label:'继续观察'}]:[]),shore]
- if(event.phase==='decision')return [...(confirmedTracking(event,task)?[{value:'maintenance',label:'提前维保'}]:hasAbnormalFindings(task)?[{value:'repair',label:'派发维修'}]:[{value:'investigate',label:'继续排查'}]),...(task?.status==='submitted'?[{value:'observe',label:'继续观察'},{value:'close',label:'闭环'}]:[]),shore]
- return [shore]
+ if(task?.status==='waiting')return [{value:'resume',label:'条件具备，恢复原任务'},{value:'terminate',label:'终止未执行部分'},...shore]
+ if(['assigned','reporting','report-error'].includes(task?.status))return shore
+ if(task?.status==='submitted'&&taskExecution(task).incomplete&&(task.kind!=='investigation'||taskExecution(task).summaryBlocked||task.records.some(r=>/未完成|受限/.test(r.result))))return [{value:task.kind==='investigation'&&!hasAbnormalFindings(task)?'investigate':'repair',label:task.kind==='investigation'&&!hasAbnormalFindings(task)?'继续排查':'派发剩余维修'},{value:'wait',label:'等待条件，保留原任务'},{value:'terminate',label:'终止未执行部分'},{value:'close',label:'说明剩余事项并闭环'},...shore]
+ if(task?.status==='terminated')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},...shore]
+ if(event.phase==='review')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},...(isVerificationReview(event)?[{value:'repair',label:'派发维修'}]:[]),...(!event.phases?.at(-1)?.observationWaiting?[{value:'observe',label:'继续观察'}]:[]),...shore]
+ if(event.phase==='decision')return [...(confirmedTracking(event,task)?[{value:'maintenance',label:'提前维保'}]:hasAbnormalFindings(task)?[{value:'repair',label:'派发维修'}]:[{value:'investigate',label:'继续排查'}]),...(task?.status==='submitted'?[{value:'observe',label:'继续观察'},{value:'close',label:'闭环'}]:[]),...shore]
+ return shore
 }
 export const dispatchAction=event=>{
  const actions=lifecycleDecisionOptions(event).filter(o=>['investigate','repair','maintenance','recheck'].includes(o.value))

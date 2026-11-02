@@ -1,3 +1,4 @@
+import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {observationAdvice,observationAdviceRequest,updateObservationAdvice} from '../src/workflow/observationAdvice.js'
@@ -11,8 +12,8 @@ function fixture(hours=3){
  const assign=action=>{state.role='captain';decide(state,id,{action,reason:ensureTaskPlan(event).scope,owner:people.engineer,deadline:new Date(now+86400000).toISOString()})}
  const submit=()=>{state.role='engineer';const task=currentTask(event);task.draft.records.forEach(r=>r.result=task.kind==='investigation'?'发现异常':'已完成');task.draft.summary='已处理确认的卡滞，完成试车，需核对修后观察。';submitTask(state,id)}
  assign('investigate');submit();assign('repair');submit();state.role='captain'
- const task=currentTask(event);task.submittedAt=new Date(now-hours*3600000).toISOString();syncLifecycleObservations(state,{},now,{demo:true})
- return {state,id,event,task,phaseId:event.phases.at(-1).id}
+ const source=currentTask(event);source.submittedAt=new Date(now-hours*3600000).toISOString();const observed=startObservation(state,event);syncLifecycleObservations(state,{},now,{demo:true})
+ return {state,...observed,phaseId:observed.event.phases.at(-1).id}
 }
 test('two hours of valid stable observation recommends manual closure without another window',()=>{
  const {event,task}=fixture(),before=JSON.stringify(event),advice=observationAdvice(event,task)

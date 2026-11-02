@@ -8,7 +8,7 @@ export function deviceHealthAssessment({deviceId,sensors=[],events=[],period}){
   const main=deviceId==='main-engine-1',group=deviceId==='aux-system'
   const points=sensors.filter(p=>group?p.deviceId?.startsWith('aux-engine-'):p.deviceId===deviceId)
   const related=events.filter(e=>e.deviceId===deviceId||(main&&e.device==='主机')||(group&&e.deviceId?.startsWith('aux-engine-')))
-  const open=related.filter(e=>e.phase!=='closed')
+  const open=related.filter(e=>!['closed','transferred'].includes(e.phase))
   const invalid=points.filter(p=>!Number.isFinite(p.value)).length
   const flagged=points.filter(p=>['over','warning'].includes(p.status)).length
   const navigation=period?.state||'航行状态待核对'
@@ -19,7 +19,7 @@ export function deviceHealthAssessment({deviceId,sensors=[],events=[],period}){
     return {
       conclusion:open.length?`需关注${names.join('、')}。${sailing}，主机${value(sensors,'s-012','rpm')}、负荷${value(sensors,'main-load','%')}；当前读数不能撤销历史事件。`:`当前无待处置事件。${sailing}，主机${value(sensors,'s-012','rpm')}、负荷${value(sensors,'main-load','%')}；已闭环记录仍保留。`,
       next:invalid?`${invalid}个测点数据缺失，先补齐工况与测点依据。`:flagged?`${flagged}个测点提示越限或预警，先对齐当前工况核验；事件按本轮状态继续处置。`:'报警、预警先核查现场；长期基线结合月度工况与独立校验决定后续。',
-      basis:related.map(e=>{const c=eventAssessmentContext[e.id];return `**${e.title} · ${e.status}**\n\n${c?c.navigation+' '+c.conditions:'发生时工况与证据尚待补齐。'}`}).join('\n\n')||'当前无关联事件，继续核对运行测点与设备记录。',
+      basis:related.map(e=>{const c=eventAssessmentContext[e.sourceEventId||e.id];return `**${e.title} · ${e.status}**\n\n${c?c.navigation+' '+c.conditions:'发生时工况与证据尚待补齐。'}`}).join('\n\n')||'当前无关联事件，继续核对运行测点与设备记录。',
       context:`当前：${navigation} · 历史事件按各自发生窗口核对`,
     }
   }

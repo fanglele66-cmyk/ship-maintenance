@@ -1,3 +1,4 @@
+import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,newEvent,decide,submitTask,currentTask,ensureTaskPlan,people,pendingDecision,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
@@ -27,7 +28,7 @@ test('dispatch resolves the captain todo; one stable task is shared by dispatche
 })
 test('submission archives only this task and produces a new captain decision, never a duplicate execution task',()=>{
  const state=createLifecycleState(),first=assign(state);submit(state)
- assert.ok(!lifecycleWorkItems(state).pending.some(i=>i.taskId===first.id));assert.ok(!lifecycleWorkItems(state).completed.some(i=>i.taskId===first.id));assert.equal(first.goalStatus,'awaiting-review')
+ assert.ok(!lifecycleWorkItems(state).pending.some(i=>i.taskId===first.id));assert.ok(lifecycleWorkItems(state).completed.some(i=>i.taskId===first.id));assert.equal(first.goalStatus,'completed')
  state.role='captain';assert.ok(lifecycleWorkItems(state).pending.some(i=>i.eventId===id&&i.kind==='decision'))
  assert.equal(state.events[id].tasks.length,1)
  const second=assign(state,'repair'),snapshot=JSON.stringify(second.draft);assert.equal(first.goalStatus,'completed');assert.ok(lifecycleWorkItems(state).completed.some(i=>i.taskId===first.id))
@@ -50,17 +51,16 @@ test('pending reminders survive reading; newest reminder is ordered first and st
 })
 test('observation has no personnel todo until its scheduled window ends; reload does not duplicate the reminder',()=>{
  const state=createLifecycleState();assign(state);submit(state);assign(state,'repair');submit(state)
- const event=state.events[id],count=event.tasks.length;state.role='captain'
- decide(state,id,{action:'observe',reason:'先由系统继续观察至本阶段结束。'})
+ const parent=state.events[id],count=parent.tasks.length;state.role='captain';const {event}=startObservation(state,parent)
  const phase=event.phases.at(-1),at=phase.at,due=Date.parse(phase.observationDueAt)
- assert.equal(pendingDecision(event),false);assert.ok(!lifecycleWorkItems(state).pending.some(i=>i.eventId===id));assert.equal(event.tasks.length,count)
+ assert.equal(pendingDecision(event),false);assert.ok(!lifecycleWorkItems(state).pending.some(i=>i.eventId===id));assert.equal(parent.tasks.length,count);assert.equal(event.tasks.length,0)
  syncLifecycleObservations(state,{recordedSensorChannels:()=>[]},due-1)
  assert.equal(pendingDecision(event),false)
  syncLifecycleObservations(state,{recordedSensorChannels:()=>[]},due)
  assert.equal(pendingDecision(event),true);assert.equal(phase.at,at);assert.equal(event.status,'待观察确认')
- const notices=lifecycleNotifications(state).filter(n=>n.eventId===id);assert.equal(notices.length,1);assert.match(notices[0].title,/观察结果/)
+ const notices=lifecycleNotifications(state).filter(n=>n.eventId===event.id);assert.equal(notices.length,1);assert.match(notices[0].progress,/观察待确认/)
  const reloaded=JSON.parse(JSON.stringify(state));syncLifecycleObservations(reloaded,{recordedSensorChannels:()=>[]},due+1000)
- assert.equal(lifecycleNotifications(reloaded).filter(n=>n.eventId===id).length,1)
+ assert.equal(lifecycleNotifications(reloaded).filter(n=>n.eventId===event.id).length,1)
  state.role='engineer';assert.equal(lifecycleWorkItems(state).pending.length,0)
 })
 test('task permissions use the assignee, not mere participation in its parent event; legacy tasks remain accessible',()=>{
@@ -86,7 +86,7 @@ test('a new supplement updates the pending reminder and remains pending after be
  const original=lifecycleNotifications(state)[0],event=state.events[id],at=new Date(Date.parse(original.at)+1000).toISOString()
  state.notices.push({id:'latest-supplement',eventId:id,reportId:event.reports.at(-1).id,recipient:'captain',title:'报告已补充',at,read:false})
  const reminder=lifecycleNotifications(state)[0]
- assert.match(reminder.title,/报告已补充/);assert.equal(reminder.at,at);assert.notEqual(reminder.id,original.id)
+ assert.match(reminder.title,/报告补充待审阅/);assert.equal(reminder.at,at);assert.notEqual(reminder.id,original.id)
  state.notices.forEach(n=>n.read=true)
  assert.equal(lifecycleNotifications(state)[0].id,reminder.id)
  assert.equal(lifecycleNotifications(state).filter(n=>n.eventId===id).length,1)
@@ -100,9 +100,9 @@ test('observation resumed after a recheck survives reload and ends when the even
  recheck.draft.summary='本轮复查未见异常。';submitTask(state,id,recheck.id);state.role='captain'
  assert.ok(work.observationEndedAt)
  decide(state,id,{action:'observe',reason:'复查已回交，继续观察至下一汇总窗口。'})
- const reloaded=refreshLifecyclePresentation(JSON.parse(JSON.stringify(state))),event=reloaded.events[id],resumed=event.tasks.find(t=>t.id===work.id)
- assert.ok(resumed.observationResumedAt);assert.equal(resumed.observationEndedAt,null);assert.equal(pendingDecision(event),false)
- decide(reloaded,id,{action:'close',reason:'复查及观察结果已由轮机长确认。'})
+ const reloaded=refreshLifecyclePresentation(JSON.parse(JSON.stringify(state))),event=reloaded.events[reloaded.events[id].observationEventIds.at(-1)],resumed=event.observationSource.task
+ assert.ok(resumed.observationStartedAt);assert.equal(resumed.observationEndedAt,undefined);assert.equal(pendingDecision(event),false)
+ decide(reloaded,event.id,{action:'close',reason:'复查及观察结果已由轮机长确认。'})
  assert.ok(resumed.observationEndedAt);assert.equal(event.phase,'closed');assert.ok(!lifecycleWorkItems(reloaded).pending.some(i=>i.eventId===id))
 })
 

@@ -1,3 +1,4 @@
+import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'vite'
@@ -40,7 +41,7 @@ test('closed events offer a separate shore handoff without reopening stage forms
   }
   await t.test('active stages retain their form entry',async()=>{
    const html=await render(createLifecycleState())
-   assert.doesNotMatch(html,/填写本阶段表单/);assert.match(html,/填写处置决定/)
+   assert.doesNotMatch(html,/填写本阶段表单/);assert.match(html,/填写决策/)
   })
   await t.test('closed captain and assigned engineer have no stage form',async()=>{
    const state=closedFixture()
@@ -52,7 +53,7 @@ test('closed events offer a separate shore handoff without reopening stage forms
   })
   await t.test('shore submission preserves closure and never prompts further shipboard handling',async()=>{
    const state=closedFixture(),event=state.events[id],before=structuredClone({phase:event.phase,status:event.status,tasks:event.tasks,reports:event.reports})
-   decide(state,id,{action:'shore',reason:'同步事件全过程及闭环报告。'})
+   decide(state,id,shoreForm(event))
    assert.deepEqual({phase:event.phase,status:event.status,tasks:event.tasks,reports:event.reports},before)
    assert.equal(event.shore.at(-1).packet.phase,'closed')
    assert.match(event.conversations.captain.at(-1).recommendation,/保持已闭环/)

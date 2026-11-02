@@ -14,7 +14,7 @@ export function submissionSnapshot(task){
  return copy(Object.fromEntries(['id','kind','purpose','round','owner','scope','steps','records','summary','attachments','maintenance','assignedAt','deadline','submittedAt','resumedAt'].filter(key=>task[key]!==undefined).map(key=>[key,task[key]])))
 }
 export function reportTask(event,report){
- const task=event.tasks.find(t=>t.id===report.taskId)
+ const task=event.tasks.find(t=>t.id===report.taskId)||(event.observationSource&&event.observationSource.taskId===report.taskId?event.observationSource.task:null)
  if(!task)return null
  if(report.submissionSnapshot)return {...task,...copy(report.submissionSnapshot)}
  const old=task.feedbackHistory?.find(h=>h.reportId===report.id)

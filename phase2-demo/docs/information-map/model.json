@@ -512,7 +512,7 @@
         "fields": [
           {
             "name": "类型",
-            "description": "当前产品共三类事件；维修或维保是工作类型，不另立事件类别。"
+            "description": "当前产品有报警、预警、异动跟踪、效果观察四类事件；维修或维保仍是工作类型。"
           }
         ],
         "sources": [
@@ -544,7 +544,7 @@
         "fields": [
           {
             "name": "类型",
-            "description": "当前产品共三类事件；维修或维保是工作类型，不另立事件类别。"
+            "description": "当前产品有报警、预警、异动跟踪、效果观察四类事件；维修或维保仍是工作类型。"
           }
         ],
         "sources": [
@@ -576,7 +576,7 @@
         "fields": [
           {
             "name": "类型",
-            "description": "当前产品共三类事件；维修或维保是工作类型，不另立事件类别。"
+            "description": "当前产品有报警、预警、异动跟踪、效果观察四类事件；维修或维保仍是工作类型。"
           }
         ],
         "sources": [
@@ -646,7 +646,7 @@
         "kind": "stage",
         "scope": "船舶 → 设备 → 事件",
         "stage": "轮机长审阅与决定",
-        "summary": "核对风险提醒后选择派发排查、确认误报或同步岸基。",
+        "summary": "核对风险提醒后通过决策弹窗派发排查或确认误报；报告生成后才能同步岸基。",
         "fields": [
           {
             "name": "不创建任务",
@@ -1058,15 +1058,15 @@
       {
         "id": "effect-observation",
         "title": "效果观察",
-        "layer": "task",
-        "kind": "derived",
+        "layer": "event",
+        "kind": "stage",
         "scope": "船舶 → 设备 → 事件",
-        "stage": "按本轮任务保存",
-        "summary": "核实后观察与修后观察共用事件工作区，按事件类型、数据质量和可比工况评估，不以时间到期代替恢复证据。",
+        "stage": "独立事件 · 关联原事件",
+        "summary": "排查、维修或维保完整提交后，轮机长选择继续观察，建立与报警、预警、异动跟踪同级的独立事件。原任务完成与设备恢复分开判断。",
         "fields": [
           {
-            "name": "两种起点",
-            "description": "核实后观察从轮机长明确选择时开始；维修／维保报告回交即具备采样起点，仍需人员决定后续安排。"
+            "name": "创建与关联",
+            "description": "决策弹窗确认继续观察时开始新周期，保存原事件、任务和报告关联；原事件标为已转效果观察，不记为设备恢复。"
           },
           {
             "name": "观察周期",
@@ -1102,13 +1102,18 @@
           "sample",
           "branch-observe"
         ],
-        "page": "结果处置 · 效果观察",
+        "page": "事件中心 · 效果观察",
         "notes": [],
         "evidence": [
           {
             "path": "ship-maintenance/phase2-demo/src/workflow/observationConditions.js",
             "line": 10,
             "note": "2026-11-02 对照当前实现"
+          },
+          {
+            "path": "ship-maintenance/phase2-demo/src/workflow/observationEvents.js",
+            "line": 10,
+            "note": "独立事件与历史迁移实现"
           }
         ]
       },
@@ -1119,7 +1124,7 @@
         "kind": "stage",
         "scope": "船舶 → 设备 → 事件",
         "stage": "结果处置与回查",
-        "summary": "在同一事件审阅报告和观察结果，决定闭环、复查、继续观察或同步岸基；核实后观察另可派发维修。",
+        "summary": "在当前事件弹窗审阅报告并决策；效果观察单独建档并关联原事件，可复查、继续观察、闭环或同步最新报告。",
         "fields": [
           {
             "name": "人工决定",
@@ -1271,7 +1276,7 @@
         "kind": "human",
         "scope": "船舶 → 设备 → 事件",
         "stage": "结果处置与回查",
-        "summary": "登记同步原因及当时的事件、任务、报告、决定快照。",
+        "summary": "仅在报告生成后开放，弹窗加载最新报告；核对或修改同步副本后提交，保存待接收快照、提示及事件会话记录。",
         "fields": [
           {
             "name": "状态",
@@ -1280,6 +1285,10 @@
           {
             "name": "作用",
             "description": "保留同步快照，船上可继续处理；后续更新不自动重写旧快照。"
+          },
+          {
+            "name": "报告版本",
+            "description": "保留原报告与编辑后的同步副本；最新报告有变化时要求重新核对，不覆盖旧快照。"
           }
         ],
         "sources": [
@@ -2139,7 +2148,7 @@
         "kind": "branch",
         "scope": "船舶 → 设备 → 事件",
         "stage": "本轮工作与后续安排",
-        "summary": "轮机长依据现场核实决定暂不处置，包括异常自行回落后的跟踪；不新增执行任务。",
+        "summary": "轮机长依据本轮报告决定继续观察，创建关联原事件的独立效果观察事件；不重复创建执行任务。",
         "fields": [
           {
             "name": "观察目标",
@@ -2147,7 +2156,7 @@
           },
           {
             "name": "下一步",
-            "description": "在原事件审阅观察结果，可派发维修、复查、继续观察或闭环。"
+            "description": "在独立观察事件审阅结果，可派发维修、复查、继续观察或闭环；来源报告与原事件可回查。"
           }
         ],
         "sources": [
@@ -2157,7 +2166,7 @@
           "effect-observation"
         ],
         "related": [],
-        "page": "本次处置 → 继续观察",
+        "page": "决策弹窗 → 继续观察",
         "notes": [],
         "evidence": [
           {
@@ -2176,14 +2185,6 @@
         "stage": "本轮工作与后续安排",
         "summary": "截至2026-11-02，受阻等待／恢复／终止与可比工况门槛已实现；以下能力仍需补齐。",
         "fields": [
-          {
-            "name": "完成判定",
-            "description": "按要求完成检查后即时完成仍未实现；当前目标完成状态需后续人员决定更新。"
-          },
-          {
-            "name": "观察起点",
-            "description": "维修／维保报告回交即具备采样起点，尚非轮机长先确认正式观察方案。"
-          },
           {
             "name": "任务调整",
             "description": "已有等待、恢复与终止；恢复保留原范围和执行人，主动申请调整、转派授权未形成完整回路。"
@@ -2436,6 +2437,12 @@
                   "plan-draft",
                   "triage-dispatch"
                 ]
+              },
+              {
+                "title": "关联效果观察",
+                "ids": [
+                  "effect-observation"
+                ]
               }
             ]
           },
@@ -2455,7 +2462,6 @@
                   "investigation-report",
                   "repair-report",
                   "report-analysis",
-                  "effect-observation",
                   "notification",
                   "work-item",
                   "maintenance-compat",
@@ -3012,6 +3018,12 @@
                   "branch-false",
                   "branch-shore"
                 ]
+              },
+              {
+                "title": "关联效果观察",
+                "ids": [
+                  "effect-observation"
+                ]
               }
             ]
           },
@@ -3031,7 +3043,6 @@
                   "investigation-report",
                   "repair-report",
                   "report-analysis",
-                  "effect-observation",
                   "notification",
                   "branch-continue",
                   "branch-repair",
@@ -3640,6 +3651,12 @@
                   "branch-false",
                   "branch-shore"
                 ]
+              },
+              {
+                "title": "关联效果观察",
+                "ids": [
+                  "effect-observation"
+                ]
               }
             ]
           },
@@ -3659,7 +3676,6 @@
                   "investigation-report",
                   "repair-report",
                   "report-analysis",
-                  "effect-observation",
                   "notification",
                   "branch-continue",
                   "branch-repair",
@@ -4268,6 +4284,12 @@
                   "branch-false",
                   "branch-shore"
                 ]
+              },
+              {
+                "title": "关联效果观察",
+                "ids": [
+                  "effect-observation"
+                ]
               }
             ]
           },
@@ -4287,7 +4309,6 @@
                   "investigation-report",
                   "repair-report",
                   "report-analysis",
-                  "effect-observation",
                   "notification",
                   "branch-continue",
                   "branch-repair",

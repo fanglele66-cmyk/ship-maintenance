@@ -25,7 +25,8 @@ function verified(id=alarm){
 }
 function observe(fixture){
  decide(fixture.state,fixture.id,{action:'observe',reason:'现场核实后暂不处置，观察变化的持续性、回落及复发。'})
- return fixture
+ const parent=fixture.event,event=fixture.state.events[parent.observationEventIds.at(-1)]
+ return Object.assign(fixture,{parent,event,id:event.id,task:observationTaskFor(event)})
 }
 for(const id of [alarm,'real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline'])test(id+': investigation can enter observation without manufacturing a repair or task',()=>{
  const f=verified(id),report=structuredClone(f.event.reports.at(-1)),count=f.event.tasks.length
@@ -33,22 +34,22 @@ for(const id of [alarm,'real-warning-0523','real-tracking-exhaust-baseline','rea
  f.task.submittedAt=new Date(Date.now()-86400000).toISOString()
  const before=Date.now();observe(f)
  assert.equal(f.event.phase,'review');assert.equal(f.event.status,'效果观察中')
- assert.equal(f.event.tasks.length,count);assert.equal(f.task.observationMode,'verification')
+ assert.equal(f.parent.tasks.length,count);assert.equal(f.event.tasks.length,0);assert.equal(f.task.observationMode,'verification')
  assert.ok(Date.parse(f.task.observationStartedAt)>=before)
  assert.equal(observationTaskFor(f.event).id,f.task.id)
- assert.deepEqual(f.event.reports.at(-1),report)
+ assert.equal(f.event.reports.at(-1).markdown,report.markdown)
  assert.deepEqual(decisionOptions(f.event).map(o=>o.value),['close','recheck','repair','shore'])
- assert.ok(!pendingDecision(f.event));assert.ok(!lifecycleWorkItems(f.state).pending.some(i=>i.eventId===id))
+ assert.ok(!pendingDecision(f.event));assert.ok(!lifecycleWorkItems(f.state).pending.some(i=>i.eventId===f.id))
  const due=Date.parse(f.event.phases.at(-1).observationDueAt)
  assert.equal(due-Date.parse(f.task.observationStartedAt),f.event.tracking?7*86400000:7200000)
  syncLifecycleObservations(f.state,{},due-1000,{demo:true})
  assert.ok(f.task.observation.pending.sampleCount>0);assert.ok(!pendingDecision(f.event))
  syncLifecycleObservations(f.state,{},due,{demo:true})
- assert.ok(pendingDecision(f.event));assert.equal(lifecycleNotifications(f.state).filter(n=>n.eventId===id).length,1)
+ assert.ok(pendingDecision(f.event));assert.equal(lifecycleNotifications(f.state).filter(n=>n.eventId===f.id).length,1)
  const saved=refreshLifecyclePresentation(JSON.parse(JSON.stringify(f.state)))
- assert.equal(observationTaskFor(saved.events[id]).id,f.task.id)
- assert.equal(saved.events[id].tasks[0].observationEndedAt,null)
- assert.ok(decisionOptions(saved.events[id]).some(o=>o.value==='observe'))
+ assert.equal(observationTaskFor(saved.events[f.id]).id,f.task.id)
+ assert.equal(saved.events[f.id].observationSource.task.observationEndedAt,undefined)
+ assert.ok(decisionOptions(saved.events[f.id]).some(o=>o.value==='observe'))
 })
 test('waiting-period manual closure preserves verification sampling without recording any repair',()=>{
  const f=observe(verified());syncLifecycleObservations(f.state,{},Date.now()+2000,{demo:true})

@@ -1,3 +1,4 @@
+import {startObservation} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,decide,submitTask,currentTask,decisionOptions,people,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
@@ -23,9 +24,9 @@ function ready(lastResult='未完成'){
 function resume(fixture){const {state,event,task}=fixture;decide(state,id,{action:'wait',reason:'等待备件到船'});decide(state,id,{action:'resume',reason:'备件已到船并核验',deadline:deadline()});task.draft.records.forEach(r=>{r.result='已完成';r.note='本次已完成。'});task.draft.records[1].note='备件换装完成';task.draft.records[2].note='完成复装';task.draft.summary=patch.summary;state.role='engineer'}
 test('not applicable does not block, carry forward or recommend resuming a task',()=>{
  const {state,event,task}=ready('不适用'),execution=taskExecution(task)
- assert.equal(execution.incomplete,false);assert.equal(execution.notApplicable.length,1);assert.equal(execution.outstanding.length,0);assert.equal(task.goalStatus,'awaiting-review');assert.deepEqual(carryForwardSteps(event),[])
+ assert.equal(execution.incomplete,false);assert.equal(execution.notApplicable.length,1);assert.equal(execution.outstanding.length,0);assert.equal(task.goalStatus,'completed');assert.deepEqual(carryForwardSteps(event),[])
  assert.ok(!decisionOptions(event).some(o=>['wait','resume','terminate'].includes(o.value)));assert.match(event.reports.at(-1).markdown,/本轮无需执行项目/)
- task.submittedAt=new Date(Date.now()-3*3600000).toISOString();syncLifecycleObservations(state,{},Date.now(),{demo:true});const advice=observationAdvice(event,task);assert.equal(advice.evidence.unresolved.length,0);assert.equal(advice.status,'review')
+ task.submittedAt=new Date(Date.now()-3*3600000).toISOString();const observed=startObservation(state,event);syncLifecycleObservations(state,{},Date.now(),{demo:true});const advice=observationAdvice(observed.event,observed.task);assert.equal(advice.evidence.unresolved.length,0);assert.equal(advice.status,'review')
 })
 test('resumed report request excludes stale AI text and records the updated submission separately',async()=>{
  const f=ready(),{state,event,task,first}=f,before=structuredClone(first);resume(f)

@@ -1,3 +1,4 @@
+import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {Readable} from 'node:stream'
@@ -12,10 +13,11 @@ function dispatch(state,action){state.role='captain';const p=ensureTaskPlan(stat
 function submit(state,summary,result){state.role='engineer';const task=currentTask(state.events[id]);task.draft.records.forEach((r,i)=>{r.result=result||task.steps[i].options[0];r.note=`现场记录 ${i+1}：${summary}`});task.draft.summary=summary;return submitTask(state,id)}
 function repairState(){const s=createLifecycleState();dispatch(s,'investigate');const task=currentTask(s.events[id]);task.steps=task.steps.slice(0,1);task.draft.records=task.draft.records.slice(0,1);delete task.draft.records[0].package;submit(s,'二缸 ICU 伺服油液压活塞卡滞，电气连接未见异常。');return s}
 
-test('shore is available at every gate and snapshots an event without changing task, report, plan or phase',()=>{
+test('shore is report-gated and syncs only the reviewed latest report without changing work',()=>{
  const state=createLifecycleState(),event=state.events[id]
- const check=()=>{state.role='captain';ensureTaskPlan(event);const before=structuredClone({phase:event.phase,phases:event.phases,tasks:event.tasks,currentTask:event.currentTask,reports:event.reports,plan:event.pendingPlan});assert.ok(decisionOptions(event).some(o=>o.value==='shore'));decide(state,id,{action:'shore',reason:'请协助核对备件。'});assert.deepEqual({phase:event.phase,phases:event.phases,tasks:event.tasks,currentTask:event.currentTask,reports:event.reports,plan:event.pendingPlan},before);const packet=event.shore.at(-1).packet;assert.equal(packet.phase,event.phase);assert.deepEqual(packet.reports,event.reports);return packet}
- const initial=check();dispatch(state,'investigate');check();submit(state,'发现活塞卡滞。');check();dispatch(state,'repair');check();submit(state,'已完成获批总成更换与密封试验，待复查。');check();decide(state,id,{action:'close',reason:'按报告中的验证范围闭环，后续继续观察。'});const archived=event.reports.at(-1).markdown;check();assert.equal(event.reports.at(-1).markdown,archived);assert.equal(initial.tasks.length,0)
+ assert.ok(!decisionOptions(event).some(o=>o.value==='shore'));dispatch(state,'investigate');assert.ok(!decisionOptions(event).some(o=>o.value==='shore'));submit(state,'发现活塞卡滞。');state.role='captain'
+ const before=structuredClone({phase:event.phase,tasks:event.tasks,reports:event.reports});decide(state,id,shoreForm(event));assert.deepEqual({phase:event.phase,tasks:event.tasks,reports:event.reports},before)
+ assert.equal(event.shore.at(-1).packet.reports.length,1);assert.equal(event.shore.at(-1).packet.reports[0].id,event.reports.at(-1).id)
 })
 
 test('repair without package metadata has concrete preparation, execution and verification steps',()=>{

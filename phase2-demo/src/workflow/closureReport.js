@@ -1,3 +1,4 @@
+import {observationTasks} from './observationEvents.js'
 import {taskName} from './lifecycleDecisions.js'
 import {observationStart,isVerificationObservation} from './observationContext.js'
 
@@ -26,7 +27,7 @@ function observationSection(task,closedAt){
 }
 
 export function closureContent(event,action,reason,at,captain){
- const tasks=event.tasks.filter(t=>t.submittedAt&&Date.parse(t.submittedAt)<=Date.parse(at))
+ const tasks=observationTasks(event).filter(t=>t.submittedAt&&Date.parse(t.submittedAt)<=Date.parse(at))
  const investigations=tasks.filter(t=>t.kind==='investigation'&&t.purpose!=='recheck'),work=tasks.filter(t=>t.kind!=='investigation'),rechecks=tasks.filter(t=>t.purpose==='recheck')
  const reports=event.reports.filter(r=>r.kind!=='闭环报告'&&Date.parse(r.at)<=Date.parse(at))
  const facts=(event.brief.facts||[]).map(f=>`- **${f.label}**：${f.value} ${f.unit||''}（${date(f.at)}）。${f.meaning||''}`).join('\n')
@@ -40,7 +41,7 @@ export function closureContent(event,action,reason,at,captain){
 ## 一、事件基础信息
 
 - 事件编号：${event.number}
-- 事件类型：${event.type}
+- 事件类型：${event.type}${event.parentEventId?'\n- 关联原事件：'+event.parentEventId+'；来源作业与报告沿用原事件记录。':''}
 - 设备：${event.device}
 - 发现时间：${event.brief.discovery?.at||'未记录'}
 - 来源：${event.brief.discovery?.label||'未记录'}

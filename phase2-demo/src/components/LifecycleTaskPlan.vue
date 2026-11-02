@@ -1,18 +1,18 @@
 <template>
  <section v-if="plan" class="lc-pending-plan" :aria-busy="busy">
-  <header><div><h2>{{planTabLabel(plan.action)}}</h2><small>{{busy?'AI 正在整理建议…':plan.status==='ready'?'建议草稿 · 确认派工后才创建执行任务':'建议待生成'}}<template v-if="plan.steps.length"> · 共 {{plan.steps.length}} 项</template></small></div><div class="lc-plan-actions"><button type="button" :disabled="plan.status!=='ready'" @click="$emit('edit')">通过对话修改任务</button><button type="button" class="lc-dispatch-button" :disabled="plan.status!=='ready'" @click="$emit('dispatch')">去派工 <span aria-hidden="true">↗</span></button></div></header>
-  <p class="lc-plan-note">{{plan.action==='recheck'?'根据本轮报告与观察记录，建议复核尚待确认的现象、已做措施与原异常是否再现；不预设已经维修。':'请先审阅建议范围与步骤，再通过“去派工”指定执行人和完成时间。'}}</p>
+  <header><div><h2>{{planTabLabel(plan.action)}}</h2><small v-if="busy">AI 正在整理建议…</small></div><div class="lc-plan-actions"><button type="button" :disabled="plan.status!=='ready'" @click="$emit('edit')">通过对话修改任务</button><button type="button" class="lc-dispatch-button" :disabled="plan.status!=='ready'" @click="$emit('dispatch')">去派工 <span aria-hidden="true">↗</span></button></div></header>
   <p v-if="sourceReport" class="lc-plan-source">任务依据：{{sourceReport.title}}</p>
-  <section v-if="plan.preview?.scope||plan.scope"><h3>本轮任务范围</h3><p>{{plan.source==='preset'?plan.scope:plan.preview?.scope||plan.scope}}</p></section>
-  <section v-if="plan.preview?.rationale||plan.rationale"><h3>安排依据与检查方向</h3><p>{{plan.source==='preset'?plan.rationale:plan.preview?.rationale||plan.rationale}}</p></section>
+  <section class="plan-focus"><h3>重点关注</h3><div><span v-for="tag in taskFocusTags(plan)" :key="tag">{{tag}}</span></div></section>
   <p v-if="busy" class="lc-plan-progress" role="status">{{plan.source==='preset'?'预设复查步骤已列出，AI 正结合实际作业与观察记录整理新版，完成后更新。':plan.status==='updating'?'正在按对话要求修改任务，完成后更新步骤。':'正在依据已有结果生成后续步骤…'}}</p>
   <div v-if="plan.error" class="lc-plan-error" role="alert"><p>{{plan.error}}{{plan.source==='preset'?' 预设任务已保留，可核对后派发或重新生成。':''}}</p><button type="button" @click="retry">重新生成任务</button></div>
-  <ol v-if="plan.steps.length" class="lc-step-list"><li v-for="(step,i) in plan.steps" :key="i"><span class="lc-step-number">{{i+1}}</span><div><h3>{{step.label}}</h3><LifecycleStepInstructions :step="step"/><p class="lc-muted">回交要求：{{step.recordHint||'记录实际结果、检查方法与未确认项。'}}</p></div></li></ol>
+  <ol v-if="plan.steps.length" class="lc-step-list"><li v-for="(step,i) in plan.steps" :key="i"><span class="lc-step-number">{{i+1}}</span><div><h3>{{step.label}}</h3><LifecycleStepInstructions :number="i+1" :step="step"/><RecordGuidance :text="step.recordHint"/></div></li></ol>
   <details v-if="plan.sources?.length"><summary>参考资料 · {{plan.sources.length}} 处</summary><p v-for="s in plan.sources" :key="s.id">[{{s.id}}] {{s.title}} · {{s.file}} L{{s.startLine}}—{{s.endLine}}</p></details>
-  <details v-if="plan.editHistory?.length" class="lc-edit-history"><summary>任务修改记录 · {{plan.editHistory.length}} 次</summary><section v-for="(edit,i) in plan.editHistory" :key="i"><strong>第 {{i+1}} 次修改</strong><p>{{edit.text}}</p><p>{{edit.summary}}</p><details><summary>查看修改前任务</summary><ol><li v-for="step in edit.before.steps" :key="step.label"><strong>{{step.label}}</strong><LifecycleStepInstructions :step="step"/></li></ol></details></section></details>
+  <details v-if="plan.editHistory?.length" class="lc-edit-history"><summary>任务修改记录 · {{plan.editHistory.length}} 次</summary><section v-for="(edit,i) in plan.editHistory" :key="i"><strong>第 {{i+1}} 次修改</strong><p>{{edit.text}}</p><p>{{edit.summary}}</p><details><summary>查看修改前任务</summary><ol><li v-for="(step,stepIndex) in edit.before.steps" :key="step.label"><strong>{{step.label}}</strong><LifecycleStepInstructions :number="stepIndex+1" :step="step"/></li></ol></details></section></details>
  </section>
 </template>
 <script setup>
+import RecordGuidance from './RecordGuidance.vue'
+import {taskFocusTags} from '../workflow/stepPresentation.js'
 import {computed} from 'vue'
 import LifecycleStepInstructions from './LifecycleStepInstructions.vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'

@@ -1,3 +1,4 @@
+import {observationTasks} from './observationEvents.js'
 import {isAbnormalResult} from './lifecycleDecisions.js'
 import {groupRepairSteps} from './repairStepGroups.js'
 import {isVerificationReview,observationTaskFor} from './observationContext.js'
@@ -11,7 +12,7 @@ const clone=value=>JSON.parse(JSON.stringify(value))
 // Sources: wiki_rt-flex50/concepts/RT-flex故障排查方法论.md:111-137;
 // 长航碧玉主机2缸ICU伺服油液压活塞卡阻故障案例.md:32-62.
 export function detailedRepairSteps(event,methods=[]){
- const investigation=[...event.tasks].reverse().find(t=>t.kind==='investigation'&&t.status==='submitted')
+ const investigation=observationTasks(event).reverse().find(t=>t.kind==='investigation'&&t.status==='submitted')
  const findings=(investigation?.records||[]).filter(isAbnormalResult)
  const target=findings.map(r=>r.label).join('、')||'本轮报告中已确认并获批的部位'
  const evidence=findings.map(r=>`${r.label}：${r.note||r.result}`).join('；')
@@ -74,7 +75,7 @@ export function presetRecheckSteps(event){
    step('汇总复查结论与后续建议','将观察趋势与现场证据对应，交轮机长决定下一步。',['明确已定位的问题、未查范围与证据缺口。','有处理依据时建议维修；未见异常时说明验证范围与后续观察条件。'],'提交复查结论、证据和仍需确认事项。')
   ].map(s=>({...s,options:['发现异常','未见异常','无法确认']}))
  }
- const work=[...event.tasks].reverse().find(t=>t.kind!=='investigation'&&t.status==='submitted')
+ const work=observationTasks(event).reverse().find(t=>t.kind!=='investigation'&&t.status==='submitted')
  const report=event.reports.findLast(r=>r.taskId===work?.id)
  const result=[
   step('核对维修记录与剩余事项',`对照《${report?.title||'本轮作业报告'}》核实实际处理：${report?.summary||work?.summary||'以已提交作业记录为准'}。`,['逐项核对实际处理部位、备件使用和试验记录，区分完成、未完成及不适用项目。','先列出报告中的剩余问题、缺少证据和限制条件，确定本次复查范围。'],'记录所依据的报告版本、已完成措施和待核实事项。'),

@@ -47,7 +47,7 @@ function findings(task){
 }
 export function trackingAssessment(event,task){
  if(!event.tracking||task?.kind!=='investigation')return null
- const subject=event.id==='real-health-c4-baseline'?'四缸相对排温基线下移':'一缸相对排温基线抬升'
+ const subject=(event.sourceEventId||event.id)==='real-health-c4-baseline'?'四缸相对排温基线下移':'一缸相对排温基线抬升'
  if(trackingNotSupported(event,task))return {
   scope:`本轮核实结论不支持“${subject}”。原月度相对偏差记录保留，按执行人提交的比较条件与核实理由重新评估原提醒。`,
   interpretation:'核对同转速、同负荷的六缸对比、测温来源和期间调整记录，说明原相对变化由什么解释，以及本轮结论适用的时间与工况范围。现场读数对应不等同于跨月基线变化已经证实。',
@@ -60,12 +60,12 @@ export function trackingAssessment(event,task){
  }
  return {
   scope:`本轮已回交${subject}的核实资料。原相对变化记录保留，是否属于该缸自身基线变化及其解释仍需结合本轮结论判断；尚缺的比较条件和原因依据继续留存。`,
-  interpretation:context[event.id]?.comparison+' 对照本轮已取得的工况、调整与测温记录，指出哪些变化已有解释、哪些比较条件仍缺失。',
+  interpretation:context[event.sourceEventId||event.id]?.comparison+' 对照本轮已取得的工况、调整与测温记录，指出哪些变化已有解释、哪些比较条件仍缺失。',
   next:'若现有资料不足以解释原变化，可围绕同工况六缸对比、独立测温或调整记录补充核实；若已有充分解释，可说明依据后闭环，也可选择继续观察。'
  }
 }
 export function reportAnalysis(event,task){
- const c=context[event.id],f=findings(task),isCheck=task.kind==='investigation',text=evidenceText(task),tracking=trackingAssessment(event,task)
+ const c=context[event.sourceEventId||event.id],f=findings(task),isCheck=task.kind==='investigation',text=evidenceText(task),tracking=trackingAssessment(event,task)
  const scope=isCheck
   ? (tracking?tracking.scope:f.abnormal.length?`现场结果中 ${f.abnormal.length} 项登记异常或持续偏离：${f.abnormal.map(r=>r.label+'（'+r.result+'）').join('；')}。`:'本轮检查尚未定位原报警／预警的具体原因；需对照已查项目、报警是否再现及剩余线索判断下一步。')
   : `本轮 ${f.records.length} 项作业中，${f.records.filter(r=>r.result==='已完成').length} 项已完成，${f.records.filter(r=>r.result==='未完成').length} 项未完成，${f.records.filter(r=>r.result==='不适用').length} 项不适用。逐项完成状态与总结果一起作为回交依据。`
@@ -102,7 +102,7 @@ export function decisionAnalysisItems(event,task,report){
 export function decisionBasis(event,action){
  if(event.phase==='reminder')return {points:event.brief.captainDecision,reason:event.brief.dispatchReason}
  const task=event.tasks.find(t=>t.id===event.currentTask),report=event.reports.findLast(r=>r.taskId===task?.id)
- const check=briefChecks[event.id]||'核对实际发现、处理范围与复测条件。'
+ const check=briefChecks[event.sourceEventId||event.id]||'核对实际发现、处理范围与复测条件。'
  const sentences=report?.summary?.split(/(?<=[。！？])/).filter(Boolean)||[]
  const conclusion=event.tracking?report?.summary||task?.summary||'':(task?.kind==='investigation'?sentences[0]:sentences.findLast(sentence=>/复测|稳定|原报警|原低压|偏差|恢复/.test(sentence)))||sentences[0]||''
  const source=report?`第${task.round}轮${report.kind}已回交。${conclusion}`:task?.status==='assigned'?`${task.owner}正在执行本轮任务，报告尚未回交。`:'以原始提醒及已有轮次记录为依据。'
@@ -125,7 +125,7 @@ function timestamp(value){
  return Date.parse(/Z$|[+-]\d\d:\d\d$/.test(text)?text:text+'+08:00')
 }
 export function adviceDetails(event,message,role){
- const c=context[event.id],cutoff=timestamp(message.at)
+ const c=context[event.sourceEventId||event.id],cutoff=timestamp(message.at)
  // Historical advice only sees records available by the message timestamp.
  const task=[...event.tasks].reverse().find(t=>timestamp(t.assignedAt)<=cutoff)
  const submitted=task?.status==='submitted'&&timestamp(task.submittedAt)<=cutoff

@@ -4,16 +4,16 @@
   <details v-if="task.feedbackHistory?.length" class="lc-procedure-history"><summary>历史填写与阶段报告已保留，可对照本次继续执行的范围。</summary><section v-for="(history,i) in task.feedbackHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
   <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :class="{active:index===i,complete:task.draft.records[i].result}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{step.short||step.label}}</button><button :class="{active:index===task.steps.length}" @click="review"><span>{{['repair','maintenance'].includes(task.kind)?'✓':task.steps.length+1}}</span>汇总提交</button></nav>
   <form v-if="step" class="lc-step-editor" @submit.prevent="next">
-   <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :step="step" :compact="repair"/><p v-if="repair&&step.recordHint" class="lc-repair-record-hint"><strong>记录要求：</strong>{{compactRepairRecordHint(step)}}</p><aside v-else-if="step.recordHint"><strong>提交记录</strong><p>{{step.recordHint}}</p></aside></div>
+   <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :number="index+1" :step="step" :compact="repair"/><RecordGuidance :text="step.recordHint"/></div>
    <fieldset><legend>{{task.kind==='investigation'?'检查结果':'作业反馈'}}</legend><label v-for="option in step.options" :key="option" :class="{selected:record.result===option}"><input type="radio" :name="task.id+'-'+index" v-model="record.result" :value="option" required/>{{option}}</label></fieldset>
-   <label class="lc-step-note">备注（选填）<textarea v-model="record.note" :rows="repair?2:4" :placeholder="repair?'记录实际部位、用料与复核结果；未完成项目请说明原因。':step.recordHint||'记录具体部位、检查发现或实际措施；没有补充信息可直接进入下一步。'"/></label>
+   <LifecycleNoteEditor :key="task.id+'-'+index" v-model="record.note" :rows="repair?3:4" :context="step.label" :placeholder="'记录实际发现、措施与未完成原因。'"/>
    <p v-if="error" role="alert" class="lc-error">{{error}}</p>
    <footer><button type="button" :disabled="index===0" @click="go(index-1)">上一步</button><small>{{index+1}} / {{task.steps.length}}</small><button type="submit" class="lc-primary">{{index===task.steps.length-1?'下一步：汇总提交':'下一步'}}</button></footer>
   </form>
   <form v-else class="lc-step-editor" @submit.prevent="submit">
    <h3>{{task.kind==='investigation'?'原因判断与排查结论':'实际措施、复测结果与剩余事项'}}</h3>
    <div class="lc-step-review"><div v-for="(r,i) in task.draft.records" :key="i"><strong>{{r.label}}</strong><span>{{r.result||'待填写'}}</span><button type="button" @click="go(i)">修改</button><p v-if="r.note">{{r.note}}</p></div></div>
-   <label class="lc-step-note">{{task.kind==='investigation'?'排查结论':'作业结论'}}<textarea v-model="task.draft.summary" required rows="5" :placeholder="task.kind==='investigation'?'记录做过什么、发现什么及尚不能确认什么；原因未明如实填写，分析建议与事实分开。':'写明实际处理部位、措施、复测结果与剩余问题。'"/></label>
+   <LifecycleNoteEditor :key="task.id+'-summary'" v-model="task.draft.summary" :label="task.kind==='investigation'?'排查结论':'作业结论'" :context="task.title" required :rows="5" placeholder="写明实际完成的内容、结果与尚待核实事项。"/>
    <p v-if="task.draft.attachments.length" class="lc-muted">已关联：{{task.draft.attachments.map(a=>a.name).join('、')}}</p>
    <p v-if="error" role="alert" class="lc-error">{{error}}</p>
    <footer><button type="button" @click="go(task.steps.length-1)">上一步</button><small>提交后交轮机长决策</small><button type="submit" class="lc-primary">提交{{taskName(task)}}报告</button></footer>
@@ -23,7 +23,8 @@
 <script setup>
 import {computed,ref} from 'vue'
 import LifecycleStepInstructions from './LifecycleStepInstructions.vue'
-import {compactRepairRecordHint} from '../workflow/repairDisplay'
+import RecordGuidance from './RecordGuidance.vue'
+import LifecycleNoteEditor from './LifecycleNoteEditor.vue'
 import {taskName} from '../workflow/lifecycleDecisions'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}}),emit=defineEmits(['submitted']),store=useEventLifecycleStore(),error=ref('')

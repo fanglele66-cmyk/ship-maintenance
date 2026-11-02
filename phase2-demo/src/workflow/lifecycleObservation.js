@@ -1,3 +1,4 @@
+import {observationTasks,evidenceEventId} from './observationEvents.js'
 import {observationConditions,replayOperatingPeriods} from './observationConditions.js'
 import {workflowCases} from '../mock/fourStoryWorkflow.js'
 import {automaticObservation} from '../mock/automaticObservation.js'
@@ -5,16 +6,16 @@ import {repairObservationSource} from '../mock/repairObservationSource.js'
 import {lifecycleSampling} from '../mock/lifecycleSampling.js'
 import {hasObservation,observationStart,observationPolicy} from './observationContext.js'
 
-export function observationCase(event){return event.tracking?(event.id.includes('c4')?'real-maintenance-c4-baseline':'real-maintenance-c1-baseline'):event.id}
+export function observationCase(event){return event.tracking?(evidenceEventId(event).includes('c4')?'real-maintenance-c4-baseline':'real-maintenance-c1-baseline'):evidenceEventId(event)}
 export function observationSettings(event){return workflowCases[observationCase(event)]?.observation}
 export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=false}={}){
- for(const event of Object.values(state.events))for(const task of event.tasks){
-  if(!hasObservation(task)||task.status!=='submitted')continue
+ for(const event of Object.values(state.events))for(const task of observationTasks(event)){
+  if(!hasObservation(task)||task.status!=='submitted'||(!task.observationStartedAt&&!task.observation))continue
   const config=observationSettings(event),start=Date.parse(observationStart(task)),end=Math.min(now,task.observationEndedAt?Date.parse(task.observationEndedAt):now)
   if(!config||!Number.isFinite(start)||end<start)continue
   const previous=task.observation
   if(previous?.policy?.intervalMs===observationPolicy(event).intervalMs&&task.observationEndedAt&&previous&&Date.parse(previous.checkedAt)>=end&&(!demo||previous.samples))continue
-  const supplied=sensors?.observationChannels?.[event.id]
+  const supplied=sensors?.observationChannels?.[event.id]??sensors?.observationChannels?.[evidenceEventId(event)]
   const channels=supplied!==undefined?supplied:demo?lifecycleSampling(event,task,config,end):repairObservationSource(sensors,observationCase(event),config,start,end)
   const policy=observationPolicy(event)
   const previousInterval=previous?.policy?.intervalMs||7200000
@@ -41,7 +42,7 @@ export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=fal
  for(const event of Object.values(state.events)){
   const phase=event.phases.at(-1),interval=observationPolicy(event).intervalMs
   if(event.phase==='review'&&phase?.observationWaiting&&phase.observationIntervalMs!==interval){
-   const task=event.tasks.find(t=>t.id===(phase.observationTaskId||phase.taskId)),start=Date.parse(observationStart(task)),at=Date.parse(phase.at)
+   const task=observationTasks(event).find(t=>t.id===(phase.observationTaskId||phase.taskId)),start=Date.parse(observationStart(task)),at=Date.parse(phase.at)
    if(Number.isFinite(start)&&Number.isFinite(at)){phase.observationDueAt=new Date(start+(Math.floor(Math.max(0,at-start)/interval)+1)*interval).toISOString();phase.observationIntervalMs=interval}
   }
   if(event.phase!=='review'||!phase?.observationWaiting||now<Date.parse(phase.observationDueAt))continue

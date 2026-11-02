@@ -12,11 +12,13 @@ import {closureContent,closurePresentationVersion} from './closureReport.js'
 import {groupRepairSteps,compactAssignedRepair} from './repairStepGroups.js'
 import {hasObservation,observationStart,observationTaskFor,isVerificationObservation,isVerificationReview,observationPolicy} from './observationContext.js'
 import {taskExecution,executionFacts,carryForwardSteps} from './taskExecution.js'
+import {createObservationEvent,migrateObservationEvents,observationTasks} from './observationEvents.js'
+import {shoreReportSnapshot} from './shoreReports.js'
 export {hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
 
 export const people = {captain:'陈志远（轮机长）',engineer:'李建国（大管轮）'}
 export const eventNumbers = {'real-alarm-0430':'CBY-EVT-20260430-001','real-warning-0523':'CBY-EVT-20260523-001','real-tracking-exhaust-baseline':'CBY-EVT-20260812-001','real-health-c4-baseline':'CBY-EVT-20260812-002'}
-export const stageNames = {reminder:'风险提醒',investigation:'原因排查',decision:'处置决策',repair:'维修执行',maintenance:'关联维保',review:'结果处置',closed:'闭环归档'}
+export const stageNames = {reminder:'风险提醒',investigation:'原因排查',decision:'处置决策',repair:'维修执行',maintenance:'关联维保',review:'结果处置',closed:'闭环归档',transferred:'已转效果观察'}
 export const timeText = value => !value?'—':Number.isNaN(new Date(value).getTime())?String(value):new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16)
 const copy = value => JSON.parse(JSON.stringify(value))
 const required = (ok,message) => {if(!ok)throw new Error(message)}
@@ -52,7 +54,7 @@ export function createLifecycleState(){
   e.phases.push({id:task.id,kind:'investigation',label:'第1轮排查',at,taskId:task.id})
   say(e,'captain','user',`已派发排查给${task.owner}。${task.scope}`,{at});advice(e,'engineer',task.scope,'请提交已核实范围、现场发现和资料缺口。',at)
   const report=makeReport(e,task);e.reports.push(report)
- task.goalStatus=taskExecution(task).incomplete?'unresolved':'awaiting-review'
+ task.goalStatus=taskExecution(task).incomplete?'unresolved':'completed'
  task.conversations||={captain:[],engineer:[]}
  task.conversations.engineer.push({id:uid('message'),kind:'user',title:'本轮反馈已提交',text:task.summary,at:task.submittedAt},{id:uid('message'),kind:'receipt',title:'反馈已收录，等待轮机长审阅',text:'本次逐项记录及汇总结论已归入关联事件。可继续补充本任务报告；提交不代表事件闭环或效果验证通过。',reportId:report.id,at:task.submittedAt})
   say(e,'engineer','receipt',prior.summary,{at:task.submittedAt,reportId:report.id,title:'排查报告已提交'})
@@ -68,8 +70,8 @@ export function activeTask(event){const t=currentTask(event);return t?.status===
 export const decisionOptions=lifecycleDecisionOptions
 export function ensureTaskPlan(event){
  const action=dispatchAction(event);if(!action)return null
- const report=event.reports.at(-1),prior=currentTask(event)
- const steps=action==='investigate'?checkSteps(event.id):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
+ const report=event.reports.at(-1),prior=currentTask(event)||event.observationSource?.task
+ const steps=action==='investigate'?checkSteps(event.sourceEventId||event.id):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
  const scope=action==='recheck'?`依据${report?.title||'本轮报告'}，${isVerificationReview(event)?'核对已查范围、观察中变化是否持续、扩大、恢复或复发；本轮未实施维修，不预设故障原因':'复核实际维修措施、剩余事项、修后数据和原异常是否再现'}，提交现场复查结果。`:action==='investigate'?event.brief.dispatchReason:`依据${report?.title||'现场记录'}，处理本轮登记的异常：${prior?.records.filter(r=>/发现异常|读数不一致|偏离仍存在/.test(r.result)).map(r=>r.label).join('、')||'已批准部位'}。保留实际措施、隔离与复测记录。`
  const draft=ensurePlanDraft(event,{steps,scope,procedureVersion:repairProcedureVersion,rationale:report?`依据《${report.title}》：${report.summary}`:event.brief.conclusion})
  if(action==='maintenance'){
@@ -88,10 +90,10 @@ export function maintenancePlan(event){
 export function proposedPlan(event){
  const remaining=carryForwardSteps(event)
  if(remaining.length)return remaining
- const investigation=[...event.tasks].reverse().find(t=>t.kind==='investigation'&&t.status==='submitted')
+ const investigation=observationTasks(event).reverse().find(t=>t.kind==='investigation'&&t.status==='submitted')
  if(!investigation)return []
  const keys=[...new Set(investigation.records.filter(r=>r.result==='发现异常').map(r=>r.package).filter(Boolean))]
- const data=workflowCases[event.id]
+ const data=workflowCases[event.sourceEventId||event.id]
  let tasks=keys.length?composeRepair(data,keys).tasks:[]
  // Notes remain verbatim evidence; they never become an unverified replacement diagnosis.
  tasks=tasks.map(t=>({...t,guide:planClean(t.guide),checks:(t.checks||[]).map(planClean),recordHint:planClean(t.recordHint)}))
@@ -110,11 +112,12 @@ export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
   event.number=eventNumbers[event.id]||event.number
   if(event.id==='real-warning-0523'){event.type='预警事件';event.brief.discovery.kind='ai-warning';event.brief.discovery.label='AI预警 → 关联研判'}
-  for(const task of event.tasks)compactAssignedRepair(task)
+  for(const task of event.tasks){compactAssignedRepair(task);if(task.status==='submitted')task.goalStatus=taskExecution(task).incomplete?'unresolved':'completed'}
   if(['repair','maintenance'].includes(event.pendingPlan?.action)&&event.pendingPlan.steps.length>4){event.pendingPlan.steps=groupRepairSteps(event.pendingPlan.steps);event.pendingPlan.version++}
   for(const task of event.tasks)if(hasObservation(task)&&task.status==='submitted'&&!task.observationEndedAt){const next=event.tasks.find(t=>Date.parse(t.assignedAt)>Date.parse(task.observationResumedAt||observationStart(task)));task.observationEndedAt=next?.assignedAt||event.closedAt||null}
   refreshSubmissionLabels(event)
   for(const report of event.reports){
+   if(report.linkedSource)continue
    const task=reportTask(event,report)
    // Refresh only built-in presentation; preserve model output and human revisions.
    if(task?.status==='submitted'&&taskReports(event,task.id).length===1&&report.presentationVersion!==5&&!report.generatedBy&&!task.generatedReport&&!report.revisions?.length&&!report.original){
@@ -125,6 +128,7 @@ export function refreshLifecyclePresentation(state){
   for(const report of event.reports)if(report.kind==='闭环报告'&&report.presentationVersion!==closurePresentationVersion){const decision=event.decisions.findLast(d=>['close','false'].includes(d.action));Object.assign(report,makeClosureReport(event,decision?.action||'close',report.summary,report.at,report.id))}
   for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==3){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=3;message.basisLabel='分析过程与依据'}
  }
+ migrateObservationEvents(state)
  return state
 }
 export function makeClosureReport(event,action,reason,at,id=uid('report')){
@@ -149,7 +153,7 @@ export function decide(state,id,form){
   if(selectedMaintenance){e.decisionDraft||={};e.decisionDraft.maintenancePlanId=selectedMaintenance.plan.id}
   const plan=ensureTaskPlan(e)
   required(plan?.key===taskPlanKey(e)&&plan.status==='ready'&&plan.steps.length,'待派任务尚未生成完成，请先查看任务草稿。')
-  for(const prior of e.tasks)if(prior.status==='submitted'&&hasObservation(prior)&&!prior.observationEndedAt)prior.observationEndedAt=at
+  for(const prior of observationTasks(e))if(prior.status==='submitted'&&hasObservation(prior)&&!prior.observationEndedAt)prior.observationEndedAt=at
   const kind=['investigate','recheck'].includes(action)?'investigation':action
   const round=e.tasks.filter(t=>t.kind===kind).length+1
   const task={id:uid(kind),kind,procedureVersion:repairProcedureVersion,purpose:action==='recheck'?'recheck':kind,round,owner:form.owner,deadline:form.deadline,scope:form.reason.trim(),assignedAt:at,status:'assigned',steps:copy(plan.steps),plan:copy(plan),records:[],summary:'',attachments:[],sourceReportId:plan.sourceReportId}
@@ -196,18 +200,24 @@ export function decide(state,id,form){
  }else if(action==='observe'){
   const task=currentTask(e),work=e.phase==='decision'&&task?.purpose!=='recheck'?task:observationTaskFor(e)||task
   required(work?.status==='submitted'&&work.submittedAt,'尚无已提交的现场核实或作业报告，不能开始观察。')
-  if(work.kind==='investigation'&&!work.observationStartedAt){work.observationMode='verification';work.observationStartedAt=at}
+  if(e.type!=='效果观察'){
+   const child=createObservationEvent(state,e,work,{at,reason:form.reason})
+   say(e,'captain','user','创建效果观察事件：'+child.title,{observationEventId:child.id})
+  }else{
+  if(!work.observationStartedAt){if(work.kind==='investigation')work.observationMode='verification';work.observationStartedAt=at}
   if(work.observationEndedAt){work.observationResumedAt=at;work.observationEndedAt=null}
   const interval=observationPolicy(e).intervalMs,start=Date.parse(observationStart(work)),elapsed=Math.max(0,Date.parse(at)-start),dueAt=new Date(start+(Math.floor(elapsed/interval)+1)*interval).toISOString()
-  phase(e,'review',isVerificationObservation(work)?'核实后继续观察':'效果观察',{taskId:task.id,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id,observationWaiting:true,observationIntervalMs:interval,observationDueAt:dueAt,observationTaskId:work.id})
+  phase(e,'review',isVerificationObservation(work)?'核实后继续观察':'效果观察',{taskId:task?.id,reportId:e.reports.findLast(r=>r.taskId===work.id)?.id,observationWaiting:true,observationIntervalMs:interval,observationDueAt:dueAt,observationTaskId:work.id})
   e.status='效果观察中';e.unread.captain=false
   say(e,'captain','user',(isVerificationObservation(work)?'核实后继续观察：':'进入效果观察：')+form.reason)
   advice(e,'captain',`本轮由系统继续观察，下一次汇总时间为 ${timeText(dueAt)}。`,'观察期间没有新的人员执行任务；本阶段结束后再提醒您审阅结果。')
+  }
  }else if(action==='shore'){
-  const record={id:uid('shore'),at,reason:form.reason,reportId:e.reports.at(-1)?.id||null,status:'待岸基接收',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,brief:e.brief,tasks:e.tasks,reports:e.reports,decisions:e.decisions,at})};e.shore.push(record)
-  say(e,'captain','user','提交岸基同步：'+form.reason);advice(e,'captain','已整理事件及关联报告，加入岸基同步记录。',e.phase==='closed'?'当前状态为待岸基接收，事件保持已闭环，闭环报告与处置记录已保留。':'当前状态为待岸基接收，可继续处理船上任务。')
+  const syncedReport=shoreReportSnapshot(e,form)
+  const record={id:uid('shore'),at,reason:form.reason,reportId:syncedReport.id,syncedReport,status:'待岸基接收',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,brief:e.brief,tasks:e.tasks,reports:[syncedReport],decisions:e.decisions,at})};e.shore.push(record)
+  say(e,'captain','user','同步岸基：'+syncedReport.title+'。'+form.reason,{shoreId:record.id});advice(e,'captain','已整理事件及关联报告，加入岸基同步记录。',e.phase==='closed'?'当前状态为待岸基接收，事件保持已闭环，闭环报告与处置记录已保留。':'当前状态为待岸基接收，可继续处理船上任务。')
  }else{
-  for(const prior of e.tasks)if(prior.status==='submitted'&&hasObservation(prior)&&!prior.observationEndedAt)prior.observationEndedAt=at
+  for(const prior of observationTasks(e))if(prior.status==='submitted'&&hasObservation(prior)&&!prior.observationEndedAt)prior.observationEndedAt=at
   e.status='已闭环';phase(e,'closed','闭环归档');e.closedAt=at;e.closeReason=form.reason;e.unread.captain=false
   say(e,'captain','user',`${action==='false'?'确认误报':'关闭闭环'}：${form.reason}`)
   advice(e,'captain','本事件已按本次决定归档，排查及作业报告保留。','后续如出现新的提醒，请依据新的运行窗口再行核查。')
@@ -251,7 +261,7 @@ export function submitTask(state,id,taskId,generation){
  task.status='submitted'
  if(generation)task.reportGeneration.status='complete'
  const report=makeReport(e,task);e.reports.push(report)
- task.goalStatus=taskExecution(task).incomplete?'unresolved':'awaiting-review'
+ task.goalStatus=taskExecution(task).incomplete?'unresolved':'completed'
  task.conversations||={captain:[],engineer:[]}
  if(!generation)task.conversations.engineer.push({id:uid('message'),kind:'user',title:'本轮反馈已提交',text:task.summary,at:task.submittedAt})
  task.conversations.engineer.push({id:uid('message'),kind:'receipt',title:'反馈已收录，等待轮机长审阅',text:'本次逐项记录及汇总结论已归入关联事件。可继续补充本任务报告；提交不代表事件闭环或效果验证通过。',reportId:report.id,at:task.submittedAt})

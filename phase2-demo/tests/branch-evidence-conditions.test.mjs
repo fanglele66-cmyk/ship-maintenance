@@ -1,3 +1,4 @@
+import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,decide,submitTask,currentTask,ensureTaskPlan,decisionOptions,people,pendingDecision} from '../src/workflow/eventLifecycle.js'
@@ -40,24 +41,24 @@ test('terminating a blocked task is distinct from closing; closure retains skipp
  const {state,event,task}=repair(true);decide(state,id,{action:'terminate',reason:'该项转由岸基安排，保留未验证范围。'});assert.equal(event.phase,'review');assert.equal(task.status,'terminated');decide(state,id,{action:'close',reason:'本轮完成范围确认，剩余事项另行安排。'});assert.match(event.reports.at(-1).markdown,/未执行部分已终止/);assert.match(event.reports.at(-1).markdown,/未完成/);assert.match(event.reports.at(-1).markdown,/转由岸基安排/)
 })
 test('4.3 stable stopped-engine data cannot produce a closure recommendation',()=>{
- const {state,event,task}=repair(),end=Date.now(),start=end-3*3600000;task.submittedAt=new Date(start).toISOString()
+ const fixture=repair(),end=Date.now();const {state}=fixture;fixture.task.submittedAt=new Date(end-3*3600000).toISOString();const {event,task}=startObservation(state,fixture.event);const start=end-3*3600000;task.observationStartedAt=new Date(start).toISOString()
  syncLifecycleObservations(state,{observationOperatingPeriods:[{start,end,state:'锚泊停机',tone:'anchored',rpm:[0,0],load:[0,0]}]},end,{demo:true})
  const advice=observationAdvice(event,task);assert.equal(advice.status,'incomplete');assert.match(advice.timing,/停机/);assert.equal(advice.conditionsMet,false);assert.equal(advice.evidence.operatingConditions.comparableMs,0)
 })
 test('4.3 data missing after previous coverage does not reuse old values as valid evidence',()=>{
- const {state,event,task}=repair(),end=Date.now();task.submittedAt=new Date(end-3*3600000).toISOString();syncLifecycleObservations(state,{},end,{demo:true});assert.equal(observationAdvice(event,task).status,'review')
+ const fixture=repair(),end=Date.now();const {state}=fixture;fixture.task.submittedAt=new Date(end-3*3600000).toISOString();const {event,task}=startObservation(state,fixture.event);task.observationStartedAt=new Date(end-3*3600000).toISOString();syncLifecycleObservations(state,{},end,{demo:true});assert.equal(observationAdvice(event,task).status,'review')
  const source={recordedSensorChannels:ids=>ids.map(channelId=>({channelId,unit:'°C',sourceKind:'live',trendData:[]})),observationOperatingPeriods:[]}
  syncLifecycleObservations(state,source,end+300000)
  const advice=observationAdvice(event,task);assert.equal(advice.status,'incomplete');assert.equal(advice.evidence.currentCoverage,false);assert.match(advice.conditionMessage,/缺少/);assert.ok(task.observation.records.length)
 })
 test('post-repair evidence uses only later comparable measurements and ties the original problem to advice',()=>{
- const {state,event,task}=repair(),end=Date.now(),start=end-3*3600000;task.submittedAt=new Date(start).toISOString();syncLifecycleObservations(state,{},end,{demo:true})
+ const fixture=repair(),end=Date.now();const {state}=fixture;fixture.task.submittedAt=new Date(end-3*3600000).toISOString();const {event,task}=startObservation(state,fixture.event);const start=end-3*3600000;task.observationStartedAt=new Date(start).toISOString();syncLifecycleObservations(state,{},end,{demo:true})
  assert.ok(task.observation.conditions.samples.every(c=>c.every(p=>p.timestamp>start&&p.timestamp<=end)))
- const advice=observationAdvice(event,task);assert.equal(advice.status,'review');assert.equal(advice.evidence.originalProblem,event.brief.conclusion);assert.match(observationAdviceRequest(event,task,advice).text,/本轮开始时间之后/)
+ const advice=observationAdvice(event,task);assert.equal(advice.status,'review');assert.equal(advice.evidence.originalProblem,event.sourceConclusion);assert.match(observationAdviceRequest(event,task,advice).text,/本轮开始时间之后/)
  task.observation.pending.channels[0].value=80;assert.equal(observationAdvice(event,task).status,'recheck')
 })
 test('tracking observes full weeks with matching sampling, due date and recommendation, alarm stays two hours',()=>{
- const state=createLifecycleState(),event=state.events['real-health-c4-baseline'],task=currentTask(event);decide(state,event.id,{action:'observe',reason:'保留现场核实，继续跟踪一周。'})
+ const state=createLifecycleState(),{event,task}=startObservation(state,state.events['real-health-c4-baseline'],new Date().toISOString())
  const start=Date.parse(task.observationStartedAt),week=7*86400000
  assert.equal(Date.parse(event.phases.at(-1).observationDueAt)-start,week);assert.equal(observationPolicy(state.events[id]).intervalMs,7200000)
  syncLifecycleObservations(state,{},start+week-1000,{demo:true});assert.equal(task.observation.records.length,0);assert.ok(!pendingDecision(event));assert.match(observationAdviceRequest(event,task,observationAdvice(event,task)).text,/观察周期为一周/)
@@ -68,7 +69,7 @@ test('early-maintenance plan includes formal work order snapshot without auto co
  const plan=maintenancePlans(event)[0],window=availableMaintenanceWindows()[0];event.decisionDraft={action:'maintenance',maintenancePlanId:plan.id};decide(state,event.id,{action:'maintenance',reason:'按计划提前维保。',owner:people.engineer,deadline:window.end,maintenancePlanId:plan.id,window:window.id});task=currentTask(event);assert.equal(task.maintenance.plan.workOrder.number,plan.workOrder.number);assert.ok(task.maintenance.plan.workOrder.content.length);task.draft.records.forEach(r=>r.result='已完成');task.draft.summary='本次计划作业已完成。';state.role='engineer';const report=submitTask(state,event.id,task.id);assert.match(report.markdown,/关联正式工单/);assert.equal(task.maintenance.plan.workOrder.status,'待执行')
 })
 test('changing tracking to weekly observation preserves earlier receipts without treating them as full weeks',()=>{
- const state=createLifecycleState(),event=state.events['real-health-c4-baseline'],task=currentTask(event);decide(state,event.id,{action:'observe',reason:'调整为每周汇总。'})
+ const state=createLifecycleState(),{event,task}=startObservation(state,state.events['real-health-c4-baseline'],new Date().toISOString())
  const start=Date.parse(task.observationStartedAt),old={id:'original-two-hour-window',windowStart:new Date(start).toISOString(),windowEnd:new Date(start+7200000).toISOString(),sampleCount:1,complete:true,covered:false,values:[-6],channels:[{name:'四缸相对偏差',unit:'°C',value:-6,sampleCount:1,covered:false}]}
  task.observation={records:[structuredClone(old)],checkedAt:old.windowEnd};syncLifecycleObservations(state,{},start+3*3600000,{demo:true});assert.deepEqual(task.observationHistory[0].records,[old]);assert.equal(task.observation.records.length,0)
  syncLifecycleObservations(state,{},start+4*3600000,{demo:true});assert.equal(task.observationHistory.length,1);assert.equal(observationAdvice(event,task).evidence.reachedCycle,false)

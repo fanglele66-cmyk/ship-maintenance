@@ -40,7 +40,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
    lastStored=JSON.stringify({version:1,events:incoming.events,notices:incoming.notices||[]});state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
  })
- const events=computed(()=>visibleEvents(state)),pending=computed(()=>events.value.filter(pendingDecision)),tasks=computed(()=>events.value.filter(e=>activeTask(e))),reports=computed(()=>events.value.flatMap(e=>e.reports).sort((a,b)=>b.at.localeCompare(a.at)))
+ const events=computed(()=>visibleEvents(state)),pending=computed(()=>events.value.filter(pendingDecision)),tasks=computed(()=>events.value.filter(e=>activeTask(e))),reports=computed(()=>events.value.flatMap(e=>e.reports.filter(r=>!r.linkedSource)).sort((a,b)=>b.at.localeCompare(a.at)))
  const workItems=computed(()=>lifecycleWorkItems(state)),notifications=computed(()=>lifecycleNotifications(state))
  const unread=computed(()=>workItems.value.pending.length)
  const notices=computed(()=>state.notices.filter(n=>n.recipient===state.role&&!n.read))
@@ -49,7 +49,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  function acknowledge(id){markRead(id);state.notices.filter(n=>n.eventId===id&&n.recipient===state.role).forEach(n=>n.read=true)}
  const pendingRequests=reactive({})
  const planRequests=new Map()
- function modelEvent(event){return {id:event.id,title:event.title,tracking:event.tracking,phase:event.phase,phases:event.phases.slice(-1),decisionDraft:{action:event.decisionDraft?.action},currentTask:event.currentTask,number:event.number,brief:event.brief,reports:currentReportContext(event),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt}))}}
+ function modelEvent(event){return {id:event.id,sourceEventId:event.sourceEventId,observationSource:event.observationSource?{task:{id:event.observationSource.task.id,kind:event.observationSource.task.kind,status:event.observationSource.task.status,observationMode:event.observationSource.task.observationMode,submittedAt:event.observationSource.task.submittedAt,observationStartedAt:event.observationSource.task.observationStartedAt,records:event.observationSource.task.records,summary:event.observationSource.task.summary}}:null,type:event.type,title:event.title,tracking:event.tracking,phase:event.phase,phases:event.phases.slice(-1),decisionDraft:{action:event.decisionDraft?.action},currentTask:event.currentTask,number:event.number,brief:event.brief,reports:currentReportContext(event),tasks:event.tasks.map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,scope:t.scope,summary:t.summary,steps:t.steps,records:t.records,maintenance:t.maintenance,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt}))}}
  function prepareTaskPlan(id,{retry=false,editText='',onProgress}={}){
   const event=state.events[id],draft=event&&suggestionAction(event)&&ensureTaskPlan(event)
   if(!draft)return Promise.resolve(null)

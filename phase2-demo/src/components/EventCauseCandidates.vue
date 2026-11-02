@@ -4,7 +4,7 @@
     <p class="cause-conclusion">{{ context.conclusion }}</p>
     <p class="cause-context">{{ context.navigation }} {{ context.conditions }}</p>
     <div class="cause-table-wrap"><table><thead><tr><th scope="col">候选原因</th><th scope="col">多源关联依据</th><th scope="col">可能影响</th></tr></thead><tbody><tr v-for="(row,i) in context.candidates" :key="row.cause"><th scope="row"><span class="cause-level" :class="'level-'+i">{{ row.level }}</span>{{ row.cause }}</th><td>{{ row.basis }}</td><td>{{ row.impact }}</td></tr></tbody></table></div>
-    <p class="cause-boundary">依据：事件发生时记录与原始采样。{{ context.boundary }}</p>
+
   </section>
 </template>
 <script setup>
