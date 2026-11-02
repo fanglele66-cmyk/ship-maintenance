@@ -1,3 +1,5 @@
+import { workflowKnowledgeDocs } from './workflowKnowledge.js'
+
 /**
  * 知识库 Mock 数据 — FSC/PSC 缺陷知识库 + 设备文档库
  * 共 79 篇文档，5 个设备类型，4 个文档类型
@@ -657,6 +659,7 @@ function genContent(id, device, docType, title, subcategory, updatedAt) {
 }
 
 export const knowledgeDocs = [
+  ...workflowKnowledgeDocs,
   // ========== 主机 · 故障案例 (8篇) ==========
   doc('DOC-CSE-003', '增压器故障分析及处理案例集', '主机', '故障案例', '主机增压系统', '涡轮增压器', chapterTurbocharger, 'V3.2', '2024-05-15'),
   doc('DOC-CSE-006', '冷却系统标准操作流程', '主机', '故障案例', '主机冷却系统', '中央冷却器', chapterCoolingSystem, 'V2.8', '2024-03-22'),

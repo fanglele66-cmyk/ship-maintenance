@@ -26,6 +26,7 @@
     <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
+   <HomeCoreSensors/>
   </div>
  </div>
 </template>
@@ -46,6 +47,7 @@ import ModuleHeader from '@/components/ModuleHeader.vue'
 
 import LifecycleWorkbench from '@/components/LifecycleWorkbench.vue'
 import NavigationVoyage from '@/components/NavigationVoyage.vue'
+import HomeCoreSensors from '@/components/HomeCoreSensors.vue'
 import {navigationChronology} from '../workflow/navigationChronology'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const lifecycle=useEventLifecycleStore(),workbench=ref(null)
@@ -122,7 +124,7 @@ const devices=computed(()=>{
 <style scoped>
 @media(min-width:761px){
 .captain-workbench{height:100%;overflow:hidden;grid-template-columns:clamp(250px,25vw,420px) minmax(0,1fr);gap:12px}
-.captain-right{display:grid;grid-template-rows:max-content max-content;align-content:start;overflow:auto;gap:12px}
+.captain-workbench .captain-right{display:grid;grid-template-rows:repeat(3,max-content);align-content:start;overflow:auto;gap:12px}
 .captain-analysis{min-height:0;max-height:none;overflow:visible}
 .captain-analysis-body{padding:0 18px 14px;max-width:none;font-size:clamp(14px,.65vw,16px);line-height:1.65}
 .captain-analysis :deep(.module-header){padding:12px 18px;min-height:40px}

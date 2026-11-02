@@ -1,6 +1,10 @@
 <template>
   <header class="app-header">
     <div class="header-left">
+      <div class="header-brand">
+        <img :src="companyLogo" alt="中国长航 CYSC" width="323" height="144" />
+      </div>
+      <div class="header-page-context">
       <template v-if="detailTitle">
         <BackButton :label="`返回${sectionTitle}`" @click="closeDetail" />
         <span class="header-section-title header-section-title-muted">{{ sectionTitle }}</span>
@@ -8,6 +12,7 @@
         <strong :key="detailTitle" class="header-page-title">{{ detailTitle }}</strong>
       </template>
       <strong v-else class="header-section-title">{{ sectionTitle }}</strong>
+      </div>
     </div>
 
     <div class="header-right">
@@ -35,6 +40,8 @@ import 'element-plus/es/components/popover/style/css'
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BackButton from './BackButton.vue'
+// Original lockup from 中国长航PPT模板_母版完善.pptx, ppt/media/image9.png.
+import companyLogo from '@/assets/brand/china-changhang.png'
 import LifecycleNotifications from './LifecycleNotifications.vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const lifecycle=useEventLifecycleStore()
@@ -130,9 +137,41 @@ onUnmounted(() => {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 20px;
   min-width: 0;
   flex: 1;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding-right: 20px;
+  position: relative;
+}
+.header-brand::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 1px;
+  height: 30px;
+  background: #e5e7eb;
+  transform: translateY(-50%);
+}
+.header-brand img {
+  display: block;
+  width: 180px;
+  height: 64px;
+  /* Fit the original artwork, trimming only its white top/bottom margin. */
+  object-fit: cover;
+}
+.header-page-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header-section-title {
@@ -301,6 +340,12 @@ onUnmounted(() => {
 }
 
 @media (max-width: 760px) {
+  .app-header.app-header { flex-wrap: wrap; align-content: center; row-gap: 0; }
+  .header-left { flex-basis: 100%; gap: 14px; }
+  .header-brand { padding-right: 14px; }
+  .header-brand img { width: 144px; height: 50px; }
+  .header-brand::after { height: 25px; }
+  .header-right { margin-left: auto; }
   .header-section-title-muted, .header-chevron { display: none; }
   .header-right { gap: 8px; }
   .header-ship-name { max-width: 96px; }

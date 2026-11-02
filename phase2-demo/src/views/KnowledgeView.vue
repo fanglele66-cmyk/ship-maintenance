@@ -170,7 +170,7 @@ const searchInputRef = ref(null)
 const isSearchOpen = ref(false)
 const selectedDoc = ref(null)
 const currentPage = ref(knowledgeViewCache.currentPage)
-const pageSize = 20
+const pageSize = 25
 const knowledgeViewRef = ref(null)
 const isAssistantCollapsed = ref(typeof window !== 'undefined' ? window.innerWidth <= 1100 : false)
 let knowledgeResizeObserver = null

@@ -34,10 +34,15 @@ if(import.meta.hot){
 
 <style scoped>
 .app-container {
+  --header-height: 76px;
   width: 100%;
   height: 100%;
   display: flex;
   overflow: hidden;
+}
+
+@media (max-width: 760px) {
+  .app-container { --header-height: 104px; }
 }
 
 .app-main {
