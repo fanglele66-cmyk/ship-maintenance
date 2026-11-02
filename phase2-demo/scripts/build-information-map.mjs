@@ -98,7 +98,10 @@ for (const view of views.values()) {
     assert.equal(nodes.get(id).layer, view.id === 'pages' ? 'page' : column.layer)
     if (column.layer === 'scenario') assert(!hasUnmappedSensorPath(id), 'Scenario bypasses mapped samples: ' + id)
   }
-  for (const edge of view.edges) assert(displayed.has(edge.from) && displayed.has(edge.to), 'Invisible edge endpoint in ' + view.id)
+  for (const edge of view.edges) {
+    assert(['source', 'output', 'flow', 'related'].includes(edge.type), 'Unrenderable edge type in ' + view.id)
+    assert(displayed.has(edge.from) && displayed.has(edge.to), 'Invisible edge endpoint in ' + view.id)
+  }
   if (displayed.has('effect-observation')) {
     assert(view.edges.some(edge => edge.from === 'sample' && edge.to === 'effect-observation'), view.id + ': missing sensor relationship')
     assert(view.edges.some(edge => edge.from === 'mapped-samples' && edge.to === 'effect-observation'), view.id + ': missing standardized sensor input')

@@ -1,7 +1,7 @@
 <template>
  <div class="captain-workbench">
   <section class="captain-twin">
-   <header><strong>长航碧玉</strong><span class="ship-scope">主机 · 辅机态势</span></header>
+   <header><strong>长航碧玉</strong><span class="ship-scope">设备健康态势</span></header>
    <div ref="twinRef" class="twin-viewport">
     <div class="twin-scene" :style="sceneStyle">
      <img src="/ship-situation-engines.png" alt="船舶俯视态势图，设备入口位置为示意" decoding="async" fetchpriority="high" width="941" height="1672"/>
@@ -15,7 +15,6 @@
       <div><dt>航速</dt><dd>{{formatReading('ship-speed')}} <small>kn</small></dd></div>
       <div><dt>主机转速</dt><dd>{{formatReading('s-012')}} <small>rpm</small></dd></div>
       <div><dt>主机负荷</dt><dd>{{formatReading('main-load')}} <small>%</small></dd></div>
-      <div><dt>辅机运行</dt><dd>{{runningAuxiliaries}} <small>/ {{auxiliaryRpmPoints.length}} 台</small></dd></div>
      </dl>
      <div class="twin-running-meta"><time :datetime="sampleTimeIso">数据更新于 {{sampleTimeLabel}}</time></div>
     </section>
@@ -53,8 +52,6 @@ const lifecycle=useEventLifecycleStore(),workbench=ref(null)
 const emit=defineEmits(['selectDevice','selectItem']),store=usePhase2DemoStore(),deviceStore=useDeviceStore(),twinRef=ref(null)
 const sensorStore=useSensorStore()
 function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return point?Number(point.value).toFixed(1):'—'}
-const auxiliaryRpmPoints=computed(()=>sensorStore.allSensors.filter(s=>s.deviceId.startsWith('aux-engine-')&&s.unit==='rpm'))
-const runningAuxiliaries=computed(()=>auxiliaryRpmPoints.value.filter(s=>s.value>0).length)
 const sampleTimeIso=computed(()=>new Date(sensorStore.sampledAt).toISOString())
 const sampleTimeLabel=computed(()=>new Date(sensorStore.sampledAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Shanghai'}))
 const chronology=computed(()=>navigationChronology(sensorStore,Math.floor(sensorStore.sampledAt/3600000)*3600000))
@@ -109,7 +106,7 @@ const devices=computed(()=>{
 </style>
 <style scoped>
 .twin-running{position:absolute;top:12px;left:12px;right:12px;z-index:2;padding:12px 10px 9px;border:1px solid #b1def23b;border-radius:8px;background:rgba(12,42,62,.68);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#f1f8fc;box-shadow:inset 0 1px 0 #d6f1ff12;pointer-events:none}
-.twin-running dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0}
+.twin-running dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
 .twin-running dl>div{min-width:0}.twin-running dt{font-size:var(--wb-label);line-height:1.5;color:#b8d1e1;white-space:nowrap}
 .twin-running dd{margin:4px 0 0;font-size:calc(var(--wb-body) + 4px);line-height:1.5;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .twin-running small{font-size:var(--wb-label);font-weight:400;color:#c5dbe8}

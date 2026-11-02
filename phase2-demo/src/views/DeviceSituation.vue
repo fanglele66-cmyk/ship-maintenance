@@ -5,8 +5,8 @@
     <div ref="deviceScroll" class="p2-device-scroll" :class="{'device-data-content':activeTab==='data'}">
       <template v-if="activeTab==='data'"><slot name="data"/></template>
       <div v-else class="device-overview-content">
-        <section class="device-assessment-summary" aria-label="设备健康研判"><header><h3>设备健康研判</h3><span v-if="isMainEngine">{{ runningAssessment.completedAt }} 分析</span></header><p>{{ assessmentConclusion }}</p><p class="assessment-next"><span>关注建议</span>{{ assessmentNext }}</p></section>
-        <details class="p2-running-details device-assessment-detail"><summary><span>详细研判</span><small>分析依据、建议与判断边界</small></summary><div class="device-detailed-body"><div v-if="isMainEngine" class="assessment-context"><span>数据截止：{{ runningAssessment.dataCutoff }}</span><span>{{ runningAssessment.conditions }} · {{ runningAssessment.coverage }}</span></div><MarkdownContent :content="assessmentDetail"/><template v-if="isMainEngine"><section v-for="section in additionalSections" :key="section.title"><h4>{{ section.title }}</h4><p v-for="paragraph in section.paragraphs" :key="paragraph">{{ paragraph }}</p></section></template></div></details>
+        <section class="device-assessment-summary" aria-label="设备健康研判"><header><h3>设备健康研判</h3><span v-if="isMainEngine">{{ runningAssessment.completedAt }} 更新</span></header><p>{{ assessmentConclusion }}</p><p class="assessment-next"><span>关注建议</span>{{ assessmentNext }}</p></section>
+        <details class="p2-running-details device-assessment-detail"><summary><span>详细研判</span><small>结论、航行工况与关联依据</small></summary><div class="device-detailed-body"><div v-if="isMainEngine" class="assessment-context"><span>数据来源：{{ runningAssessment.dataCutoff }}</span></div><MarkdownContent :content="assessmentDetail"/><template v-if="isMainEngine"><section v-for="section in additionalSections" :key="section.title"><h4>{{ section.title }}</h4><p v-for="paragraph in section.paragraphs" :key="paragraph">{{ paragraph }}</p></section></template></div></details>
         <section class="overview-sensor-panel" aria-label="重点系统测点"><header class="overview-sensor-heading"><div><h3>重点系统测点</h3><span>{{ previewReadings.length }} 个测点 · 点击读数查看趋势</span></div><button type="button" class="overview-all-sensors" @click="openAllData">查看全部 {{ deviceReadings.length }} 个测点 <span aria-hidden="true">→</span></button></header><SensorBoard :readings="previewReadings" overview :show-heading="false" @select-sensor="openSensor"/></section>
       </div>
     </div>
@@ -17,8 +17,9 @@ import {computed,onUnmounted,ref,watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {useSensorStore} from '@/stores/sensorStore'
-import {operationAssessment} from '@/mock/phase2SituationContent'
-import {deviceStoryAssessment} from '@/mock/fourStoryWorkflow'
+import {deviceHealthAssessment} from '@/workflow/deviceHealthAssessment.js'
+import {navigationChronology} from '@/workflow/navigationChronology.js'
+import {useEventLifecycleStore} from '@/stores/eventLifecycleStore'
 import {overviewSensorReadings} from '@/mock/sensorLayout.js'
 import {resolveIssueNavigation} from '@/mock/issueRelationships'
 import BackButton from '@/components/BackButton.vue'
@@ -32,14 +33,16 @@ const tabs=[{id:'overview',label:'健康概览'},{id:'data',label:'传感器数�
 const activeTab=ref('overview'),deviceScroll=ref(null)
 const isMainEngine=computed(()=>props.deviceId==='main-engine-1')
 const auxiliaryOptions=[{value:'aux-system',label:'辅机整体'},{value:'aux-engine-1',label:'1号辅机'},{value:'aux-engine-2',label:'2号辅机'},{value:'aux-engine-3',label:'3号辅机'}]
-const runningAssessment=computed(()=>operationAssessment(store))
-const otherOverview=computed(()=>deviceStoryAssessment(store,props.deviceId))
-const assessmentConclusion=computed(()=>overviewCopy(isMainEngine.value?runningAssessment.value.conclusion:otherOverview.value.conclusion))
+const lifecycle=useEventLifecycleStore()
+const healthAssessment=computed(()=>deviceHealthAssessment({deviceId:props.deviceId,sensors:sensorStore.allSensors,events:Object.values(lifecycle.state.events),period:navigationChronology(sensorStore,sensorStore.sampledAt).periods.at(-1)}))
+const runningAssessment=computed(()=>({...healthAssessment.value,recommendation:healthAssessment.value.next,completedAt:new Date(sensorStore.sampledAt).toLocaleTimeString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'}),dataCutoff:'当前测点与航行回放；事件使用各自历史窗口',conditions:healthAssessment.value.context,coverage:'不以当前读数替代历史核实',sections:[{title:'后续判断',paragraphs:['以现场核实与独立测量确认原因；任务提交、事件闭环和设备恢复分别判断，观察同时核对数据覆盖与可比工况。']}]}))
+
+const assessmentConclusion=computed(()=>overviewCopy(healthAssessment.value.conclusion))
 const assessmentNext=computed(()=>{
-  const recommendation=overviewCopy(isMainEngine.value?runningAssessment.value.recommendation:otherOverview.value.next)
+  const recommendation=overviewCopy(healthAssessment.value.next)
   return recommendation.match(/^[^。！？]+[。！？]?/)?.[0]||recommendation
 })
-const assessmentDetail=computed(()=>overviewCopy(`### 分析依据\n\n${isMainEngine.value?runningAssessment.value.basis:otherOverview.value.basis}\n\n### 建议\n\n${isMainEngine.value?runningAssessment.value.recommendation:otherOverview.value.next}`))
+const assessmentDetail=computed(()=>overviewCopy(`### ${isMainEngine.value?'事件结论与工况依据':'工况与测点依据'}\n\n${healthAssessment.value.basis}\n\n### 建议\n\n${healthAssessment.value.next}`))
 const additionalSections=computed(()=>runningAssessment.value.sections.filter(section=>!['关联分析与判断边界','当前安排'].includes(section.title)))
 const deviceReadings=computed(()=>sensorStore.allSensors.filter(sensor=>props.deviceId==='aux-system'?sensor.deviceId.startsWith('aux-engine-'):sensor.deviceId===props.deviceId))
 const previewReadings=computed(()=>overviewSensorReadings(deviceReadings.value))
