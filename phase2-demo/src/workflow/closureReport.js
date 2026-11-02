@@ -48,6 +48,7 @@ export function closureContent(event,action,reason,at,captain){
 - 确认人：${captain}
 - 闭环时间：${date(at)}
 - 处置方式：${action==='false'?'确认误报':'关闭闭环'}
+- 闭环依据：${event.linkedClosure?'关联效果观察 '+event.linkedClosure.eventNumber+' 已闭环，沿关联链路同步归档。':'轮机长确认本事件闭环。'}
 - 执行人员：${[...new Set(tasks.map(t=>t.owner))].join('、')||'未派发现场任务'}
 
 ## 二、原始异常与触发依据
@@ -77,6 +78,8 @@ ${rechecks.map(t=>taskSection(event,t)).join('\n\n')||'未提交独立复查报�
 ## 六、闭环决定与后续安排
 
 ${reason}
+
+${event.linkedClosure?event.tasks.filter(t=>t.status==='terminated').map(t=>`- ${taskTitle(t)}：随关联链路闭环终止，原填写记录保留；未执行内容不记为已完成。`).join('\n'):''}
 
 ${analysisMarkdown}
 

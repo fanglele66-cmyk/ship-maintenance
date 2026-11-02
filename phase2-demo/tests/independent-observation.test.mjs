@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createLifecycleState,decide,currentTask,submitTask,ensureTaskPlan,people,refreshLifecyclePresentation,pendingDecision} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,decide,currentTask,submitTask,ensureTaskPlan,people,refreshLifecyclePresentation,pendingDecision,isProcessingEvent,stageNames,beginTaskReport} from '../src/workflow/eventLifecycle.js'
+import {createObservationEvent} from '../src/workflow/observationEvents.js'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 import {observationTaskFor} from '../src/workflow/observationContext.js'
 import {lifecycleWorkItems,lifecycleNotifications} from '../src/workflow/lifecycleWorkItems.js'
@@ -19,7 +20,56 @@ for(const repair of [false,true])test(`${repair?'维修':'排查'}完成后建�
  const due=Date.parse(event.phases.at(-1).observationDueAt);syncLifecycleObservations(state,{},due-1,{demo:true});assert.ok(source.observation.pending.sampleCount>0)
  syncLifecycleObservations(state,{},due,{demo:true});assert.ok(pendingDecision(event));assert.equal(lifecycleNotifications(state).filter(n=>n.eventId===event.id).length,1)
  const saved=refreshLifecyclePresentation(structuredClone(state));assert.equal(Object.keys(saved.events).length,Object.keys(state.events).length);assert.equal(saved.events[event.id].reports[0].markdown,report.markdown)
- decide(state,event.id,{action:'close',reason:'本次观察结果已核对，保留边界并结束观察。'});assert.equal(parent.phase,'transferred');assert.equal(event.phase,'closed');assert.ok(source.observationEndedAt);assert.match(event.reports.at(-1).markdown,/关联原事件/)
+ assert.ok(!isProcessingEvent(parent));assert.ok(isProcessingEvent(event))
+ decide(state,event.id,{action:'close',reason:'本次观察结果已核对，保留边界并结束观察。'});assert.equal(parent.phase,'closed');assert.equal(event.phase,'closed');assert.ok(source.observationEndedAt);assert.match(event.reports.at(-1).markdown,/关联原事件/)
+ assert.equal(parent.linkedClosure.eventId,event.id);assert.equal(task.goalStatus,'completed');assert.equal(parent.reports.find(r=>r.id===report.id).markdown,report.markdown);assert.ok(!isProcessingEvent(event))
+})
+
+test('多轮观察中任一闭环同时归档父级、同级和后续事件，不影响其他事件',()=>{
+ const {state,parent,event}=observed(true),unrelated=structuredClone(state.events['real-warning-0523'])
+ const recheck=dispatch(state,event,'recheck');submit(state,event,recheck,'未见异常')
+ const descendant=createObservationEvent(state,event,recheck,{reason:'后续观察'})
+ // A second submitted source report starts a sibling observation.
+ parent.reports.push({...structuredClone(parent.reports.at(-1)),id:'second-source-report'})
+ const sibling=createObservationEvent(state,parent,currentTask(parent),{reason:'另一轮观察'})
+ const unfinished=dispatch(state,sibling,'recheck');unfinished.draft.records[0].note='已记录的现场读数'
+ const originalDraft=structuredClone(unfinished.draft)
+ decide(state,descendant.id,{action:'close',reason:'可比工况下原异常未再现，确认闭环。'})
+ for(const item of [parent,event,sibling,descendant]){assert.equal(item.phase,'closed');assert.equal(item.status,'已闭环');assert.ok(!pendingDecision(item));assert.ok(!isProcessingEvent(item))}
+ assert.equal(unfinished.status,'terminated');assert.equal(unfinished.goalStatus,'terminated');assert.deepEqual(unfinished.draft,originalDraft)
+ assert.match(sibling.reports.at(-1).markdown,/未执行内容不记为已完成/)
+ assert.deepEqual(state.events[unrelated.id],unrelated)
+ for(const role of ['captain','engineer']){state.role=role;assert.ok(!lifecycleWorkItems(state).pending.some(i=>[parent.id,event.id,sibling.id,descendant.id].includes(i.eventId)))}
+ const saved=structuredClone(state);refreshLifecyclePresentation(state);const refreshed=structuredClone(state);refreshLifecyclePresentation(state);assert.deepEqual(state,refreshed)
+ for(const id of [parent.id,event.id,sibling.id,descendant.id])assert.equal(state.events[id].reports.length,saved.events[id].reports.length)
+})
+
+test('旧记录已有观察闭环时补齐原事件闭环，重复加载不生成重复报告',()=>{
+ const {state,parent,event}=observed()
+ event.phase='closed';event.status='已闭环';event.closedAt=new Date().toISOString();event.closeReason='旧版本已确认效果';event.phases.push({id:'legacy-close',kind:'closed',at:event.closedAt})
+ refreshLifecyclePresentation(state)
+ assert.equal(parent.phase,'closed');assert.equal(parent.linkedClosure.eventId,event.id);assert.match(parent.reports.at(-1).summary,/旧版本已确认效果/)
+ const reports=parent.reports.length,decisions=parent.decisions.length,notices=state.notices.length
+ refreshLifecyclePresentation(state);assert.equal(parent.reports.length,reports);assert.equal(parent.decisions.length,decisions);assert.equal(state.notices.length,notices)
+})
+
+test('关联链路闭环会中止尚在生成的报告，迟到结果不能重新打开事件',()=>{
+ const {state,parent,event}=observed()
+ parent.reports.push({...structuredClone(parent.reports.at(-1)),id:'parallel-source-report'})
+ const child=createObservationEvent(state,parent,currentTask(parent),{reason:'另一轮观察'})
+ const pending=dispatch(state,event,'recheck');pending.draft.records.forEach(r=>r.result='未见异常');pending.draft.summary='提交中的原始记录'
+ state.role='engineer';beginTaskReport(state,event.id,pending.id,'in-flight')
+ state.role='captain';decide(state,child.id,{action:'close',reason:'关联观察确认闭环'})
+ assert.equal(parent.phase,'closed');assert.equal(pending.status,'terminated');assert.equal(pending.reportGeneration.status,'cancelled');assert.equal(pending.summary,'提交中的原始记录')
+ state.role='engineer';assert.throws(()=>submitTask(state,event.id,pending.id,{requestId:'in-flight'}),/报告生成状态已变化/);assert.equal(event.status,'已闭环')
+})
+
+test('新旧排查回交统一待决策，当前阶段为决策中，观察选项显示效果观察',()=>{
+ const state=createLifecycleState(),event=state.events[root],task=dispatch(state,event,'investigate');submit(state,event,task,'未见异常')
+ assert.equal(event.status,'待决策');assert.equal(stageNames[event.phase],'决策中');assert.equal(lifecycleDecisionOptions(event).find(o=>o.value==='observe').label,'效果观察')
+ event.status='待处置决策';refreshLifecyclePresentation(state)
+ assert.equal(event.status,'待决策');assert.equal(stageNames[event.phase],'决策中')
+ const repaired=observed(true);repaired.parent.phase='review';assert.equal(lifecycleDecisionOptions(repaired.parent).find(o=>o.value==='observe').label,'效果观察')
 })
 test('观察事件可复查，来源观察停止且源任务保持完成',()=>{
  const {state,parent,event,task,source}=observed();const next=dispatch(state,event,'recheck');assert.equal(parent.tasks.length,1);assert.ok(source.observationEndedAt);assert.equal(task.goalStatus,'completed');assert.equal(event.currentTask,next.id)

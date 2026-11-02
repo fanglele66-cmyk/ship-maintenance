@@ -12,7 +12,7 @@
 .lc-home-chronology .operation-anchored{color:#6b6296;background:#f1edf8}
 .lc-home-chronology .operation-maneuver{color:#a47629;background:#fff4e2}
 .lc-home-chronology .operation-accelerating{color:#3d7399;background:#eaf3fb}
-.lc-type{padding:2px 5px;border-radius:3px}.lc-type.type-0{color:#c55353;background:#fff0ef}.lc-type.type-1{color:#a77b37;background:#fff5e5}.lc-type.type-2{color:#537fa8;background:#edf5fc}
+.lc-type{padding:2px 5px;border-radius:3px}.lc-type.type-0{color:#c55353;background:#fff0ef}.lc-type.type-1{color:#a77b37;background:#fff5e5}.lc-type.type-2{color:#537fa8;background:#edf5fc}.lc-type.type-3{color:#39815e;background:#edf7f0}
 .lc-board.compact .lc-board-list{overflow:auto;scrollbar-width:thin;flex:0 1 auto}.lc-board.compact .lc-board-footer{justify-content:center;border-top:1px solid #edf0f5;margin-top:0}.lc-board.compact .lc-board-footer button{border:0;font-size:12px;padding:8px}
 @media(min-width:1101px){.lc-home-chronology{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .lc-workspace,.lc-list-page,.lc-todo-page,.lc-report-page,.lc-access{flex:1;width:100%;min-width:0;box-sizing:border-box}

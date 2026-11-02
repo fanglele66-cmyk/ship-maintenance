@@ -11,13 +11,13 @@
 import {computed,ref,watch} from 'vue'
 import {useRouter,useRoute} from 'vue-router'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
-import {currentTask,timeText,activeTask} from '../workflow/eventLifecycle'
+import {currentTask,timeText,activeTask,isProcessingEvent} from '../workflow/eventLifecycle'
 const store=useEventLifecycleStore(),router=useRouter(),route=useRoute(),captain=computed(()=>store.state.role==='captain')
 const tab=ref(route.query.view==='reports'?'报告':captain.value?'待决策':'我的任务')
 const boardTabs=computed(()=>captain.value?['待决策','处置中','报告']:['我的任务','报告'])
-const events=computed(()=>tab.value==='待决策'?store.pending:captain.value?store.events.filter(e=>!['reminder','closed'].includes(e.phase)):store.events.filter(e=>activeTask(e)))
+const events=computed(()=>tab.value==='待决策'?store.pending:captain.value?store.events.filter(isProcessingEvent):store.events.filter(e=>activeTask(e)))
 const reports=computed(()=>store.reports.filter(r=>r.kind!=='工况报告'))
-const typeRank=type=>['报警事件','预警事件','异动跟踪'].indexOf(type)
+const typeRank=type=>['报警事件','预警事件','异动跟踪','效果观察'].indexOf(type)
 function openEvent(e){if(!captain.value&&activeTask(e)){router.push('/tasks/'+activeTask(e).id);return}router.push({path:'/situation/issue/'+e.id,query:{from:'workbench'}})}
 function rowSummary(e){const t=currentTask(e);return e.phase==='reminder'?e.brief.conclusion:e.reports.at(-1)?.summary||t.owner+' · 要求 '+timeText(t.deadline)+' 前完成 · '+t.draft.records.filter(r=>r.result).length+' / '+t.steps.length+' 项已填写'}
 watch(()=>store.state.role,()=>tab.value=captain.value?'待决策':'我的任务')

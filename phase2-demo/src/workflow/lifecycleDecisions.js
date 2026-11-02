@@ -28,8 +28,8 @@ export function lifecycleDecisionOptions(event){
  if(['assigned','reporting','report-error'].includes(task?.status))return shore
  if(task?.status==='submitted'&&taskExecution(task).incomplete&&(task.kind!=='investigation'||taskExecution(task).summaryBlocked||task.records.some(r=>/未完成|受限/.test(r.result))))return [{value:task.kind==='investigation'&&!hasAbnormalFindings(task)?'investigate':'repair',label:task.kind==='investigation'&&!hasAbnormalFindings(task)?'继续排查':'派发剩余维修'},{value:'wait',label:'等待条件，保留原任务'},{value:'terminate',label:'终止未执行部分'},{value:'close',label:'说明剩余事项并闭环'},...shore]
  if(task?.status==='terminated')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},...shore]
- if(event.phase==='review')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},...(isVerificationReview(event)?[{value:'repair',label:'派发维修'}]:[]),...(!event.phases?.at(-1)?.observationWaiting?[{value:'observe',label:'继续观察'}]:[]),...shore]
- if(event.phase==='decision')return [...(confirmedTracking(event,task)?[{value:'maintenance',label:'提前维保'}]:hasAbnormalFindings(task)?[{value:'repair',label:'派发维修'}]:[{value:'investigate',label:'继续排查'}]),...(task?.status==='submitted'?[{value:'observe',label:'继续观察'},{value:'close',label:'闭环'}]:[]),...shore]
+ if(event.phase==='review')return [{value:'close',label:'闭环'},{value:'recheck',label:'派发复查'},...(isVerificationReview(event)?[{value:'repair',label:'派发维修'}]:[]),...(!event.phases?.at(-1)?.observationWaiting?[{value:'observe',label:'效果观察'}]:[]),...shore]
+ if(event.phase==='decision')return [...(confirmedTracking(event,task)?[{value:'maintenance',label:'提前维保'}]:hasAbnormalFindings(task)?[{value:'repair',label:'派发维修'}]:[{value:'investigate',label:'继续排查'}]),...(task?.status==='submitted'?[{value:'observe',label:'效果观察'},{value:'close',label:'闭环'}]:[]),...shore]
  return shore
 }
 export const dispatchAction=event=>{

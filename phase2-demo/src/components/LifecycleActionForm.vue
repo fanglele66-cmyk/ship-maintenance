@@ -43,7 +43,7 @@ const plan=computed(()=>captain.value&&suggestionAction(props.event)?ensureTaskP
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))
 const reason=computed({get:()=>dispatch.value?plan.value?.scope||'':decision.value.action==='shore'?decision.value.shoreReason||'':decision.value.reason,set:value=>{if(dispatch.value&&plan.value){plan.value.scope=value;plan.value.version++}else if(decision.value.action==='shore')decision.value.shoreReason=value;else decision.value.reason=value}})
 watch(options,list=>{if(props.shoreOnly){decision.value.action=list.some(o=>o.value==='shore')?'shore':'';return}if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})
-const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'提交岸基同步',observe:'确认进入观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
+const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'提交岸基同步',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
 const plans=computed(()=>maintenancePlans(props.event)),windows=computed(()=>availableMaintenanceWindows())
 const selectedMaintenance=computed(()=>plans.value.find(p=>p.id===decision.value.maintenancePlanId))
 function changeMaintenancePlan(){ensureTaskPlan(props.event);error.value=''}

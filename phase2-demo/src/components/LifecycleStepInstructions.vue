@@ -1,7 +1,7 @@
 <template><div class="lc-operation-details" :class="{'lc-operation-compact':compact,'has-substeps':step.substeps?.length>1}">
  <p v-if="step.guide&&(!compact||!step.substeps?.length)">{{step.guide}}</p>
  <ol v-if="step.checks?.length" class="instruction-list"><li v-for="(check,j) in step.checks" :key="j"><span class="instruction-number">{{number}}.{{j+1}}</span><span>{{check}}</span></li></ol>
- <section v-for="(part,i) in step.substeps||[]" :key="i" class="substep"><h4>{{number}}.{{i+1}} {{part.label}}</h4><p v-if="!compact||!part.checks?.length">{{part.guide}}</p><ol class="instruction-list"><li v-for="(check,j) in part.checks||[]" :key="j"><span class="instruction-number">{{number}}.{{i+1}}.{{j+1}}</span><span>{{check}}</span></li></ol><details v-if="compact&&(part.recordHint||part.guide&&part.checks?.length)" class="operation-context"><summary>说明与回交要求</summary><p v-if="part.checks?.length">{{part.guide}}</p><RecordGuidance v-if="part.recordHint" :text="part.recordHint"/></details><RecordGuidance v-else-if="part.recordHint" :text="part.recordHint"/></section>
+ <section v-for="(part,i) in step.substeps||[]" :key="i" class="substep"><h4>{{number}}.{{i+1}} {{part.label}}</h4><p v-if="!compact||!part.checks?.length">{{part.guide}}</p><ol class="instruction-list"><li v-for="(check,j) in part.checks||[]" :key="j"><span class="instruction-number">{{number}}.{{i+1}}.{{j+1}}</span><span>{{check}}</span></li></ol><details v-if="compact&&part.guide&&part.checks?.length" class="operation-context"><summary>作业说明</summary><p>{{part.guide}}</p></details><RecordGuidance v-if="part.recordHint" :text="part.recordHint"/></section>
 </div></template>
 <script setup>
 import RecordGuidance from './RecordGuidance.vue'

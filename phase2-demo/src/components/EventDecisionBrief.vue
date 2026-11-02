@@ -15,7 +15,7 @@ defineProps({brief:{type:Object,required:true},eventType:{type:String,default:''
 </script>
 
 <style scoped>
-.event-decision-brief{min-width:0;color:#52637a;font-size:14px;line-height:1.75;padding-top:18px}
+.event-decision-brief{min-width:0;color:#52637a;font-size:14px;line-height:1.75;padding-top:0}
 .brief-origin{display:flex;align-items:center;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;color:#8a7960;font-size:12px}
 .brief-origin time{color:#8490a0;font-variant-numeric:tabular-nums}
 .event-decision-brief h3{font-size:14px;line-height:1.5;color:#33465f;margin:0 0 7px;font-weight:600}

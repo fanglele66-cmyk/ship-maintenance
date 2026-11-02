@@ -12,13 +12,13 @@ import {closureContent,closurePresentationVersion} from './closureReport.js'
 import {groupRepairSteps,compactAssignedRepair} from './repairStepGroups.js'
 import {hasObservation,observationStart,observationTaskFor,isVerificationObservation,isVerificationReview,observationPolicy} from './observationContext.js'
 import {taskExecution,executionFacts,carryForwardSteps} from './taskExecution.js'
-import {createObservationEvent,migrateObservationEvents,observationTasks} from './observationEvents.js'
+import {createObservationEvent,migrateObservationEvents,observationTasks,observationChain,isObservationEvent} from './observationEvents.js'
 import {shoreReportSnapshot} from './shoreReports.js'
 export {hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
 
 export const people = {captain:'陈志远（轮机长）',engineer:'李建国（大管轮）'}
 export const eventNumbers = {'real-alarm-0430':'CBY-EVT-20260430-001','real-warning-0523':'CBY-EVT-20260523-001','real-tracking-exhaust-baseline':'CBY-EVT-20260812-001','real-health-c4-baseline':'CBY-EVT-20260812-002'}
-export const stageNames = {reminder:'风险提醒',investigation:'原因排查',decision:'处置决策',repair:'维修执行',maintenance:'关联维保',review:'结果处置',closed:'闭环归档',transferred:'已转效果观察'}
+export const stageNames = {reminder:'风险提醒',investigation:'原因排查',decision:'决策中',repair:'维修执行',maintenance:'关联维保',review:'结果处置',closed:'闭环归档',transferred:'已转效果观察'}
 export const timeText = value => !value?'—':Number.isNaN(new Date(value).getTime())?String(value):new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16)
 const copy = value => JSON.parse(JSON.stringify(value))
 const required = (ok,message) => {if(!ok)throw new Error(message)}
@@ -59,7 +59,7 @@ export function createLifecycleState(){
  task.conversations.engineer.push({id:uid('message'),kind:'user',title:'本轮反馈已提交',text:task.summary,at:task.submittedAt},{id:uid('message'),kind:'receipt',title:'反馈已收录，等待轮机长审阅',text:'本次逐项记录及汇总结论已归入关联事件。可继续补充本任务报告；提交不代表事件闭环或效果验证通过。',reportId:report.id,at:task.submittedAt})
   say(e,'engineer','receipt',prior.summary,{at:task.submittedAt,reportId:report.id,title:'排查报告已提交'})
   advice(e,'captain',prior.summary,'请补充排查独立测温与历史调整依据，或明确范围后关联维保单。',task.submittedAt)
-  e.phases.push({id:uid('decision'),kind:'decision',label:'排查后决策',at:task.submittedAt,taskId:task.id,reportId:report.id});e.phase='decision';e.status='待处置决策'
+  e.phases.push({id:uid('decision'),kind:'decision',label:'排查后决策',at:task.submittedAt,taskId:task.id,reportId:report.id});e.phase='decision';e.status='待决策'
  }
  return {version:1,role:'captain',events,notices:[]}
 }
@@ -67,6 +67,7 @@ export function currentTask(event){return event.tasks.find(t=>t.id===event.curre
 export function pendingDecision(event){return ['reminder','decision','review'].includes(event.phase)&&!event.phases.at(-1)?.observationWaiting&&currentTask(event)?.status!=='waiting'}
 export function visibleEvents(state){return Object.values(state.events).filter(e=>state.role==='captain'||e.participants.includes(people.engineer))}
 export function activeTask(event){const t=currentTask(event);return t?.status==='assigned'?t:null}
+export function isProcessingEvent(event){return !['reminder','transferred','closed'].includes(event.phase)}
 export const decisionOptions=lifecycleDecisionOptions
 export function ensureTaskPlan(event){
  const action=dispatchAction(event);if(!action)return null
@@ -111,6 +112,7 @@ export function makeReport(event,task,reportId){
 export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
   event.number=eventNumbers[event.id]||event.number
+  if(event.status==='待处置决策')event.status='待决策'
   if(event.id==='real-warning-0523'){event.type='预警事件';event.brief.discovery.kind='ai-warning';event.brief.discovery.label='AI预警 → 关联研判'}
   for(const task of event.tasks){compactAssignedRepair(task);if(task.status==='submitted')task.goalStatus=taskExecution(task).incomplete?'unresolved':'completed'}
   if(['repair','maintenance'].includes(event.pendingPlan?.action)&&event.pendingPlan.steps.length>4){event.pendingPlan.steps=groupRepairSteps(event.pendingPlan.steps);event.pendingPlan.version++}
@@ -129,10 +131,39 @@ export function refreshLifecyclePresentation(state){
   for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==3){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=3;message.basisLabel='分析过程与依据'}
  }
  migrateObservationEvents(state)
+ // Apply the same rule to saved observations closed before chain closure existed.
+ for(const event of Object.values(state.events))if(isObservationEvent(event)&&event.phase==='closed'&&!event.linkedClosure)closeObservationChain(state,event)
  return state
 }
 export function makeClosureReport(event,action,reason,at,id=uid('report')){
  return {id,kind:'闭环报告',title:event.title+' · 闭环报告',eventId:event.id,eventNumber:event.number,owner:people.captain,at,summary:reason,...closureContent(event,action,reason,at,people.captain)}
+}
+
+function closeObservationChain(state,source){
+ const closure=source.decisions.findLast(d=>['close','false'].includes(d.action))
+ const at=source.closedAt||closure?.at||source.phases.at(-1)?.at
+ if(!at)return
+ for(const event of observationChain(state,source.id)){
+  if(event.phase==='closed')continue
+  const reason=`关联效果观察「${source.title}」（${source.number}）已闭环，整条链路同步闭环。${source.closeReason||closure?.reason||''}`
+  const sourcePhaseId=event.phases.at(-1)?.id
+  for(const task of observationTasks(event)){
+   if(hasObservation(task)&&!task.observationEndedAt)task.observationEndedAt=at
+   if(['assigned','waiting','reporting','report-error'].includes(task.status)){
+    // Closing the event does not turn unfinished work into completed work.
+    task.status='terminated';task.goalStatus='terminated';task.terminatedAt=at;task.terminationReason=reason
+    if(task.reportGeneration){task.reportGeneration.status='cancelled';task.reportGeneration.requestId=null}
+    for(const messages of Object.values(task.conversations||{}))for(const message of messages)if(message.status==='streaming')Object.assign(message,{status:'interrupted',modelError:'关联链路已闭环，原填写记录已保留。'})
+   }
+  }
+  event.linkedClosure={eventId:source.id,eventNumber:source.number,at}
+  event.status='已闭环';event.closedAt=at;event.closeReason=reason;event.unread.captain=false
+  const closed=phase(event,'closed','闭环归档',{at,linkedEventId:source.id})
+  event.decisions.push({id:uid('decision'),action:'close',reason,at,owner:people.captain,taskId:event.currentTask,sourcePhaseId,resultPhaseId:closed.id,linkedEventId:source.id})
+  event.reports.push(makeClosureReport(event,'close',reason,at))
+  say(event,'captain','receipt',reason,{at,title:'关联链路已闭环',linkedEventId:source.id})
+  if(event.participants.length){say(event,'engineer','receipt',reason,{at,title:'关联链路已闭环',linkedEventId:source.id});event.unread.engineer=true;notify(state,event,'engineer','关联链路已闭环',reason)}
+ }
 }
 
 export function analyzeFindings(task){
@@ -227,6 +258,7 @@ export function decide(state,id,form){
  const reviewed=e.tasks.find(t=>t.id===e.phases.find(p=>p.id===sourcePhaseId)?.taskId)
  if(action!=='shore'&&reviewed?.status==='submitted'){reviewed.reviewedAt=at;reviewed.goalStatus=taskExecution(reviewed).incomplete?'unresolved':'completed'}
  e.decisions.push({id:uid('decision'),action,reason:form.reason,at,owner:people.captain,taskId:e.currentTask,sourcePhaseId,resultPhaseId:e.phases.at(-1)?.id})
+ if(['close','false'].includes(action)&&isObservationEvent(e))closeObservationChain(state,e)
 }
 export function beginTaskReport(state,id,taskId,requestId){
  required(state.role==='engineer','请在大管轮视角提交执行反馈。')
@@ -266,7 +298,7 @@ export function submitTask(state,id,taskId,generation){
  if(!generation)task.conversations.engineer.push({id:uid('message'),kind:'user',title:'本轮反馈已提交',text:task.summary,at:task.submittedAt})
  task.conversations.engineer.push({id:uid('message'),kind:'receipt',title:'反馈已收录，等待轮机长审阅',text:'本次逐项记录及汇总结论已归入关联事件。可继续补充本任务报告；提交不代表事件闭环或效果验证通过。',reportId:report.id,at:task.submittedAt})
  const needsDecision=task.kind==='investigation'&&!(task.purpose==='recheck'&&!hasAbnormalFindings(task))
- phase(e,needsDecision?'decision':'review',`${needsDecision?'排查后决策':'结果处置'} · 第${report.submissionNumber}次`,{taskId:task.id,reportId:report.id});e.status=needsDecision?'待处置决策':'待结果处置';e.unread.captain=true;e.unread.engineer=false
+ phase(e,needsDecision?'decision':'review',`${needsDecision?'排查后决策':'结果处置'} · 第${report.submissionNumber}次`,{taskId:task.id,reportId:report.id});e.status=needsDecision?'待决策':'待结果处置';e.unread.captain=true;e.unread.engineer=false
  notify(state,e,'captain',report.kind+'已回交，待您决策',`${task.owner}已提交“${e.title}”的${report.kind}。${report.summary}`)
  say(e,'engineer','receipt',report.summary,{reportId:report.id,title:report.kind+'已提交'})
  advice(e,'engineer',report.analysis,'本轮记录已形成'+report.kind+'并交轮机长处置。如发现遗漏，可在会话补充说明；新的排查或作业安排由轮机长派发。')

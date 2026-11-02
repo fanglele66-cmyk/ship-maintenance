@@ -5,6 +5,24 @@ export const isObservationEvent=event=>event?.type==='效果观察'
 export const evidenceEventId=event=>event?.sourceEventId||event?.id
 export const observationTasks=event=>[...(event.observationSource?[event.observationSource.task]:[]),...event.tasks]
 
+// Walk both directions so a closed observation also reaches sibling and later
+// observations. Only explicit event links belong to this chain.
+export function observationChain(state,eventId){
+ const links=new Map(Object.keys(state.events).map(id=>[id,new Set()]))
+ for(const event of Object.values(state.events)){
+  const related=[event.parentEventId,event.observationSource?.parentEventId,
+   ...(isObservationEvent(event)?[event.sourceEventId]:[]),
+   ...(event.observationEventIds||[]),...(event.phases||[]).map(p=>p.observationEventId)]
+  for(const id of related)if(links.has(id)){links.get(event.id).add(id);links.get(id).add(event.id)}
+ }
+ const seen=new Set(),queue=[eventId]
+ for(const id of queue){
+  if(seen.has(id)||!links.has(id))continue
+  seen.add(id);queue.push(...links.get(id))
+ }
+ return [...seen].map(id=>state.events[id])
+}
+
 // A separate event owns observation samples and decisions; source tasks stay in
 // their original event. The source report is a read-only submission snapshot.
 export function createObservationEvent(state,parent,task,{at=new Date().toISOString(),reason,migrate=false}={}){
