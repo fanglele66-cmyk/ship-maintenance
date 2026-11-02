@@ -7,11 +7,10 @@
      <div class="stage-clock"><time :datetime="new Date(stage.start).toISOString()">{{shortTime(stage.start)}}</time><span aria-hidden="true">—</span><time :datetime="new Date(stage.end).toISOString()">{{shortTime(stage.end)}}</time></div>
      <div class="stage-track" aria-hidden="true"><i class="track-node"/><span class="track-line"/><svg v-if="index<stages.length-1" viewBox="0 0 8 12"><path d="m2 2 4 4-4 4"/></svg></div>
      <div class="stage-content">
-      <header class="stage-heading"><h3>{{stage.status}}</h3><span v-if="index===stages.length-1" class="latest-label">最近阶段</span><small v-else>{{duration(stage)}}</small></header>
+      <header class="stage-heading"><h3>{{stage.status}}</h3><span v-if="index===stages.length-1" class="latest-label">最近阶段</span></header>
       <p class="stage-description">{{stage.detail.split(' 主机 ')[0]}}</p>
       <dl class="stage-metrics"><div><dt>航速</dt><dd>{{range(stage.sog)}} <small>kn</small></dd></div><div><dt>主机转速</dt><dd>{{range(stage.rpm)}} <small>rpm</small></dd></div><div><dt>主机负荷</dt><dd>{{range(stage.load)}} <small>%</small></dd></div></dl>
-      <div class="stage-secondary"><span>辅机 {{stage.aux}} 台</span><span>航向 {{stage.cog===null?'—':stage.cog+'°'}}</span><span v-if="index===stages.length-1">{{duration(stage)}}</span></div>
-      <p class="stage-position">时段末位置 {{stage.position}}</p>
+      <div class="stage-secondary"><span>辅机 {{stage.aux}} 台</span><span>航向 {{stage.cog===null?'—':stage.cog+'°'}}</span><span class="stage-position">时段末位置 {{stage.position}}</span><span v-if="index===stages.length-1">{{duration(stage)}}</span></div>
       <div v-if="stage.incidents.length" class="voyage-incidents"><RouterLink v-for="incident in stage.incidents" :key="incident.id" :to="'/situation/issue/'+incident.id" :class="incident.severity"><i aria-hidden="true"/><span>{{incident.type}} · {{incident.title}}</span><span aria-hidden="true">↗</span></RouterLink></div>
      </div>
     </li>
@@ -52,7 +51,6 @@ function duration(stage){const minutes=Math.round((stage.end-stage.start)/60000)
 .stage-content{margin-right:22px;padding:4px 0 0}
 .stage-heading{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 8px!important}
 .stage-heading h3{color:var(--stage-color);font-size:14px;line-height:1.5;font-weight:600;margin:0}
-.stage-heading>small{font-size:10px;line-height:1.5;color:#6b7a70}
 .latest-label{font-size:10px;line-height:1.5;color:#357354;background:#edf5ed;border-radius:4px;padding:2px 6px}
 .stage-description{font-size:12px;line-height:1.75;color:#53697a;min-height:42px;margin:0 0 12px!important}
 .stage-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;padding:0}
@@ -60,7 +58,7 @@ function duration(stage){const minutes=Math.round((stage.end-stage.start)/60000)
 .stage-metrics dd{font-size:13px;line-height:1.5;color:#365566;font-weight:600;margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}
 .stage-metrics dd small{font-size:10px;font-weight:400;color:#667c73}
 .stage-secondary{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:10px;line-height:1.6;color:#617a6e;margin-top:12px;font-variant-numeric:tabular-nums}
-.stage-position{font-size:10px;line-height:1.6;color:#6b7c73;margin:5px 0 0!important;font-variant-numeric:tabular-nums}
+.stage-position{color:#6b7c73;font-variant-numeric:tabular-nums}
 .voyage-incidents{display:grid;gap:4px;margin-top:10px}
 .voyage-incidents a{display:flex;align-items:baseline;gap:5px;color:#a17b2d;font-size:11px;line-height:1.6;text-decoration:none}
 .voyage-incidents a.alarm{color:#b95e51}
@@ -73,7 +71,24 @@ function duration(stage){const minutes=Math.round((stage.end-stage.start)/60000)
 @keyframes track-flow{0%{transform:translateX(-100%);opacity:0}10%{opacity:.8}65%{transform:translateX(100%);opacity:.8}66%,100%{transform:translateX(100%);opacity:0}}
 @keyframes arrow-flow{0%,65%,100%{opacity:.4;transform:translateX(0)}40%,50%{opacity:1;transform:translateX(2px)}}
 .motion-paused .voyage-stage,.motion-paused .track-line,.motion-paused .track-line:after,.motion-paused .track-node:after,.motion-paused .stage-track svg{animation-play-state:paused}
-@media(min-width:1600px){.stage-clock{font-size:12px}.stage-heading h3{font-size:15px}.stage-description{font-size:13px;min-height:46px}.stage-metrics dd{font-size:14px}.stage-secondary,.stage-position,.stage-metrics dt{font-size:11px}}
+@media(min-width:1200px){
+ .voyage{padding:0 18px 14px}
+ .voyage-timeline{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .stage-clock{font-size:calc(clamp(12px,.56vw,15px) + 1px)}
+ .stage-track{height:24px}
+ .stage-content{margin-right:16px;padding-top:0}
+ .voyage-stage:last-child .stage-content{margin-right:0}
+ .stage-heading{margin-bottom:6px!important;gap:8px}
+ .stage-heading h3{font-size:calc(clamp(16px,.72vw,19px) + 1px)}
+ .latest-label{font-size:13px}
+ .stage-description{font-size:calc(clamp(14px,.63vw,17px) + 1px);line-height:1.55;min-height:2.9em;margin-bottom:8px!important}
+ .stage-metrics dt{font-size:calc(clamp(12px,.54vw,14px) + 1px);margin-bottom:2px}
+ .stage-metrics dd{font-size:calc(clamp(16px,.78vw,21px) + 1px);line-height:1.4}
+ .stage-metrics dd small{font-size:13px}
+ .stage-secondary{font-size:calc(clamp(11px,.51vw,13px) + 1px);gap:3px 8px;line-height:1.5;margin-top:8px}
+ .stage-secondary>span{white-space:nowrap}
+ .voyage-incidents a{font-size:15px}
+}
 @media(max-width:1100px){.voyage{padding:0 16px 16px}.voyage-timeline{grid-template-columns:repeat(4,minmax(225px,1fr))}.stage-content{margin-right:20px}}
 @media(max-width:760px){.voyage-scroll{scroll-snap-type:x proximity}.voyage-timeline{grid-template-columns:repeat(4,minmax(245px,78vw));width:max-content}.voyage-stage{scroll-snap-align:start}.stage-content{margin-right:24px}}
 @media(prefers-reduced-motion:reduce){.voyage-stage,.track-line,.track-node:after,.track-line:after,.stage-track svg{animation:none}.track-node:after,.track-line:after,.voyage-motion{display:none}}

@@ -165,3 +165,34 @@ const devices=computed(()=>{
 .captain-right :deep(.captain-issues .module-header){padding-top:8px;padding-bottom:8px}
 }
 </style>
+<style scoped>
+/* Keep the overview legible at desktop fullscreen sizes without shrinking the ship panel. */
+@media(min-width:1200px){
+ .captain-right{--home-title-size:calc(clamp(20px,.86vw,24px) + 1px);--home-body-size:calc(clamp(14px,.64vw,17px) + 1px);--home-meta-size:calc(clamp(13px,.59vw,16px) + 1px)}
+ .captain-analysis :deep(.module-header){padding:10px 18px;min-height:44px}
+ .captain-analysis :deep(.module-header h3){font-size:var(--home-title-size)}
+ .analysis-window{font-size:var(--home-meta-size)}
+ .captain-right :deep(.lc-board.compact){align-self:start;max-height:none;padding:12px 18px}
+ .captain-right :deep(.lc-board h2){font-size:var(--home-title-size);line-height:1.4;margin:0}
+ .captain-right :deep(.lc-tabs){margin:4px 0 0}
+ .captain-right :deep(.lc-tabs button){font-size:var(--home-meta-size);padding:8px 0}
+ .captain-right :deep(.lc-tabs button small){font-size:14px}
+ .captain-right :deep(.lc-board-list){display:flex;flex-direction:column;flex:none}
+ .captain-right :deep(.lc-board-row){flex:none;padding:10px 0;gap:16px}
+ .captain-right :deep(.lc-board-row small){font-size:var(--home-meta-size);line-height:1.5}
+ .captain-right :deep(.lc-board-row h3){font-size:calc(clamp(18px,.8vw,21px) + 1px);line-height:1.4;margin:4px 0}
+ .captain-right :deep(.lc-board-row p){font-size:var(--home-body-size);line-height:1.5;margin:2px 0;-webkit-line-clamp:2}
+ .captain-right :deep(.lc-board-row button){font-size:var(--home-body-size)}
+ .captain-right :deep(.lc-empty){font-size:15px}
+ .captain-right :deep(.lc-board-footer){margin-top:6px;font-size:var(--home-meta-size)}
+ .captain-right :deep(.lc-board-footer button){font-size:var(--home-meta-size);padding:4px 0}
+ .captain-right :deep(.home-core-sensors .module-tools time){font-size:var(--home-meta-size)}
+}
+@media(min-width:1200px) and (max-height:900px){
+ .captain-workbench .captain-right{gap:8px}
+ .captain-right :deep(.lc-board.compact){padding:8px 16px}
+ .captain-right :deep(.lc-board-row){padding:6px 0}
+ .captain-right :deep(.lc-board-row p){-webkit-line-clamp:1}
+ .captain-right :deep(.core-sensor){padding:6px 0}
+}
+</style>

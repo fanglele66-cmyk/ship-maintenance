@@ -48,21 +48,21 @@ const sampleTimeLabel = computed(() => new Date(store.sampledAt).toLocaleTimeStr
 
 <style scoped>
 .home-core-sensors{min-width:0;background:#fff;border:1px solid #e6ebf2;border-radius:8px;overflow:hidden}
-.home-core-sensors :deep(.module-header){padding:14px 18px 12px;min-height:42px;box-sizing:border-box}
-.home-core-sensors :deep(.module-header h3){font-size:18px;color:#293646}
-.home-core-sensors :deep(.module-tools){gap:8px 16px;font-size:12px}
-.sampling-source{color:#8c806a;font-size:12px}
-.core-sensor-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;padding:0 18px 12px;gap:0 24px}
-.core-sensor{min-width:0;padding:17px 0 15px;border-top:1px solid #eceeea}
-.core-sensor dt{display:flex;flex-direction:column;gap:5px}
-.core-sensor-device{font-size:11px;color:#87938e;line-height:1.5}
-.core-sensor-name{font-size:14px;color:#52667d;line-height:1.6;overflow-wrap:anywhere}
-.core-sensor dd{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px;margin:7px 0 0;color:#263e52;line-height:1.35}
-.core-sensor-value{font-size:27px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
-.core-sensor small{font-size:12px;color:#7c8c98;font-weight:400}
+.home-core-sensors :deep(.module-header){padding:10px 18px;min-height:42px;box-sizing:border-box}
+.home-core-sensors :deep(.module-header h3){font-size:var(--home-title-size,23px);color:#293646}
+.home-core-sensors :deep(.module-tools){gap:8px 16px;font-size:15px}
+.sampling-source{color:#8c806a;font-size:15px}
+.core-sensor-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;padding:0 18px 4px;gap:0 24px}
+.core-sensor{min-width:0;padding:10px 0;border-top:1px solid #eceeea}
+.core-sensor dt{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.core-sensor-device{font-size:14px;color:#798780;line-height:1.5;white-space:nowrap}
+.core-sensor-name{font-size:17px;color:#52667d;line-height:1.5;overflow-wrap:anywhere}
+.core-sensor dd{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px;margin:3px 0 0;color:#263e52;line-height:1.25}
+.core-sensor-value{font-size:31px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.core-sensor small{font-size:15px;color:#7c8c98;font-weight:400}
 .core-sensor .reading-alert{color:#bd5c50}
-.reading-status{font-size:10px;line-height:1.6;padding:1px 5px;border-radius:3px;background:#fcf0ed;color:#b56154;align-self:center}
-@media(max-width:1400px){.core-sensor-grid{gap:0 16px}.core-sensor-value{font-size:23px}.core-sensor-name{font-size:13px}}
+.reading-status{font-size:13px;line-height:1.6;padding:1px 5px;border-radius:3px;background:#fcf0ed;color:#b56154;align-self:center}
+@media(max-width:1600px){.core-sensor-grid{gap:0 16px}.core-sensor-value{font-size:27px}.core-sensor-name{font-size:15px}.core-sensor-device{font-size:13px}}
 @media(max-width:1100px){.core-sensor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.core-sensor{padding:12px 0}}
-@media(max-width:400px){.home-core-sensors :deep(.module-tools){margin-left:0}.core-sensor-grid{gap:0 12px;padding:0 14px 10px}.core-sensor-value{font-size:22px}}
+@media(max-width:400px){.home-core-sensors :deep(.module-tools){margin-left:0}.core-sensor-grid{gap:0 12px;padding:0 14px 10px}.core-sensor-value{font-size:23px}}
 </style>
