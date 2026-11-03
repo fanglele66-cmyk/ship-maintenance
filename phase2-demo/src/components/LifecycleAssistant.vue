@@ -6,7 +6,7 @@
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>
     <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===messages.length-1,historical:i!==messages.length-1,actionLabel:''}" @stream-progress="follow"/>
-    <template v-else><strong v-if="message.title">{{message.title}}</strong><p>{{message.text}}</p><button v-if="message.reportId" type="button" @click="$emit('report',message.reportId)">查看报告</button></template><button v-if="message.shoreId" type="button" @click="$emit('shore-report',message.shoreId)">查看同步报告</button><time>{{timeText(message.at)}}</time>
+    <template v-else><strong v-if="message.title">{{message.title}}</strong><p>{{message.text}}</p><button v-if="message.reportId" type="button" @click="$emit('report',message.reportId)">查看报告</button></template><button v-if="message.shoreId" type="button" @click="$emit('shore-report',message.shoreId)">查看上报报告</button><time>{{timeText(message.at)}}</time>
    </article>
    <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>逐项结果及汇总结论已归入关联事件，可回看本次报告。</p><button type="button" @click="$emit('report',event.reports.findLast(r=>r.taskId===task.id)?.id)">查看报告</button><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>

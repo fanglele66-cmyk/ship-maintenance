@@ -1,6 +1,7 @@
 <template>
  <section class="lc-evidence">
-  <EventEvidenceSources :brief="event.brief"/>
+  <p v-if="event.timeline" class="lc-muted">本轮案例时间已统一平移，测点数值和采样间隔保持原样。以下为原始来源时间；原事件锚点 {{event.timeline.sourceAt}} 对应本轮 {{event.brief.discovery.at}}。</p>
+  <EventEvidenceSources :brief="sourceBrief"/>
   <h3>测点采样记录</h3>
   <div class="lc-evidence-table" tabindex="0" aria-label="测点采样记录">
    <table><thead><tr><th>测点</th><th>记录数值</th><th>采样时间</th></tr></thead><tbody><tr v-for="s in snapshots" :key="s.name"><th>{{s.name}}</th><td>{{s.value}} {{s.unit}}</td><td>{{s.at}}</td></tr></tbody></table>
@@ -18,6 +19,7 @@ import {workflowDossiers} from '../mock/fourStoryWorkflow'
 import EventEvidenceSources from './EventEvidenceSources.vue'
 import ObservationTrend from './ObservationTrend.vue'
 const props=defineProps({event:{type:Object,required:true}}),opened=ref(new Set())
+const sourceBrief=computed(()=>({...props.event.brief,evidenceCutoff:props.event.timeline?.sourceAt||props.event.brief.evidenceCutoff}))
 // Use the same original event window as the previous evidence page, not later repair data.
 const series=computed(()=>workflowDossiers[props.event.id]?.series||[])
 const snapshots=computed(()=>series.value.flatMap(s=>{const i=s.values.findLastIndex(Number.isFinite);return i<0?[]:[{name:s.name,value:s.values[i],unit:s.unit,at:s.labels[i]}]}))

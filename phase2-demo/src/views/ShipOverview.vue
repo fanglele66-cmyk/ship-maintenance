@@ -23,7 +23,7 @@
   <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
     <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span></ModuleHeader>
-    <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events"/>
+    <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events" :captain="lifecycle.state.role==='captain'"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
@@ -54,7 +54,7 @@ const sensorStore=useSensorStore()
 function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return point?Number(point.value).toFixed(1):'—'}
 const sampleTimeIso=computed(()=>new Date(sensorStore.sampledAt).toISOString())
 const sampleTimeLabel=computed(()=>new Date(sensorStore.sampledAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Shanghai'}))
-const chronology=computed(()=>navigationChronology(sensorStore,Math.floor(sensorStore.sampledAt/3600000)*3600000))
+const chronology=computed(()=>navigationChronology(sensorStore,sensorStore.sampledAt,{timeBase:lifecycle.state.timeBase}))
 const {width,height}=useElementSize(twinRef)
 const sceneStyle=computed(()=>{const scale=Math.max(width.value/941,height.value/1672);return {height:1672*scale+'px',width:941*scale+'px'}})
 const devices=computed(()=>{

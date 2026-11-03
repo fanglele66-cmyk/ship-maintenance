@@ -27,13 +27,15 @@ test('closed events leave the attention conclusion but keep their historical ass
   assert.match(result.basis,/已闭环/)
 })
 test('auxiliary running, standby, missing and flagged readings remain distinct',()=>{
-  const input={...setup(),deviceId:'aux-engine-3'},standby=deviceHealthAssessment(input)
-  assert.match(standby.conclusion,/3号备用/)
+  const input={...setup(),deviceId:'aux-engine-1'}
+  input.sensors.find(p=>p.id==='aux-1-rpm').value=0
+  const standby=deviceHealthAssessment(input)
+  assert.match(standby.conclusion,/辅机备用/)
   assert.match(standby.basis,/备用不代表带载正常/)
   assert.match(deviceHealthAssessment({...input,sensors:[]}).conclusion,/测点缺失/)
-  input.sensors.find(p=>p.id==='aux-3-oil-temp').status='over'
+  input.sensors.find(p=>p.id==='aux-1-oil-temp').status='over'
   assert.match(deviceHealthAssessment(input).conclusion,/异常读数待核验/)
-  for(const deviceId of ['aux-system','aux-engine-1','aux-engine-2','aux-engine-3']){
+  for(const deviceId of ['aux-system','aux-engine-1']){
     const r=deviceHealthAssessment({...setup(),deviceId})
     assert.ok([r.conclusion,r.basis,r.next].join('').length<=65,'keep compact auxiliary copy')
   }

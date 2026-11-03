@@ -9,8 +9,8 @@ export const shipInfo = {
   speed: 9.8,
   heading: 185,
   healthScore: 82,
-  onlineDevices: 10,
-  totalDevices: 10,
+  onlineDevices: 9,
+  totalDevices: 9,
   lastInspectionAt: '2026-06-26 08:00',
   cumulativeOperations: 5680
 }
@@ -36,7 +36,7 @@ export const statusColors = {
 }
 
 /**
- * 10 台设备，含系统归属和状态
+ * 9 台设备，含系统归属和状态
  */
 export const mockDevices = [
   {
@@ -52,7 +52,7 @@ export const mockDevices = [
   },
   {
     id: 'aux-engine-1',
-    name: '1号辅机',
+    name: '辅机',
     system: '辅机系统',
     status: 'normal',
     metrics: [
@@ -60,17 +60,6 @@ export const mockDevices = [
       { label: '转速', value: 1800, unit: 'rpm', status: 'normal' }
     ],
     position: { x: '50%', y: '25%' }
-  },
-  {
-    id: 'aux-engine-2',
-    name: '2号辅机',
-    system: '辅机系统',
-    status: 'warning',
-    metrics: [
-      { label: '油压', value: 0.18, unit: 'MPa', status: 'over' },
-      { label: '转速', value: 1750, unit: 'rpm', status: 'normal' }
-    ],
-    position: { x: '45%', y: '20%' }
   },
   {
     id: 'cooling-pump-1',

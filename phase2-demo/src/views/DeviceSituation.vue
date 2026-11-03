@@ -1,6 +1,6 @@
 <template>
   <div class="p2-device-page device-situation">
-    <div class="p2-device-head"><BackButton label="返回船舶态势" @click="$emit('back')"/><div class="device-heading"><span class="p2-eyebrow">设备态势</span><h2>{{ deviceName }}</h2></div><FormSelect v-if="deviceId==='aux-system'||deviceId.startsWith('aux-engine-')" :model-value="deviceId" :options="auxiliaryOptions" placeholder="" aria-label="选择辅机" @update:model-value="$emit('select-device',$event)"/><div v-if="isMainEngine" class="p2-device-status"><span><i></i>航行中</span></div></div>
+    <div class="p2-device-head"><BackButton label="返回船舶态势" @click="$emit('back')"/><div class="device-heading"><span class="p2-eyebrow">设备态势</span><h2>{{ deviceName }}</h2></div><div v-if="isMainEngine" class="p2-device-status"><span><i></i>航行中</span></div></div>
     <div class="p2-tab-row" role="tablist" aria-label="设备层内容"><button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab===tab.id" :class="{active:activeTab===tab.id}" @click="activeTab=tab.id">{{ tab.label }}</button></div>
     <div ref="deviceScroll" class="p2-device-scroll" :class="{'device-data-content':activeTab==='data'}">
       <template v-if="activeTab==='data'"><slot name="data"/></template>
@@ -23,7 +23,6 @@ import {useEventLifecycleStore} from '@/stores/eventLifecycleStore'
 import {overviewSensorReadings} from '@/mock/sensorLayout.js'
 import {resolveIssueNavigation} from '@/mock/issueRelationships'
 import BackButton from '@/components/BackButton.vue'
-import FormSelect from '@/components/forms/FormSelect.vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import SensorBoard from '@/components/SensorBoard.vue'
 const props=defineProps({deviceName:{type:String,default:'主机'},deviceId:{type:String,default:'main-engine-1'}})
@@ -32,9 +31,8 @@ const router=useRouter(),store=usePhase2DemoStore(),sensorStore=useSensorStore()
 const tabs=[{id:'overview',label:'健康概览'},{id:'data',label:'传感器数据'}]
 const activeTab=ref('overview'),deviceScroll=ref(null)
 const isMainEngine=computed(()=>props.deviceId==='main-engine-1')
-const auxiliaryOptions=[{value:'aux-system',label:'辅机整体'},{value:'aux-engine-1',label:'1号辅机'},{value:'aux-engine-2',label:'2号辅机'},{value:'aux-engine-3',label:'3号辅机'}]
 const lifecycle=useEventLifecycleStore()
-const healthAssessment=computed(()=>deviceHealthAssessment({deviceId:props.deviceId,sensors:sensorStore.allSensors,events:Object.values(lifecycle.state.events),period:navigationChronology(sensorStore,sensorStore.sampledAt).periods.at(-1)}))
+const healthAssessment=computed(()=>deviceHealthAssessment({deviceId:props.deviceId,sensors:sensorStore.allSensors,events:Object.values(lifecycle.state.events),period:navigationChronology(sensorStore,sensorStore.sampledAt,{timeBase:lifecycle.state.timeBase}).periods.at(-1)}))
 const runningAssessment=computed(()=>({...healthAssessment.value,recommendation:healthAssessment.value.next,completedAt:new Date(sensorStore.sampledAt).toLocaleTimeString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'}),dataCutoff:'当前测点与航行回放；事件使用各自历史窗口',conditions:healthAssessment.value.context,coverage:'不以当前读数替代历史核实',sections:[{title:'后续判断',paragraphs:['以现场核实与独立测量确认原因；任务提交、事件闭环和设备恢复分别判断，观察同时核对数据覆盖与可比工况。']}]}))
 
 const assessmentConclusion=computed(()=>overviewCopy(healthAssessment.value.conclusion))

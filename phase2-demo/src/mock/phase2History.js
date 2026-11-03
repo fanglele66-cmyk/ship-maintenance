@@ -26,18 +26,7 @@ export function deviceHistory(store){
  for(const [id,entries] of Object.entries(store.assignmentRecords))entries.forEach((entry,index)=>records.push({id:'assignment-'+id+'-'+index,type:isMaintenanceWorkflow(id)?'maintenance':'event',parentIssueId:parentIssueId(id),taskId:id,...timestamp(entry.at),target:parentIssueId(id),title:store.cases[id].initialTitle+' · 任务指派',status:'已指派',source:entry.assignedBy,summary:entry.owner+' · '+entry.type,conclusion:entry.scope,recommendation:'计划：'+entry.due,sections:[{title:'人员与本次要求',paragraphs:[entry.assignedBy+'指定'+entry.owner,entry.scope,'计划：'+entry.due]}]}))
  const review=operationAssessment(store)
  records.push({id:'review-today',type:'review',...timestamp(review.completedAt),title:'主机每日健康回顾',status:'可回查报告',source:'AI设备健康分析',summary:review.conclusion,conclusion:review.conclusion,recommendation:review.recommendation,sections:review.sections})
- for(const deviceId of ['aux-engine-1','aux-engine-2','aux-engine-3']){
-  if(deviceId==='aux-engine-2'){
-   const byDate=new Map((store.dailyHealthReports||[]).map(entry=>[entry.date,entry]))
-   for(const entry of byDate.values()){
-    const report=entry.report
-    records.push({id:'review-aux-engine-2-'+entry.date,type:'review',deviceId,...timestamp(entry.at),title:'2号辅机每日健康回顾',status:'按日留存报告',source:'AI设备健康分析',summary:report.conclusion,conclusion:report.conclusion,recommendation:report.next,sections:[{title:'当日分析依据',paragraphs:[report.basis]},{title:'当日边界与下一步',paragraphs:[report.next,'该报告保留当日已取得的材料；后续节点另日留存，不回写成当日已知。']}]})
-   }
-   if(byDate.size)continue
-  }
-  const report=deviceStoryAssessment(store,deviceId),state=deviceId==='aux-engine-2'?store.healthUpdates?.['aux2-health']:null
-  const at=state?.laterNodes?.at(-1)?.at||'2026-10-15 08:00'
-  records.push({id:'review-'+deviceId,type:'review',deviceId,...timestamp(at),title:deviceId.replace('aux-engine-','')+'号辅机每日健康回顾',status:'可回查报告',source:'AI设备健康分析',summary:report.conclusion,conclusion:report.conclusion,recommendation:report.next,sections:[{title:'变化与分析依据',paragraphs:[report.basis]},{title:'判断边界与后续',paragraphs:[deviceId==='aux-engine-3'?'备用试运行只覆盖所记录负荷与时长，不代表所有负荷的能力。':deviceId==='aux-engine-2'?'现场核实、长期趋势与实际维护分别留痕。温度偏移不能转换为寿命损失，作业完成不能代替持续改善。':'已覆盖片段无持续变化不等于所有部位已验证。',report.next]}]})
- }
+ const deviceId='aux-engine-1',report=deviceStoryAssessment(store,deviceId)
+ records.push({id:'review-'+deviceId,type:'review',deviceId,...timestamp('2026-10-15 08:00'),title:'辅机每日健康回顾',status:'可回查报告',source:'AI设备健康分析',summary:report.conclusion,conclusion:report.conclusion,recommendation:report.next,sections:[{title:'变化与分析依据',paragraphs:[report.basis]},{title:'判断边界与后续',paragraphs:['已覆盖片段无持续变化不等于所有部位已验证。',report.next]}]})
  return records.sort((a,b)=>(b.date+' '+b.time).localeCompare(a.date+' '+a.time))
 }

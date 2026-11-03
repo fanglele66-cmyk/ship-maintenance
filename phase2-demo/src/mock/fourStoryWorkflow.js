@@ -216,13 +216,5 @@ export function deviceStoryAssessment(store,deviceId){
     const warning=store.completedTasks?.['main-warning']?'润滑预警已有本次结束决定，依据保留。':store.todoCreated['main-warning']?'润滑供油预警已派发，查看核实结果及当前原因排查。':'润滑供油压力下降伴过滤段压损增加，需及时核实当前供油变化。'
     return {conclusion:`主机的当前运行问题应与长期健康线索分开理解。${cooling}${warning}目前没有证据把两项变化归为共同根因；原3号缸排温仅保留为健康线索。`,basis:'冷却资料记录淡水出口92.4°C与海水支路68.2 m³/h，是跨回路关联；润滑资料记录滤后0.31→0.24 MPa、上游0.34→0.31 MPa，压差0.03→0.07 MPa由同刻压力计算，不能重复视为独立证明。各记录按自身发生时间与已提交现场反馈解读；温度、趋势或作业完成都不能直接证明具体部件损坏或持续恢复。',next:store.todoCreated.fault?'查看原冷却任务的实际发现与验证，同时跟进润滑预警的现场核实；已有事项不重复派发。轴承提前评估与主机3号缸健康记录分别保留。':'先了解冷却报警的当前影响及排查范围，并安排润滑预警的及时核实；两项都需要按实际现场情况决定处置，不能等一种问题完成后才了解另一种。'}
   }
-  if(['aux-system','aux-engine-1','aux-engine-2','aux-engine-3'].includes(deviceId))return {conclusion:'本设备暂无本轮待处理事项。',basis:'可查看设备测点、运行资料与既有处理记录。',next:'按实际设备资料和原计划查看运行状态。'}
-  if(deviceId==='aux-system')return {conclusion:'辅机侧的主要变化集中在2号机，现有记录未显示为三台机组的共同问题。1、2号运行，3号备用；运行评价与备用可用性不能共用一段结论。',basis:'1号已覆盖的运行片段没有持续扩大变化；2号3号缸在负荷65%—67%、约750 rpm下从404升至409°C，其他缸约399—400°C。3号最近只有约30%负荷、30分钟试运行记录，不能代表更高负荷或更长运行能力。',next:'先查看2号机的长期变化及当前核实进展，再按各机资料了解情况。1号维持原记录，3号按备用分工核对试运行资料。'}
-  if(deviceId==='aux-engine-2'){
-    const state=store.healthUpdates?.['aux2-health'],later=state?.laterNodes?.at(-1),assessment=store.checkAssessments?.['aux-health']
-    const execution=store.executionRecords?.['aux-maintenance']?.at(-1),observation=store.observationRecords?.['aux-maintenance']?.at(-1)
-    const conclusion=execution?`本轮相关检查与实际措施已有人员记录。${execution.values.measures} ${execution.values.verification==='unresolved'?'原问题仍存在，继续解释原因。':observation?.values?`最新可比片段3号缸${observation.values[0]}°C、其他缸中位数${observation.values[1]}°C，需结合覆盖范围评价持续效果。`:'持续效果尚需可比运行记录验证。'}`:later?`${later.values}。${later.judgement}`:state?.taskComplete?'本次现场核实已结束，原3号缸排温健康记录继续；核实完成不等于部件故障已确定或健康已经恢复。':'3号缸在可比负荷下持续高于本机历史，偏移从+4°C扩大到+9°C。需要补齐现场信息，暂不据此安排拆机或换件。'
-    return {conclusion,basis:`本机历史参考400°C，9月28日／10月2日／10月14日为404／406／409°C，其他缸中位数399／400／400°C；负荷65%—67%、约750 rpm、增压空气39—40°C。温度与偏移共享来源，不能重复计为独立证明。${assessment?' 已提交的现场分析：'+assessment.message:' 测点校验及完整燃油／维护背景尚待补充，同源显示相符不能视为校准。'}`,next:execution?'回查实际检查与措施，对照原排温记录评价效果；未做的季度项目保留。':state?.recommendationId?'查看累积趋势、已补反馈与原季度项目为何支持提前评估；具体检查决定是否维护，不预定换件。':state?.taskComplete?'继续比较同口径趋势，没有新信息需求时不重复派单；偏移稳定不等于恢复，持续发展再结合相关计划评估。':store.todoCreated['aux-health']?'沿原核实待办补充实际读数与背景，完成本次信息补充后原趋势继续。':'查看3号缸偏移的分析与核实范围，决定是否安排当班人员补充信息。'}
-  }
-  return deviceId==='aux-engine-1'?{conclusion:'已覆盖的运行片段未见持续扩大变化，目前没有需要轮机长决策的新事项。单次轻微偏移仍保留原记录，不据此推断健康衰减。',basis:'1号运行约750 rpm、近期负荷61%—64%。曾有一个相近条件片段高于本机历史约3°C，后续尚无支持持续发展的证据；没有事项不等于所有部位已验证。',next:'继续比较可比窗口；若变化再次出现并持续，再评价是否需要现场信息。维持原计划，可回查传感器和已有记录。'}:{conclusion:'3号辅机当前备用，现有资料支持最近一次试运行完成，不能据此宣称所有负荷下能力均已验证。',basis:'10月10日记录覆盖启动、建压与约30%负荷下30分钟试运行，未记录异常；尚无更高负荷及更长时间的资料。备用转速0属于状态背景，不作为运行健康证据。',next:'下一次切换准备时按原计划核对试运行与当班记录；如需承担更高负荷，先核对相应试运行资料。'}
+  return {conclusion:'本设备暂无本轮待处理事项。',basis:'可查看设备测点、运行资料与既有处理记录。',next:'按实际设备资料和原计划查看运行状态。'}
 }

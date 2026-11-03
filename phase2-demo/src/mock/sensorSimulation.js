@@ -16,8 +16,6 @@ export const navigationSimulationProfile={speed:9.8,amplitude:0.12,timeScale:4}
 export const simulationProfiles = {
  'main-engine-1':{type:'慢速二冲程主机',operating:true,rpm:95},
  'aux-engine-1':{type:'辅机发电机组',operating:true,rpm:750},
- 'aux-engine-2':{type:'辅机发电机组',operating:true,rpm:750},
- 'aux-engine-3':{type:'辅机发电机组',operating:false,rpm:0},
 }
 // Base, amplitude, precision and alarm/reference range can be changed per point.
 export const simulationOverrides = {
@@ -79,10 +77,10 @@ export function buildSimulationSensors(existing){
   ['oil-temp','滑油温度','Lubricating oil temperature','滑油系统','°C',65,0.3,'55-75'],
   ['oil-press','滑油压力','Lubricating oil pressure','滑油系统','MPa',0.45,0.005,'0.3-0.6'],
  ]
- for(let n=1;n<=3;n++)for(const [key,nameCn,nameEn,subsystem,unit,base,amplitude,range] of points){
+ for(let n=1;n<=1;n++)for(const [key,nameCn,nameEn,subsystem,unit,base,amplitude,range] of points){
   const profile=simulationProfiles[`aux-engine-${n}`],standby=!profile.operating
   const value=standby?({rpm:0,load:0,exhaust:34,water:60,'oil-temp':40,'oil-press':0.04}[key]):(key==='rpm'?profile.rpm:base)+(key==='load'?(n===1?-4:4):key==='exhaust'?(n===1?-6:6):0)
-  main.push({id:`aux-${n}-${key}`,nameCn:`${n}号辅机${nameCn}`,nameEn:`DG${n} ${nameEn}`,device:`${n}号辅机`,deviceId:`aux-engine-${n}`,system:'辅机系统',subsystem,unit,value,amplitude:standby?(key==='rpm'||key==='load'?0:amplitude*0.25):amplitude,precision:unit==='MPa'?3:1,range:standby?undefined:range,status:'normal',operating:!standby})
+  main.push({id:`aux-${n}-${key}`,nameCn:`辅机${nameCn}`,nameEn:`DG ${nameEn}`,device:'辅机',deviceId:`aux-engine-${n}`,system:'辅机系统',subsystem,unit,value,amplitude:standby?(key==='rpm'||key==='load'?0:amplitude*0.25):amplitude,precision:unit==='MPa'?3:1,range:standby?undefined:range,status:'normal',operating:!standby})
  }
  return main
 }

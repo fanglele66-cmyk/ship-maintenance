@@ -23,8 +23,8 @@ import * as echarts from 'echarts'
 import { scenarioSensors } from '@/mock/phase2Content'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import {taskObservationData,taskObservationWindow,taskObservationRanges,normalizeObservationHours,observationTime,formatObservationTime} from '@/mock/taskObservationData'
-const props=defineProps({scenario:{type:String,required:true},stage:{type:String,default:'event'}})
-const store=usePhase2DemoStore(),historical=computed(()=>taskObservationData(props.scenario))
+const props=defineProps({scenario:{type:String,required:true},stage:{type:String,default:'event'},timeline:{type:Object,default:null}})
+const store=usePhase2DemoStore(),historical=computed(()=>taskObservationData(props.scenario,props.timeline))
 const sensors=computed(()=>historical.value?.sensors||scenarioSensors(props.scenario,props.stage))
 const saved=store.dataViews[props.scenario]||{}
 const page=ref(saved.page||0),multi=ref(Boolean(saved.multi)),selected=ref(saved.selected||[sensors.value[0]?.id]),hours=ref(normalizeObservationHours(saved.hours))

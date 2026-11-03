@@ -48,8 +48,8 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     return storyJournal.at(-1)
   }
   function captureHealthSnapshot(at='2026-10-15 08:00'){
-    const report=deviceStoryAssessment({healthUpdates,checkAssessments,executionRecords,observationRecords,todoCreated,assignments,completedTasks,isTaskHandled},'aux-engine-2')
-    dailyHealthReports.push({id:'health-review-'+(dailyHealthReports.length+1),deviceId:'aux-engine-2',date:at.slice(0,10),at,report:JSON.parse(JSON.stringify(report))})
+    const report=deviceStoryAssessment({healthUpdates,checkAssessments,executionRecords,observationRecords,todoCreated,assignments,completedTasks,isTaskHandled},'aux-engine-1')
+    dailyHealthReports.push({id:'health-review-'+(dailyHealthReports.length+1),deviceId:'aux-engine-1',date:at.slice(0,10),at,report:JSON.parse(JSON.stringify(report))})
   }
   const selectedAttentionId = ref('maintenance')
   const selectedTodoId = ref(null)

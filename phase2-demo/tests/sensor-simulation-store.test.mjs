@@ -16,7 +16,7 @@ test('one shared 30s timer, pause/resume, scenario baselines and auxiliary filte
   now+=30000;callback()
   assert.equal(store.sampledAt,now)
   assert.ok(store.allSensors.some((s,i)=>s.value!==before[i]),'sampling advances even when RPM or pressure holds its last displayed level')
-  store.setDevice('aux-system');assert.equal(store.filteredSensors.length,18)
+  store.setDevice('aux-system');assert.equal(store.filteredSensors.length,6)
   store.setSimulationBaselines({'s-007':{value:79.1}})
   now+=30000;callback();assert.ok(store.allSensors.find(s=>s.id==='s-007').value<80)
   const latest=store.allSensors.find(s=>s.id==='s-012').value

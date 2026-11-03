@@ -1,3 +1,4 @@
+import {shoreReportEntries} from '../workflow/shoreReports.js'
 import {lifecycleModelContext} from '../workflow/lifecycleModelContext.js'
 import {capabilities,actor,ownsTask} from '../workflow/lifecyclePermissions.js'
 import {resumeOwnTask} from '../workflow/eventLifecycle.js'
@@ -16,11 +17,13 @@ import {lifecycleWorkItems,lifecycleNotifications,canViewTask,taskConversation,t
 import {generateTaskReport,recoverTaskReportGeneration} from '../workflow/taskReportGeneration.js'
 import {observationTaskFor} from '../workflow/observationContext.js'
 import {suggestionAction} from '../workflow/lifecycleDecisions.js'
-const storageKey='engine-room-captain-workflow-v1',roleKey='engine-room-current-role'
+import {loadLifecycleState,lifecycleSnapshot,lifecycleStorageKey as storageKey} from '../workflow/demoTimeline.js'
+const roleKey='engine-room-current-role'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let reportSession=crypto.randomUUID();try{reportSession=sessionStorage.getItem('engine-room-report-session')||reportSession;sessionStorage.setItem('engine-room-report-session',reportSession)}catch{}
- let initial=createLifecycleState()
- try{const saved=JSON.parse(localStorage.getItem(storageKey));if(saved?.version===1&&Object.keys(initial.events).every(id=>saved.events?.[id]))initial=saved;const role=sessionStorage.getItem(roleKey);if(Boolean(capabilities[role]))initial.role=role}catch{}
+ let storage;try{storage=localStorage}catch{}
+ let initial=loadLifecycleState(storage,createLifecycleState)
+ try{const role=sessionStorage.getItem(roleKey);if(Boolean(capabilities[role]))initial.role=role}catch{}
  refreshLifecyclePresentation(initial)
  recoverTaskReportGeneration(initial,reportSession)
  for(const event of Object.values(initial.events))for(const messages of Object.values(event.conversations))for(const message of messages)if(message.status==='streaming'){
@@ -32,7 +35,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  const state=reactive(initial)
  const sensors=useSensorStore(),syncObservations=()=>syncLifecycleObservations(state,sensors,Date.now(),{demo:true})
  watch(()=>sensors.sampledAt,syncObservations,{immediate:true})
- const snapshot=()=>JSON.stringify({version:1,events:state.events,notices:state.notices})
+ const snapshot=()=>lifecycleSnapshot(state)
  let lastStored=snapshot()
  watch(()=>[state.events,state.notices],()=>{const value=snapshot();if(value!==lastStored)try{lastStored=value;localStorage.setItem(storageKey,value)}catch{}},{deep:true})
  // Each browser tab keeps its role; only shared workflow data crosses tabs.
@@ -40,9 +43,11 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   if(event.key!==storageKey||!event.newValue)return
   try{const incoming=JSON.parse(event.newValue);if(incoming.version!==1||!Object.keys(state.events).every(id=>incoming.events?.[id]))return
    refreshLifecyclePresentation(incoming)
-   lastStored=JSON.stringify({version:1,events:incoming.events,notices:incoming.notices||[]});state.events=incoming.events;state.notices=incoming.notices||[]
+   incoming.timeBase=Number.isFinite(incoming.timeBase)?incoming.timeBase:state.timeBase
+   lastStored=lifecycleSnapshot(incoming);state.timeBase=incoming.timeBase;state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
  })
+ const shoreReports=computed(()=>shoreReportEntries(state))
  const events=computed(()=>visibleEvents(state)),pending=computed(()=>events.value.filter(pendingDecision)),tasks=computed(()=>events.value.filter(e=>activeTask(e))),reports=computed(()=>events.value.flatMap(e=>e.reports.filter(r=>!r.linkedSource)).sort((a,b)=>b.at.localeCompare(a.at)))
  const workItems=computed(()=>lifecycleWorkItems(state)),notifications=computed(()=>lifecycleNotifications(state))
  const unread=computed(()=>workItems.value.pending.length)
@@ -150,5 +155,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.[state.role]:event?.conversations[state.role])?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
  async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
- return {resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
+ return {resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

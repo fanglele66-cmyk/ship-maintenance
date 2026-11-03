@@ -14,6 +14,7 @@ import {hasObservation,observationStart,observationTaskFor,isVerificationObserva
 import {taskExecution,executionFacts,carryForwardSteps} from './taskExecution.js'
 import {createObservationEvent,migrateObservationEvents,observationTasks,observationChain,isObservationEvent} from './observationEvents.js'
 import {shoreReportSnapshot} from './shoreReports.js'
+import {applyInitialTimeline,shiftTimelineContent} from './demoTimeline.js'
 export {hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
 
 import {people,capabilities,actor,ownsTask,executors} from './lifecyclePermissions.js'
@@ -42,13 +43,14 @@ function notify(state,event,recipient,title,text){
 }
 function advice(event,role,analysis,recommendation,at){
  const message=say(event,role,'advice','',{analysis,recommendation,animate:!at,...(at?{at}: {})})
- message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=3;message.basisLabel='分析过程与依据'
+ message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=event.timeline?4:3;message.basisLabel='分析过程与依据'
  return message
 }
 function phase(event,kind,label,extra={}){const p={id:uid(kind),kind,label:label||stageNames[kind],at:new Date().toISOString(),...extra};event.phases.push(p);event.phase=kind;return p}
-export function createLifecycleState(){
+export function createLifecycleState({timeBase}={}){
  const events=Object.fromEntries(workflowIssues.filter(item=>!item.latent).map(item=>[item.id,newEvent(item,{createdAt:eventBriefingFor(item.id)?.discovery.at})]))
- for(const e of Object.values(events))advice(e,'captain',e.brief.conclusion,'请核对提醒依据，指定排查负责人和完成时限；有明确依据时可登记误报。',e.brief.discovery.at)
+ for(const e of Object.values(events))applyInitialTimeline(e,timeBase)
+ for(const e of Object.values(events))advice(e,'captain',e.brief.conclusion,'请核对提醒依据，指定排查负责人和完成时限；有明确依据时可登记误报。',e.timeline?new Date(Date.parse(e.createdAt)+5*60000).toISOString():e.brief.discovery.at)
  // Retain the complete earlier C4 investigation, including its handoff report.
  const e=events['real-health-c4-baseline'],prior=trackingProcessReference(e.id)
  if(prior){
@@ -64,7 +66,7 @@ export function createLifecycleState(){
   advice(e,'captain',prior.summary,'请补充排查独立测温与历史调整依据，或明确范围后关联维保单。',task.submittedAt)
   e.phases.push({id:uid('decision'),kind:'decision',label:'排查后决策',at:task.submittedAt,taskId:task.id,reportId:report.id});e.phase='decision';e.status='待决策'
  }
- return {version:1,role:'captain',events,notices:[]}
+ return {version:1,role:'captain',...(Number.isFinite(timeBase)?{timeBase}:{}),events,notices:[]}
 }
 export function currentTask(event){return event.tasks.find(t=>t.id===event.currentTask)}
 export function pendingDecision(event){if(currentTask(event)?.waiting?.reviewRequested)return true;return ['reminder','decision','review'].includes(event.phase)&&!event.phases.at(-1)?.observationWaiting&&currentTask(event)?.status!=='waiting'}
@@ -75,7 +77,7 @@ export const decisionOptions=lifecycleDecisionOptions
 export function ensureTaskPlan(event){
  const action=dispatchAction(event);if(!action)return null
  const report=event.reports.at(-1),prior=currentTask(event)||event.observationSource?.task
- const steps=action==='investigate'?checkSteps(event.sourceEventId||event.id):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
+ const steps=action==='investigate'?shiftTimelineContent(checkSteps(event.sourceEventId||event.id),event.timeline):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
  const scope=action==='recheck'?`依据${report?.title||'本轮报告'}，${isVerificationReview(event)?'核对已查范围、观察中变化是否持续、扩大、恢复或复发；本轮未实施维修，不预设故障原因':'复核实际维修措施、剩余事项、修后数据和原异常是否再现'}，提交现场复查结果。`:action==='investigate'?event.brief.dispatchReason:`依据${report?.title||'现场记录'}，处理本轮登记的异常：${prior?.records.filter(r=>/发现异常|读数不一致|偏离仍存在/.test(r.result)).map(r=>r.label).join('、')||'已批准部位'}。保留实际措施、隔离与复测记录。`
  const draft=ensurePlanDraft(event,{steps,scope,procedureVersion:repairProcedureVersion,rationale:report?`依据《${report.title}》：${report.summary}`:event.brief.conclusion})
  if(action==='maintenance'){
@@ -142,7 +144,7 @@ export function refreshLifecyclePresentation(state){
    }
   }
   for(const report of event.reports)if(report.kind==='闭环报告'&&!report.confirmedDraft&&report.presentationVersion!==closurePresentationVersion){const decision=event.decisions.findLast(d=>['close','false'].includes(d.action));Object.assign(report,makeClosureReport(event,decision?.action||'close',report.summary,report.at,report.id))}
-  for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==3){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=3;message.basisLabel='分析过程与依据'}
+  for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==(event.timeline?4:3)){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=event.timeline?4:3;message.basisLabel='分析过程与依据'}
  }
  migrateObservationEvents(state)
  // Apply the same rule to saved observations closed before chain closure existed.
@@ -199,7 +201,7 @@ export function decide(state,id,form){
  // Dispatch uses the reviewed task plan. Observation uses its structured plan;
  // neither requires a second narrative or a model-generated decision prefill.
  form={...form,reason:form.reason?.trim()||''}
- if(!['investigate','repair','maintenance','recheck','observe'].includes(action))required(form.reason,'请填写决定依据或本次安排。')
+ if(!['investigate','repair','maintenance','recheck','observe'].includes(action)&&!(action==='shore'&&form.shoreIncludeHistory))required(form.reason,'请填写决定依据或本次安排。')
  validateDecisionEvidence(e,form)
  const observationPlan=action==='observe'?validateObservationPlan({...observationPlanDraft(e),...form.observationPlan,purpose:form.reason||'依据已提交报告，核对相关变化是否持续、恢复或复发。'}):null
  if(observationPlan&&!form.reason)form.reason=`安排效果观察，计划 ${timeText(observationPlan.dueAt)} 汇报。`
@@ -279,9 +281,9 @@ export function decide(state,id,form){
   advice(e,'captain',`本轮由系统继续观察，下一次汇总时间为 ${timeText(dueAt)}。`,'观察期间没有新的人员执行任务；本阶段结束后再提醒您审阅结果。')
   }
  }else if(action==='shore'){
-  const syncedReport=shoreReportSnapshot(e,form)
-  const record={id:uid('shore'),at,reason:form.reason,reportId:syncedReport.id,syncedReport,status:'本地保存，未发送',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,brief:e.brief,tasks:e.tasks,reports:[syncedReport],decisions:e.decisions,at})};e.shore.push(record)
-  say(e,'captain','user','同步岸基：'+syncedReport.title+'。'+form.reason,{shoreId:record.id});advice(e,'captain','上报摘要已保存在本地记录，尚未发送岸端。',e.phase==='closed'?'当前状态为本地保存、尚未发送，事件保持已闭环，闭环报告与处置记录已保留。':'当前状态为本地保存、尚未发送，可继续处理船上任务。')
+  const syncedReport={...shoreReportSnapshot(e,form,state),at,owner:actor(state)}
+  const record={id:uid('shore'),at,owner:actor(state),reason:form.reason,reportId:syncedReport.id,syncedReport,status:'本地保存，未发送',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,reports:[syncedReport],at})};e.shore.push(record)
+  say(e,'captain','user','上报岸基：'+syncedReport.title+'。'+form.reason,{shoreId:record.id});advice(e,'captain','上报报告已保存在本事件的“上报岸基报告”页签，尚未发送岸基。',e.phase==='closed'?'当前状态为本地保存、尚未发送，事件保持已闭环，闭环报告与处置记录已保留。':'当前状态为本地保存、尚未发送，可继续处理船上任务。')
  }else{
   for(const prior of observationTasks(e))if(prior.status==='submitted'&&hasObservation(prior)&&!prior.observationEndedAt)prior.observationEndedAt=at
   for(const prior of e.tasks){

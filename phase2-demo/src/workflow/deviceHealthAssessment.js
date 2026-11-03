@@ -1,3 +1,4 @@
+import {shiftTimelineContent} from './demoTimeline.js'
 import {eventAssessmentContext} from './eventAssessmentContext.js'
 
 const value=(points,id,unit)=>{
@@ -19,13 +20,13 @@ export function deviceHealthAssessment({deviceId,sensors=[],events=[],period}){
     return {
       conclusion:open.length?`需关注${names.join('、')}。${sailing}，主机${value(sensors,'s-012','rpm')}、负荷${value(sensors,'main-load','%')}；当前读数不能撤销历史事件。`:`当前无待处置事件。${sailing}，主机${value(sensors,'s-012','rpm')}、负荷${value(sensors,'main-load','%')}；已闭环记录仍保留。`,
       next:invalid?`${invalid}个测点数据缺失，先补齐工况与测点依据。`:flagged?`${flagged}个测点提示越限或预警，先对齐当前工况核验；事件按本轮状态继续处置。`:'报警、预警先核查现场；长期基线结合月度工况与独立校验决定后续。',
-      basis:related.map(e=>{const c=eventAssessmentContext[e.sourceEventId||e.id];return `**${e.title} · ${e.status}**\n\n${c?c.navigation+' '+c.conditions:'发生时工况与证据尚待补齐。'}`}).join('\n\n')||'当前无关联事件，继续核对运行测点与设备记录。',
+      basis:related.map(e=>{const c=shiftTimelineContent(eventAssessmentContext[e.sourceEventId||e.id],e.timeline);return `**${e.title} · ${e.status}**\n\n${c?c.navigation+' '+c.conditions:'发生时工况与证据尚待补齐。'}`}).join('\n\n')||'当前无关联事件，继续核对运行测点与设备记录。',
       context:`当前：${navigation} · 历史事件按各自发生窗口核对`,
     }
   }
-  const number=deviceId.split('-').at(-1),rpm=points.find(p=>p.unit==='rpm')
+  const number='1',rpm=points.find(p=>p.unit==='rpm')
   const operating=Number.isFinite(rpm?.value)?rpm.value>0:null
-  const modes=group?[1,2,3].map(n=>{const p=points.find(p=>p.id===`aux-${n}-rpm`);return `${n}号${!Number.isFinite(p?.value)?'待核对':p.value>0?'运行':'备用'}`}).join('、'):`${number}号${operating===null?'状态待核对':operating?'运行':'备用'}`
+  const modes=`辅机${operating===null?'状态待核对':operating?'运行':'备用'}`
   return {
     conclusion:`${open.length?`${open.length}项事件待处置`:invalid?'数据待补齐':flagged?'异常读数待核验':'无待处置事件'}；${navigation}，${modes}。`,
     basis:group?`转速、负荷、排温及冷却／滑油${invalid?`有${invalid}点缺失`:flagged?`有${flagged}点提示异常`:'暂无越限提示'}。`:`${value(points,`aux-${number}-rpm`,'rpm')}、${value(points,`aux-${number}-load`,'%')}负荷；${operating===false?'备用不代表带载正常':operating===null?'运行状态待核对':'排温与冷却／滑油联判'}。`,

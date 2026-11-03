@@ -11,12 +11,12 @@ test('navigation speed stays near 9.8kn and changes more slowly than engine meas
  assert.ok(values.slice(1).every((v,n)=>Math.abs(v-values[n])<=0.101))
  assert.equal(sensors.find(s=>s.id==='main-load').value,70)
 })
-test('slow-speed engine and three auxiliary groups have plausible configured modes',()=>{
+test('slow-speed engine and single auxiliary have plausible configured modes',()=>{
  const rpm=sensors.find(s=>s.id==='s-012')
  for(let n=0;n<120;n++)assert.ok(simulationValue(rpm,at+n*30000)>=93.5&&simulationValue(rpm,at+n*30000)<=96.5)
- assert.equal(sensors.filter(s=>s.deviceId.startsWith('aux-engine-')).length,18)
- assert.equal(simulationValue(sensors.find(s=>s.id==='aux-3-rpm'),at),0)
- assert.equal(simulationValue(sensors.find(s=>s.id==='aux-3-load'),at),0)
+ assert.equal(sensors.filter(s=>s.deviceId.startsWith('aux-engine-')).length,6)
+ assert.deepEqual([...new Set(sensors.filter(s=>s.deviceId.startsWith('aux-engine-')).map(s=>s.deviceId))],['aux-engine-1'])
+ assert.ok(sensors.filter(s=>s.deviceId==='aux-engine-1').every(s=>!/[123]号辅机/.test(s.nameCn)))
  assert.equal(mockSensors.find(s=>s.id==='s-012').value,450,'existing scenario fixtures are not mutated')
 })
 test('30-second samples vary smoothly, remain bounded and respect precision',()=>{

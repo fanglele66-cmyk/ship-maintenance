@@ -26,7 +26,6 @@ button,input,select,textarea{font-family:inherit}
 .app-container.app-container .nav-label{font-family:var(--type-family);font-size:var(--type-caption)}
 .app-container.app-container .captain-right{min-width:0;width:100%;grid-template-columns:minmax(0,1fr);overflow:auto}
 .app-container.app-container .captain-right>section,.app-container.app-container .captain-right>div{min-width:0;max-width:100%}
-.app-container.app-container .voyage-timeline{grid-template-columns:repeat(4,minmax(320px,1fr))}
 .app-container.app-container .stage-metrics dd{white-space:normal}
 .app-container.app-container .lc-board-row>div{flex:1;min-width:0}
 .app-container.app-container .stage-clock,.app-container.app-container .stage-heading small,.app-container.app-container .stage-secondary,.app-container.app-container .stage-position,.app-container.app-container .stage-metrics dt,.app-container.app-container .stage-metrics dd small{font-size:var(--type-caption)}

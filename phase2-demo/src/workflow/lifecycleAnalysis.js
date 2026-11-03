@@ -1,3 +1,4 @@
+import {shiftTimelineContent} from './demoTimeline.js'
 import {taskExecution} from './taskExecution.js'
 // User-facing evidence summaries. These describe source records and submitted
 // findings; they do not claim access to hidden model reasoning or new readings.
@@ -65,7 +66,7 @@ export function trackingAssessment(event,task){
  }
 }
 export function reportAnalysis(event,task){
- const c=context[event.sourceEventId||event.id],f=findings(task),isCheck=task.kind==='investigation',text=evidenceText(task),tracking=trackingAssessment(event,task)
+ const c=shiftTimelineContent(context[event.sourceEventId||event.id],event.timeline),f=findings(task),isCheck=task.kind==='investigation',text=evidenceText(task),tracking=trackingAssessment(event,task)
  const scope=isCheck
   ? (tracking?tracking.scope:f.abnormal.length?`现场结果中 ${f.abnormal.length} 项登记异常或持续偏离：${f.abnormal.map(r=>r.label+'（'+r.result+'）').join('；')}。`:'本轮检查尚未定位原报警／预警的具体原因；需对照已查项目、报警是否再现及剩余线索判断下一步。')
   : `本轮 ${f.records.length} 项作业中，${f.records.filter(r=>r.result==='已完成').length} 项已完成，${f.records.filter(r=>r.result==='未完成').length} 项未完成，${f.records.filter(r=>r.result==='不适用').length} 项不适用。逐项完成状态与总结果一起作为回交依据。`
@@ -125,7 +126,7 @@ function timestamp(value){
  return Date.parse(/Z$|[+-]\d\d:\d\d$/.test(text)?text:text+'+08:00')
 }
 export function adviceDetails(event,message,role){
- const c=context[event.sourceEventId||event.id],cutoff=timestamp(message.at)
+ const c=shiftTimelineContent(context[event.sourceEventId||event.id],event.timeline),cutoff=timestamp(message.at)
  // Historical advice only sees records available by the message timestamp.
  const task=[...event.tasks].reverse().find(t=>timestamp(t.assignedAt)<=cutoff)
  const submitted=task?.status==='submitted'&&timestamp(task.submittedAt)<=cutoff

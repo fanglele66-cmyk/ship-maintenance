@@ -2,9 +2,9 @@
  <form class="lc-form" @submit.prevent="submit" :aria-label="shoreOnly?'岸基同步表单':captain?'轮机长处置表单':'执行反馈表单'">
   <template v-if="captain">
    <LifecycleDecisionBasis v-if="showBasis&&!shoreOnly" :event="event" :action="decision.action"/>
-   <p v-if="shoreOnly" class="lc-muted">将情况摘要保存为上报记录，事件状态与船上工作保持不变。</p>
+   <p v-if="shoreOnly" class="lc-muted">汇集已有资料并保存上报记录，事件状态与船上工作保持不变。</p>
    <div v-if="!shoreOnly" class="decision-choice-bar"><fieldset class="decision-options"><legend>选择本次决策</legend><label v-for="o in options" :key="o.value" :class="{selected:decision.action===o.value}"><input type="radio" name="decision-action" v-model="decision.action" :value="o.value" @change="changeAction"/>{{o.label}}</label></fieldset><button v-if="dispatch" type="button" class="decision-plan-link" @click="$emit('plan',decision.action)">查看{{planTabLabel(decision.action)}} ↗</button></div>
-   <template v-if="decision.action"><section v-if="decision.action==='shore'&&decision.shoreSituation" class="shore-editor"><p>摘要仅保存到本地记录，尚未连接岸端发送服务。</p><label v-for="field in shoreFields" :key="field.key">{{field.label}}<textarea v-model="decision.shoreSituation[field.key]" :required="field.key==='situation'" rows="2"/></label></section>
+   <template v-if="decision.action"><section v-if="decision.action==='shore'&&decision.shoreSituation" class="shore-editor"><p>已汇集关联事件的初始信息、处置记录及 {{shoreBasis.includedReports.length}} 份正式报告。当前仅本地保存，尚未发送岸基。</p><details class="shore-basis"><summary>查看基础报告与索引</summary><MarkdownContent :content="shoreBasis.markdown"/></details><label v-for="field in shoreFields" :key="field.key">{{field.label}}<textarea v-model="decision.shoreSituation[field.key]" rows="2"/></label></section>
     <label v-if="!dispatch&&!['shore','observe'].includes(decision.action)">决定依据与后续安排<textarea v-model="reason" required rows="3" placeholder="说明判断依据、设备安全影响与后续安排"/></label>
     <label v-if="decision.action==='resume'">恢复后的完成时限（不调整可留空）<input type="datetime-local" v-model="decision.deadline"/></label><template v-if="dispatch">
      <label>负责人<select v-model="decision.owner" required><option v-for="person in executors" :key="person.role" :value="person.name">{{person.name}}</option></select></label>
@@ -32,21 +32,22 @@ import {currentTask,decisionOptions,ensureTaskPlan,people} from '../workflow/eve
 import {maintenancePlans,availableMaintenanceWindows} from '../workflow/maintenancePlans'
 import {planTabLabel} from '../workflow/taskPlanning'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
-import {latestShoreReport} from '../workflow/shoreReports.js'
+import {shoreReportBasis} from '../workflow/shoreReports.js'
+import MarkdownContent from './MarkdownContent.vue'
 import LifecycleConfirmationFields from './LifecycleConfirmationFields.vue'
 import {executors} from '../workflow/lifecyclePermissions.js'
 import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
 const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded','plan'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event).filter(o=>props.event.decisionDraft?.action==='shore'?o.value==='shore':o.value!=='shore'))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}))
-const latestReport=computed(()=>latestShoreReport(props.event))
-const shoreFields=[{key:'situation',label:'当前情况'},{key:'actions',label:'已采取安排（选填）'},{key:'uncertainty',label:'尚未确认事项（选填）'},{key:'support',label:'需岸端知悉或支持事项（选填）'}]
-watch(()=>decision.value.action,action=>{if(action==='shore')decision.value.shoreSituation={situation:'',actions:'',uncertainty:'',support:''}},{immediate:true})
+const shoreBasis=computed(()=>decision.value.action==='shore'?shoreReportBasis(props.event,store.state):{includedReports:[],markdown:''})
+const shoreFields=[{key:'situation',label:'补充情况（选填）'},{key:'actions',label:'已采取安排（选填）'},{key:'uncertainty',label:'尚未确认事项（选填）'},{key:'support',label:'需岸端知悉或支持事项（选填）'}]
+watch(()=>decision.value.action,action=>{if(action==='shore'){decision.value.shoreIncludeHistory=true;decision.value.shoreSituation={situation:'',actions:'',uncertainty:'',support:''}}},{immediate:true})
 const plan=computed(()=>captain.value&&suggestionAction(props.event)?ensureTaskPlan(props.event):null)
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))
 const reason=computed({get:()=>dispatch.value||decision.value.action==='observe'?'':decision.value.action==='shore'?decision.value.shoreSituation?.situation||'':decision.value.reason||'',set:value=>{decision.value.reason=value}})
 watch(options,list=>{if(props.shoreOnly){decision.value.action=list.some(o=>o.value==='shore')?'shore':'';return}if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})
-const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'保存上报摘要',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
+const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'保存上报报告',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
 const plans=computed(()=>maintenancePlans(props.event)),windows=computed(()=>availableMaintenanceWindows())
 const selectedMaintenance=computed(()=>plans.value.find(p=>p.id===decision.value.maintenancePlanId))
 function changeMaintenancePlan(){ensureTaskPlan(props.event);error.value=''}
@@ -55,3 +56,6 @@ function changeAction(){error.value='';decision.value.reason='';decision.value.e
 async function submit(){try{error.value='';const action=captain.value?decision.value.action:null;if(captain.value){store.decide(props.event.id,{...decision.value,reason:reason.value});if(action==='shore'){decision.value.action='';decision.value.shoreReason=''}else props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}}else await store.submit(props.event.id,task.value?.id);emit('submitted',action)}catch(e){error.value=e.message}}
 
 </script>
+<style scoped>
+.shore-basis{grid-column:1/-1;border:1px solid #e4e6df;border-radius:6px;padding:10px 12px}.shore-basis summary{cursor:pointer;color:#806638}.shore-basis :deep(.markdown-content){max-height:280px;overflow:auto;font-size:13px}
+</style>

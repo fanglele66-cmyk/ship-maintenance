@@ -1,6 +1,6 @@
 <template>
  <Teleport to="body"><dialog ref="dialog" class="decision-dialog" :class="{'shore-dialog':action==='shore'}" aria-labelledby="decision-title" @click="outside" @cancel.prevent="close" @close="visible=false">
-  <header><div><small>{{event.title}}</small><h2 id="decision-title">{{archive?'岸基同步报告':action==='shore'?'上报岸端':'轮机长决策'}}</h2></div><button type="button" aria-label="关闭决策弹窗" @click="close">×</button></header>
+  <header><div><small>{{event.title}}</small><h2 id="decision-title">{{archive?'上报岸基报告':action==='shore'?'上报岸基':'轮机长决策'}}</h2></div><button type="button" aria-label="关闭决策弹窗" @click="close">×</button></header>
   <div class="decision-dialog-body"><LifecycleReport v-if="archive" :report="archive.syncedReport"/><LifecycleActionForm v-else-if="visible" :event="event" :show-basis="false" @submitted="submitted" @plan="showPlan"/></div>
  </dialog></Teleport>
 </template>

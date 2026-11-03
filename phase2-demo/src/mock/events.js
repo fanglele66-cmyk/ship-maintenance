@@ -104,8 +104,8 @@ export const mockEvents = [
   },
   {
     id: 'EVT-2026-002',
-    title: '2号辅机油压偏低预警',
-    deviceId: 'aux-engine-2',
+    title: '辅机油压偏低预警',
+    deviceId: 'aux-engine-1',
     system: '辅机系统',
     priority: 'normal',
     status: 'pending',

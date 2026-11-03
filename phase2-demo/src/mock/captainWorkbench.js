@@ -39,7 +39,7 @@ export function captainAnalysis(store,deviceIds){
 export function isIssueClosed(store,id){const root=parentIssueId(id);return issueState(store,root).state==='已闭环'}
 export function activeWorkbenchIssues(store){return workbenchIssues(store).filter(i=>i.eventState!=='已闭环')}
 
-export const issueDevices=[{value:'main-engine-1',label:'主机'},{value:'aux-engine-1',label:'1号辅机'},{value:'aux-engine-2',label:'2号辅机'},{value:'aux-engine-3',label:'3号辅机'}]
+export const issueDevices=[{value:'main-engine-1',label:'主机'},{value:'aux-engine-1',label:'辅机'}]
 export const issueTypes=[...issueTypeNames]
 const deviceOrder=Object.fromEntries(issueDevices.map((d,index)=>[d.value,index]))
 export function sortIssues(rows,{stateFirst=false}={}){

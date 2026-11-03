@@ -76,13 +76,13 @@ test('unknown devices and newly added main-engine points use the fallback instea
   assert.deepEqual(layoutSensors(layout), extra)
 })
 
-test('all three auxiliary engines are distinct and retain zero as a valid reading', () => {
+test('single auxiliary retains six measurements and zero as a valid reading', () => {
   const auxiliary = readings.filter(sensor => sensor.deviceId.startsWith('aux-engine-'))
   const layout = buildSensorLayout(auxiliary)
   assert.equal(layout.main, null)
-  assert.equal(layout.devices.length, 3)
+  assert.equal(layout.devices.length, 1)
   assert.ok(layout.devices.every(device => device.count === 6))
-  assert.equal(formatSensorValue(auxiliary.find(sensor => sensor.id === 'aux-3-rpm')), '0.0')
+  assert.equal(formatSensorValue({...auxiliary.find(sensor => sensor.id === 'aux-1-rpm'), value:0}), '0.0')
 })
 
 test('missing, blank and non-finite numbers display a dash, while precision and zero remain intact', () => {

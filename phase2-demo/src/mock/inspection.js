@@ -93,10 +93,8 @@ function defaultSystems(flags = {}) {
   ]
 
   const auxItems = [
-    { name: '1号辅机冷却水温', unit: '℃',   value: flags.auxCool || '78',  range: '70 ~ 85',  status: flags.auxCool ? 'warning' : 'normal', statusText: flags.auxCool ? '⚠ 关注' : '✓ 正常', remark: flags.auxCoolRemark || '' },
-    { name: '1号辅机滑油压力', unit: 'MPa', value: '0.38', range: '0.30 ~ 0.45', status: 'normal', statusText: '✓ 正常', remark: '' },
-    { name: '2号辅机冷却水温', unit: '℃',   value: '80',   range: '70 ~ 85',  status: 'normal', statusText: '✓ 正常', remark: '' },
-    { name: '2号辅机滑油压力', unit: 'MPa', value: '0.36', range: '0.30 ~ 0.45', status: 'normal', statusText: '✓ 正常', remark: '' }
+    { name: '辅机冷却水温', unit: '℃',   value: flags.auxCool || '78',  range: '70 ~ 85',  status: flags.auxCool ? 'warning' : 'normal', statusText: flags.auxCool ? '⚠ 关注' : '✓ 正常', remark: flags.auxCoolRemark || '' },
+    { name: '辅机滑油压力', unit: 'MPa', value: '0.38', range: '0.30 ~ 0.45', status: 'normal', statusText: '✓ 正常', remark: '' },
   ]
 
   const pumpItems = [
@@ -249,7 +247,7 @@ export const inspectionReportDetails = {
     normal: 24, warn: 2, bad: 0, health: 87,
     aiText: '辅机冷却水温度偏高，清洗冷却器后恢复正常。',
     aiSummary: { level: 'warn', score: 87, tag: '需关注', text: '辅机冷却水温偏高，清洗冷却器后已恢复。', points: [
-      { icon: 'mdi:alert', type: 'warn', title: '1号辅机冷却水温偏高', text: '冷却水温88℃，超过上限85℃。检查发现冷却器海水管侧脏堵，清洗后水温降至78℃。' },
+      { icon: 'mdi:alert', type: 'warn', title: '辅机冷却水温偏高', text: '冷却水温88℃，超过上限85℃。检查发现冷却器海水管侧脏堵，清洗后水温降至78℃。' },
       { icon: 'mdi:alert', type: 'warn', title: '辅机冷却器压差增大', text: '冷却器海水管侧压差增大，已清洗。建议缩短冷却器清洗周期。' }
     ]},
     systemFlags: { auxCool: '88', auxCoolRemark: '偏高，冷却器脏堵已清洗', auxLevel: 'warn', auxStatus: '1项需关注' }
