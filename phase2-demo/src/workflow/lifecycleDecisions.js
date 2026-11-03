@@ -1,4 +1,3 @@
-import {latestShoreReport} from './shoreReports.js'
 import {isVerificationReview} from './observationContext.js'
 import {taskExecution} from './taskExecution.js'
 export const isAbnormalResult=record=>/发现异常|读数不一致|偏离仍存在/.test(record.result||'')
@@ -19,11 +18,13 @@ export function confirmedTracking(event,task){
   ||rows.some(r=>/偏离仍存在/.test(r.result))))
 }
 export function lifecycleDecisionOptions(event){
- const shore=latestShoreReport(event)?[{value:'shore',label:'同步岸基'}]:[]
+ const shore=[{value:'shore',label:'上报岸端'}]
  if(event.phase==='transferred')return shore
  if(event.phase==='closed')return shore
  if(event.phase==='reminder')return [{value:'investigate',label:'派发排查'},{value:'false',label:'确认误报'},...shore]
- const task=event.tasks.find(t=>t.id===event.currentTask)
+ const current=event.tasks.find(t=>t.id===event.currentTask)
+ // Formal feedback is usable while its optional AI enrichment is pending or failed.
+ const task=current&&['reporting','report-error'].includes(current.status)&&current.submittedAt&&event.reports.some(r=>r.taskId===current.id)?{...current,status:'submitted'}:current
  if(task?.status==='waiting')return [{value:'resume',label:'条件具备，恢复原任务'},{value:'terminate',label:'终止未执行部分'},...shore]
  if(['assigned','reporting','report-error'].includes(task?.status))return shore
  if(task?.status==='submitted'&&taskExecution(task).incomplete&&(task.kind!=='investigation'||taskExecution(task).summaryBlocked||task.records.some(r=>/未完成|受限/.test(r.result))))return [{value:task.kind==='investigation'&&!hasAbnormalFindings(task)?'investigate':'repair',label:task.kind==='investigation'&&!hasAbnormalFindings(task)?'继续排查':'派发剩余维修'},{value:'wait',label:'等待条件，保留原任务'},{value:'terminate',label:'终止未执行部分'},{value:'close',label:'说明剩余事项并闭环'},...shore]
@@ -44,3 +45,9 @@ export function suggestionAction(event){
  return ['investigate','repair','maintenance','recheck'].includes(selected)&&lifecycleDecisionOptions(event).some(o=>o.value===selected)?selected:null
 }
 export const taskName=task=>task?.purpose==='recheck'?'复查':task?.kind==='investigation'?'排查':task?.kind==='maintenance'?'维保':'维修'
+
+export function validateDecisionEvidence(event,form){
+ const task=event.tasks.find(t=>t.id===event.currentTask)
+ if(form.action==='observe'&&task&&taskExecution(task).incomplete&&task.status!=='terminated')throw Error('仍有未完成工作，请先处理等待条件或明确终止剩余部分。')
+ if(['close','false'].includes(form.action)&&task&&task.status!=='terminated'&&taskExecution(task).incomplete&&!form.remainingDisposition?.trim())throw Error('请明确未完成事项的处置与承担人，不能把未完成工作记为已完成。')
+}

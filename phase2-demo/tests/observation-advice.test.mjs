@@ -2,7 +2,8 @@ import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {observationAdvice,observationAdviceRequest,updateObservationAdvice} from '../src/workflow/observationAdvice.js'
-import {createLifecycleState,decide,submitTask,currentTask,people,ensureTaskPlan} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,submitTask,currentTask,people,ensureTaskPlan} from '../src/workflow/eventLifecycle.js'
+import {decide} from './helpers/confirmed-decision.mjs'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 import {createAiHandler} from '../server/ai-api.mjs'
 import {Readable} from 'node:stream'
@@ -35,7 +36,7 @@ test('the first two-hour boundary is sufficient and existing old-rule advice is 
  const advice=observationAdvice(exact.event,exact.task)
  assert.equal(advice.status,'review');assert.equal(advice.evidence.reachedTwoHours,true)
  assert.equal(nextTick.task.observation.pending.sampleCount,0);assert.equal(observationAdvice(nextTick.event,nextTick.task).status,'review')
- assert.equal(exact.task.observation.records.length,1);assert.equal(JSON.parse(advice.key)[0],4)
+ assert.equal(exact.task.observation.records.length,1);assert.equal(JSON.parse(advice.key)[0],5)
  assert.equal(Date.parse(advice.evidence.targetAt)-Date.parse(exact.task.submittedAt),7200000)
 })
 test('elapsed time alone never recommends closure for an unstable or empty trend',()=>{

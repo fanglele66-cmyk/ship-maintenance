@@ -7,7 +7,7 @@ const finite=Number.isFinite
 const clock=value=>value?new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16):''
 
 // Product workflow thresholds for trend screening, not manufacturer operating limits.
-export const observationAdvicePolicy={version:4,durationMs:2*3600000,trendMs:30*60000,rangeByUnit:{'°C':5,MPa:0.02},relativeRange:1}
+export const observationAdvicePolicy={version:5,durationMs:2*3600000,trendMs:30*60000,rangeByUnit:{'°C':5,MPa:0.02},relativeRange:1}
 function stableChannels(observation,config,policy){
  const end=Date.parse(observation?.checkedAt),start=Math.max(Date.parse(observation?.executedAt)||0,end-policy.trendMs)
  const windows=[...(observation?.records||[]),...(observation?.pending?[observation.pending]:[])]
@@ -37,7 +37,8 @@ export function observationAdvice(event,task){
  const available=config.names.length>0&&config.names.every((_,i)=>channels[i]?.sampleCount>0&&finite(channels[i]?.value))
  const covered=observation?.currentSourceAvailable!==false&&available&&channels.every(c=>c.covered&&finite(Date.parse(c.lastAt))&&checkedAt-Date.parse(c.lastAt)<=policy.gapThresholdMs)
  const complete=Boolean(completed?.complete&&completed.covered&&completed.channels?.length===config.names.length&&completed.channels.every(c=>c.covered&&finite(c.value)))
- const targetTime=Date.parse(observationStart(task))+policy.intervalMs,targetAt=finite(targetTime)?new Date(targetTime).toISOString():null
+ const confirmedDue=event.phases?.at(-1)?.observationPlan?.dueAt
+ const targetTime=confirmedDue?Date.parse(confirmedDue):Date.parse(observationStart(task))+policy.intervalMs,targetAt=finite(targetTime)?new Date(targetTime).toISOString():null
  const reached=finite(checkedAt)&&checkedAt>=targetTime,trend=stableChannels(observation,config,policy),stable=trend.length>0&&trend.every(c=>c.stable)
  let status='incomplete',label='检查数据质量',summary='当前观察数据尚不完整。',timing='先检查缺测、采样时效与连续性；数据有效且无异常后，观察满两小时推荐闭环。'
  if(available)summary=config.names.map((name,i)=>`${name} ${channels[i].value} ${config.units[i]}`).join('；')+'。'
@@ -71,19 +72,21 @@ export function observationAdvice(event,task){
  const originalPersists=event.tracking?originalDifference>0&&currentDifference>=originalDifference*.8:(event.sourceEventId||event.id)==='real-alarm-0430'&&originalDifference>0&&currentDifference>=originalDifference*.8
  if(conditions?.eligible&&covered&&originalPersists){summary=config.names.map((name,i)=>`${name} ${channels[i]?.value??'未取得'} ${config.units[i]}`).join('；')+'。近期平稳本身不表示原偏差已消失。';status='recheck';label='原偏差仍需核实';timing='本轮可比工况读数仍接近事件原有偏差，平稳不等于恢复。请核对处理措施、同工况对比和现场反馈；需要补充定位时派发复查。'}
  if(event.tracking){summary=summary.replaceAll('两小时','一周');timing=timing.replaceAll('两小时','一周');label=label.replaceAll('两小时','一周')}
+ if(confirmedDue){summary=summary.replaceAll('两小时','本轮计划窗口').replaceAll('一周','本轮计划窗口');timing=timing.replaceAll('两小时','本轮计划窗口').replaceAll('一周','本轮计划窗口');label=label.replaceAll('两小时','计划汇报时间').replaceAll('一周','计划汇报时间')}
  const report=event.reports.findLast(r=>r.taskId===feedback?.id)
  const feedbackSummary=report?.summary||feedback?.summary||''
  // Refresh model advice at a new completed window / changed feedback, not per sample.
- const key=JSON.stringify([observationAdvicePolicy.version,task?.id,status,available,covered,reached,stable,completed?.id,feedback?.id,feedbackSummary,feedback?.records,report?.updatedAt,verification,observationStart(task),conditions?.eligible,conditions?.currentState,originalPersists,policy.intervalMs])
+ const latestReport=event.reports.at(-1)
+ const key=JSON.stringify([observationAdvicePolicy.version,task?.id,status,available,covered,reached,stable,completed?.id,feedback?.id,feedbackSummary,feedback?.records,report?.updatedAt,verification,observationStart(task),conditions?.eligible,conditions?.currentState,originalPersists,policy.intervalMs,event.observationPlan,latestReport?.id,latestReport?.summary,latestReport?.updatedAt])
  return {key,status,label,summary,timing,feedbackSummary,verification,conditionMessage,conditionsMet:Boolean(conditions?.eligible),checkedAt:observation?.checkedAt,
-  evidence:{observedAt:observation?.checkedAt,nextUpdateAt:observation?.nextUpdateAt,targetAt,reachedCycle:reached,reachedTwoHours:!event.tracking&&reached,cycle:policy.label,intervalMs:policy.intervalMs,requiredCondition:policy.requiredCondition,operatingConditions:conditions?{...conditions,samples:undefined}:null,originalProblem:event.sourceConclusion||event.brief?.conclusion,originalReadings:config.before,originalPersists,stable,trend,comparableReadings:(conditions?.samples||[]).map((points,i)=>({name:config.names[i],unit:config.units[i],count:points.length,last:points.at(-1)||null})),completeWindow:complete,currentCoverage:covered,unresolved,
+  evidence:{observedAt:observation?.checkedAt,nextUpdateAt:confirmedDue||observation?.nextUpdateAt,targetAt,reachedCycle:reached,reachedTwoHours:!event.tracking&&reached,cycle:confirmedDue?'本轮已确认窗口':policy.label,intervalMs:confirmedDue?targetTime-Date.parse(event.phases.at(-1).at):policy.intervalMs,requiredCondition:policy.requiredCondition,operatingConditions:conditions?{...conditions,samples:undefined}:null,originalProblem:event.sourceConclusion||event.brief?.conclusion,originalReadings:config.before,originalPersists,stable,trend,comparableReadings:(conditions?.samples||[]).map((points,i)=>({name:config.names[i],unit:config.units[i],count:points.length,last:points.at(-1)||null})),completeWindow:complete,currentCoverage:covered,unresolved,
    recentWindows:[...(observation?.records||[]).slice(-2),...(observation?.pending?[observation.pending]:[])].map(w=>({start:w.windowStart,end:w.windowEnd,complete:w.complete,covered:w.covered,channels:w.channels?.map(c=>({name:c.name,unit:c.unit,value:c.value,min:c.min,max:c.max,mean:c.mean,sampleCount:c.sampleCount,covered:c.covered,lastAt:c.lastAt}))}))}}
 }
 
 export function observationAdviceRequest(event,task,advice){
  const policy=observationPolicy(event)
- return {mode:'observation',role:'captain',text:`结合本轮报告和观察证据给轮机长80—160字建议。观察周期为${policy.label}。先核对数据时效、缺测和工况；停机、非稳态或无工况数据时明确等待有效观测，不把停机的平稳值写成修复有效。只使用本轮开始时间之后的可比工况传感器数据，结合原异常判断变化是否持续、扩大、恢复或复发。周期未满且无异常时等待本周期结束；周期已满、数据有效且适用工况平稳、原异常未复现且无未执行项目，可推荐人工闭环。资料不足说明缺口，有异常建议复查。核实后观察未实施维修，不写修复成功。只给分析摘要和建议，不输出内部思维过程。\n`+JSON.stringify({decision:advice.status,summary:advice.summary,timing:advice.timing,feedback:advice.feedbackSummary,observations:advice.evidence}),
- event:{id:event.id,type:event.type,sourceEventId:event.sourceEventId,observationSource:event.observationSource?{task:{id:task.id,kind:task.kind,status:task.status,observationMode:task.observationMode,observationStartedAt:task.observationStartedAt,submittedAt:task.submittedAt,records:task.records,summary:task.summary}}:null,title:event.title,tracking:event.tracking,number:event.number,phase:event.phase,currentTask:event.currentTask,phases:event.phases.slice(-1),brief:{conclusion:event.brief?.conclusion,facts:event.brief?.facts},reports:currentReportContext(event).slice(-2),tasks:event.tasks.filter(t=>t.id===task.id||t.id===event.currentTask).map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt,summary:t.summary,records:t.records}))}}
+ return {mode:'observation',role:'captain',text:`结合本轮报告和观察证据给轮机长80—160字建议。${event.observationPlan?'计划汇报时间为'+clock(event.observationPlan.dueAt):'观察周期为'+policy.label}。先核对数据时效、缺测和工况；停机、非稳态或无工况数据时明确等待有效观测，不把停机的平稳值写成修复有效。只使用本轮开始时间之后的可比工况传感器数据，结合原异常判断变化是否持续、扩大、恢复或复发。以 observationPlan.dueAt 为本轮汇报时间；到期应先提交当前证据，不擅自沿用默认周期或修改已确认时间。数据不足可建议下一轮继续观察，由轮机长另行确认。周期未满且无异常时等待本周期结束；周期已满、数据有效且适用工况平稳、原异常未复现且无未执行项目，可推荐人工闭环。资料不足说明缺口，有异常建议复查。核实后观察未实施维修，不写修复成功。只给分析摘要和建议，不输出内部思维过程。\n`+JSON.stringify({decision:advice.status,summary:advice.summary,timing:advice.timing,feedback:advice.feedbackSummary,observations:advice.evidence}),
+ event:{id:event.id,type:event.type,sourceEventId:event.sourceEventId,observationSource:event.observationSource?{task:{id:task.id,kind:task.kind,status:task.status,observationMode:task.observationMode,observationStartedAt:task.observationStartedAt,submittedAt:task.submittedAt,records:task.records,summary:task.summary}}:null,title:event.title,tracking:event.tracking,observationPlan:event.observationPlan,number:event.number,phase:event.phase,currentTask:event.currentTask,phases:event.phases.slice(-1),brief:{conclusion:event.brief?.conclusion,facts:event.brief?.facts},reports:currentReportContext(event).slice(-2),tasks:event.tasks.filter(t=>t.id===task.id||t.id===event.currentTask).map(t=>({id:t.id,kind:t.kind,purpose:t.purpose,status:t.status,observationMode:t.observationMode,observationStartedAt:t.observationStartedAt,submittedAt:t.submittedAt,summary:t.summary,records:t.records}))}}
 }
 
 export function updateObservationAdvice(state,eventId,phaseId,patch){

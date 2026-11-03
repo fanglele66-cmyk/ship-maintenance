@@ -1,7 +1,8 @@
+import {decide} from './helpers/confirmed-decision.mjs'
 import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createLifecycleState,newEvent,decide,submitTask,currentTask,ensureTaskPlan,people,pendingDecision,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,newEvent,submitTask,currentTask,ensureTaskPlan,people,pendingDecision,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
 import {lifecycleWorkItems,lifecycleNotifications,workItemPresentation,taskNumber,findTask,canViewTask} from '../src/workflow/lifecycleWorkItems.js'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 const id='real-alarm-0430'
@@ -57,7 +58,7 @@ test('observation has no personnel todo until its scheduled window ends; reload 
  syncLifecycleObservations(state,{recordedSensorChannels:()=>[]},due-1)
  assert.equal(pendingDecision(event),false)
  syncLifecycleObservations(state,{recordedSensorChannels:()=>[]},due)
- assert.equal(pendingDecision(event),true);assert.equal(phase.at,at);assert.equal(event.status,'待观察确认')
+ assert.equal(pendingDecision(event),true);assert.equal(phase.at,at);assert.equal(event.status,'待决策')
  const notices=lifecycleNotifications(state).filter(n=>n.eventId===event.id);assert.equal(notices.length,1);assert.match(notices[0].progress,/观察待确认/)
  const reloaded=JSON.parse(JSON.stringify(state));syncLifecycleObservations(reloaded,{recordedSensorChannels:()=>[]},due+1000)
  assert.equal(lifecycleNotifications(reloaded).filter(n=>n.eventId===event.id).length,1)

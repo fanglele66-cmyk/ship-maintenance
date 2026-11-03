@@ -23,8 +23,8 @@
           v-if="item.path === '/event' && totalUnread > 0"
           class="nav-badge"
           :class="{ 'nav-badge-pulse': recentlyBumpedTotal }"
-          :title="`${totalUnread} 项待办待处理`"
-          :aria-label="`${totalUnread} 项待办待处理`"
+          :title="`${totalUnread} 项任务待处理`"
+          :aria-label="`${totalUnread} 项任务待处理`"
         ></span>
       </router-link>
     </div>
@@ -43,7 +43,7 @@ const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
 const lifecycle=useEventLifecycleStore()
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
-const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:lifecycle.unread)
+const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:lifecycle.workItems.pending.filter(item=>item.kind==='task').length)
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {
@@ -72,10 +72,10 @@ watch(totalUnread, (v) => {
 onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
 
 const navItems = [
-  { path: '/situation', label: '首页', icon: '/nav-icons/situation.svg' },
+  { path: '/situation', label: '态势', icon: '/nav-icons/situation.svg' },
   { path: '/issues', label: '事件', icon: '/nav-icons/event.svg' },
-  { path: '/event', label: '待办', icon: '/nav-icons/inspection.svg' },
-  { path: '/knowledge', label: '知识', icon: '/nav-icons/knowledge.svg' }
+  { path: '/event', label: '任务', icon: '/nav-icons/inspection.svg' },
+  { path: '/knowledge', label: '知识库', icon: '/nav-icons/knowledge.svg' }
 ]
 </script>
 

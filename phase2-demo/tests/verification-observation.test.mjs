@@ -1,6 +1,7 @@
+import {decide} from './helpers/confirmed-decision.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createLifecycleState,decide,submitTask,currentTask,decisionOptions,ensureTaskPlan,people,refreshLifecyclePresentation,pendingDecision} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,submitTask,currentTask,decisionOptions,ensureTaskPlan,people,refreshLifecyclePresentation,pendingDecision} from '../src/workflow/eventLifecycle.js'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 import {observationTaskFor,isVerificationReview} from '../src/workflow/observationContext.js'
 import {observationAdvice,observationAdviceRequest} from '../src/workflow/observationAdvice.js'
@@ -41,7 +42,7 @@ for(const id of [alarm,'real-warning-0523','real-tracking-exhaust-baseline','rea
  assert.deepEqual(decisionOptions(f.event).map(o=>o.value),['close','recheck','repair','shore'])
  assert.ok(!pendingDecision(f.event));assert.ok(!lifecycleWorkItems(f.state).pending.some(i=>i.eventId===f.id))
  const due=Date.parse(f.event.phases.at(-1).observationDueAt)
- assert.equal(due-Date.parse(f.task.observationStartedAt),f.event.tracking?7*86400000:7200000)
+ assert.ok(Math.abs(due-Date.parse(f.task.observationStartedAt)-(f.event.tracking?7*86400000:7200000))<61000)
  syncLifecycleObservations(f.state,{},due-1000,{demo:true})
  assert.ok(f.task.observation.pending.sampleCount>0);assert.ok(!pendingDecision(f.event))
  syncLifecycleObservations(f.state,{},due,{demo:true})

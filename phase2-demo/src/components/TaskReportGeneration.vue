@@ -2,9 +2,9 @@
  <section class="task-report-generation" aria-live="polite" :aria-busy="task.status==='reporting'">
   <h2>{{task.status==='reporting'?'AI 正在生成本轮报告':'报告生成未完成'}}</h2>
   <p role="status">{{task.status==='reporting'?task.reportGeneration.progress?.label:task.reportGeneration.error}}</p>
-  <p class="lc-muted">原始反馈已保存，完整报告生成后交轮机长审阅。</p>
+  <p class="lc-muted">现场事实已正式回交；工作完成情况不受 AI 分析生成影响，可继续审阅事实记录。</p>
   <MarkdownContent v-if="preview" :content="preview"/>
-  <button v-if="task.status==='report-error'&&store.state.role==='engineer'" class="lc-primary" @click="retry">重新生成报告</button>
+  <button v-if="task.status==='report-error'&&task.owner===store.people[store.state.role]" class="lc-primary" @click="retry">重新生成报告</button>
  </section>
 </template>
 <script setup>

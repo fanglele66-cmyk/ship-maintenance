@@ -1,0 +1,44 @@
+/* One reading scale across overview, directories, tasks, event rounds and dialogs. */
+:root{--type-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;--type-caption:13px;--type-body:15px;--type-subtitle:16px;--type-section:18px;--type-title:24px;--wb-body:var(--type-body);--wb-label:var(--type-caption);--wb-title:var(--type-title);--font-xs:13px;--font-sm:14px;--font-base:15px;--font-md:16px;--font-lg:18px;--font-xl:20px;--font-2xl:24px}
+html{font-size:16px}
+body,#app,.app-container,dialog{font-family:var(--type-family);font-size:var(--type-body);line-height:1.65}
+button,input,select,textarea{font-family:inherit}
+.app-container.app-container{--wb-body:var(--type-body);--wb-label:var(--type-caption);--wb-title:var(--type-title);font-family:var(--type-family)}
+.app-container.app-container :is(.issues-page-head h2,.task-center h1,.lc-title h1,.task-heading h1,.doc-heading .doc-title){font-size:var(--type-title);line-height:1.45;font-weight:600;letter-spacing:0}
+.app-container.app-container :is(.lc-board h2,.task-center h2,.lc-content h2,.task-scope h2,.task-detail-content h2,.lc-assistant>header strong){font-size:var(--type-section);line-height:1.5;font-weight:600}
+.app-container.app-container :is(.card-title,.work-card h3,.lc-board-row h3,.lc-content h3,.task-detail-content h3){font-size:var(--type-subtitle);line-height:1.6;font-weight:600}
+.app-container.app-container :is(.card-summary,.work-summary,.lc-board.compact .lc-board-row p,.lc-analysis-brief,.task-scope p,.task-record,.lc-report .markdown-content,.lc-message,.lc-step-list li li){font-size:var(--type-body);line-height:1.8}
+.app-container.app-container :is(.work-card small,.work-card>header,.work-progress,.work-event,.work-card dl,.work-card footer,.task-basics dt,.task-event-info small,.lc-header-facts,.lc-assistant>header small,.lc-message time,.lc-muted,.lc-board.compact .lc-board-row small,.lc-tabs button,.lc-stage-strip small){font-size:var(--type-caption);line-height:1.6}
+.app-container.app-container :is(.task-center-head p,.task-center-intro p,.issues-page-head p){font-size:var(--type-body);color:#68778a}
+.app-container.app-container .work-card h3 button{flex-wrap:wrap}
+.app-container.app-container .work-name{white-space:normal;overflow:visible}
+.app-container.app-container .work-card-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,390px),1fr));gap:20px}
+.app-container.app-container .work-card{padding:20px 20px 0}
+.app-container.app-container .lc-workspace{grid-template-columns:minmax(0,1fr) 400px}
+.app-container.app-container .lc-title,.app-container.app-container .lc-title>div{min-width:0}
+.app-container.app-container .lc-main{padding:24px}
+.lc-current-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:18px 0;border-block:1px solid #e2e7ec;margin:16px 0}
+.lc-current-summary>div{min-width:0;flex:1;max-width:75%}.lc-current-summary small{display:block;font-size:var(--type-caption);color:#68778a}.lc-current-summary strong{display:block;font-size:var(--type-subtitle);margin:4px 0}.lc-current-summary p{font-size:var(--type-body);line-height:1.7;margin:6px 0;max-width:none}.lc-current-summary button{flex:none}
+.task-resume{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:18px;background:#faf8f3;margin:16px 0}.task-resume>label:first-child{display:flex;flex-direction:column;gap:8px;width:100%}.task-resume textarea{padding:10px;border:1px solid #dfe5eb;font:inherit;width:100%;box-sizing:border-box}.task-resume button,.lc-current-summary .lc-primary{font:inherit;border:0;border-radius:5px;background:#252b30;color:#fff;padding:10px 16px;cursor:pointer}
+.report-submissions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.report-submissions button{font:inherit;font-size:var(--type-caption);padding:8px 12px;border:1px solid #dfe4e9;background:#fff;border-radius:5px}.report-submissions button[aria-pressed=true]{background:#faf4e8;border-color:#bca575}
+.execution-confirmation{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.execution-confirmation select{font:inherit;padding:6px}.execution-confirmation small{font-size:var(--type-caption);color:#68778a}
+.decision-dialog{font-family:var(--type-family);font-size:var(--type-body)}.decision-dialog .lc-form label,.decision-dialog .lc-primary,.decision-dialog input,.decision-dialog textarea,.decision-dialog select{font-size:var(--type-body)}.decision-dialog .lc-form input[type=checkbox]{width:auto}.decision-dialog .shore-editor textarea{min-height:80px}
+.app-container.app-container .nav-label{font-family:var(--type-family);font-size:var(--type-caption)}
+.app-container.app-container .captain-right{min-width:0;width:100%;grid-template-columns:minmax(0,1fr);overflow:auto}
+.app-container.app-container .captain-right>section,.app-container.app-container .captain-right>div{min-width:0;max-width:100%}
+.app-container.app-container .voyage-timeline{grid-template-columns:repeat(4,minmax(320px,1fr))}
+.app-container.app-container .stage-metrics dd{white-space:normal}
+.app-container.app-container .lc-board-row>div{flex:1;min-width:0}
+.app-container.app-container .stage-clock,.app-container.app-container .stage-heading small,.app-container.app-container .stage-secondary,.app-container.app-container .stage-position,.app-container.app-container .stage-metrics dt,.app-container.app-container .stage-metrics dd small{font-size:var(--type-caption)}
+.app-container.app-container .stage-description,.app-container.app-container .stage-metrics dd{font-size:var(--type-body);line-height:1.7}
+.app-container.app-container .stage-heading h3{font-size:var(--type-subtitle)}
+@media(max-width:1100px){.app-container.app-container .lc-workspace{grid-template-columns:minmax(0,1fr) 340px}.app-container.app-container .lc-main{padding:18px}.lc-current-summary{flex-wrap:wrap}}
+@media(max-width:760px){.app-container.app-container .lc-workspace{display:flex;height:100%;overflow-y:auto}.app-container.app-container .lc-main{flex:none;overflow:visible}.app-container.app-container .lc-assistant{flex:none;min-height:540px}.app-container.app-container :is(.lc-title h1,.task-heading h1,.issues-page-head h2,.task-center h1){font-size:22px}.app-container.app-container .task-header-actions{flex-wrap:wrap}.task-center-tabs{gap:16px}.lc-current-summary{gap:12px}}
+
+.lc-saved-plan{margin:16px 0;padding:16px 18px;border:1px solid #e0e5e9;border-radius:6px;font-size:var(--type-body)}.lc-saved-plan summary{cursor:pointer;font-weight:600}.lc-saved-plan dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px 16px}.lc-saved-plan dd{margin:0;white-space:pre-wrap}.lc-saved-plan dt{color:#68778a}
+.app-container.app-container :is(.task-basics,.task-progress,.task-submitted,.lc-task-summary,.lc-step-instructions,.note-heading,.note-proposal,.lc-definition,.task-heading small,.task-state){font-size:var(--type-caption)}
+.app-container.app-container :is(.lc-message-content,.lc-step-instructions p,.lc-step-instructions li,.lc-task-summary p,.lc-report p,.lc-analysis-brief dd,.lc-definition dd,.note-proposal p){font-size:var(--type-body);line-height:1.8}
+.app-container.app-container .task-workspace.assistant-hidden{grid-template-columns:minmax(0,1fr)}
+
+.app-container.app-container .lc-task-summary>small{font-size:var(--type-body);line-height:1.8}
+@media(max-width:1100px){.lc-current-summary>div{max-width:none}}

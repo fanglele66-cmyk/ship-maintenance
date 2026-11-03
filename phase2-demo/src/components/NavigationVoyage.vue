@@ -7,10 +7,10 @@
      <div class="stage-clock"><time :datetime="new Date(stage.start).toISOString()">{{shortTime(stage.start)}}</time><span aria-hidden="true">—</span><time :datetime="new Date(stage.end).toISOString()">{{shortTime(stage.end)}}</time></div>
      <div class="stage-track" aria-hidden="true"><i class="track-node"/><span class="track-line"/><svg v-if="index<stages.length-1" viewBox="0 0 8 12"><path d="m2 2 4 4-4 4"/></svg></div>
      <div class="stage-content">
-      <header class="stage-heading"><h3>{{stage.status}}</h3><span v-if="index===stages.length-1" class="latest-label">最近阶段</span><small v-else>{{duration(stage)}}</small></header>
+      <header class="stage-heading"><h3>{{stage.status}}</h3><span v-if="index===stages.length-1" class="latest-label">最近阶段</span></header>
       <p class="stage-description">{{stage.detail.split(' 主机 ')[0]}}</p>
       <dl class="stage-metrics"><div><dt>航速</dt><dd>{{range(stage.sog)}} <small>kn</small></dd></div><div><dt>主机转速</dt><dd>{{range(stage.rpm)}} <small>rpm</small></dd></div><div><dt>主机负荷</dt><dd>{{range(stage.load)}} <small>%</small></dd></div></dl>
-      <div class="stage-secondary"><span>辅机 {{stage.aux}} 台</span><span>航向 {{stage.cog===null?'—':stage.cog+'°'}}</span><span v-if="index===stages.length-1">{{duration(stage)}}</span></div>
+      <div class="stage-secondary"><span>辅机 {{stage.aux}} 台</span><span>航向 {{stage.cog===null?'—':stage.cog+'°'}}</span></div>
       <p class="stage-position">时段末位置 {{stage.position}}</p>
       <div v-if="stage.incidents.length" class="voyage-incidents"><RouterLink v-for="incident in stage.incidents" :key="incident.id" :to="'/situation/issue/'+incident.id" :class="incident.severity"><i aria-hidden="true"/><span>{{incident.type}} · {{incident.title}}</span><span aria-hidden="true">↗</span></RouterLink></div>
      </div>
@@ -28,7 +28,6 @@ const stages=computed(()=>navigationStages(props.periods,props.events).slice(-4)
 const motionPaused=ref(false)
 const shortTime=at=>new Date(at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Shanghai'})
 const range=values=>values[0]===values[1]?String(values[0]):values.join('–')
-function duration(stage){const minutes=Math.round((stage.end-stage.start)/60000);return `${Math.floor(minutes/60)?Math.floor(minutes/60)+'小时':''}${minutes%60?minutes%60+'分':''}`}
 </script>
 <style scoped>
 .voyage{position:relative;padding:0 20px 18px;min-width:0;color:#435765}

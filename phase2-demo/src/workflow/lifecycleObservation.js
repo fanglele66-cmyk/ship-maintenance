@@ -5,6 +5,7 @@ import {automaticObservation} from '../mock/automaticObservation.js'
 import {repairObservationSource} from '../mock/repairObservationSource.js'
 import {lifecycleSampling} from '../mock/lifecycleSampling.js'
 import {hasObservation,observationStart,observationPolicy} from './observationContext.js'
+import {observationIntervention,finishObservation} from './observationReports.js'
 
 export function observationCase(event){return event.tracking?(evidenceEventId(event).includes('c4')?'real-maintenance-c4-baseline':'real-maintenance-c1-baseline'):evidenceEventId(event)}
 export function observationSettings(event){return workflowCases[observationCase(event)]?.observation}
@@ -38,16 +39,17 @@ export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=fal
   }
   if(!update.pending?.sampleCount&&previous?.pending?.sampleCount&&update.pending?.windowStart===previous.pending.windowStart)update.pending={...update.pending,values:previous.pending.values,channels:previous.pending.channels,sampleCount:previous.pending.sampleCount,covered:false}
   task.observation={...update,records:[...saved.values()].sort((a,b)=>a.windowEnd.localeCompare(b.windowEnd)),policy,conditions,samples:channels.map(c=>c.trendData),currentSourceAvailable:channels.length>0&&channels.every(c=>c.trendData?.some(p=>Number.isFinite(p.value)&&p.timestamp>end-policy.gapThresholdMs&&p.timestamp<=end&&p.timestamp>start))}
+  const phase=event.phases.at(-1)
+  if(event.phase==='review'&&phase?.observationWaiting){const intervention=observationIntervention(phase.observationPlan||event.observationPlan,channels,now);if(intervention)finishObservation(event,phase,now,{intervention})}
  }
  for(const event of Object.values(state.events)){
   const phase=event.phases.at(-1),interval=observationPolicy(event).intervalMs
-  if(event.phase==='review'&&phase?.observationWaiting&&phase.observationIntervalMs!==interval){
+  if(event.phase==='review'&&phase?.observationWaiting&&!phase.observationPlan&&phase.observationIntervalMs!==interval){
    const task=observationTasks(event).find(t=>t.id===(phase.observationTaskId||phase.taskId)),start=Date.parse(observationStart(task)),at=Date.parse(phase.at)
    if(Number.isFinite(start)&&Number.isFinite(at)){phase.observationDueAt=new Date(start+(Math.floor(Math.max(0,at-start)/interval)+1)*interval).toISOString();phase.observationIntervalMs=interval}
   }
   if(event.phase!=='review'||!phase?.observationWaiting||now<Date.parse(phase.observationDueAt))continue
-  phase.observationWaiting=false;phase.observationReview=true;phase.observationCompletedAt=new Date(now).toISOString()
-  event.status='待观察确认';event.unread.captain=true
+  finishObservation(event,phase,now)
   // The new work item is derived from this phase, so reloads do not duplicate it.
  }
 }

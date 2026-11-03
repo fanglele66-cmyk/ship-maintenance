@@ -8,7 +8,7 @@ function blocked(text,kind){
 export function taskExecution(task){
  const records=task?.records||[],outstanding=[]
  records.forEach((record,index)=>{
-  if(record.result!=='不适用'&&(/未完成|无法确认|受限/.test(record.result||'')||blocked(record.note,task.kind)||record.subrecords?.some(r=>/未完成|受限/.test(r.result))))outstanding.push({index,label:record.label,result:record.result,reason:record.note||'尚未提供未执行原因或恢复条件，请核实。',step:task.steps?.[index]})
+  if(record.result!=='不适用'&&(record.executionStatus==='未完成'||record.executionStatus!=='已完成'&&(/未完成|无法确认|受限/.test(record.result||''))||blocked(record.note,task.kind)||record.subrecords?.some(r=>/未完成|受限/.test(r.result))))outstanding.push({index,label:record.label,result:record.result,reason:record.note||'尚未提供未执行原因或恢复条件，请核实。',step:task.steps?.[index]})
  })
  const summaryBlocked=blocked(task?.summary,task?.kind)
  return {completed:records.filter((r,i)=>r.result&&r.result!=='不适用'&&!outstanding.some(o=>o.index===i)),notApplicable:records.filter(r=>r.result==='不适用'),outstanding,summaryBlocked,incomplete:outstanding.length>0||summaryBlocked}

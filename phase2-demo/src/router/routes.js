@@ -2,6 +2,7 @@ export const routes = [
   { path: '/', redirect: '/situation' },
   {path:'/real-cases',redirect:'/situation'},
   {path:'/reports/:reportId?',name:'LifecycleReport',component:()=>import('@/views/LifecycleReportView.vue'),meta:{title:'报告'}},
+  {path:'/situation/todos',name:'SituationTodos',component:()=>import('@/views/LifecycleTodoView.vue'),meta:{title:'态势 · 个人待办',crossBusiness:true}},
   {path:'/issues',name:'SituationIssues',component:()=>import('@/views/LifecycleListView.vue'),meta:{title:'事件中心'}},
   {path:'/tasks/:taskId',name:'LifecycleTask',component:()=>import('@/views/LifecycleTaskView.vue'),meta:{title:'任务详情'}},
   {path:'/situation/issue/warning-history',redirect:'/issues'},
@@ -11,13 +12,13 @@ export const routes = [
     path: '/event',
     name: 'EventCenter',
     component: () => import('@/views/LifecycleTodoView.vue'),
-    meta: { title: '待办中心', icon: '📌' }
+    meta: { title: '我的任务', icon: '📌' }
   },
   {
     path: '/situation/:section(attention|maintenance|issue)?/:attentionId?',
     name: 'Situation',
     component: () => import('@/views/SituationView.vue'),
-    meta: { title: '首页', icon: '📡' }
+    meta: { title: '态势', icon: '📡' }
   },
   {
     path: '/phase1-event',

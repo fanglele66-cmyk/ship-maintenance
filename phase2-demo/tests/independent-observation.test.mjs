@@ -1,6 +1,7 @@
+import {decide} from './helpers/confirmed-decision.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createLifecycleState,decide,currentTask,submitTask,ensureTaskPlan,people,refreshLifecyclePresentation,pendingDecision,isProcessingEvent,stageNames,beginTaskReport} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,currentTask,submitTask,ensureTaskPlan,people,refreshLifecyclePresentation,pendingDecision,isProcessingEvent,stageNames,beginTaskReport} from '../src/workflow/eventLifecycle.js'
 import {createObservationEvent} from '../src/workflow/observationEvents.js'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 import {observationTaskFor} from '../src/workflow/observationContext.js'
@@ -91,10 +92,10 @@ test('旧观察迁移保留开始时刻、采样与报告，重复加载不再�
  refreshLifecyclePresentation(state);const child=state.events[parent.observationEventIds[0]];assert.equal(child.observationSource.task.observationStartedAt,source.observationStartedAt);assert.equal(child.observationSource.task.observation.records[0].sampleCount,8);assert.equal(child.reports[0].markdown,report.markdown)
  const ids=Object.keys(state.events);refreshLifecyclePresentation(state);assert.deepEqual(Object.keys(state.events),ids)
 })
-test('岸基只能同步最新报告，保留编辑快照和会话记录，拒绝过期报告',()=>{
- const state=createLifecycleState(),parent=state.events[root];assert.ok(!lifecycleDecisionOptions(parent).some(o=>o.value==='shore'));assert.throws(()=>decide(state,root,{action:'shore',reason:'查阅'}),/当前阶段/)
+test('兼容旧报告同步时保留编辑快照，拒绝过期报告，明确尚未发送',()=>{
+ const state=createLifecycleState(),parent=state.events[root];assert.ok(lifecycleDecisionOptions(parent).some(o=>o.value==='shore'));assert.throws(()=>decide(state,root,{action:'shore',reason:'查阅'}),/报告生成后/)
  const task=dispatch(state,parent,'investigate');submit(state,parent,task,'未见异常');const report=parent.reports.at(-1),original=report.markdown
  const form={action:'shore',reason:'请岸基核对',shoreReportId:report.id,shoreBaseMarkdown:original,shoreMarkdown:original+'\n\n补充核对意见。'}
  assert.throws(()=>shoreReportSnapshot(parent,{...form,shoreReportId:'old'}),/最近报告已更新/)
- decide(state,root,form);assert.equal(parent.reports.at(-1).markdown,original);assert.match(parent.shore[0].syncedReport.markdown,/补充核对意见/);assert.equal(parent.shore[0].status,'待岸基接收');assert.ok(parent.conversations.captain.some(m=>m.shoreId===parent.shore[0].id));assert.equal(parent.phase,'decision')
+ decide(state,root,form);assert.equal(parent.reports.at(-1).markdown,original);assert.match(parent.shore[0].syncedReport.markdown,/补充核对意见/);assert.equal(parent.shore[0].status,'本地保存，未发送');assert.ok(parent.conversations.captain.some(m=>m.shoreId===parent.shore[0].id));assert.equal(parent.phase,'decision')
 })

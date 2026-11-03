@@ -25,12 +25,13 @@ export function observationChain(state,eventId){
 
 // A separate event owns observation samples and decisions; source tasks stay in
 // their original event. The source report is a read-only submission snapshot.
-export function createObservationEvent(state,parent,task,{at=new Date().toISOString(),reason,migrate=false}={}){
+export function createObservationEvent(state,parent,task,{at=new Date().toISOString(),reason,migrate=false,plan}={}){
  const report=parent.reports.findLast(r=>r.taskId===task.id)
  if(!report)throw Error('请先提交本轮报告，再创建效果观察事件。')
  const id=`${parent.id}-observation-${report.id}`
  if(state.events[id])return state.events[id]
  const source=copy(task),policy=observationPolicy(parent)
+ source.status='submitted'
  source.observationMode=task.kind==='investigation'?'verification':'effect'
  if(!migrate){source.observationStartedAt=at;delete source.observation;delete source.observationHistory;delete source.observationResumedAt}
  source.observationStartedAt||=observationStart(source)
@@ -38,8 +39,10 @@ export function createObservationEvent(state,parent,task,{at=new Date().toISOStr
  const oldPhase=parent.phases.at(-1),start=Date.parse(observationStart(source))
  const observing={id:`${id}-start`,kind:'review',label:'效果观察',at,reportId:report.id,observationTaskId:source.id,observationWaiting:true,observationIntervalMs:policy.intervalMs,observationDueAt:new Date(start+policy.intervalMs).toISOString()}
  if(migrate)Object.assign(observing,...['observationWaiting','observationReview','observationCompletedAt','observationDueAt'].filter(k=>oldPhase[k]!==undefined).map(k=>({[k]:oldPhase[k]})))
+ if(plan){observing.observationPlan=copy(plan);observing.observationDueAt=plan.dueAt;observing.observationIntervalMs=Date.parse(plan.dueAt)-Date.parse(at)}
  const title=parent.title.replace(/ · 效果观察$/,'')+' · 效果观察'
  const event={id,number:parent.number+'-OBS-'+String((parent.observationEventIds||[]).length+1).padStart(2,'0'),title,type:'效果观察',device:parent.device,tracking:parent.tracking,sourceEventId:evidenceEventId(parent),parentEventId:parent.id,sourceTaskId:task.id,sourceReportId:report.id,createdAt:at,phase:'review',status:observing.observationWaiting?'效果观察中':'待观察确认',currentTask:null,tasks:[],reports:[{...copy(report),linkedSource:true}],decisions:[],shore:[],participants:[...parent.participants],maintenance:null,phases:[observing],brief:{...copy(parent.brief),conclusion:`${task.kind==='investigation'?'排查':'作业'}已回交，继续核对原异常是否持续、恢复或复发。`,discovery:{...copy(parent.brief.discovery),at,label:'关联报告 → 效果观察'}},observationSource:{parentEventId:parent.id,taskId:task.id,reportId:report.id,task:source},conversations:{captain:[{id:id+'-receipt',kind:'receipt',title:'效果观察事件已建立',text:reason||'依据本轮报告继续观察，原事件与作业记录保留。',at}],engineer:[]},unread:{captain:!observing.observationWaiting,engineer:false}}
+ if(plan)event.observationPlan=copy(plan)
  state.events[id]=event
  event.sourceConclusion=parent.sourceConclusion||parent.brief.conclusion
  parent.observationEventIds||=[];parent.observationEventIds.push(id)

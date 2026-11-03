@@ -1,10 +1,11 @@
+import {ownsTask,capabilities} from './lifecyclePermissions.js'
 import {people,pendingDecision,taskName} from './eventLifecycle.js'
 
 export const taskLocation=task=>({path:'/tasks/'+task.id})
 export const taskTitle=task=>task.title||`第${task.round}轮${taskName(task)}任务 · ${task.steps?.[0]?.short||task.steps?.[0]?.label||'现场执行'}`
 export const taskNumber=(event,task)=>task.number||`${event.number?.replace('EVT','TSK')||event.id}-${String(event.tasks.indexOf(task)+1).padStart(2,'0')}`
-export const canViewTask=(role,task)=>Boolean(task&&(role==='captain'||role==='engineer'&&task.owner===people.engineer))
-export const canExecuteTask=(state,event,task)=>state.role==='engineer'&&canViewTask(state.role,task)&&task.status==='assigned'&&event.currentTask===task.id
+export const canViewTask=(role,task)=>Boolean(task&&people[role]&&(role==='captain'||ownsTask(role,task)||task.assignedBy===people[role]))
+export const canExecuteTask=(state,event,task)=>ownsTask(state.role,task)&&task.status==='assigned'&&event.currentTask===task.id
 export function findTask(state,id){
  for(const event of Object.values(state.events)){
   const task=event.tasks.find(t=>t.id===id)
@@ -18,7 +19,7 @@ const decisionLabels={investigate:'派发排查',repair:'派发维修',maintenan
 export function decisionWorkItem(event){
  const phase=event.phases.at(-1),task=event.tasks.find(t=>t.id===event.currentTask)
  const label=event.phase==='reminder'?'评估风险并安排排查':event.phase==='decision'?'审阅排查结果并决定下一步':phase?.observationReview?'审阅观察结果并确认后续安排':'审阅作业结果并决定后续安排'
- return {id:'decision:'+event.id+':'+phase.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策 / 确认',eventType:event.type,title:label,summary:event.phase==='reminder'?event.brief.conclusion:event.reports.findLast(r=>r.taskId===task?.id)?.summary||event.brief.conclusion,owner:people.captain,status:'待我处理',at:phase.observationCompletedAt||(event.phase==='reminder'?event.createdAt:null)||phase.at,location:{path:'/situation/issue/'+event.id,query:{from:'tasks'}},actionLabel:'查看并决策'}
+ return {id:'decision:'+event.id+':'+phase.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策 / 确认',eventType:event.type,title:label,summary:event.phase==='reminder'?event.brief.conclusion:event.reports.findLast(r=>r.taskId===task?.id)?.summary||event.brief.conclusion,owner:people.captain,status:'待我处理',at:phase.observationCompletedAt||(event.phase==='reminder'?event.createdAt:null)||phase.at,location:{path:'/situation/issue/'+event.id,query:{from:'workbench'}},actionLabel:'查看并决策'}
 }
 export function lifecycleWorkItems(state){
  const role=state.role,actor=people[role],tasks=[],pending=[],completed=[]
@@ -27,9 +28,9 @@ export function lifecycleWorkItems(state){
   for(const task of event.tasks){
    if(!canViewTask(role,task))continue
    const report=event.reports.findLast(r=>r.taskId===task.id),submitted=task.status==='submitted',done=task.goalStatus==='completed'
-   const item={id:'task:'+task.id,taskId:task.id,kind:'task',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:taskName(task)+'任务',eventType:event.type,title:taskTitle(task),number:taskNumber(event,task),summary:submitted?report?.summary||task.summary:task.scope,owner:task.owner,assignedBy:task.assignedBy||people.captain,deadline:task.deadline,at:task.resumedAt||task.assignedAt,completedAt:task.submittedAt,waiting:task.status==='waiting',status:task.status==='waiting'?'等待条件':task.status==='terminated'?'已终止':task.status==='reporting'?'报告生成中':task.status==='report-error'?'报告待生成':done?'已完成':submitted?(task.goalStatus==='unresolved'?'目标未完成':'反馈待审阅'):'待执行',done,progress:(submitted?task.records:task.draft?.records||[]).filter(r=>r.result).length,total:task.steps.length,location:taskLocation(task),actionLabel:task.status==='waiting'?'查看等待条件':submitted?'查看任务记录':canExecuteTask(state,event,task)?'执行任务':'查看执行进度'}
+   const item={id:'task:'+task.id,taskId:task.id,kind:'task',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:taskName(task)+'任务',eventType:event.type,title:taskTitle(task),number:taskNumber(event,task),summary:task.status==='waiting'?task.waiting.reason:submitted?report?.summary||task.summary:task.scope,owner:task.owner,assignedBy:task.assignedBy||people.captain,deadline:task.deadline,at:task.resumedAt||task.assignedAt,completedAt:task.submittedAt,waiting:task.status==='waiting',status:task.status==='waiting'?'等待条件':task.status==='terminated'?'已终止':task.status==='reporting'?'报告生成中':task.status==='report-error'?'报告待生成':done?'已完成':submitted?(task.goalStatus==='unresolved'?'目标未完成':'反馈待审阅'):'待执行',done,progress:(submitted?task.records:task.draft?.records||[]).filter(r=>r.result).length,total:task.steps.length,location:taskLocation(task),actionLabel:task.status==='waiting'?'查看等待条件':submitted?'查看任务记录':canExecuteTask(state,event,task)?'执行任务':'查看执行进度'}
    tasks.push(item)
-   if(canExecuteTask(state,event,task)||role==='engineer'&&task.owner===actor&&['report-error','waiting'].includes(task.status)){if(task.status==='report-error')item.actionLabel='重新生成报告';pending.push(item)}
+   if(canExecuteTask(state,event,task)||ownsTask(role,task)&&['report-error','waiting'].includes(task.status)){if(task.status==='report-error')item.actionLabel='重新生成报告';pending.push(item)}
    if(done&&(task.owner===actor||item.assignedBy===actor))completed.push({...item,at:task.submittedAt})
    if(role==='captain'&&item.assignedBy===actor&&!event.decisions.some(d=>d.taskId===task.id&&['investigate','repair','maintenance','recheck'].includes(d.action))){
     completed.push({id:'legacy-dispatch:'+task.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策记录',eventType:event.type,title:'派发'+taskName(task),summary:task.scope,owner:actor,status:'已完成',at:task.assignedAt,done:true,location:{path:'/situation/issue/'+event.id,query:{from:'tasks',phase:task.id}},actionLabel:'查看处置记录'})
@@ -44,7 +45,7 @@ export function lifecycleWorkItems(state){
    completed.push({id:'decision-record:'+decision.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策记录',eventType:event.type,title:decisionLabels[decision.action]||'处置决定',summary:decision.reason,owner:decision.owner,status:'已完成',at:decision.at,done:true,location:{path:'/situation/issue/'+event.id,query:{from:'tasks',...(phaseId?{phase:phaseId}:{})}},actionLabel:'查看处置记录'})
   }
  }
- const assigned=role==='captain'?tasks.filter(t=>t.assignedBy===actor):[]
+ const assigned=tasks.filter(t=>t.assignedBy===actor)
  const all=role==='captain'?[...tasks,...pending.filter(i=>i.kind==='decision'),...completed.filter(i=>i.kind==='decision')]:tasks
  return {pending:pending.sort(newest),assigned:assigned.sort(newest),completed:completed.sort(newest),all:all.sort(newest)}
 }
@@ -53,6 +54,7 @@ export function lifecycleWorkItems(state){
 // Stable work-item IDs keep reminders across reloads without making new notices.
 export function workItemPresentation(item,event,supplement){
  if(item.kind==='decision'&&item.done)return {name:item.eventTitle,progress:item.title,title:item.eventTitle+'（'+item.title+'）',text:'负责人：'+item.owner+' · '+item.status}
+ if(item.kind==='dispatch')return {name:item.eventTitle,progress:'待派发',title:item.title,text:item.summary}
  const phase=event.phases.at(-1),task=event.tasks.find(t=>t.id===event.currentTask)
  const name=item.kind==='task'?item.title:item.eventTitle
  const progress=supplement?'报告补充待审阅':item.kind==='task'?item.status:event.phase==='reminder'?'待决策':phase?.observationReview?'观察待确认':task?.kind==='investigation'?'排查待审阅':'作业待审阅'
@@ -72,7 +74,7 @@ export function lifecycleNotifications(state){
   // Do not resurrect old handoffs after their work has been completed.
   if(n.taskId&&event.tasks.find(t=>t.id===n.taskId)?.status!=='assigned')return []
   if(/收到新的.+任务|已回交，待您决策/.test(n.title))return []
-  return [{...n,name:event.title,progress:n.title,title:event.title+'（'+n.title+'）',text:'负责人：'+(state.role==='captain'?people.captain:people.engineer)+' · '+event.status,location:{path:'/situation/issue/'+event.id,query:{from:'tasks',...(n.reportId?{report:n.reportId}:{})}},pending:false}]
+  return [{...n,name:event.title,progress:n.title,title:event.title+'（'+n.title+'）',text:'负责人：'+people[state.role]+' · '+event.status,location:{path:'/situation/issue/'+event.id,query:{from:'tasks',...(n.reportId?{report:n.reportId}:{})}},pending:false}]
  })
  return [...pending,...updates].sort(newest)
 }

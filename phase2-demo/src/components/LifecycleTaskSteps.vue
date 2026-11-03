@@ -6,14 +6,14 @@
   <form v-if="step" class="lc-step-editor" @submit.prevent="next">
    <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :number="index+1" :step="step" :compact="repair"/><RecordGuidance v-if="!step.substeps?.length" :text="step.recordHint"/></div>
    <div class="lc-task-feedback"><fieldset><legend>{{task.kind==='investigation'?'检查结果':'作业反馈'}}</legend><label v-for="option in step.options" :key="option" :class="{selected:record.result===option}"><input type="radio" :name="task.id+'-'+index" v-model="record.result" :value="option" required/>{{option}}</label></fieldset>
-   <LifecycleNoteEditor :key="task.id+'-'+index" v-model="record.note" :rows="repair?2:3" :context="step.label" :placeholder="'记录实际发现、措施与未完成原因。'"/></div>
+   <label v-if="/无法确认|受限/.test(record.result||'')" class="execution-confirmation">本步骤实际执行情况<select v-model="record.executionStatus" required><option value="">请选择</option><option>已完成</option><option>未完成</option></select><small>已完成检查但原因未明，与检查尚未实施分别记录。</small></label><LifecycleNoteEditor :key="task.id+'-'+index" v-model="record.note" :rows="repair?2:3" :context="step.label" :placeholder="'记录实际发现、措施与未完成原因。'"/></div>
    <p v-if="error" role="alert" class="lc-error">{{error}}</p>
    <footer><button type="button" :disabled="index===0" @click="go(index-1)">上一步</button><small>{{index+1}} / {{task.steps.length}}</small><button type="submit" class="lc-primary">{{index===task.steps.length-1?'下一步：汇总提交':'下一步'}}</button></footer>
   </form>
   <form v-else class="lc-step-editor" @submit.prevent="submit">
    <h3>{{task.kind==='investigation'?'原因判断与排查结论':'实际措施、复测结果与剩余事项'}}</h3>
    <div class="lc-step-review"><div v-for="(r,i) in task.draft.records" :key="i"><strong>{{r.label}}</strong><span>{{r.result||'待填写'}}</span><button type="button" @click="go(i)">修改</button><p v-if="r.note">{{r.note}}</p></div></div>
-   <LifecycleNoteEditor :key="task.id+'-summary'" v-model="task.draft.summary" :label="task.kind==='investigation'?'排查结论':'作业结论'" :context="task.title" required :rows="5" placeholder="写明实际完成的内容、结果与尚待核实事项。"/>
+   <LifecycleNoteEditor :key="task.id+'-summary'" v-model="task.draft.summary" :label="task.kind==='investigation'?'排查结论':'作业结论'" :context="task.title+'：根据全部步骤整理事实摘要，保留原因未明和未完成项，不添加推断'" :source-text="allStepFacts" required :rows="5" placeholder="写明实际完成的内容、结果与尚待核实事项。"/>
    <p v-if="task.draft.attachments.length" class="lc-muted">已关联：{{task.draft.attachments.map(a=>a.name).join('、')}}</p>
    <p v-if="error" role="alert" class="lc-error">{{error}}</p>
    <footer><button type="button" @click="go(task.steps.length-1)">上一步</button><small>提交后交轮机长决策</small><button type="submit" class="lc-primary">提交{{taskName(task)}}报告</button></footer>
@@ -21,7 +21,7 @@
  </section>
 </template>
 <script setup>
-import {computed,ref} from 'vue'
+import {computed,ref,watch} from 'vue'
 import LifecycleStepInstructions from './LifecycleStepInstructions.vue'
 import RecordGuidance from './RecordGuidance.vue'
 import LifecycleNoteEditor from './LifecycleNoteEditor.vue'
@@ -30,6 +30,8 @@ import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}}),emit=defineEmits(['submitted']),store=useEventLifecycleStore(),error=ref('')
 const index=computed({get:()=>Math.min(props.task.draft.stepIndex||0,props.task.steps.length),set:value=>props.task.draft.stepIndex=value})
 const step=computed(()=>props.task.steps[index.value]),record=computed(()=>props.task.draft.records[index.value])
+const allStepFacts=computed(()=>props.task.draft.records.map(r=>r.label+'：'+r.result+'；'+(r.executionStatus||'')+'；'+r.note).join('\n')+'\n执行人补充：'+props.task.draft.summary)
+watch(()=>[props.task.draft.records,props.task.draft.summary,props.task.draft.attachments],()=>{props.task.draft.updatedAt=new Date().toISOString()},{deep:true})
 const repair=computed(()=>['repair','maintenance'].includes(props.task.kind))
 function go(i){error.value='';index.value=i}
 function next(){if(!record.value.result){error.value='请选择本步骤的实际结果。';return}go(index.value+1)}
@@ -45,5 +47,5 @@ async function submit(){try{await store.submit(props.event.id,props.task.id);emi
 
 <style scoped>
 .lc-task-feedback{display:flex;flex-direction:column;gap:8px;grid-column:1/-1}.lc-task-feedback fieldset{flex:none}.lc-task-feedback legend{margin-bottom:6px}.lc-task-feedback fieldset label{margin-bottom:2px}.lc-task-feedback :deep(.note-editor){gap:6px}.lc-repair-wizard .lc-task-feedback :deep(textarea){min-height:92px;height:92px;padding-bottom:38px}.lc-repair-wizard .lc-step-editor{gap:8px}.lc-repair-wizard .lc-step-instructions :deep(.record-guidance){margin:5px 0}.lc-repair-wizard .lc-step-instructions :deep(.instruction-list){margin:4px 0}.lc-repair-wizard .lc-step-instructions :deep(.instruction-list>li){padding:1px 0!important}
-@media(min-width:1101px){.lc-repair-wizard .lc-task-feedback{display:grid;grid-template-columns:minmax(225px,300px) minmax(0,1fr);gap:18px;align-items:start}.lc-repair-wizard .lc-step-editor :deep(.note-input textarea){font-size:13px}}
+@media(min-width:1101px){.lc-repair-wizard .lc-task-feedback{display:flex;flex-direction:column;gap:14px;align-items:stretch}.lc-repair-wizard .lc-step-editor :deep(.note-input textarea){font-size:13px}}
 </style>

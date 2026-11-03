@@ -22,7 +22,7 @@
           {{ statusLabel }}
         </span>
       </div>
-      <button class="header-role-switch" type="button" :aria-label="lifecycle.state.role==='captain'?'切换为大管轮':'切换为轮机长'" @click="lifecycle.setRole(lifecycle.state.role==='captain'?'engineer':'captain')"><span>{{lifecycle.state.role==='captain'?'轮机长':'大管轮'}}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4 4-4-4 4-4"/></svg></button>
+      <select class="header-role-switch" aria-label="切换角色" :value="lifecycle.state.role" @change="lifecycle.setRole($event.target.value)"><option value="captain">轮机长</option><option value="engineer">大管轮</option><option value="secondEngineer">二管轮</option></select>
       <LifecycleNotifications />
       <span class="header-time">{{ currentTime }}</span>
     </div>
@@ -49,7 +49,7 @@ const route = useRoute()
 const router = useRouter()
 const displayShipName=computed(()=>route.path.startsWith('/situation')||route.path.startsWith('/reports')||route.path.startsWith('/tasks/')||['/issues','/event'].includes(route.path)?'长航碧玉':shipInfo.name)
 const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
-const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')?(route.query.from==='tasks'?'待办中心':'事件中心'):route.meta.title || '船舶设备检修助手')
+const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')?(route.query.from==='tasks'?'我的任务':'事件中心'):route.meta.title || '船舶设备检修助手')
 const detailTitle = computed(() => {
   if (selectedEvent.value) return selectedEvent.value.title
   if (route.path.startsWith('/inspection')) {

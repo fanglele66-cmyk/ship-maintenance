@@ -1,13 +1,14 @@
+import {decide} from './helpers/confirmed-decision.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {Readable} from 'node:stream'
-import {createLifecycleState,decide,submitTask,currentTask,decisionOptions,ensureTaskPlan,people} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,submitTask,currentTask,decisionOptions,ensureTaskPlan,people} from '../src/workflow/eventLifecycle.js'
 import {acceptTaskPlan,normalizeTaskPlan,taskPlanKey} from '../src/workflow/taskPlanning.js'
 import {createAiHandler} from '../server/ai-api.mjs'
 const id='real-alarm-0430',deadline=()=>new Date(Date.now()+86400000).toISOString()
 const generated={scope:'核对上一轮未覆盖的二缸测量链路与报警时序。',rationale:'ICU机械动作与燃油供给未见异常，需要区分测温偏移与瞬态指令差异。',steps:[{label:'独立校验二缸测温链路',guide:'对照独立测温与采集通道，核实传感器、端子及时间对齐。',checks:['记录同刻测量结果与方法。'],recordHint:'提交独立读数、时间、对照结果与未确认项。'}]}
 function dispatch(state,action){state.role='captain';const plan=ensureTaskPlan(state.events[id]);decide(state,id,{action,owner:people.engineer,deadline:deadline(),reason:plan.scope||'核对本轮范围。'})}
-function submit(state,results){state.role='engineer';const task=currentTask(state.events[id]);task.draft.records.forEach((r,i)=>r.result=results?.[i]||task.steps[i].options[0]);task.draft.summary='实际检查结果已逐项登记，未实施范围外处理。';submitTask(state,id)}
+function submit(state,results){state.role='engineer';const task=currentTask(state.events[id]);task.draft.records.forEach((r,i)=>{r.result=results?.[i]||task.steps[i].options[0];r.executionStatus='已完成'});task.draft.summary='实际检查结果已逐项登记，未实施范围外处理。';submitTask(state,id)}
 function accept(state,plan=generated){const event=state.events[id],draft=ensureTaskPlan(event);return acceptTaskPlan(event,{key:draft.key,version:draft.version},{plan,usage:{inputTokens:1,outputTokens:2},sources:[]})}
 test('a pre-dispatch preview is not an assigned task; edited steps are the dispatched steps',()=>{
  const state=createLifecycleState(),event=state.events[id],draft=ensureTaskPlan(event)
@@ -22,7 +23,7 @@ for(const results of [['未见异常','未见异常'],['无法确认','未见异
  assert.deepEqual(decisionOptions(event).map(o=>o.value),['investigate','observe','close','shore']);assert.equal(ensureTaskPlan(event).steps.length,0)
  assert.throws(()=>dispatch(state,'repair'),/当前阶段/);assert.throws(()=>dispatch(state,'investigate'),/尚未生成/)
  const plan=accept(state);assert.notDeepEqual(plan.steps,first.steps);dispatch(state,'investigate')
- assert.equal(currentTask(event).round,2);assert.equal(currentTask(event).sourceReportId,report.id);assert.deepEqual({...event.tasks[0],goalStatus:first.goalStatus,reviewedAt:undefined},{...first,reviewedAt:undefined});assert.equal(event.tasks[0].goalStatus,results.includes('无法确认')?'unresolved':'completed');assert.deepEqual(event.reports[0],report)
+ assert.equal(currentTask(event).round,2);assert.equal(currentTask(event).sourceReportId,report.id);assert.deepEqual({...event.tasks[0],goalStatus:first.goalStatus,reviewedAt:undefined},{...first,reviewedAt:undefined});assert.equal(event.tasks[0].goalStatus,'completed');assert.deepEqual(event.reports[0],report)
 })
 test('one abnormal finding wins over normal and unknown findings and forbids repeat investigation',()=>{
  for(const other of ['未见异常','无法确认']){

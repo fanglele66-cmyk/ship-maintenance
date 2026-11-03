@@ -2,17 +2,17 @@
  <form class="lc-form" @submit.prevent="submit" :aria-label="shoreOnly?'岸基同步表单':captain?'轮机长处置表单':'执行反馈表单'">
   <template v-if="captain">
    <LifecycleDecisionBasis v-if="showBasis&&!shoreOnly" :event="event" :action="decision.action"/>
-   <p v-if="shoreOnly" class="lc-muted">将事件与闭环报告发送岸基，事件保持已闭环。</p>
+   <p v-if="shoreOnly" class="lc-muted">将情况摘要保存为上报记录，事件状态与船上工作保持不变。</p>
    <div v-if="!shoreOnly" class="decision-choice-bar"><fieldset class="decision-options"><legend>选择本次决策</legend><label v-for="o in options" :key="o.value" :class="{selected:decision.action===o.value}"><input type="radio" name="decision-action" v-model="decision.action" :value="o.value" @change="changeAction"/>{{o.label}}</label></fieldset><button v-if="dispatch" type="button" class="decision-plan-link" @click="$emit('plan',decision.action)">查看{{planTabLabel(decision.action)}} ↗</button></div>
-   <template v-if="decision.action"><label v-if="decision.action==='shore'" class="shore-editor"><span class="shore-title">{{latestReport?.title}}</span><textarea aria-label="编辑同步报告" v-model="decision.shoreMarkdown" required rows="15"/></label>
-    <label>{{dispatch?'安排范围与依据':decision.action==='shore'?'同步内容与岸基支持需求':'决定依据与后续安排'}}<textarea v-model="reason" :disabled="dispatch&&plan?.status!=='ready'" required rows="3" :placeholder="dispatch?'明确检查/处理对象、已确认原因及本轮要求':'说明判断依据、设备安全影响与后续安排'"/></label>
-    <label v-if="decision.action==='resume'">恢复后的完成时限<input type="datetime-local" v-model="decision.deadline" required/></label><template v-if="dispatch">
-     <label>负责人<select v-model="decision.owner" required><option :value="people.engineer">{{people.engineer}}</option></select></label>
+   <template v-if="decision.action"><section v-if="decision.action==='shore'&&decision.shoreSituation" class="shore-editor"><p>摘要仅保存到本地记录，尚未连接岸端发送服务。</p><label v-for="field in shoreFields" :key="field.key">{{field.label}}<textarea v-model="decision.shoreSituation[field.key]" :required="field.key==='situation'" rows="2"/></label></section>
+    <label v-if="!dispatch&&!['shore','observe'].includes(decision.action)">决定依据与后续安排<textarea v-model="reason" required rows="3" placeholder="说明判断依据、设备安全影响与后续安排"/></label>
+    <label v-if="decision.action==='resume'">恢复后的完成时限（不调整可留空）<input type="datetime-local" v-model="decision.deadline"/></label><template v-if="dispatch">
+     <label>负责人<select v-model="decision.owner" required><option v-for="person in executors" :key="person.role" :value="person.name">{{person.name}}</option></select></label>
      <label>要求完成时间<input type="datetime-local" v-model="decision.deadline" required/></label>
      <template v-if="decision.action==='maintenance'"><label>维保计划<select aria-label="维保计划" v-model="decision.maintenancePlanId" required @change="changeMaintenancePlan"><option value="" disabled>选择要提前执行的维保计划</option><option v-for="item in plans" :key="item.id" :value="item.id">{{item.id}} · {{item.title}} · 工单 {{item.workOrder.number}}</option></select></label><p v-if="selectedMaintenance">正式工单：{{selectedMaintenance.workOrder.number}} · {{selectedMaintenance.workOrder.status}}<br/>{{selectedMaintenance.workOrder.content.join('；')}}<br/><small>计划与工单一并关联，正式完工状态单独确认。</small></p><label>靠港检修时间<select aria-label="靠港检修时间" v-model="decision.window" required @change="changeWindow"><option value="" disabled>选择适合的靠港停机窗口</option><option v-for="item in windows" :key="item.id" :value="item.id">{{item.label}}</option></select></label><p v-if="!windows.length" class="lc-error">当前没有可用的靠港检修窗口，请更新航次计划后安排。</p></template>
     </template>
     <div class="lc-plan-preview" v-if="dispatch"><strong>{{planTabLabel(decision.action)}}</strong><ol v-if="plan?.steps.length"><li v-for="step in plan.steps" :key="step.label">{{step.label}}</li></ol><small>{{plan?.status==='ready'?decision.action==='maintenance'?'将按所选维保计划提前执行，范围与步骤随任务保存。':'派发将采用任务 Tab 中的当前范围与步骤。':plan?.error||'AI 正在预生成任务，请完成后核对。'}}</small></div>
-    <button class="lc-primary" type="submit" :disabled="dispatch&&plan?.status!=='ready'">{{submitLabel}}</button>
+    <LifecycleConfirmationFields :event="event" :draft="decision" :action="decision.action"/><button class="lc-primary" type="submit" :disabled="dispatch&&plan?.status!=='ready'">{{submitLabel}}</button>
    </template>
   </template>
   <template v-else-if="task?.status==='assigned'">
@@ -33,22 +33,25 @@ import {maintenancePlans,availableMaintenanceWindows} from '../workflow/maintena
 import {planTabLabel} from '../workflow/taskPlanning'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {latestShoreReport} from '../workflow/shoreReports.js'
+import LifecycleConfirmationFields from './LifecycleConfirmationFields.vue'
+import {executors} from '../workflow/lifecyclePermissions.js'
 import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
 const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded','plan'])
-const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event))
-const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,deadline:'',maintenancePlanId:'',window:''}))
+const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event).filter(o=>props.event.decisionDraft?.action==='shore'?o.value==='shore':o.value!=='shore'))
+const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}))
 const latestReport=computed(()=>latestShoreReport(props.event))
-watch(()=>decision.value.action,action=>{if(action==='shore'&&latestReport.value){decision.value.shoreReportId=latestReport.value.id;decision.value.shoreBaseMarkdown=latestReport.value.markdown;decision.value.shoreMarkdown=latestReport.value.markdown;decision.value.shoreReason||='请岸基查阅本轮报告。'}},{immediate:true})
+const shoreFields=[{key:'situation',label:'当前情况'},{key:'actions',label:'已采取安排（选填）'},{key:'uncertainty',label:'尚未确认事项（选填）'},{key:'support',label:'需岸端知悉或支持事项（选填）'}]
+watch(()=>decision.value.action,action=>{if(action==='shore')decision.value.shoreSituation={situation:'',actions:'',uncertainty:'',support:''}},{immediate:true})
 const plan=computed(()=>captain.value&&suggestionAction(props.event)?ensureTaskPlan(props.event):null)
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))
-const reason=computed({get:()=>dispatch.value?plan.value?.scope||'':decision.value.action==='shore'?decision.value.shoreReason||'':decision.value.reason,set:value=>{if(dispatch.value&&plan.value){plan.value.scope=value;plan.value.version++}else if(decision.value.action==='shore')decision.value.shoreReason=value;else decision.value.reason=value}})
+const reason=computed({get:()=>dispatch.value||decision.value.action==='observe'?'':decision.value.action==='shore'?decision.value.shoreSituation?.situation||'':decision.value.reason||'',set:value=>{decision.value.reason=value}})
 watch(options,list=>{if(props.shoreOnly){decision.value.action=list.some(o=>o.value==='shore')?'shore':'';return}if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})
-const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'提交岸基同步',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
+const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'保存上报摘要',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
 const plans=computed(()=>maintenancePlans(props.event)),windows=computed(()=>availableMaintenanceWindows())
 const selectedMaintenance=computed(()=>plans.value.find(p=>p.id===decision.value.maintenancePlanId))
 function changeMaintenancePlan(){ensureTaskPlan(props.event);error.value=''}
 function changeWindow(){const item=windows.value.find(w=>w.id===decision.value.window);if(item)decision.value.deadline=item.end.slice(0,16);error.value=''}
-function changeAction(){error.value='';emit('expanded')}
-async function submit(){try{error.value='';const action=captain.value?decision.value.action:null;if(captain.value){store.decide(props.event.id,{...decision.value,reason:reason.value});if(action==='shore'){decision.value.action='';decision.value.shoreReason=''}else props.event.decisionDraft={action:'',reason:'',owner:people.engineer,deadline:'',maintenancePlanId:'',window:''}}else await store.submit(props.event.id,task.value?.id);emit('submitted',action)}catch(e){error.value=e.message}}
+function changeAction(){error.value='';decision.value.reason='';decision.value.evidence='';emit('expanded')}
+async function submit(){try{error.value='';const action=captain.value?decision.value.action:null;if(captain.value){store.decide(props.event.id,{...decision.value,reason:reason.value});if(action==='shore'){decision.value.action='';decision.value.shoreReason=''}else props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}}else await store.submit(props.event.id,task.value?.id);emit('submitted',action)}catch(e){error.value=e.message}}
 
 </script>

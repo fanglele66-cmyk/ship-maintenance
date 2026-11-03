@@ -1,18 +1,18 @@
 <template>
  <main class="task-center">
-  <header class="task-center-head"><div><h1>待办中心</h1><p>{{captain?'处理当前决策，跟进已派发的执行任务。':'按本次任务要求执行，完成后提交结果。'}}</p></div><label class="task-search"><span class="sr-only">搜索任务、事件或设备</span><input v-model="query" type="search" placeholder="搜索任务、事件或设备"/></label></header>
+  <header class="task-center-head"><div><h1>{{crossBusiness?'个人待办':'我的任务'}}</h1><p>{{crossBusiness?'汇总当前决策、执行与等待事项。':'执行本人任务，跟进本人派发的工作，保留历史记录。'}}</p></div><label class="task-search"><span class="sr-only">搜索任务、事件或设备</span><input v-model="query" type="search" placeholder="搜索任务、事件或设备"/></label></header>
   <nav class="task-center-tabs" aria-label="待办分类"><button v-for="item in tabs" :key="item.key" :class="{active:tab===item.key}" :aria-current="tab===item.key?'page':undefined" @click="selectTab(item.key)">{{item.label}}<span>{{work[item.key].length}}</span></button></nav>
   <section class="task-center-body">
    <div class="task-center-intro"><div class="task-intro-copy">
     <div class="task-intro-title"><h2>{{activeLabel}}</h2><label v-if="tab==='assigned'" class="task-history-filter">派发记录 <span class="task-select"><select v-model="assignedFilter" aria-label="派发记录"><option value="active">未完成</option><option value="all">全部历史</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
     <p>{{tabDescription}}</p>
-   </div><label class="task-type-filter">类型<span class="task-select"><select v-model="filter" aria-label="记录类型"><option value="">全部类型</option><option v-if="captain&&tab!=='assigned'" value="decision">决策与确认</option><option value="task">执行任务</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
+   </div><label class="task-type-filter">类型<span class="task-select"><select v-model="filter" aria-label="记录类型"><option value="">全部类型</option><option v-if="crossBusiness&&captain&&tab!=='assigned'" value="decision">决策与确认</option><option value="task">执行任务</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
    <div v-if="items.length" class="work-card-grid">
     <article v-for="item in items" :key="item.id" class="work-card" :class="{'is-decision':item.kind==='decision','is-done':item.done}" :data-work-id="item.id">
      <header><span class="work-kind">{{item.type}}</span><small>{{item.number||item.eventNumber}}</small><span class="work-state">{{item.status}}</span></header>
      <h3><button @click="open(item)" :title="cardTitle(item).title"><span class="work-name">{{cardTitle(item).name}}</span><span class="work-progress">（{{cardTitle(item).progress}}）</span></button></h3>
      <p class="work-summary">{{item.summary}}</p>
-     <div class="work-event"><span>关联事件</span><span>{{item.eventTitle}} · {{store.state.events[item.eventId]?.status}}</span></div>
+     <div class="work-event"><span>关联事件</span><span>{{item.eventTitle}} · {{eventState(store.state.events[item.eventId])}}</span></div>
      <dl><div><dt>{{item.kind==='task'?'执行人':'处理人'}}</dt><dd>{{item.owner}}</dd></div><div><dt>{{item.kind==='task'?'要求完成':'记录时间'}}</dt><dd>{{timeText(item.deadline||item.at)}}</dd></div></dl>
      <footer><span v-if="item.kind==='task'">{{item.progress}} / {{item.total}} 项{{item.done?'已提交':'已填写'}}</span><span v-else>{{item.device}} · {{item.eventType}}</span><button @click="open(item)">{{item.actionLabel}} <span aria-hidden="true">→</span></button></footer>
     </article>
@@ -22,21 +22,23 @@
  </main>
 </template>
 <script setup>
+import {eventState} from '../workflow/lifecyclePresentation.js'
+import {capabilities} from '../workflow/lifecyclePermissions.js'
 import {computed,ref,watch} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {timeText} from '../workflow/eventLifecycle'
 import {workItemPresentation} from '../workflow/lifecycleWorkItems'
 const store=useEventLifecycleStore(),route=useRoute(),router=useRouter(),query=ref(''),filter=ref(''),tab=ref('pending'),assignedFilter=ref('active')
-const captain=computed(()=>store.state.role==='captain'),work=computed(()=>store.workItems)
-const tabs=computed(()=>[{key:'pending',label:'待我处理'},...(captain.value?[{key:'assigned',label:'我派发的'}]:[]),{key:'completed',label:'已完成'},{key:'all',label:'全部记录'}])
+const captain=computed(()=>store.state.role==='captain'),crossBusiness=computed(()=>route.name==='SituationTodos'),work=computed(()=>Object.fromEntries(Object.entries(store.workItems).map(([key,items])=>[key,crossBusiness.value?items:items.filter(i=>i.kind==='task')])) )
+const tabs=computed(()=>[{key:'pending',label:'待我处理'},...(capabilities[store.state.role]?.dispatch?[{key:'assigned',label:'我派发的'}]:[]),{key:'completed',label:'已完成'},{key:'all',label:'全部记录'}])
 const activeLabel=computed(()=>tabs.value.find(t=>t.key===tab.value)?.label)
-const tabDescription=computed(()=>({pending:'只显示当前需要本人执行、决策或确认的工作。',assigned:'查看本人派发的任务及执行进度；派发记录与执行人看到的是同一项任务。',completed:captain.value?'已完成的决策与确认记录，保留当时的处理依据。':'已提交的任务和报告，可回看本轮步骤及实际结果。',all:captain.value?'汇总本人可见的执行任务与决策记录。':'仅显示本人负责的任务及完成记录。'}[tab.value]))
+const tabDescription=computed(()=>({pending:crossBusiness.value?'显示当前需要本人执行、决策、派发或确认的工作；等待项保留原因。':'仅显示本人的已派发执行任务，等待任务保留。',assigned:'查看本人派发的任务及执行进度；派发记录与执行人看到的是同一项任务。',completed:crossBusiness.value?'保留已完成的工作与决策记录。':'按约定工作已完成的执行任务；AI 报告状态单独展示。',all:crossBusiness.value?'汇总本人可见的工作与决策记录。':'本人可见的执行任务历史，不包含事件决策。'}[tab.value]))
 const items=computed(()=>work.value[tab.value].filter(item=>(tab.value!=='assigned'||assignedFilter.value==='all'||!item.done)&&(!filter.value||item.kind===filter.value)&&[item.title,item.eventTitle,item.eventNumber,item.number,item.device,item.owner].join(' ').toLowerCase().includes(query.value.trim().toLowerCase())))
 function cardTitle(item){return workItemPresentation(item,store.state.events[item.eventId])}
-function selectTab(value){tab.value=value;filter.value='';router.replace({path:'/event',query:value==='pending'?{}:{view:value}})}
+function selectTab(value){tab.value=value;filter.value='';router.replace({path:crossBusiness.value?'/situation/todos':'/event',query:value==='pending'?{}:{view:value}})}
 function open(item){router.push({...item.location,query:{...item.location.query,returnView:tab.value}})}
-watch(()=>[route.name,route.query.view,store.state.role],()=>{if(route.name==='EventCenter')tab.value=tabs.value.some(t=>t.key===route.query.view)?route.query.view:'pending';else if(!tabs.value.some(t=>t.key===tab.value))tab.value='pending';filter.value=''},{immediate:true})
+watch(()=>[route.name,route.query.view,store.state.role],()=>{if(['EventCenter','SituationTodos'].includes(route.name))tab.value=tabs.value.some(t=>t.key===route.query.view)?route.query.view:'pending';else if(!tabs.value.some(t=>t.key===tab.value))tab.value='pending';filter.value=''},{immediate:true})
 </script>
 <style scoped>
 .work-card h3 button{display:flex;align-items:baseline;gap:5px;width:100%;min-width:0}.work-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.work-progress{flex:none;white-space:nowrap;font-size:12px;color:#a07e43}

@@ -1,8 +1,9 @@
+import {decide} from './helpers/confirmed-decision.mjs'
 import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {Readable} from 'node:stream'
-import {createLifecycleState,decide,submitTask,currentTask,decisionOptions,ensureTaskPlan,refreshLifecyclePresentation,people} from '../src/workflow/eventLifecycle.js'
+import {createLifecycleState,submitTask,currentTask,decisionOptions,ensureTaskPlan,refreshLifecyclePresentation,people} from '../src/workflow/eventLifecycle.js'
 import {acceptTaskPlan} from '../src/workflow/taskPlanning.js'
 import {applyReportSupplement} from '../src/workflow/reportRevisions.js'
 import {createAiHandler} from '../server/ai-api.mjs'
@@ -13,9 +14,9 @@ function dispatch(state,action){state.role='captain';const p=ensureTaskPlan(stat
 function submit(state,summary,result){state.role='engineer';const task=currentTask(state.events[id]);task.draft.records.forEach((r,i)=>{r.result=result||task.steps[i].options[0];r.note=`现场记录 ${i+1}：${summary}`});task.draft.summary=summary;return submitTask(state,id)}
 function repairState(){const s=createLifecycleState();dispatch(s,'investigate');const task=currentTask(s.events[id]);task.steps=task.steps.slice(0,1);task.draft.records=task.draft.records.slice(0,1);delete task.draft.records[0].package;submit(s,'二缸 ICU 伺服油液压活塞卡滞，电气连接未见异常。');return s}
 
-test('shore is report-gated and syncs only the reviewed latest report without changing work',()=>{
+test('shore is available before reporting and can sync a reviewed latest report without changing work',()=>{
  const state=createLifecycleState(),event=state.events[id]
- assert.ok(!decisionOptions(event).some(o=>o.value==='shore'));dispatch(state,'investigate');assert.ok(!decisionOptions(event).some(o=>o.value==='shore'));submit(state,'发现活塞卡滞。');state.role='captain'
+ assert.ok(decisionOptions(event).some(o=>o.value==='shore'));dispatch(state,'investigate');assert.ok(decisionOptions(event).some(o=>o.value==='shore'));submit(state,'发现活塞卡滞。');state.role='captain'
  const before=structuredClone({phase:event.phase,tasks:event.tasks,reports:event.reports});decide(state,id,shoreForm(event));assert.deepEqual({phase:event.phase,tasks:event.tasks,reports:event.reports},before)
  assert.equal(event.shore.at(-1).packet.reports.length,1);assert.equal(event.shore.at(-1).packet.reports[0].id,event.reports.at(-1).id)
 })

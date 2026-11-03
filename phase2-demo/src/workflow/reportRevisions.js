@@ -4,8 +4,8 @@ const fields=['evidence','interpretation','unverified','next']
 const copy=value=>JSON.parse(JSON.stringify(value))
 const prose=value=>String(value).replace(/^#{1,6}\s*/gm,'').trim()
 export function supplementaryReports(event,role){
- if(role!=='engineer'||event.phase==='closed')return []
- return event.reports.filter(r=>r.owner===people.engineer&&['排查报告','维修报告','维保作业报告'].includes(r.kind)&&event.tasks.some(t=>t.id===r.taskId&&t.status==='submitted'))
+ if(!people[role]||role==='captain'||event.phase==='closed')return []
+ return event.reports.filter(r=>r.owner===people[role]&&['排查报告','维修报告','维保作业报告'].includes(r.kind)&&event.tasks.some(t=>t.id===r.taskId&&t.status==='submitted'))
 }
 export function revisionAnalysis(patch){
  const labels=['证据与范围核对','原因解释与措施判断','待核实事项','建议处置']
@@ -19,7 +19,7 @@ export function applyReportSupplement(state,eventId,proposal){
  const patch=proposal.patch
  if(typeof patch?.summary!=='string'||!patch.summary.trim()||fields.some(k=>typeof patch.analysis?.[k]!=='string'||!patch.analysis[k].trim()))throw Error('修订内容不完整，原报告未修改。')
  const task=reportTask(event,report),at=new Date().toISOString(),before=copy({summary:report.summary,analysis:report.analysis,analysisMarkdown:report.analysisMarkdown,markdown:report.markdown,updatedAt:report.updatedAt||null})
- const revision={id:proposal.id,at,actor:people.engineer,text:proposal.text,model:proposal.model,sources:proposal.sources||[],before}
+ const revision={id:proposal.id,at,actor:people[state.role],text:proposal.text,model:proposal.model,sources:proposal.sources||[],before}
  const revisions=[...(report.revisions||[]),revision]
  const updated=makeReport(event,{...task,generatedReport:undefined,summary:prose(patch.summary)},report.id)
  const analysisMarkdown=revisionAnalysis(patch)
@@ -27,7 +27,7 @@ export function applyReportSupplement(state,eventId,proposal){
  Object.assign(report,updated,{analysisMarkdown,analysis:prose(patch.summary),revisions,updatedAt:at,original:report.original||before})
  proposal.applied=true
  event.unread.captain=true
- event.conversations.captain.push({id:'supplement-'+proposal.id,kind:'receipt',title:'报告补充已提交',text:`${people.engineer}补充了《${report.title}》，请复核更新后的结论与依据。`,reportId:report.id,at})
+ event.conversations.captain.push({id:'supplement-'+proposal.id,kind:'receipt',title:'报告补充已提交',text:`${people[state.role]}补充了《${report.title}》，请复核更新后的结论与依据。`,reportId:report.id,at})
  ;(state.notices||=[]).push({id:'notice-'+proposal.id,eventId,reportId:report.id,recipient:'captain',title:'报告已补充',text:report.title,at,read:false})
  return report
 }

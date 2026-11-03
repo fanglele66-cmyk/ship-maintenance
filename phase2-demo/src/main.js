@@ -17,3 +17,5 @@ app.use(router)
 
 router.onError(error=>window.__shipRecover?.(error))
 router.isReady().then(()=>{app.mount('#app');window.dispatchEvent(new Event('ship:ready'))}).catch(error=>window.__shipRecover?.(error))
+
+import './styles/typography.css'
