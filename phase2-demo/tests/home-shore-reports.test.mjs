@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,decide,people,ensureTaskPlan,currentTask,submitTask,pendingDecision} from '../src/workflow/eventLifecycle.js'
-import {shoreReportBasis,shoreReportEntries} from '../src/workflow/shoreReports.js'
+import {shoreReportBasis,shoreReportEntries,shoreReportPresentation} from '../src/workflow/shoreReports.js'
 import {createObservationEvent} from '../src/workflow/observationEvents.js'
 import {decisionStage,processingWorkItems,workbenchDetails} from '../src/workflow/workbenchDetails.js'
 const id='real-alarm-0430',future=()=>new Date(Date.now()+3600000).toISOString()
@@ -12,7 +12,7 @@ const shore={action:'shore',shoreIncludeHistory:true,shoreSituation:{situation:'
 test('Initial shore report has event basis, permits blank additions, and preserves pending decision',()=>{
  const s=createLifecycleState(),e=s.events[id],before=e.phase;decide(s,id,shore)
  assert.equal(e.phase,before);assert.equal(pendingDecision(e),true);assert.equal(e.reports.length,0)
- const r=e.shore[0];assert.equal(r.status,'本地保存，未发送');assert.match(r.syncedReport.markdown,new RegExp(e.title));assert.equal(r.syncedReport.includedReports.length,0)
+ const r=e.shore[0];assert.equal(r.status,'已上报岸基');assert.equal(r.delivery.mode,'prototype');assert.match(r.syncedReport.markdown,new RegExp(e.title));assert.equal(r.syncedReport.includedReports.length,0)
  assert.equal(shoreReportEntries(s)[0].id,r.id);s.role='engineer';assert.deepEqual(shoreReportEntries(s),[])
 })
 test('Shore snapshot includes related initial facts, task reports, observation and closure, excludes unrelated events and drafts',()=>{
@@ -24,7 +24,7 @@ test('Shore snapshot includes related initial facts, task reports, observation a
  t.draft.summary='交付后的私有草稿';t.draft.records[0].note='新草稿秘密'
  decide(s,obs.id,shore);const record=obs.shore[0],saved=JSON.stringify(record)
  assert.equal(record.syncedReport.events.length,2);assert.equal(record.syncedReport.includedReports.length,3)
- assert.match(record.syncedReport.markdown,/正式现场事实/);assert.match(record.syncedReport.markdown,/观察正文/);assert.match(record.syncedReport.markdown,/闭环正文/)
+ assert.match(record.syncedReport.markdown,/正式现场事实/);assert.match(record.syncedReport.markdown,/观察结果/);assert.equal(record.syncedReport.includedReports[1].markdown,'观察正文');assert.match(record.syncedReport.markdown,/闭环正文/)
  assert.doesNotMatch(saved,/新草稿秘密|交付后的私有草稿|四缸排温/)
  e.reports[0].markdown='新的 AI 内容';obs.reports.push({id:'later-report',markdown:'后来报告'});t.records[0].note='后来修订'
  assert.equal(JSON.stringify(record),saved)
@@ -50,4 +50,38 @@ test('Ongoing observation appears in processing, then moves to observation decis
  assert.deepEqual(processingWorkItems([e,obs]).map(i=>i.eventId),[obs.id]);assert.equal(decisionStage(obs),'效果观察中')
  assert.match(workbenchDetails(obs,{kind:'observation'}).join(' '),/系统持续观测.*计划汇报/)
  Object.assign(obs.phases.at(-1),{observationWaiting:false,observationReview:true});assert.equal(processingWorkItems([e,obs]).length,0);assert.equal(decisionStage(obs),'效果观察后决策')
+})
+
+
+test('Shore report integrates formal facts and additions into one account without pasting source documents',()=>{
+ const s=createLifecycleState(),e=s.events[id],t=assign(s);submit(s,t)
+ const report=e.reports[0];report.markdown+="\n\n独立报告内部导航，不应拼入上报正文";report.analysisMarkdown='### AI分析（原因与措施判断）\n\n需核对活塞动作与反馈是否一致。\n\n### 尚不能确认与未执行事项\n\n液压读数尚未复核。\n\n### AI后续建议\n\n取得复核读数后再安排。'
+ decide(s,id,{...shore,shoreSituation:{situation:'主机保持监测',actions:'已通知值班人员',uncertainty:'待核实执行压力',support:'请岸基提供同型机记录'}})
+ const r=e.shore[0].syncedReport,body=r.markdown
+ assert.equal(body.match(/^# /gm).length,1)
+ assert.doesNotMatch(body,/附录|独立报告内部导航|本次人工补充|尚未发送|本地保存/)
+ for(const phrase of ['正式现场事实','完成本轮排查','主机保持监测','已通知值班人员','待核实执行压力','请岸基提供同型机记录','液压读数尚未复核','取得复核读数后再安排'])assert.ok(body.includes(phrase),phrase)
+ assert.match(r.includedReports[0].markdown,/独立报告内部导航/)
+ assert.ok(body.indexOf('安排'+people.engineer)<body.indexOf('回交排查结果'))
+})
+
+test('Old full packets gain an integrated view using only their frozen facts',()=>{
+ const s=createLifecycleState(),e=s.events[id],t=assign(s);submit(s,t);decide(s,id,shore)
+ const record=e.shore[0];delete record.syncedReport.presentationVersion;record.syncedReport.markdown='旧拼接正文';const original=JSON.stringify(record)
+ e.brief.conclusion='后来的事件判断';e.reports[0].summary='后来的报告结论';t.records[0].note='后来的现场修改'
+ const shown=shoreReportPresentation(record)
+ assert.match(shown.markdown,/正式现场事实/);assert.doesNotMatch(shown.markdown,/后来的|旧拼接正文/)
+ assert.equal(JSON.stringify(record),original)
+ assert.equal(shoreReportEntries(s)[0].markdown,shown.markdown)
+})
+
+test('Resolved findings remain in the history, not in the current unresolved section',async()=>{
+ const {composeShoreNarrative}=await import('../src/workflow/shoreReportNarrative.js')
+ const event={id:'e',number:'E1',title:'压力复核',device:'主机',type:'预警事件',createdAt:'2026-11-03T00:00:00Z',status:'待决策',phase:'decision',brief:{conclusion:'压力偏低'},tasks:[]}
+ const record={label:'读取压力',result:'未完成',note:'现场条件暂不具备',executionStatus:'未完成'}
+ const first={id:'r1',taskId:'t',kind:'排查报告',at:'2026-11-03T01:00:00Z',submissionSnapshot:{kind:'investigation',records:[record],summary:'待条件具备'},summary:'待条件具备'}
+ const second={...first,id:'r2',at:'2026-11-03T02:00:00Z',submissionNumber:2,submissionSnapshot:{kind:'investigation',records:[{...record,result:'未见异常',note:'已完成表计核实',executionStatus:'已完成'}],summary:'完成复核'},summary:'完成复核'}
+ const body=composeShoreNarrative({events:[event],includedReports:[second,first],eventId:'e'})
+ assert.match(body,/现场条件暂不具备/);assert.match(body,/已完成表计核实/)
+ assert.doesNotMatch(body.split('## 当前判断与待解决事项')[1],/现场条件暂不具备|读取压力：未完成/)
 })

@@ -63,8 +63,8 @@ test('closed events offer a separate shore handoff without reopening stage forms
   })
   await t.test('the explicit closed shore form has no decision selector or dispatch basis',async()=>{
    const html=await render(closedFixture(),ActionForm,{shoreOnly:true})
-   assert.match(html,/岸基同步表单|提交岸基同步/)
-   assert.match(html,/同步内容与岸基支持需求/)
+   assert.match(html,/上报岸基表单/)
+   assert.match(html,/确认上报岸基/)
    assert.doesNotMatch(html,/本次处置|本轮决策依据|派发依据|<select/)
   })
  }finally{await server.close();if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow}

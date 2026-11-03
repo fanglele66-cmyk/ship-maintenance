@@ -1,6 +1,6 @@
 <template>
  <main class="lc-report-page" :class="{'lc-report-index':!route.params.reportId}">
-  <header><button @click="goBack">← {{route.params.reportId?'返回全部报告':'返回首页报告'}}</button><span>{{report?.kind||'报告中心'}}</span></header>
+  <header><button @click="goBack">← {{route.params.reportId?'返回全部报告':'返回首页'}}</button><span>{{report?.kind||'报告中心'}}</span></header>
   <article v-if="report"><div class="report-event-index"><RouterLink :to="{path:'/situation/issue/'+report.eventId,query:report.kind==='上报岸基报告'?{shore:report.id}:{}}">← 返回所属事件：{{store.state.events[report.eventId]?.title}} · {{report.eventNumber}}</RouterLink><p v-if="report.status">{{report.status}}</p><details v-if="report.includedReports?.length"><summary>本次收录 {{report.includedReports.length}} 份报告 · 查看原报告索引</summary><p>下列链接查看当前原报告；本页正文保留上报时的版本。</p><ul><li v-for="source in report.includedReports" :key="source.id"><RouterLink :to="'/reports/'+source.id">{{source.title}} ↗</RouterLink><RouterLink :to="'/situation/issue/'+source.eventId"> 所属事件 ↗</RouterLink></li></ul></details></div><LifecycleReport :report="report"/></article>
   <section v-else-if="!route.params.reportId" class="lc-report-library">
    <div class="lc-library-heading"><div><h1>全部报告</h1><p>按事件归集排查、维修、维保、观察、闭环及上报岸基报告。</p></div><span>{{filtered.length}} 份报告</span></div>
@@ -16,13 +16,14 @@
  </main>
 </template>
 <script setup>
-import {computed,ref} from 'vue'
+import {computed,ref,watch} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import LifecycleReport from '../components/LifecycleReport.vue'
 import {timeText} from '../workflow/eventLifecycle'
 const route=useRoute(),router=useRouter(),store=useEventLifecycleStore()
 const kinds=computed(()=>['全部','排查','维修','维保','观察','闭环',...(store.state.role==='captain'?['上报岸基']:[])]),kind=ref(kinds.value.includes(route.query.kind)?route.query.kind:'全部'),search=ref(String(route.query.q||''))
+watch(()=>[route.path,route.query.kind,route.query.q,store.state.role],()=>{if(route.path==='/reports'){kind.value=kinds.value.includes(route.query.kind)?route.query.kind:'全部';search.value=String(route.query.q||'')}})
 const allReports=computed(()=>[...store.reports.filter(r=>r.kind!=='工况报告'),...store.shoreReports].sort((a,b)=>String(b.at).localeCompare(String(a.at))))
 const report=computed(()=>allReports.value.find(r=>r.id===route.params.reportId&&r.kind!=='工况报告'))
 const category=r=>kinds.value.find(k=>k!=='全部'&&r.kind.startsWith(k))||r.kind
@@ -32,7 +33,7 @@ const filtered=computed(()=>allReports.value.filter(r=>{
 }))
 const filterQuery=()=>({...(kind.value==='全部'?{}:{kind:kind.value}),...(search.value?{q:search.value}:{})})
 function open(r){router.push({path:'/reports/'+r.id,query:filterQuery()})}
-function goBack(){router.push(route.params.reportId?{path:'/reports',query:filterQuery()}:{path:'/situation',query:{view:'reports'}})}
+function goBack(){router.push(route.params.reportId?{path:'/reports',query:filterQuery()}:{path:'/situation'})}
 </script>
 <style scoped>
 .report-event-index{margin-bottom:20px;padding:16px 20px;background:#faf8f2;border-radius:7px;font-size:14px;line-height:1.8}.report-event-index a,.lc-report-card dd a{color:#8a6c3d;text-decoration:none}.report-event-index a:hover,.lc-report-card dd a:hover{text-decoration:underline}.report-event-index summary{cursor:pointer}.report-event-index li{margin:7px 0}

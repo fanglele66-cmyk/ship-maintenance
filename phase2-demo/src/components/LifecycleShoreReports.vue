@@ -1,17 +1,18 @@
 <template>
  <section class="shore-history" aria-label="本事件上报岸基报告">
-  <header><h2>上报岸基报告</h2><p>保留每次上报时的内容，后续报告更新不会覆盖已保存版本。</p></header>
+  <header><h2>上报岸基报告</h2><p>保留每次上报时的内容，后续报告更新不会覆盖已上报版本。</p></header>
   <nav class="shore-versions" aria-label="历次上报记录"><button v-for="(record,index) in ordered" :key="record.id" :aria-pressed="current?.id===record.id" @click="selected=record.id">第 {{ordered.length-index}} 次 · {{timeText(record.at)}}</button></nav>
   <template v-if="current">
-   <p class="shore-status">{{current.status||'本地保存，未发送'}} · {{current.owner||'轮机长'}}</p>
+   <p class="shore-status">已上报岸基 · {{current.owner||'轮机长'}}</p>
    <details v-if="current.syncedReport?.includedReports?.length" class="shore-sources"><summary>本次收录 {{current.syncedReport.includedReports.length}} 份报告 · 原报告索引</summary><p>链接打开当前原报告；下方正文保留本次上报时的版本。</p><ul><li v-for="report in current.syncedReport.includedReports" :key="report.id"><RouterLink :to="'/reports/'+report.id">{{report.title}} ↗</RouterLink></li></ul></details>
-   <LifecycleReport :report="{...current.syncedReport,at:current.at}"/>
+   <LifecycleReport :report="{...shoreReportPresentation(current),at:current.at}"/>
   </template>
  </section>
 </template>
 <script setup>
 import {computed,ref,watch} from 'vue'
 import LifecycleReport from './LifecycleReport.vue'
+import {shoreReportPresentation} from '../workflow/shoreReports.js'
 import {timeText} from '../workflow/eventLifecycle.js'
 const props=defineProps({records:{type:Array,required:true},selectedId:{type:String,default:''}})
 const selected=ref(props.selectedId),ordered=computed(()=>[...props.records].reverse())

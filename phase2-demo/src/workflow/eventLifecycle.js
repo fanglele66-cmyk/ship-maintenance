@@ -126,7 +126,7 @@ export function refreshLifecyclePresentation(state){
    delete event.dispatchAuthorization
    event.unread.captain=true
   }
-  for(const item of event.shore||[])if(item.status?.includes('演示'))item.status='本地保存，未发送'
+  for(const item of event.shore||[]){item.status='已上报岸基';item.delivery||={mode:'prototype',submittedAt:item.at}}
   event.number=eventNumbers[event.id]||event.number
   if(event.status==='待处置决策')event.status='待决策'
   if(event.id==='real-warning-0523'){event.type='预警事件';event.brief.discovery.kind='ai-warning';event.brief.discovery.label='AI预警 → 关联研判'}
@@ -281,9 +281,9 @@ export function decide(state,id,form){
   advice(e,'captain',`本轮由系统继续观察，下一次汇总时间为 ${timeText(dueAt)}。`,'观察期间没有新的人员执行任务；本阶段结束后再提醒您审阅结果。')
   }
  }else if(action==='shore'){
-  const syncedReport={...shoreReportSnapshot(e,form,state),at,owner:actor(state)}
-  const record={id:uid('shore'),at,owner:actor(state),reason:form.reason,reportId:syncedReport.id,syncedReport,status:'本地保存，未发送',packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,reports:[syncedReport],at})};e.shore.push(record)
-  say(e,'captain','user','上报岸基：'+syncedReport.title+'。'+form.reason,{shoreId:record.id});advice(e,'captain','上报报告已保存在本事件的“上报岸基报告”页签，尚未发送岸基。',e.phase==='closed'?'当前状态为本地保存、尚未发送，事件保持已闭环，闭环报告与处置记录已保留。':'当前状态为本地保存、尚未发送，可继续处理船上任务。')
+  const syncedReport={...shoreReportSnapshot(e,form,state,at),at,owner:actor(state)}
+  const record={id:uid('shore'),at,owner:actor(state),reason:form.reason,reportId:syncedReport.id,syncedReport,status:'已上报岸基',delivery:{mode:'prototype',submittedAt:at},packet:copy({eventId:e.id,number:e.number,title:e.title,type:e.type,device:e.device,phase:e.phase,status:e.status,reports:[syncedReport],at})};e.shore.push(record)
+  say(e,'captain','user','上报岸基：'+syncedReport.title+'。'+form.reason,{shoreId:record.id});advice(e,'captain','已上报岸基，可在本事件的“上报岸基报告”页签查看内容。',e.phase==='closed'?'事件保持已闭环，闭环报告与处置记录已保留。':'本次上报不改变事件状态，可继续处理船上任务。')
  }else{
   for(const prior of observationTasks(e))if(prior.status==='submitted'&&hasObservation(prior)&&!prior.observationEndedAt)prior.observationEndedAt=at
   for(const prior of e.tasks){

@@ -16,7 +16,8 @@
         :class="{ active: isActive(item.path) }"
       >
         <!-- Icon -->
-        <span class="nav-icon" :style="{ '--nav-icon-url': `url(${item.icon})` }"></span>
+        <Document v-if="item.path==='/reports'" class="nav-icon nav-report-icon" aria-hidden="true"/>
+        <span v-else class="nav-icon" :style="{ '--nav-icon-url': `url(${item.icon})` }"></span>
         <span class="nav-label">{{ item.label }}</span>
         <!-- Unread badge -->
         <span
@@ -32,6 +33,7 @@
 </template>
 
 <script setup>
+import {Document} from '@element-plus/icons-vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useEventStore } from '@/stores/eventStore'
@@ -50,7 +52,7 @@ function isActive(path) {
   if(route.path.startsWith('/tasks/'))return path==='/event'
   const detail=route.path.startsWith('/situation/issue/')
   if(detail){if(route.query.from==='tasks')return path==='/event';if(route.query.from==='workbench')return path==='/situation';return path==='/issues'}
-  if(route.path.startsWith('/reports'))return path==='/situation'
+  if(route.path.startsWith('/reports'))return path==='/reports'
   const issueDetail = false
   if (path === '/issues') return route.path === '/issues' || issueDetail
   if (path === '/situation' && issueDetail) return false
@@ -75,6 +77,7 @@ const navItems = [
   { path: '/situation', label: '态势', icon: '/nav-icons/situation.svg' },
   { path: '/issues', label: '事件', icon: '/nav-icons/event.svg' },
   { path: '/event', label: '任务', icon: '/nav-icons/inspection.svg' },
+  { path: '/reports', label: '报告' },
   { path: '/knowledge', label: '知识库', icon: '/nav-icons/knowledge.svg' }
 ]
 </script>
@@ -156,6 +159,8 @@ const navItems = [
   transition: color 0.18s;
   display: block;
 }
+
+.nav-icon.nav-report-icon { background:none; mask:none; -webkit-mask:none; }
 
 .nav-label {
   font-size: 12px;

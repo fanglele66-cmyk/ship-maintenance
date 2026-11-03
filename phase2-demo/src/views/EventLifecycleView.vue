@@ -83,7 +83,7 @@ const tabs=computed(()=>{
  return core
 })
 function choosePhase(id){selected.value=visiblePhases.value.find(p=>p.id===id||p.aliases.includes(id))?.id||visiblePhases.value.at(-1)?.id||'';reportOverride.value=null;tab.value=tabs.value[0]}
-function afterSubmit(action){if(action==='shore'){openShoreReport(event.value.shore.at(-1)?.id);toast.value='上报报告已保存到本事件的“上报岸基报告”页签；尚未发送';setTimeout(()=>toast.value='',4000);return}if(action==='observe'&&event.value?.phase==='transferred'){router.push('/situation/issue/'+event.value.observationEventIds.at(-1));return;}if(event.value){choosePhase(event.value.phases.at(-1).id);if(route.name==='EventLifecycle')store.markRead(event.value.id)}}
+function afterSubmit(action){if(action==='shore'){openShoreReport(event.value.shore.at(-1)?.id);toast.value='已上报岸基，可在本事件的“上报岸基报告”页签查看';setTimeout(()=>toast.value='',4000);return}if(action==='observe'&&event.value?.phase==='transferred'){router.push('/situation/issue/'+event.value.observationEventIds.at(-1));return;}if(event.value){choosePhase(event.value.phases.at(-1).id);if(route.name==='EventLifecycle')store.markRead(event.value.id)}}
 function openShoreReport(id){if(!captain.value||!event.value?.shore?.some(r=>r.id===id))return;shoreOverride.value=id;tab.value='上报岸基报告'}
 function openReport(id){const p=event.value.phases.find(p=>p.reportId===id);if(p)choosePhase(p.id);reportOverride.value=id;tab.value=id===closeReport.value?.id?'闭环结果':'阶段报告'}
 function openPlan(action){if(typeof action==='string'&&['investigate','repair','maintenance','recheck'].includes(action)){event.value.decisionDraft||={};event.value.decisionDraft.action=action}choosePhase(event.value.phases.at(-1).id);if(pendingTab.value)tab.value=pendingTab.value}
