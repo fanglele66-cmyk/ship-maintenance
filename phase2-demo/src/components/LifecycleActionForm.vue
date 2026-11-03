@@ -4,7 +4,12 @@
    <LifecycleDecisionBasis v-if="showBasis&&!shoreOnly" :event="event" :action="decision.action"/>
    <p v-if="shoreOnly" class="lc-muted">汇集已有资料并上报岸基，事件状态与船上工作保持不变。</p>
    <div v-if="!shoreOnly" class="decision-choice-bar"><fieldset class="decision-options"><legend>选择本次决策</legend><label v-for="o in options" :key="o.value" :class="{selected:decision.action===o.value}"><input type="radio" name="decision-action" v-model="decision.action" :value="o.value" @change="changeAction"/>{{o.label}}</label></fieldset><button v-if="dispatch" type="button" class="decision-plan-link" @click="$emit('plan',decision.action)">查看{{planTabLabel(decision.action)}} ↗</button></div>
-   <template v-if="decision.action"><section v-if="decision.action==='shore'&&decision.shoreSituation" class="shore-editor"><p>已汇集关联事件的初始信息、处置记录及 {{shoreBasis.includedReports.length}} 份正式报告。确认后上报岸基，并保留本次报告。</p><details class="shore-basis"><summary>预览本次上报内容</summary><MarkdownContent :content="shoreBasis.markdown"/></details><label v-for="field in shoreFields" :key="field.key">{{field.label}}<textarea v-model="decision.shoreSituation[field.key]" rows="2"/></label></section>
+   <template v-if="decision.action"><section v-if="decision.action==='shore'&&decision.shoreDraftReport" class="shore-editor">
+     <p>{{decision.shoreDraftReport.sourceShoreId?'修改后重新上报，原上报版本保留。':'已汇集事件已有资料，可直接修改下方正文后上报。'}}已收录 {{decision.shoreDraftReport.includedReports?.length||0}} 份正式报告。</p>
+     <nav class="shore-editor-tabs" aria-label="上报报告编辑方式"><button type="button" :aria-pressed="!shorePreview" @click="shorePreview=false">编辑正文</button><button type="button" :aria-pressed="shorePreview" @click="shorePreview=true">预览报告</button></nav>
+     <div v-if="shorePreview" class="shore-body-preview"><MarkdownContent :content="decision.shoreMarkdown"/></div>
+     <label v-else class="shore-body-label">上报报告正文<textarea class="shore-body-input" v-model="decision.shoreMarkdown" required rows="16" placeholder="填写本次上报的完整内容"/></label>
+    </section>
     <label v-if="!dispatch&&!['shore','observe'].includes(decision.action)">决定依据与后续安排<textarea v-model="reason" required rows="3" placeholder="说明判断依据、设备安全影响与后续安排"/></label>
     <label v-if="decision.action==='resume'">恢复后的完成时限（不调整可留空）<input type="datetime-local" v-model="decision.deadline"/></label><template v-if="dispatch">
      <label>负责人<select v-model="decision.owner" required><option v-for="person in executors" :key="person.role" :value="person.name">{{person.name}}</option></select></label>
@@ -32,7 +37,7 @@ import {currentTask,decisionOptions,ensureTaskPlan,people} from '../workflow/eve
 import {maintenancePlans,availableMaintenanceWindows} from '../workflow/maintenancePlans'
 import {planTabLabel} from '../workflow/taskPlanning'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
-import {shoreReportBasis} from '../workflow/shoreReports.js'
+import {createShoreReportDraft} from '../workflow/shoreReports.js'
 import MarkdownContent from './MarkdownContent.vue'
 import LifecycleConfirmationFields from './LifecycleConfirmationFields.vue'
 import {executors} from '../workflow/lifecyclePermissions.js'
@@ -40,22 +45,21 @@ import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
 const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded','plan'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event).filter(o=>props.shoreOnly||props.event.decisionDraft?.action==='shore'?o.value==='shore':o.value!=='shore'))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}))
-const shoreBasis=computed(()=>decision.value.action==='shore'?shoreReportBasis(props.event,store.state,decision.value.shoreSituation):{includedReports:[],markdown:''})
-const shoreFields=[{key:'situation',label:'补充情况（选填）'},{key:'actions',label:'已采取安排（选填）'},{key:'uncertainty',label:'尚未确认事项（选填）'},{key:'support',label:'需岸端知悉或支持事项（选填）'}]
-watch(()=>decision.value.action,action=>{if(action==='shore'){decision.value.shoreIncludeHistory=true;decision.value.shoreSituation={situation:'',actions:'',uncertainty:'',support:''}}},{immediate:true})
+const shorePreview=ref(false)
 const plan=computed(()=>captain.value&&suggestionAction(props.event)?ensureTaskPlan(props.event):null)
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))
 const reason=computed({get:()=>dispatch.value||decision.value.action==='observe'?'':decision.value.action==='shore'?decision.value.shoreSituation?.situation||'':decision.value.reason||'',set:value=>{decision.value.reason=value}})
 watch(options,list=>{if(props.shoreOnly){decision.value.action=list.some(o=>o.value==='shore')?'shore':'';return}if(decision.value.action&&!list.some(o=>o.value===decision.value.action)){decision.value.action='';decision.value.reason=''}},{immediate:true})
-const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:'确认上报岸基',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
+watch(()=>decision.value.action,action=>{if(action==='shore'){decision.value.shoreIncludeHistory=true;if(!decision.value.shoreDraftReport){decision.value.shoreDraftReport=createShoreReportDraft(props.event,store.state);decision.value.shoreMarkdown=decision.value.shoreDraftReport.markdown}}},{immediate:true,flush:'sync'})
+const submitLabel=computed(()=>({investigate:'确认派发排查',repair:'确认派发维修',recheck:'确认派发复查',maintenance:'派发提前维保任务',shore:decision.value.shoreDraftReport?.sourceShoreId?'保存并重新上报':'确认上报岸基',observe:'确认转入效果观察',close:'确认闭环并归档',false:'确认误报并归档',wait:'保留任务并等待条件',resume:'确认恢复原任务',terminate:'确认终止未执行部分'}[decision.value.action]))
 const plans=computed(()=>maintenancePlans(props.event)),windows=computed(()=>availableMaintenanceWindows())
 const selectedMaintenance=computed(()=>plans.value.find(p=>p.id===decision.value.maintenancePlanId))
 function changeMaintenancePlan(){ensureTaskPlan(props.event);error.value=''}
 function changeWindow(){const item=windows.value.find(w=>w.id===decision.value.window);if(item)decision.value.deadline=item.end.slice(0,16);error.value=''}
 function changeAction(){error.value='';decision.value.reason='';decision.value.evidence='';emit('expanded')}
-async function submit(){try{error.value='';const action=captain.value?decision.value.action:null;if(captain.value){store.decide(props.event.id,{...decision.value,reason:reason.value});if(action==='shore'){decision.value.action='';decision.value.shoreReason=''}else props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}}else await store.submit(props.event.id,task.value?.id);emit('submitted',action)}catch(e){error.value=e.message}}
+async function submit(){try{error.value='';const action=captain.value?decision.value.action:null;if(captain.value){store.decide(props.event.id,{...decision.value,reason:reason.value});if(action==='shore'){decision.value.action='';decision.value.shoreReason='';delete decision.value.shoreDraftReport;delete decision.value.shoreMarkdown}else props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}}else await store.submit(props.event.id,task.value?.id);emit('submitted',action)}catch(e){error.value=e.message}}
 
 </script>
 <style scoped>
-.shore-basis{grid-column:1/-1;border:1px solid #e4e6df;border-radius:6px;padding:10px 12px}.shore-basis summary{cursor:pointer;color:#806638}.shore-basis :deep(.markdown-content){max-height:280px;overflow:auto;font-size:13px}
+.shore-editor-tabs{display:flex;gap:8px;grid-column:1/-1}.shore-editor-tabs button{border:1px solid #ded6c5;border-radius:5px;padding:7px 12px;background:white;color:#776545;font:inherit;cursor:pointer}.shore-editor-tabs button[aria-pressed=true]{background:#f6f0e4;border-color:#b79b65}.shore-body-label,.shore-body-preview{grid-column:1/-1}.shore-body-preview{max-height:42vh;overflow:auto;border:1px solid #e2e5df;border-radius:6px;padding:14px}.shore-body-input{width:100%;line-height:1.8;resize:vertical}
 </style>

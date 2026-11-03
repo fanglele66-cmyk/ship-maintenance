@@ -10,7 +10,6 @@
    </article>
    <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>逐项结果及汇总结论已归入关联事件，可回看本次报告。</p><button type="button" @click="$emit('report',event.reports.findLast(r=>r.taskId===task.id)?.id)">查看报告</button><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
-   <section v-if="canAct" class="lc-assistant-form"><button type="button" class="lc-form-toggle" @click="$emit('decision')">{{historical?'按最新状态填写决策':'填写决策'}} ↗</button></section>
    <button v-if="!taskId&&!captain&&task?.status==='assigned'" class="lc-task-open" @click="$emit('task',task.id)">进入本轮{{task.kind==='investigation'?'排查':'作业'}}任务 →</button>
    <div class="lc-followups" aria-label="继续追问"><span class="lc-followups-label">继续了解</span><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
@@ -20,14 +19,14 @@
 <script setup>
 import {computed,ref,watch,nextTick} from 'vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
-import {people,currentTask,decisionOptions,timeText} from '../workflow/eventLifecycle'
+import {people,currentTask,timeText} from '../workflow/eventLifecycle'
 import AssistantAdviceMessage from './messages/AssistantAdviceMessage.vue'
 import ModelReply from './ModelReply.vue'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {supplementaryReports} from '../workflow/reportRevisions'
 import {taskConversation,taskTitle} from '../workflow/lifecycleWorkItems'
-const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','decision','collapse','shore-report']),store=useEventLifecycleStore()
-const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[]),canAct=computed(()=>!props.taskId&&!closed.value&&captain.value&&decisionOptions(props.event).some(o=>o.value!=='shore'))
+const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
+const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
 const questions=computed(()=>props.taskId?['本次任务需要注意哪些事项？','这次记录还需要补充什么？']:props.event.phase==='closed'?['回顾本次处理过程']:captain.value?['这次决定的依据是什么？','下一步应如何安排？']:['还需要补充哪些排查依据？','维修范围如何确定？'])
 const inputEl=ref(null),editablePlan=computed(()=>!props.taskId&&captain.value&&suggestionAction(props.event)?props.event.pendingPlan:null)
 function editTask(){if(editablePlan.value?.status!=='ready')return;mode.value='plan';emit('plan');nextTick(()=>inputEl.value?.focus())}

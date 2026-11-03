@@ -1,13 +1,47 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,decide,people,ensureTaskPlan,currentTask,submitTask,pendingDecision} from '../src/workflow/eventLifecycle.js'
-import {shoreReportBasis,shoreReportEntries,shoreReportPresentation} from '../src/workflow/shoreReports.js'
+import {shoreReportBasis,shoreReportEntries,shoreReportPresentation,createShoreReportDraft} from '../src/workflow/shoreReports.js'
 import {createObservationEvent} from '../src/workflow/observationEvents.js'
 import {decisionStage,processingWorkItems,workbenchDetails} from '../src/workflow/workbenchDetails.js'
 const id='real-alarm-0430',future=()=>new Date(Date.now()+3600000).toISOString()
 function assign(s){const e=s.events[id];s.role='captain';e.decisionDraft={action:'investigate'};ensureTaskPlan(e).status='ready';decide(s,id,{action:'investigate',owner:people.engineer,deadline:future()});return currentTask(e)}
 function submit(s,t){s.role='engineer';t.draft.records.forEach((r,i)=>{r.result=t.steps[i].options[0];r.note='正式现场事实';r.executionStatus='已完成'});t.draft.summary='完成本轮排查';submitTask(s,id,t.id);s.role='captain'}
 const shore={action:'shore',shoreIncludeHistory:true,shoreSituation:{situation:'',actions:'',uncertainty:'',support:''}}
+
+test('Edited outbound text is retained exactly with frozen sources and without changing shipboard work',()=>{
+ const s=createLifecycleState(),e=s.events[id],t=assign(s);submit(s,t)
+ const draft=createShoreReportDraft(e,s),original=JSON.stringify(e.reports),phase=e.phase
+ const body='# 人工核对后的报告\n\n## 当前情况\n\n已核对现场回传，请岸基协助复核。\n\n## 后续安排\n\n持续跟踪压力。'
+ e.reports[0].markdown+='\n后来的 AI 更新'
+ const updatedReports=JSON.stringify(e.reports)
+ decide(s,id,{...shore,shoreDraftReport:draft,shoreMarkdown:body})
+ const sent=e.shore.at(-1).syncedReport
+ assert.equal(sent.markdown,body);assert.equal(sent.originalMarkdown,draft.markdown);assert.equal(sent.edited,true)
+ assert.equal(shoreReportEntries(s)[0].markdown,body);assert.equal(e.phase,phase);assert.equal(JSON.stringify(e.reports),updatedReports)
+ assert.doesNotMatch(JSON.stringify(sent.includedReports),/后来的 AI 更新/);assert.notEqual(original,updatedReports)
+})
+
+test('Revising a submitted shore report creates a new version and preserves the original',()=>{
+ const s=createLifecycleState(),e=s.events[id];decide(s,id,shore)
+ const first=e.shore[0],frozen=JSON.stringify(first),draft=createShoreReportDraft(e,s,first.id)
+ const body=draft.markdown+'\n\n人工补充：已联系岸基技术人员。'
+ decide(s,id,{...shore,shoreDraftReport:draft,shoreMarkdown:body})
+ assert.equal(e.shore.length,2);assert.equal(JSON.stringify(first),frozen)
+ assert.equal(e.shore[1].syncedReport.sourceShoreId,first.id)
+ assert.notEqual(e.shore[1].reportId,first.reportId)
+ assert.equal(shoreReportPresentation(e.shore[1]).markdown,body)
+ assert.equal(JSON.parse(JSON.stringify(s)).events[id].shore[1].syncedReport.markdown,body)
+})
+
+test('Empty, unrelated and unauthorized edits cannot create an outbound record',()=>{
+ const s=createLifecycleState(),e=s.events[id],draft=createShoreReportDraft(e,s)
+ assert.throws(()=>decide(s,id,{...shore,shoreDraftReport:draft,shoreMarkdown:'  '}),/不能为空/)
+ assert.throws(()=>decide(s,id,{...shore,shoreDraftReport:{...draft,eventId:'other'},shoreMarkdown:'正文'}),/不属于当前事件/)
+ assert.throws(()=>createShoreReportDraft(e,s,'missing'),/未找到/)
+ s.role='engineer';assert.throws(()=>decide(s,id,{...shore,shoreDraftReport:draft,shoreMarkdown:'正文'}),/只有轮机长/)
+ assert.equal(e.shore.length,0);assert.equal(e.decisions.length,0)
+})
 
 test('Initial shore report has event basis, permits blank additions, and preserves pending decision',()=>{
  const s=createLifecycleState(),e=s.events[id],before=e.phase;decide(s,id,shore)

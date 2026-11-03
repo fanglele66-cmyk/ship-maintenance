@@ -33,7 +33,25 @@ export function shoreReportPresentation(record){
  return {...report,markdown:composeShoreNarrative({...report,at:record.at})}
 }
 
+// Editing starts from a frozen report so later AI updates cannot replace the
+// text being reviewed. Revising a sent report creates another outbound version.
+export function createShoreReportDraft(event,state,sourceId=''){
+ if(sourceId){
+  const source=event.shore.find(record=>record.id===sourceId)
+  if(!source)throw Error('未找到要修改的上报报告。')
+  return {...copy(shoreReportPresentation(source)),eventId:event.id,sourceShoreId:source.id}
+ }
+ return shoreReportSnapshot(event,{shoreIncludeHistory:true,shoreSituation:{}},state)
+}
+
 export function shoreReportSnapshot(event,form,state,at){
+ if(form.shoreDraftReport){
+  const draft=form.shoreDraftReport,markdown=String(form.shoreMarkdown??'').trim()
+  if(draft.eventId!==event.id)throw Error('报告不属于当前事件，请重新打开上报窗口。')
+  if(!markdown)throw Error('上报报告内容不能为空。')
+  if(draft.sourceShoreId&&!event.shore.some(r=>r.id===draft.sourceShoreId))throw Error('原上报版本不存在，请重新打开上报窗口。')
+  return {...copy(draft),id:'shore-report-'+crypto.randomUUID(),markdown,originalMarkdown:draft.markdown,edited:markdown!==draft.markdown.trim(),presentationVersion:2,summary:markdown.replace(/^#+.*$/gm,'').trim().replace(/\s+/g,' ').slice(0,180)}
+ }
  if(form.shoreIncludeHistory){
   const value=copy(form.shoreSituation||{}),basis=shoreReportBasis(event,state,value)
   return {id:'shore-report-'+crypto.randomUUID(),kind:'上报岸基报告',title:event.title+' · 上报岸基报告',eventId:event.id,eventNumber:event.number,summary:`覆盖 ${basis.events.length} 个关联事件、${basis.includedReports.length} 份正式报告。${value.situation||''}`,fields:value,...basis,presentationVersion:2,markdown:composeShoreNarrative({...basis,fields:value,eventId:event.id,title:event.title,at})}

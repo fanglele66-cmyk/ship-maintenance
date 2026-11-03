@@ -39,9 +39,10 @@ test('closed events offer a separate shore handoff without reopening stage forms
     return await renderToString(app)
    }finally{disposePinia(pinia)}
   }
-  await t.test('active stages retain their form entry',async()=>{
+  await t.test('active assistant keeps discussion without a duplicate decision entry',async()=>{
    const html=await render(createLifecycleState())
-   assert.doesNotMatch(html,/填写本阶段表单/);assert.match(html,/填写决策/)
+   assert.doesNotMatch(html,/填写本阶段表单|填写决策|lc-assistant-form/)
+   assert.match(html,/继续了解/)
   })
   await t.test('closed captain and assigned engineer have no stage form',async()=>{
    const state=closedFixture()
@@ -65,7 +66,15 @@ test('closed events offer a separate shore handoff without reopening stage forms
    const html=await render(closedFixture(),ActionForm,{shoreOnly:true})
    assert.match(html,/上报岸基表单/)
    assert.match(html,/确认上报岸基/)
+   assert.match(html,/上报报告正文/)
+   assert.match(html,/shore-body-input/)
    assert.doesNotMatch(html,/本次处置|本轮决策依据|派发依据|<select/)
+  })
+  await t.test('reopening an edited shore draft retains its text and offers preview',async()=>{
+   const state=createLifecycleState(),event=state.events[id]
+   event.decisionDraft={action:'shore',shoreIncludeHistory:true,shoreDraftReport:{eventId:id,markdown:'原正文',includedReports:[]},shoreMarkdown:'人工修改尚未上报'}
+   const html=await render(state,ActionForm)
+   assert.match(html,/人工修改尚未上报/);assert.match(html,/预览报告/)
   })
  }finally{await server.close();if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow}
 })
