@@ -22,7 +22,6 @@
           {{ statusLabel }}
         </span>
       </div>
-      <select class="header-role-switch" aria-label="切换角色" :value="lifecycle.state.role" @change="lifecycle.setRole($event.target.value)"><option value="captain">轮机长</option><option value="engineer">大管轮</option><option value="secondEngineer">二管轮</option></select>
       <LifecycleNotifications />
       <span class="header-time">{{ currentTime }}</span>
     </div>
@@ -36,8 +35,6 @@ import 'element-plus/es/components/popover/style/css'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BackButton from './BackButton.vue'
 import LifecycleNotifications from './LifecycleNotifications.vue'
-import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
-const lifecycle=useEventLifecycleStore()
 import { shipInfo, statusLabels } from '@/mock/devices'
 import { knowledgeDocs } from '@/mock/knowledge'
 import { useEventStore } from '@/stores/eventStore'

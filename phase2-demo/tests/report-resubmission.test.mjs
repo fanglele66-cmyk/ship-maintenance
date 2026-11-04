@@ -35,7 +35,7 @@ test('resumed report request excludes stale AI text and records the updated subm
   assert.equal(body.event.submissionContext.submissionNumber,2);assert.equal(body.event.submissionContext.previousSubmissions[0].id,first.id)
   assert.ok(!body.event.reports.some(r=>r.taskId===task.id));assert.equal(body.event.submissionContext.changes[1].上次结果,'未完成');assert.equal(body.event.submissionContext.changes[1].本次结果,'已完成');assert.equal(body.event.tasks[0].records[1].note,'备件换装完成');return result
  })
- assert.notEqual(first.title,report.title);assert.match(first.title,/第1次提交/);assert.match(report.title,/第2次提交（恢复后）/);assert.equal(report.taskId,first.taskId);assert.deepEqual(first,before)
+ assert.equal(first.title,report.title);assert.notEqual(first.number,report.number);assert.match(first.number,/-WX-01-01$/);assert.match(report.number,/-WX-01-02$/);assert.equal(report.taskId,first.taskId);assert.deepEqual(first,before)
  const phases=event.phases.filter(p=>p.reportId===first.id||p.reportId===report.id);assert.notEqual(phases[0].label,phases[1].label)
  const context=currentReportContext(event);assert.ok(!context.some(r=>r.id===first.id));assert.ok(context.some(r=>r.id===report.id));assert.equal(reportTask(event,first).records[1].result,'未完成')
  syncLifecycleObservations(state,{},Date.now(),{demo:true});const request=observationAdviceRequest(event,task,observationAdvice(event,task));assert.ok(!request.event.reports.some(r=>r.id===first.id));assert.ok(!request.event.reports.some(r=>r.summary.includes('等待备件')))
@@ -44,7 +44,7 @@ test('legacy reports get unique labels without replacing old facts with the resu
  const f=ready(),{state,event,task,first}=f;resume(f);submitTask(state,id,task.id);const second=event.reports.at(-1)
  for(const report of [first,second]){delete report.submissionSnapshot;delete report.submissionNumber;delete report.analysisContextVersion;report.title='旧的重复标题';report.markdown=report.markdown.replace(/^# [^\n]+/,'# 旧的重复标题');report.presentationVersion=1}
  const firstBody=first.markdown.split('\n').slice(1).join('\n');refreshLifecyclePresentation(state)
- assert.notEqual(first.title,second.title);assert.equal(first.markdown.split('\n').slice(1).join('\n'),firstBody);assert.equal(first.submissionSnapshot.records[1].result,'未完成');assert.equal(second.submissionSnapshot.records[1].note,'备件换装完成');assert.equal(second.analysisContextVersion,undefined)
+ assert.equal(first.title,second.title);assert.notEqual(first.number,second.number);assert.equal(first.markdown.split('\n').slice(1).join('\n'),firstBody);assert.equal(first.submissionSnapshot.records[1].result,'未完成');assert.equal(second.submissionSnapshot.records[1].note,'备件换装完成');assert.equal(second.analysisContextVersion,undefined)
  const saved=JSON.stringify(state);refreshLifecyclePresentation(state);assert.equal(JSON.stringify(state),saved)
 })
 test('refresh streams into the same report, preserves earlier report and audit; failure changes nothing',async()=>{

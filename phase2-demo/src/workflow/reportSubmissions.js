@@ -8,7 +8,11 @@ export function submissionNumber(event,task,reportId){
 }
 export function submissionTitle(event,task,number){
  const kind=task.purpose==='recheck'?'复查报告':task.kind==='investigation'?'排查报告':task.kind==='maintenance'?'维保作业报告':'维修报告'
- return `${event.title} · 第${task.round}轮${kind} · 第${number}次提交${number>1?'（恢复后）':''}`
+ return `${event.title} · ${kind}`
+}
+export function submissionCode(event,task,number){
+ const kind=task.purpose==='recheck'?'FC':task.kind==='investigation'?'PC':task.kind==='maintenance'?'WB':'WX'
+ return `${event.number}-${kind}-${String(task.round).padStart(2,'0')}-${String(number).padStart(2,'0')}`
 }
 export function submissionSnapshot(task){
  return copy(Object.fromEntries(['id','kind','purpose','round','owner','scope','steps','records','summary','attachments','maintenance','assignedAt','deadline','submittedAt','resumedAt'].filter(key=>task[key]!==undefined).map(key=>[key,task[key]])))
@@ -26,7 +30,7 @@ export function refreshSubmissionLabels(event){
   const reports=taskReports(event,task.id)
   reports.forEach((report,index)=>{
    const number=index+1,title=submissionTitle(event,task,number),source=reportTask(event,report)
-   report.submissionNumber=number;report.title=title
+   report.submissionNumber=number;report.title=title;report.number=submissionCode(event,task,number)
    if(report.markdown)report.markdown=report.markdown.replace(/^# [^\n]+/,()=>`# ${title}`)
    if(!report.submissionSnapshot&&source)report.submissionSnapshot=submissionSnapshot(source)
    for(const phase of event.phases)if(phase.reportId===report.id&&['decision','review'].includes(phase.kind)){

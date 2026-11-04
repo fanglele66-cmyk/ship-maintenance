@@ -29,10 +29,17 @@
         ></span>
       </router-link>
     </div>
+    <el-popover trigger="click" placement="right-end" :width="210" v-model:visible="roleMenuOpen">
+      <template #reference><button class="nav-role-avatar" type="button" :aria-label="'切换角色，当前'+roleLabel" :title="roleLabel" :aria-expanded="roleMenuOpen">{{roleLabel.slice(0,1)}}</button></template>
+      <div class="nav-role-menu" aria-label="选择角色"><strong>切换角色</strong><button v-for="(name,key) in people" :key="key" type="button" :aria-pressed="lifecycle.state.role===key" @click="lifecycle.setRole(key);roleMenuOpen=false">{{name}}<span v-if="lifecycle.state.role===key"> ✓</span></button></div>
+    </el-popover>
   </nav>
 </template>
 
 <script setup>
+import {ElPopover} from 'element-plus'
+import 'element-plus/es/components/popover/style/css'
+import {people} from '../workflow/lifecyclePermissions.js'
 import {Document} from '@element-plus/icons-vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -43,7 +50,8 @@ import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const route = useRoute()
 const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
-const lifecycle=useEventLifecycleStore()
+const lifecycle=useEventLifecycleStore(),roleMenuOpen=ref(false)
+const roleLabel=computed(()=>people[lifecycle.state.role]?.match(/（(.+)）/)?.[1]||'轮机长')
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
 const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:lifecycle.workItems.pending.filter(item=>item.kind==='task').length)
 
@@ -83,6 +91,8 @@ const navItems = [
 </script>
 
 <style scoped>
+.nav-role-avatar{width:42px;height:42px;border-radius:50%;margin:12px 0 16px;border:1px solid #b79b66;background:#34332d;color:#ead9b8;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;flex-shrink:0}.nav-role-avatar:focus-visible{outline:2px solid #d8bc87;outline-offset:3px}.nav-role-menu{display:grid;gap:8px;color:#37434a}.nav-role-menu>strong{font-size:12px;color:#86908b;padding:5px}.nav-role-menu button{text-align:left;background:transparent;border:0;border-radius:6px;padding:10px;cursor:pointer;color:inherit}.nav-role-menu button:hover,.nav-role-menu button[aria-pressed=true]{background:#f4efe4;color:#8b6937}
+
 .app-nav {
   width: var(--nav-width);
   height: 100%;

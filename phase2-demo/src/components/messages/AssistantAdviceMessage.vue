@@ -10,7 +10,7 @@
    </div>
   </details>
   <p v-if="message.analysis" class="assistant-advice-analysis">{{visibleAnalysis}}</p>
-  <div v-if="visibleRecommendation" class="assistant-advice-next"><strong>建议您</strong><p>{{visibleRecommendation}}</p></div>
+  <div v-if="visibleRecommendation && !message.compact" class="assistant-advice-next"><strong>建议您</strong><p>{{visibleRecommendation}}</p></div>
   <button v-if="!streaming && message.currentAdvice && !message.historical && message.actionLabel" type="button" class="assistant-advice-action" @click="$emit('action','workflow:focus')">{{message.actionLabel}} <span aria-hidden="true">↓</span></button>
  </section>
 </template>

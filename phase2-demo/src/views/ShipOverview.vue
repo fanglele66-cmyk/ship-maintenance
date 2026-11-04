@@ -22,15 +22,19 @@
   </section>
   <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
-    <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span></ModuleHeader>
+    <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span><button class="home-assistant-toggle" type="button" :aria-expanded="assistantOpen" aria-controls="home-situation-assistant" @click="assistantOpen=!assistantOpen">✦ 态势助手</button></ModuleHeader>
     <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events" :captain="lifecycle.state.role==='captain'"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
+  <HomeSituationAssistant v-if="assistantOpen" id="home-situation-assistant" @close="assistantOpen=false"/>
  </div>
 </template>
 <script setup>
-import {computed,ref} from 'vue'
+import {computed,ref,onDeactivated} from 'vue'
+import HomeSituationAssistant from '../components/HomeSituationAssistant.vue'
+const assistantOpen=ref(false)
+onDeactivated(()=>assistantOpen.value=false)
 import {useElementSize} from '@vueuse/core'
 import {useDeviceStore} from '@/stores/deviceStore'
 import {useSensorStore} from '@/stores/sensorStore'
@@ -66,17 +70,24 @@ const devices=computed(()=>{
 })
 </script>
 <style scoped>
+.home-assistant-toggle{border:1px solid #dfd7c7;background:#faf8f2;color:#8b6b39;border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer}.home-assistant-toggle[aria-expanded=true]{background:#eee6d5}
+
+
 .captain-workbench{display:grid;grid-template-columns:clamp(280px,28vw,480px) minmax(0,1fr);gap:16px;height:100%;min-height:0;background:#f3f5f8}.captain-twin{display:flex;flex-direction:column;min-height:0;background:#001b30;border-radius:8px;overflow:hidden}.captain-twin header{display:flex;align-items:center;gap:12px;color:#e0eef7;padding:18px 20px;border-bottom:1px solid #16364a;font-size:var(--wb-body)}.captain-twin header span{font-size:var(--wb-label);color:#91b1c5}.twin-viewport{flex:1;min-height:0;position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden}.twin-scene{position:relative;flex:none}.twin-scene img{width:100%;height:100%;object-fit:contain}.twin-device{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;padding:10px 16px;border:1px solid #38627b;border-radius:6px;background:#092639eF;color:#e9f4fb;font:inherit;font-size:var(--wb-body);cursor:pointer;white-space:nowrap}.twin-device:hover,.twin-device:focus-visible{border-color:#89d7f2;outline:2px solid #89d7f255;outline-offset:2px}.twin-device i{width:8px;height:8px;border-radius:50%;background:#47ad72}.twin-device i.danger{background:#e15c55}.twin-device i.warning{background:#e6a444}.captain-right{display:grid;grid-template-rows:auto minmax(0,1fr);gap:16px;min-width:0;min-height:0}.captain-analysis{background:white;border-radius:8px;padding:18px 22px;max-height:44vh;overflow:auto}.captain-analysis header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.captain-analysis header strong{font-size:calc(var(--wb-body) + 2px);font-weight:600;color:#202020}.captain-analysis time{font-size:var(--wb-label);color:#7c8797;white-space:nowrap}.captain-analysis :deep(.markdown-content){font-size:var(--wb-body);line-height:1.75}.captain-analysis :deep(h4:first-child){margin-top:0}.captain-analysis :deep(h4){font-size:calc(var(--wb-body) + 2px);line-height:1.5;margin:12px 0 4px}.captain-analysis :deep(p){margin:4px 0 9px}@media(max-width:1100px){.captain-workbench{grid-template-columns:minmax(250px,29%) minmax(0,1fr);gap:12px}.captain-analysis{padding:16px;max-height:46vh}.captain-right{gap:12px}}@media(max-width:760px){.captain-workbench{display:flex;flex-direction:column;height:auto;overflow:auto}.captain-twin{height:500px;flex:none}.captain-right{display:flex;flex-direction:column}.captain-analysis{max-height:none}.captain-right :deep(.captain-issues){min-height:400px}}
 </style>
 
 <style scoped>
+
 .captain-workbench{width:100%;min-width:0}.captain-twin{min-width:0}.captain-analysis-body{max-width:76em}.captain-analysis header{flex-wrap:wrap;row-gap:4px}.captain-analysis header strong{line-height:1.5}.captain-analysis time{margin-left:auto}.captain-right :deep(.issue-row){overflow-wrap:break-word}.captain-right :deep(.issue-meta){flex-wrap:wrap;row-gap:4px}
 </style>
 
-<style scoped>.captain-analysis{padding:0}.captain-analysis-body{padding:0 22px 14px}@media(max-width:1100px){.captain-analysis-body{padding:0 16px 12px}}</style>
-
-<style scoped>.captain-analysis :deep(.module-header){margin-bottom:0}</style>
 <style scoped>
+.captain-analysis{padding:0}.captain-analysis-body{padding:0 22px 14px}@media(max-width:1100px){.captain-analysis-body{padding:0 16px 12px}}</style>
+
+<style scoped>
+.captain-analysis :deep(.module-header){margin-bottom:0}</style>
+<style scoped>
+
 .captain-right{display:flex;flex-direction:column;overflow:auto}
 .captain-analysis{flex:none;max-height:none;overflow:visible}
 .captain-analysis :deep(.markdown-content){font-size:clamp(13px,calc(var(--wb-body) - 1px),16px);line-height:1.7}
@@ -87,9 +98,12 @@ const devices=computed(()=>{
 .captain-workbench,.captain-right{scrollbar-width:none;-ms-overflow-style:none}
 .captain-workbench::-webkit-scrollbar,.captain-right::-webkit-scrollbar{width:0;height:0;display:none}
 </style>
-<style scoped>.analysis-window{font-size:var(--wb-label);line-height:1.6;color:#7c8797;font-variant-numeric:tabular-nums}@media(max-width:760px){.analysis-window{font-size:var(--wb-label)}}</style>
-<style scoped>.twin-scene img{display:block}</style>
 <style scoped>
+.analysis-window{font-size:var(--wb-label);line-height:1.6;color:#7c8797;font-variant-numeric:tabular-nums}@media(max-width:760px){.analysis-window{font-size:var(--wb-label)}}</style>
+<style scoped>
+.twin-scene img{display:block}</style>
+<style scoped>
+
 .twin-device{width:164px;min-height:66px;padding:11px 14px;box-sizing:border-box;justify-content:space-between;gap:12px;text-align:left;background:rgba(19,57,78,.68);color:#f1f8fc;border:1px solid rgba(177,222,242,.5);border-radius:8px;backdrop-filter:blur(12px) saturate(125%);-webkit-backdrop-filter:blur(12px) saturate(125%);box-shadow:inset 0 1px 0 #d6f1ff1f,0 4px 16px #00132340;transition:background-color .15s,border-color .15s,box-shadow .15s}
 .twin-device-copy{display:flex;flex-direction:column;gap:5px}
 .twin-device-name{display:flex;align-items:center;gap:8px;font-size:calc(var(--wb-body) + 2px);font-weight:600;line-height:1.4}
@@ -105,6 +119,7 @@ const devices=computed(()=>{
 @media(prefers-reduced-motion:reduce){.twin-device{transition:none}}
 </style>
 <style scoped>
+
 .twin-running{position:absolute;top:12px;left:12px;right:12px;z-index:2;padding:12px 10px 9px;border:1px solid #b1def23b;border-radius:8px;background:rgba(12,42,62,.68);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#f1f8fc;box-shadow:inset 0 1px 0 #d6f1ff12;pointer-events:none}
 .twin-running dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
 .twin-running dl>div{min-width:0}.twin-running dt{font-size:var(--wb-label);line-height:1.5;color:#b8d1e1;white-space:nowrap}
@@ -116,10 +131,12 @@ const devices=computed(()=>{
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.twin-running{background:#123348}}
 </style>
 <style scoped>
+
 .captain-twin header{gap:10px;flex-wrap:wrap}.captain-twin header strong{white-space:nowrap}.captain-twin .ship-scope{font-size:var(--wb-label)}@media(max-width:1600px) and (min-width:761px){.captain-twin .ship-scope{display:none}}@media(max-width:760px){.captain-twin header{padding:16px}}
 </style>
 
 <style scoped>
+
 @media(min-width:761px){
 .captain-workbench{height:100%;overflow:hidden;grid-template-columns:clamp(250px,25vw,420px) minmax(0,1fr);gap:12px}
 .captain-right{display:grid;grid-template-rows:max-content max-content;align-content:start;overflow:auto;gap:12px}

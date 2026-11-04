@@ -3,31 +3,32 @@
   <small class="model-caption">AI检修助手</small>
   <MarkdownContent v-if="message.text" :content="message.text"/>
   <small v-if="message.status==='streaming'" class="generation-status" role="status"><span class="generation-dot"/>{{message.progress?.label||'正在生成内容…'}}</small>
-  <section v-if="message.generatedReport" class="report-proposal"><strong>{{message.status==='complete'?'本轮报告':message.status==='streaming'?'本轮报告 · 生成中':'本轮报告 · 生成中断'}}</strong><MarkdownContent :content="generatedPreview(message.generatedReport)"/><button v-if="message.reportId" type="button" @click="$emit('report',message.reportId)">查看完整报告 →</button></section>
+  <section v-if="message.generatedReport" class="report-proposal"><strong>{{message.status==='complete'?'本轮报告':message.status==='streaming'?'本轮报告 · 生成中':'本轮报告 · 生成中断'}}</strong><MarkdownContent :content="reportMarkdown({markdown:generatedPreview(message.generatedReport)})"/></section>
   <details v-if="message.progressLog?.length" class="processing-summary"><summary>分析摘要与处理进度</summary><ol><li v-for="(item,i) in message.progressLog" :key="i">{{item.label}}<p v-if="item.summary">{{item.summary}}</p></li></ol></details>
   <section v-if="message.taskDraft||message.taskChange" class="report-proposal task-change">
    <strong>{{message.taskChange?'AI任务建议已更新':message.status==='streaming'?'任务修改中':'任务修改中断'}}</strong>
    <p class="report-prose">{{(message.taskChange||message.taskDraft).scope}}</p><p class="proposal-hint">{{(message.taskChange||message.taskDraft).rationale}}</p>
    <ol v-if="message.taskChange"><li v-for="step in message.taskChange.steps" :key="step.label">{{step.label}}</li></ol>
-   <button v-if="message.taskChange" type="button" @click="$emit('plan')">查看AI任务建议 →</button>
+
   </section>
   <details v-if="message.sources?.length" class="model-sources"><summary>参考资料 · {{message.sources.length}} 处</summary><article v-for="source in message.sources" :key="source.id"><b>[{{source.id}}] {{source.title}}</b><small>{{source.file}} · L{{source.startLine}}—{{source.endLine}}</small><p>{{source.text}}</p></article></details>
   <section v-if="reportContent" class="report-proposal" :aria-busy="message.status==='streaming'">
    <strong>报告补充 · {{message.proposal?(message.proposal.applied?'已写入':'待核对'):message.status==='streaming'?'生成中':'生成中断'}}</strong><p>{{reportContent.reportTitle}}</p>
-   <details><summary>查看原报告</summary><MarkdownContent :content="reportContent.baseMarkdown"/></details>
+   <details><summary>原报告</summary><MarkdownContent :content="reportContent.baseMarkdown"/></details>
    <template v-if="reportContent.patch.summary"><h4>修订后的结论</h4><p class="report-prose">{{reportContent.patch.summary}}</p></template>
    <div v-if="message.draft" class="streaming-analysis"><section v-for="section in draftSections" :key="section.key"><h4>{{section.label}}</h4><p class="report-prose">{{section.text}}</p></section></div>
-   <details v-else><summary>查看修订后的分析</summary><MarkdownContent :content="revisionAnalysis(message.proposal.patch)"/></details>
+   <details v-else><summary>修订后的分析</summary><MarkdownContent :content="revisionAnalysis(message.proposal.patch)"/></details>
    <template v-if="message.proposal">
     <p class="proposal-hint">确认后更新结论与分析，原始逐项记录和历次版本保留。</p>
     <button v-if="!message.proposal.applied" type="button" @click="$emit('apply',message.id)">确认补充并更新报告</button>
-    <button v-else type="button" @click="$emit('report',message.proposal.reportId)">查看更新后的报告 →</button>
+
    </template>
   </section>
   <small v-if="message.usage" class="model-usage">Token：输入 {{message.usage.inputTokens}} · 输出 {{message.usage.outputTokens}}</small>
  </section>
 </template>
 <script setup>
+import {reportMarkdown} from '../workflow/reportPresentation.js'
 import MarkdownContent from './MarkdownContent.vue'
 import {computed} from 'vue'
 import {revisionAnalysis} from '../workflow/reportRevisions'

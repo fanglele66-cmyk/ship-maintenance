@@ -1,8 +1,8 @@
 <template>
  <section class="initial-information">
   <dl class="initial-source"><div><dt>来源</dt><dd>{{brief.discovery?.label||'原始事件资料'}}</dd></div><div><dt>发现时间</dt><dd>{{brief.discovery?.at||event.createdAt||'未记录'}}</dd></div><div><dt>数据窗口</dt><dd>{{times.dataWindow}}</dd></div><div><dt>AI 生成时间</dt><dd>{{times.generatedAt}}</dd></div></dl>
-  <details open><summary>AI 分析与依据</summary><EventDecisionBrief :brief="brief" :event-type="event.type" :show-decisions="false"/><h3>关键数据</h3><div class="lc-fact-grid"><div v-for="fact in brief.facts" :key="fact.label"><small>{{fact.label}}</small><b>{{fact.value}} {{fact.unit}}</b><p>{{fact.meaning}}</p></div></div></details>
-  <section><h3>建议安排</h3><ol><li v-for="task in brief.tasks" :key="task.title"><strong>{{task.title}}</strong>：{{task.detail}}</li></ol><p>{{brief.boundary}}</p></section>
+  <details open><summary>AI 分析与依据</summary><EventDecisionBrief :brief="brief" :event-type="event.type" :show-decisions="false" :show-time="false"/><h3>关键数据</h3><div class="lc-fact-grid"><div v-for="fact in brief.facts" :key="fact.label"><small>{{fact.label}}</small><b>{{fact.value}} {{fact.unit}}</b><p>{{fact.meaning}}</p></div></div></details>
+  <section><h3>建议安排</h3><ol><li v-for="task in brief.tasks" :key="task.title"><strong>{{task.title}}</strong></li></ol></section>
  </section>
 </template>
 <script setup>import {computed} from 'vue';import EventDecisionBrief from './EventDecisionBrief.vue';import {initialInformationTimes} from '../workflow/initialInformationTimes.js';const props=defineProps({event:Object});const brief=computed(()=>props.event.brief||{}),times=computed(()=>initialInformationTimes(props.event))</script>

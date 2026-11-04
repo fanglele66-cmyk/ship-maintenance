@@ -1,4 +1,4 @@
-import {submissionNumber,submissionTitle,submissionSnapshot,refreshSubmissionLabels,reportTask,taskReports,reportContextVersion} from './reportSubmissions.js'
+import {submissionCode,submissionNumber,submissionTitle,submissionSnapshot,refreshSubmissionLabels,reportTask,taskReports,reportContextVersion} from './reportSubmissions.js'
 import {workflowCases, workflowIssues, composeRepair} from '../mock/fourStoryWorkflow.js'
 import {eventBriefingFor} from '../mock/eventBriefings.js'
 import {trackingProcessReference} from '../mock/trackingProcessReferences.js'
@@ -43,7 +43,7 @@ function notify(state,event,recipient,title,text){
 }
 function advice(event,role,analysis,recommendation,at){
  const message=say(event,role,'advice','',{analysis,recommendation,animate:!at,...(at?{at}: {})})
- message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=event.timeline?4:3;message.basisLabel='分析过程与依据'
+ message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=event.timeline?6:5;message.basisLabel='思考过程'
  return message
 }
 function phase(event,kind,label,extra={}){const p={id:uid(kind),kind,label:label||stageNames[kind],at:new Date().toISOString(),...extra};event.phases.push(p);event.phase=kind;return p}
@@ -110,9 +110,9 @@ export function makeReport(event,task,reportId){
  const id=reportId||uid('report'),number=submissionNumber(event,task,reportId),title=submissionTitle(event,task,number)
  const priorRows=[...(task.procedureHistory||[]),...(task.feedbackHistory||[])].map(h=>'### 历史阶段的原填写记录\n\n'+h.draft.records.filter(r=>r.result||r.note).map(r=>`- ${r.label} · ${r.result||'未选结果'}：${r.note||'未填备注'}`).join('\n')).join('\n\n')
  const generated=task.generatedReport,analysis=generated?.patch.summary||reportAnalysisSummary(event,task),analysisMarkdown=generated?generatedAnalysis(generated.patch):reportAnalysis(event,task)
- const markdown=`# ${title}\n\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'检查结果摘要':'处理结果与剩余事项'}\n\n${generated?.patch.summary||task.summary}\n\n${executionFacts(task)}\n\n## AI分析与建议（不作为现场事实）\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}${priorRows?'\n\n'+priorRows:''}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
+ const markdown=`# ${title}\n\n- 报告编号：${submissionCode(event,task,number)}\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'检查结果摘要':'处理结果与剩余事项'}\n\n${generated?.patch.summary||task.summary}\n\n${executionFacts(task)}\n\n## AI分析与建议\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}${priorRows?'\n\n'+priorRows:''}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
  const maintenanceText=task.maintenance?`\n\n## 提前维保安排\n\n- 维保计划：${task.maintenance.plan.id} · ${task.maintenance.plan.title}\n- 计划版本：${task.maintenance.plan.revision}\n- 关联正式工单：${task.maintenance.plan.workOrder?.number||'未关联'} · ${task.maintenance.plan.workOrder?.status||'待核实'}\n- 工单状态独立管理，本次报告不自动确认正式工单完工。\n- 靠港时间：${task.maintenance.window.label}\n- 执行方式：按选定维保计划提前执行，实际措施见逐项记录。`:''
- return {id,title,kind,submissionNumber:number,submissionSnapshot:submissionSnapshot(task),analysisContextVersion:reportContextVersion,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：')+maintenanceText+(generated?'\n\n## 执行人原始汇总\n\n'+task.summary:''),analysis,analysisMarkdown,summary:generated?.patch.summary||task.summary,presentationVersion:5,...(generated?{generatedBy:generated.model,usage:generated.usage,sources:generated.sources,generatedAt:generated.at}:{})}
+ return {id,title,kind,number:submissionCode(event,task,number),submissionNumber:number,submissionSnapshot:submissionSnapshot(task),analysisContextVersion:reportContextVersion,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：')+maintenanceText+(generated?'\n\n## 执行人原始汇总\n\n'+task.summary:''),analysis,analysisMarkdown,summary:generated?.patch.summary||task.summary,presentationVersion:5,...(generated?{generatedBy:generated.model,usage:generated.usage,sources:generated.sources,generatedAt:generated.at}:{})}
 }
 export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
@@ -144,7 +144,7 @@ export function refreshLifecyclePresentation(state){
    }
   }
   for(const report of event.reports)if(report.kind==='闭环报告'&&!report.confirmedDraft&&report.presentationVersion!==closurePresentationVersion){const decision=event.decisions.findLast(d=>['close','false'].includes(d.action));Object.assign(report,makeClosureReport(event,decision?.action||'close',report.summary,report.at,report.id))}
-  for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==(event.timeline?4:3)){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=event.timeline?4:3;message.basisLabel='分析过程与依据'}
+  for(const role of ['captain','engineer'])for(const message of event.conversations[role])if(message.kind==='advice'&&message.basisVersion!==(event.timeline?6:5)){message.detailsMarkdown=adviceDetails(event,message,role);message.basisVersion=event.timeline?6:5;message.basisLabel='思考过程'}
  }
  migrateObservationEvents(state)
  // Apply the same rule to saved observations closed before chain closure existed.

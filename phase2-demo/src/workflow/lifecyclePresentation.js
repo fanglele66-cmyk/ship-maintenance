@@ -1,3 +1,4 @@
+import {responsibilitySummary} from './responsibilitySummary.js'
 // Public event state is independent of the viewer and internal processing labels.
 export const eventStates=['研判中','待决策','处理中','观察中','已闭环']
 export function eventState(event){
@@ -10,12 +11,16 @@ export function eventState(event){
  if(task||event.tasks?.length)return '处理中'
  return '研判中'
 }
-export function currentResponsibility(event){
+function responsibilityContext(event){
  const task=event.tasks?.find(t=>t.id===event.currentTask),state=eventState(event)
  if(state==='已闭环')return {owner:'轮机长',action:'已确认归档',detail:event.closeReason}
  if(state==='待决策')return {owner:'轮机长',action:task?.waiting?.reviewRequested?'审阅执行条件变化':'审阅当前资料并决定后续安排',detail:task?.waiting?.reviewRequested?.reason||event.reports?.at(-1)?.summary||event.brief?.conclusion}
  if(state==='观察中')return {owner:'系统观察',action:event.phase==='transferred'?'由关联效果观察事件继续跟踪':'按已确认方案采样，到期提交报告',detail:event.observationPlan?.purpose||event.decisions?.at(-1)?.reason}
  return {owner:task?.owner||'系统',action:task?.status==='waiting'?'等待原执行条件；具备后由原执行人确认':task?.status==='report-error'?'现场事实已回交，AI 报告待重试':task?.status==='reporting'?'现场事实已回交，AI 报告生成中':'按本轮批准范围执行',detail:task?.waiting?.reason||task?.scope||event.brief?.conclusion,deadline:task?.deadline}
+}
+export function currentResponsibility(event){
+ const context=responsibilityContext(event),task=event.tasks?.find(t=>t.id===event.currentTask)
+ return {...context,detail:responsibilitySummary(event,eventState(event),task)}
 }
 // Raw transitions remain audit records; the navigation groups them by actual task.
 export function eventRounds(event){

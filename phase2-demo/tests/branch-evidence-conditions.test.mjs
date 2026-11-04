@@ -17,7 +17,7 @@ function repair(partial=false){const state=createLifecycleState();let task=dispa
 test('4.1 unknown cause report streams from actual feedback and separates facts from AI interpretation',async()=>{
  const state=createLifecycleState(),task=dispatch(state,'investigate');task.draft.records.forEach(r=>{r.result='未见异常';r.note='已核对本项记录，当前未复现。'});task.draft.summary='检查已完成，原因尚不能确认。';state.role='engineer'
  let calls=0;const report=await generateTaskReport(state,id,task.id,async(body,on)=>{calls++;assert.match(body.text,/现场事实和AI分析建议分开/);assert.equal(body.event.tasks[0].summary,task.summary);on('report',{patch:{summary:'检查已完成',analysis:{}}});assert.equal(state.events[id].reports.length,0);return {model:'test',patch:{summary:'检查已完成，原因尚不能确认。',analysis:{evidence:'两项核查已完成，未复现异常。',interpretation:'不能据此定位故障原因。',unverified:'故障原因与复发条件待核实。',next:'交轮机长决定继续观察或补充检查。'}},usage:{inputTokens:90,outputTokens:80}}})
- assert.equal(calls,1);assert.equal(taskExecution(task).incomplete,false);assert.match(report.markdown,/现场事实（执行人原始记录）/);assert.match(report.markdown,/AI分析与建议（不作为现场事实）/);assert.match(report.markdown,/原因尚不能确认/);assert.equal(state.events[id].phase,'decision');assert.ok(pendingDecision(state.events[id]))
+ assert.equal(calls,1);assert.equal(taskExecution(task).incomplete,false);assert.match(report.markdown,/现场事实（执行人原始记录）/);assert.match(report.markdown,/AI分析与建议/);assert.match(report.markdown,/原因尚不能确认/);assert.equal(state.events[id].phase,'decision');assert.ok(pendingDecision(state.events[id]))
 })
 test('4.7 skipped repair is in report, captain options and the next dispatch; model cannot erase it',()=>{
  const {state,event,task}=repair(true),skipped=task.records.at(-1).label,report=structuredClone(event.reports.at(-1))

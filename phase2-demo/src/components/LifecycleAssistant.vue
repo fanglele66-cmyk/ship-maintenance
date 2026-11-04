@@ -1,30 +1,29 @@
 <template>
- <aside class="lc-assistant"><header><strong>{{taskId?'任务助手':'事件助手'}}</strong><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button><small>{{people[store.state.role]}} · {{taskId?taskTitle(task):event.title}}</small></header>
+ <aside class="lc-assistant"><header><strong>{{taskId?'任务助手':'事件助手'}}</strong><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button></header>
   <div ref="stream" class="lc-conversation" @wheel.passive="following=false" @pointerdown="following=false">
    <article v-if="taskId" class="lc-message advice"><strong>本次任务要求</strong><p>{{task?.scope}}</p><p class="lc-muted">{{task?.status==='submitted'?'本次反馈已提交，可查看结果或补充本任务报告；任务目标与后续安排由轮机长审阅。':captain?'由执行人按步骤填写；此处可查看进度与询问本次任务。':'按本次步骤记录实际结果，汇总后提交给轮机长。'}}</p></article>
    <article v-for="(message,i) in messages" :key="message.id" :class="['lc-message',message.kind]" :data-message-id="message.id">
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>
-    <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===messages.length-1,historical:i!==messages.length-1,actionLabel:''}" @stream-progress="follow"/>
-    <template v-else><strong v-if="message.title">{{message.title}}</strong><p>{{message.text}}</p><button v-if="message.reportId" type="button" @click="$emit('report',message.reportId)">查看报告</button></template><button v-if="message.shoreId" type="button" @click="$emit('shore-report',message.shoreId)">查看上报报告</button><time>{{timeText(message.at)}}</time>
+    <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===messages.length-1,historical:i!==messages.length-1,actionLabel:'',compact:true,basisLabel:'思考过程'}" @stream-progress="follow"/>
+    <template v-else><strong v-if="message.title">{{message.title}}</strong><p>{{message.text}}</p></template><time>{{timeText(message.at)}}</time>
    </article>
-   <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>逐项结果及汇总结论已归入关联事件，可回看本次报告。</p><button type="button" @click="$emit('report',event.reports.findLast(r=>r.taskId===task.id)?.id)">查看报告</button><time>{{timeText(task.submittedAt)}}</time></article>
+   <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>逐项结果及汇总结论已归入关联事件，可回看本次报告。</p><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
-   <button v-if="!taskId&&!captain&&task?.status==='assigned'" class="lc-task-open" @click="$emit('task',task.id)">进入本轮{{task.kind==='investigation'?'排查':'作业'}}任务 →</button>
-   <div class="lc-followups" aria-label="继续追问"><span class="lc-followups-label">继续了解</span><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
+   <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
-  <form class="lc-composer" @submit.prevent="ask(input)"><div v-if="editableReports.length||editablePlan" class="lc-chat-mode"><button v-if="editableReports.length" type="button" :aria-pressed="mode==='report'" @click="mode=mode==='report'?'chat':'report'">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="mode=mode==='plan'?'chat':'plan'">修改AI建议</button><select v-if="mode==='report'" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}}</option></select></div><textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="mode==='plan'?'说明要增加、删除或调整的任务步骤，修改后在建议页签核对…':mode==='report'?'输入要补充的事实，生成修订稿后核对写入…':'询问依据、补充现场情况或后续安排…'" @keydown.enter.exact.prevent="ask(input)"/><footer><button type="button" aria-label="添加文件" @click="upload.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><small v-if="fileNotice">{{fileNotice}}</small><button type="submit" aria-label="发送" :disabled="pending||!input.trim()" :aria-busy="pending"><svg v-if="!pending" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></footer><input ref="upload" type="file" hidden accept=".txt,.md,.csv,.json" @change="attach"/></form>
+  <form class="lc-composer" @submit.prevent="ask(input)"><div v-if="editableReports.length||editablePlan" class="lc-chat-mode"><button v-if="editableReports.length" type="button" :aria-pressed="mode==='report'" @click="mode=mode==='report'?'chat':'report'">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="mode=mode==='plan'?'chat':'plan'">修改AI建议</button><select v-if="mode==='report'" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div><textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="mode==='plan'?'说明要增加、删除或调整的任务步骤，修改后在建议页签核对…':mode==='report'?'输入要补充的事实，生成修订稿后核对写入…':'询问依据、补充现场情况或后续安排…'" @keydown.enter.exact.prevent="ask(input)"/><footer><button type="button" aria-label="添加文件" @click="upload.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><small v-if="fileNotice">{{fileNotice}}</small><button type="submit" aria-label="发送" :disabled="pending||!input.trim()" :aria-busy="pending"><svg v-if="!pending" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></footer><input ref="upload" type="file" hidden accept=".txt,.md,.csv,.json" @change="attach"/></form>
  </aside>
 </template>
 <script setup>
 import {computed,ref,watch,nextTick} from 'vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
-import {people,currentTask,timeText} from '../workflow/eventLifecycle'
+import {currentTask,timeText} from '../workflow/eventLifecycle'
 import AssistantAdviceMessage from './messages/AssistantAdviceMessage.vue'
 import ModelReply from './ModelReply.vue'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {supplementaryReports} from '../workflow/reportRevisions'
-import {taskConversation,taskTitle} from '../workflow/lifecycleWorkItems'
+import {taskConversation} from '../workflow/lifecycleWorkItems'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
 const questions=computed(()=>props.taskId?['本次任务需要注意哪些事项？','这次记录还需要补充什么？']:props.event.phase==='closed'?['回顾本次处理过程']:captain.value?['这次决定的依据是什么？','下一步应如何安排？']:['还需要补充哪些排查依据？','维修范围如何确定？'])
@@ -52,6 +51,8 @@ async function attach(ev){const file=ev.target.files?.[0];if(!file)return;fileNo
 </script>
 
 <style scoped>
+.lc-message>time{text-align:left!important}.lc-conversation .lc-message :deep(.assistant-basis-content){background:transparent}
+
 .lc-assistant>header{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}.lc-assistant>header small{grid-column:1/-1}.lc-assistant>header .assistant-collapse{justify-self:end;width:auto;padding:4px 8px;border:0;background:transparent;font-size:12px}
 .lc-chat-mode{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.lc-chat-mode button{font-size:11px;padding:4px 8px;border:1px solid #e0e5eb;background:#fff;color:#8390a0;border-radius:5px;cursor:pointer}.lc-chat-mode button[aria-pressed=true]{color:#96723e;background:#fbf7ef;border-color:#dac8a8}.lc-chat-mode select{width:100%;font-size:11px;padding:5px;border:1px solid #e3e7ec;border-radius:4px;color:#687b92}.lc-model-status,.lc-model-error{font-size:12px;line-height:1.6;color:#8490a0;padding:8px 0}.lc-model-error{color:#b47546}.lc-composer button:disabled{opacity:.4;cursor:wait}
 </style>

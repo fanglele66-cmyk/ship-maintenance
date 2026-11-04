@@ -42,7 +42,7 @@ test('closed events offer a separate shore handoff without reopening stage forms
   await t.test('active assistant keeps discussion without a duplicate decision entry',async()=>{
    const html=await render(createLifecycleState())
    assert.doesNotMatch(html,/填写本阶段表单|填写决策|lc-assistant-form/)
-   assert.match(html,/继续了解/)
+   assert.doesNotMatch(html,/继续了解/);assert.match(html,/这次决定的依据是什么/)
   })
   await t.test('closed captain and assigned engineer have no stage form',async()=>{
    const state=closedFixture()

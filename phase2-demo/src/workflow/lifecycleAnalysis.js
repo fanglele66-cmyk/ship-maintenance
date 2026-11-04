@@ -97,7 +97,7 @@ export function decisionAnalysisItems(event,task,report){
  if(confirmedTracking(event,task))return [{label:'异动已核实',text:'本轮现场与系统一致，背景信息已记录，支持异动成立。可选择适用维保计划和靠港时间提前执行；具体部件原因仍以现场检查为准。'},{label:'本轮提交结论',text:task.summary}]
  if(!report?.analysisMarkdown)return [{label:'本轮判断',text:report?.analysis||event.brief.conclusion}]
  return report.analysisMarkdown.split(/(?:^|\n)### /).filter(Boolean).map(section=>{
-  const [label,...lines]=section.split('\n');return {label,text:lines.filter(Boolean).join(' ')}
+  const [label,...lines]=section.split('\n');return {label:label.replace('AI后续建议','AI建议'),text:lines.filter(Boolean).join(' ')}
  })
 }
 export function decisionBasis(event,action){
@@ -133,6 +133,6 @@ export function adviceDetails(event,message,role){
  const facts=event.brief.facts.map(f=>`- **${f.label}：${f.value}${f.unit?' '+f.unit:''}**。${f.meaning}（${f.at||event.brief.discovery.at}）`).join('\n')
  const sources=event.brief.sources.map(s=>`- ${s.title} · ${s.date} · ${s.kind}`).join('\n')
  const taskContent=task?`本轮责任人：${task.owner}；安排范围：${task.scope}\n\n`+(submitted?`已提交的现场结论：${task.summary}\n\n${task.records.map(r=>`- **${r.label}：${r.result}**。${r.note||'未填写单项备注；以本轮结论和已有材料核对。'}`).join('\n')}`:`尚未收到本轮执行报告，以下为要求取得的检查信息：\n\n${task.steps.map(s=>`- **${s.label}**：${s.guide||s.recordHint||'提交该项实际结果和检查范围。'}`).join('\n')}`):'当前依据来自提醒发生窗口，尚无本轮现场排查结果。优先安排现场核实，反馈应对应具体部位、方法与发生时刻。'
- return `### 1. 提醒的原始依据\n\n${event.brief.discovery.text}\n\n${facts}\n\n### 2. 对齐工况与比较条件\n\n${c?.comparison||event.brief.boundary}\n\n### 3. ${submitted?'现场反馈如何支持判断':'需要区分的检查方向'}\n\n${submitted?reportAnalysis(event,task).replaceAll('### ','#### '):c?.branches||event.brief.conclusion}\n\n### 4. 本轮任务与证据状态\n\n${taskContent}\n\n### 5. 建议动作及交回条件\n\n${message.recommendation}\n\n${role==='engineer'?'按批准范围记录实际结果；无法确认的项目注明缺口，报告提交后等待轮机长处置。':'审阅记录后确认范围与安全影响；继续排查或安排作业时指定负责人和完成时限。'}\n\n### 6. 来源与判断边界\n\n${sources}\n\n${event.brief.boundary}`
+ return `${event.brief.discovery.text}\n\n${c?.comparison||event.brief.boundary}\n\n${submitted?reportAnalysisSummary(event,task):c?.branches||event.brief.conclusion}\n\n${taskContent}\n\n${message.recommendation}\n\n### 关键依据\n\n${facts}\n\n### 来源与判断边界\n\n${sources}\n\n${event.brief.boundary}`
 }
 
