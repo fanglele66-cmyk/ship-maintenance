@@ -29,7 +29,7 @@
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
  </div>
-  <HomeSituationAssistant v-show="assistantOpen" id="home-situation-assistant" :open="assistantOpen" :chronology="chronology" :readings="{speed:formatReading('ship-speed'),rpm:formatReading('s-012'),load:formatReading('main-load'),sampledAt:sampleTimeIso}" @close="assistantOpen=false"/>
+  <Transition name="situation-assistant"><HomeSituationAssistant v-show="assistantOpen" id="home-situation-assistant" :open="assistantOpen" :chronology="chronology" :readings="{speed:formatReading('ship-speed'),rpm:formatReading('s-012'),load:formatReading('main-load'),sampledAt:sampleTimeIso}" @close="assistantOpen=false"/></Transition>
  </div>
 </template>
 <script setup>

@@ -53,7 +53,7 @@ test('initial and C4 follow-up advice select a specific action without decision 
 test('generated and legacy report presentations share headings and retain raw facts unchanged',()=>{
  const patch={summary:'两项检查已回交',analysis:{evidence:'重复的现场记录',interpretation:'动作与反馈不对应',unverified:'未执行项目：无。',next:'复测流量活塞反馈'}}
  const markdown=generatedAnalysis(patch)
- assert.match(markdown,/### AI分析（原因与措施判断）/);assert.match(markdown,/### 未执行与待核实事项/);assert.match(markdown,/### AI建议/)
+ assert.match(markdown,/### 原因与措施判断/);assert.match(markdown,/### 未执行与待核实事项/);assert.match(markdown,/### AI建议/)
  assert.doesNotMatch(markdown,/重复的现场记录|现场记录摘要/)
  const report={markdown:'# 排查报告\n\n## 现场事实（执行人原始记录）\n\n独立表计0.61 MPa，12:01记录。\n\n### 证据与范围核对\n\n重复的现场记录\n\n### 建议处置\n\n复测流量活塞反馈'}
  const before=JSON.stringify(report),display=reportMarkdown(report)

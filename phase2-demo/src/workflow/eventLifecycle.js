@@ -11,7 +11,7 @@ import {detailedRepairSteps,presetRecheckSteps,repairProcedureVersion} from './r
 import {closureContent,closurePresentationVersion} from './closureReport.js'
 import {groupRepairSteps,compactAssignedRepair} from './repairStepGroups.js'
 import {hasObservation,observationStart,observationTaskFor,isVerificationObservation,isVerificationReview,observationPolicy} from './observationContext.js'
-import {taskExecution,executionFacts,carryForwardSteps} from './taskExecution.js'
+import {taskExecution,executionFacts,carryForwardSteps,taskRecordSummary} from './taskExecution.js'
 import {createObservationEvent,migrateObservationEvents,observationTasks,observationChain,isObservationEvent} from './observationEvents.js'
 import {shoreReportSnapshot} from './shoreReports.js'
 import {applyInitialTimeline,shiftTimelineContent} from './demoTimeline.js'
@@ -253,7 +253,7 @@ export function decide(state,id,form){
   required(task?.status==='waiting','当前任务不在等待条件状态。')
   if(form.deadline)required(Date.parse(form.deadline)>Date.now(),'调整的完成时限应晚于当前时间。')
   task.feedbackHistory||=[];task.feedbackHistory.push({at:task.submittedAt,observation:task.observation?copy(task.observation):null,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id,draft:{records:copy(task.records),summary:task.summary}})
-  task.draft={records:copy(task.records),summary:task.summary,attachments:copy(task.attachments||[])}
+  task.draft={records:copy(task.records),summary:task.summarySource==='records'?'':task.summary,attachments:copy(task.attachments||[])}
   task.status='assigned';task.deadline=form.deadline||task.deadline;task.resumedAt=at;task.waiting={...task.waiting,resumedAt:at,resumeReason:form.reason,reviewRequested:null}
   delete task.generatedReport;delete task.reportGeneration;delete task.observation;delete task.observationEndedAt;delete task.observationStartedAt;delete task.observationMode
   e.phase=task.kind;e.phases.at(-1).resumeAt=at;e.status='任务执行中';e.unread.engineer=true;e.unread.captain=false
@@ -324,8 +324,7 @@ export function submitTask(state,id,taskId,generation){
  if(!generation){
  const draft=task.draft
  required(draft.records.length===task.steps.length&&draft.records.every((r,i)=>task.steps[i].options.includes(r.result)),'请为每个步骤选择实际结果；备注可以不填。')
- required(draft.summary?.trim(),task.kind==='investigation'?'请填写原因判断、排查结论及仍需核实的事项。':'请填写实际措施、复测结果及剩余事项。')
- task.records=copy(draft.records);task.summary=draft.summary.trim();task.attachments=copy(draft.attachments);task.submittedAt=new Date().toISOString();task.status='submitted'
+ task.records=copy(draft.records);task.summarySource=draft.summary?.trim()?'executor':'records';task.summary=draft.summary?.trim()||taskRecordSummary(draft.records);task.attachments=copy(draft.attachments);task.submittedAt=new Date().toISOString();task.status='submitted'
  }
  task.status='submitted'
  if(generation){
@@ -366,7 +365,7 @@ export function resumeOwnTask(state,eventId,taskId,{reason,unchanged=true}={}){
  if(!unchanged){task.waiting.reviewRequested={at,reason,owner:actor(state)};event.unread.captain=true;return}
  required(task.waiting.resumeApproved,'原等待安排尚未授权条件具备后继续，请由轮机长确认。')
  task.feedbackHistory||=[];task.feedbackHistory.push({at:task.submittedAt,reportId:event.reports.findLast(r=>r.taskId===task.id)?.id,draft:{records:copy(task.records),summary:task.summary}})
- task.draft={records:copy(task.records),summary:task.summary,attachments:copy(task.attachments||[])}
+ task.draft={records:copy(task.records),summary:task.summarySource==='records'?'':task.summary,attachments:copy(task.attachments||[])}
  task.status='assigned';task.resumedAt=at;task.waiting={...task.waiting,resumedAt:at,resumeReason:reason,confirmedBy:actor(state),reviewRequested:null}
  delete task.generatedReport;delete task.reportGeneration;delete task.observation
  event.phase=task.kind;event.status='任务执行中';event.unread.captain=false

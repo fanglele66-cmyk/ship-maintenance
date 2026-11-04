@@ -69,7 +69,7 @@
               </span>
             </div>
             <div class="doc-card-bottom">
-              <span class="doc-card-date">更新 {{ doc.updatedAt }}</span>
+              <span v-if="hasUpdateDate(doc)" class="doc-card-date">更新 {{ doc.updatedAt }}</span>
               <span class="doc-card-id" :title="`文档唯一编号：${doc.id}`">编号 {{ doc.id }}</span>
               <span class="doc-card-action">查看详情
                 <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>
@@ -121,7 +121,7 @@
                 <div class="doc-meta-block">
                   <div class="doc-meta-row"><span class="doc-meta-label">文档编号</span><span class="doc-meta-value">{{ selectedDoc.id }}</span></div>
                   <div class="doc-meta-row"><span class="doc-meta-label">版本</span><span class="doc-meta-value">{{ selectedDoc.version || '—' }}</span></div>
-                  <div class="doc-meta-row"><span class="doc-meta-label">更新日期</span><span class="doc-meta-value">{{ selectedDoc.updatedAt }}</span></div>
+                  <div v-if="hasUpdateDate(selectedDoc)" class="doc-meta-row"><span class="doc-meta-label">更新日期</span><span class="doc-meta-value">{{ selectedDoc.updatedAt }}</span></div>
                   <div class="doc-meta-row"><span class="doc-meta-label">分类</span><span class="doc-meta-value">{{ selectedDoc.category }} / {{ selectedDoc.subcategory }}</span></div>
                 </div>
                 <div class="doc-content-body" v-html="renderContent"></div>
@@ -162,6 +162,7 @@ const deviceTypes = computed(() => DEVICE_TYPES.map(device => ({
 })))
 const route = useRoute()
 const router = useRouter()
+const hasUpdateDate = doc => !!doc?.updatedAt && !['未注明', '未记录', '未知', '—'].includes(doc.updatedAt.trim())
 const selectedDevice = ref(knowledgeViewCache.selectedDevice)
 const selectedSystem = ref('全部系统')
 const selectedDocType = ref('全部类型')
@@ -279,7 +280,7 @@ const rawContent = computed(() => {
     <p><strong>所属分类：</strong>${selectedDoc.value.category} / ${selectedDoc.value.subcategory}</p>
     <p><strong>文档编号：</strong>${selectedDoc.value.id}</p>
     <p><strong>版本：</strong>${selectedDoc.value.version}</p>
-    <p><strong>更新日期：</strong>${selectedDoc.value.updatedAt}</p>
+    ${hasUpdateDate(selectedDoc.value) ? '<p><strong>更新日期：</strong>' + selectedDoc.value.updatedAt + '</p>' : ''}
     <hr>
     <p>本文档详细内容正在编制中，敬请期待。</p>
   `

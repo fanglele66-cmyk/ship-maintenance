@@ -21,14 +21,14 @@ export function composeShoreNarrative({events=[],includedReports=[],fields={},ev
  const current=selected?.phase==='transferred'?ordered.at(-1):selected||ordered.at(-1)
  const latest=reports.at(-1),tasks=ordered.flatMap(e=>e.tasks||[]),process=[]
  for(const task of tasks){
-  process.push({at:task.assignedAt,body:`${time(task.assignedAt)}，安排${task.owner||'执行人员'}开展${kind(task)}${task.scope?'，范围为'+task.scope.replace(/[。；]$/,''):''}。`})
+  process.push({at:task.assignedAt,body:`${time(task.assignedAt)}，安排${task.owner||'执行人员'}开展第${task.round||1}轮${kind(task)}${task.deadline?'，要求 '+time(task.deadline)+' 前回交结果':''}。`})
  }
  for(const report of reports){
   const task=report.submissionSnapshot||tasks.find(t=>t.id===report.taskId)
   if(task&&report.taskId){
-   const records=task.records||[],facts=unique(records.map(r=>sentence(r.label+'：'+(r.result||'未记录')+(r.note?'；'+r.note:'')))).join('')
-   const original=task.summary||report.summary,analysis=analysisOf(report)
-   process.push({at:report.at,body:`${time(report.at)}，${report.owner||task.owner||'执行人员'}回交${kind(task)}结果${report.submissionNumber>1?'（恢复后第'+report.submissionNumber+'次提交）':''}。${facts}${original&&(report.id!==latest?.id||fields.situation)&&!facts.includes(original)?'\n\n执行汇总：'+sentence(original):''}\n\n记录索引：${report.number||report.id}。${report.analysisState?'\n\n'+sentence(report.analysisState):''}`})
+   const records=task.records||[],facts=unique(records.map(r=>sentence(r.label+'：'+(r.result||'未记录')+(r.executionStatus&&r.executionStatus!==r.result?'（'+r.executionStatus+'）':'')+(r.note?'；'+r.note:''))))
+   const original=task.summarySource==='records'?'':task.summary||report.summary
+   process.push({at:report.at,body:`${time(report.at)}，${report.owner||task.owner||'执行人员'}回交${kind(task)}结果${report.submissionNumber>1?'（第'+report.submissionNumber+'次提交）':''}。${facts.length?'\n\n'+facts.map(f=>'- '+f).join('\n'):''}${original&&(report.id!==latest?.id||fields.situation)&&!facts.join('').includes(original)?'\n\n执行人结论：'+sentence(original):''}\n\n记录索引：${report.number||report.id}。`})
   }else if(report.kind==='观察报告'){
    const snapshot=report.observationSnapshot,obs=snapshot?.observation
    const windows=[...(obs?.records||[]),...(obs?.pending?[obs.pending]:[])]
@@ -60,7 +60,8 @@ export function composeShoreNarrative({events=[],includedReports=[],fields={},ev
  const pendingTasks=tasks.filter(t=>['assigned','waiting'].includes(t.status))
  const next=unique([fields.support,...pendingTasks.map(t=>`${t.owner}继续${kind(t)}，要求 ${time(t.deadline)} 前完成${t.status==='waiting'?'；等待条件：'+(t.waiting?.reason||'未记录'):''}`),...(!pendingTasks.length&&currentAnalysis.next?['AI建议：'+currentAnalysis.next]:[])])
  if(fields.actions)process.push({at:at||ordered.at(-1)?.createdAt,body:'本次补充已采取安排：'+sentence(fields.actions)})
- const summary=sentence(fields.situation||latest?.summary)
+ const summary=sentence(fields.situation||(current.phase==='closed'?'':latest?.summary))
+ const interpretation=currentAnalysis.interpretation||(current.phase==='closed'?[...reports].reverse().map(analysisOf).find(a=>a.interpretation)?.interpretation:'')
  const facts=unique((root.brief?.facts||[]).map(f=>`${f.label} ${f.value??'未记录'}${f.unit?' '+f.unit:''}`)).join('；')
- return `# ${(title||root.title).replace(/ · (?:上报岸基报告|效果观察)$/,'')} · 事件处置情况报告\n\n事件编号：${root.number}　设备：${root.device}${at?'　上报时间：'+time(at):''}\n\n## 当前情况\n\n截至本次上报，${current.title}处于“${current.status}”。${summary}\n\n## 事件发现\n\n${time(root.createdAt)}，${root.brief?.discovery?.label||'系统发现异常线索'}。${sentence(root.brief?.discovery?.text||root.brief?.conclusion)}${facts?'\n\n发现时关键数据：'+sentence(facts):''}\n\n## 排查与处置经过\n\n${unique(process.sort((a,b)=>timestamp(a.at)-timestamp(b.at)).map(p=>p.body)).join('\n\n')||'尚无现场处置记录。'}\n\n## 当前判断与待解决事项\n\n${unique([currentAnalysis.interpretation?'当前分析认为：'+currentAnalysis.interpretation:'',...outstanding]).map(sentence).join('\n\n')||'尚未取得现场核实结论。'}\n\n## 后续安排\n\n${next.map(sentence).join('\n\n')||(current.phase==='closed'?'本事件已闭环，暂无新增岸基支持诉求。':'暂无已填写的岸基支持诉求。')}`
+ return `# ${(title||root.title).replace(/ · (?:上报岸基报告|效果观察)$/,'')} · 事件处置情况报告\n\n事件编号：${root.number}　设备：${root.device}${at?'　上报时间：'+time(at):''}\n\n## 当前情况\n\n截至本次上报，事件状态：${current.status}。${summary}\n\n## 事件发现\n\n${time(root.createdAt)}，${root.brief?.discovery?.label||'系统发现异常线索'}。${sentence(root.brief?.discovery?.text||root.brief?.conclusion)}${facts?'\n\n发现时关键数据：'+sentence(facts):''}\n\n## 排查与处置经过\n\n${unique(process.sort((a,b)=>timestamp(a.at)-timestamp(b.at)).map(p=>p.body)).join('\n\n')||'尚无现场处置记录。'}\n\n## 当前判断与待解决事项\n\n${unique([interpretation?'原因与措施判断：'+interpretation:'',...outstanding]).map(sentence).join('\n\n')||'尚未取得现场核实结论。'}\n\n## 后续安排\n\n${next.map(sentence).join('\n\n')||(current.phase==='closed'?'暂无新增岸基支持诉求。':'暂无已填写的岸基支持诉求。')}`
 }

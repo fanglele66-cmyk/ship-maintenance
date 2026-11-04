@@ -1,7 +1,6 @@
 <template>
  <aside class="lc-assistant"><header><strong>{{taskId?'任务助手':'事件助手'}}</strong><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button></header>
   <div ref="stream" class="lc-conversation" @wheel.passive="following=false" @pointerdown="following=false">
-   <article v-if="taskId" class="lc-message advice"><strong>本轮进度</strong><p>{{(task?.status==='submitted'?task?.records:task?.draft?.records||[])?.filter(r=>r.result).length||0}} / {{task?.steps.length||0}} 项{{task?.status==='submitted'?'已提交':'已填写'}}</p><p class="lc-muted">{{task?.status==='submitted'?'已提交，待轮机长审阅。':captain?'等待执行人回交本轮结果。':'补齐未填写项目后提交。'}}</p></article>
    <article v-for="(message,i) in messages" :key="message.id" :class="['lc-message',message.kind]" :data-message-id="message.id">
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>

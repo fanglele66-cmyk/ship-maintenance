@@ -10,14 +10,18 @@ export function taskExecution(task){
  records.forEach((record,index)=>{
   if(record.result!=='不适用'&&(record.executionStatus==='未完成'||record.executionStatus!=='已完成'&&(/未完成|无法确认|受限/.test(record.result||''))||blocked(record.note,task.kind)||record.subrecords?.some(r=>/未完成|受限/.test(r.result))))outstanding.push({index,label:record.label,result:record.result,reason:record.note||'尚未提供未执行原因或恢复条件，请核实。',step:task.steps?.[index]})
  })
- const summaryBlocked=blocked(task?.summary,task?.kind)
+ const summaryBlocked=task?.summarySource!=='records'&&blocked(task?.summary,task?.kind)
  return {completed:records.filter((r,i)=>r.result&&r.result!=='不适用'&&!outstanding.some(o=>o.index===i)),notApplicable:records.filter(r=>r.result==='不适用'),outstanding,summaryBlocked,incomplete:outstanding.length>0||summaryBlocked}
 }
 export function executionFacts(task){
  const result=taskExecution(task)
  const list=task.records.map(r=>`- ${r.label}：${r.result||'未记录'}${r.note?'；'+r.note:'；未提供详细过程记录。'}`).join('\n')
  const remaining=result.outstanding.map(r=>`- ${r.label}：${r.result}；${r.reason}`).join('\n')
- return `## 现场事实（执行人原始记录）\n\n${list}\n\n### 执行人汇总\n\n${task.summary}${result.notApplicable.length?'\n\n### 本轮无需执行项目\n\n'+result.notApplicable.map(r=>'- '+r.label+'：不适用，本项无需执行。'+(r.note||'')).join('\n'):''}${remaining?'\n\n## 未执行项目\n\n'+remaining:''}${result.summaryBlocked?'\n\n汇总中记录实施条件受限，具体条件见执行人汇总。':''}`
+ return `## 现场事实（执行人原始记录）\n\n${list}${task.summarySource==='records'?'':'\n\n### 执行人汇总\n\n'+task.summary}${result.notApplicable.length?'\n\n### 本轮无需执行项目\n\n'+result.notApplicable.map(r=>'- '+r.label+'：不适用，本项无需执行。'+(r.note||'')).join('\n'):''}${remaining?'\n\n## 未执行项目\n\n'+remaining:''}${result.summaryBlocked?'\n\n汇总中记录实施条件受限，具体条件见执行人汇总。':''}`
+}
+// A factual fallback for direct submission; no cause or completion is inferred.
+export function taskRecordSummary(records){
+ return records.map(r=>`${r.label}：${r.result}${r.executionStatus&&r.executionStatus!==r.result?'（'+r.executionStatus+'）':''}${r.note?.trim()?'；'+r.note.trim():''}`.replace(/[；。]+$/,'')+'。').join('')
 }
 export function carryForwardSteps(event){
  const previous=event.tasks.findLast(t=>['repair','maintenance'].includes(t.kind))

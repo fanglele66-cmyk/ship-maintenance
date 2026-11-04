@@ -17,7 +17,7 @@ export function shoreReportBasis(event,state={events:{[event.id]:event}},fields=
   phases:(e.phases||[]).map(p=>({id:p.id,label:p.label,at:p.at,observationDueAt:p.observationDueAt,observationCompletedAt:p.observationCompletedAt})),
   decisions:(e.decisions||[]).filter(d=>d.action!=='shore').map(d=>({id:d.id,action:d.action,owner:d.owner,at:d.at,reason:d.reason})),
   tasks:(e.tasks||[]).map(t=>({id:t.id,title:t.title||'第'+(t.round||1)+'轮'+({investigation:'排查',repair:'维修',maintenance:'维保'}[t.kind]||'执行')+'任务',kind:t.kind,purpose:t.purpose,round:t.round,owner:t.owner,assignedBy:t.assignedBy,assignedAt:t.assignedAt,deadline:t.deadline,status:t.status,scope:t.scope,submittedAt:t.submittedAt,
-   ...(t.submittedAt?{records:copy(t.records||[]),summary:t.summary}:{} )}))}))
+   ...(t.submittedAt?{records:copy(t.records||[]),summary:t.summary,summarySource:t.summarySource}:{} )}))}))
  return {events,includedReports,markdown:composeShoreNarrative({events,includedReports,fields,eventId:event.id,title:event.title})}
 }
 
@@ -29,7 +29,7 @@ export function shoreReportEntries(state){
 // Upgrade only the presentation of older frozen packets, never read current event facts.
 export function shoreReportPresentation(record){
  const report=record.syncedReport||{}
- if(report.presentationVersion===2||!report.events?.length)return report
+ if(report.presentationVersion===3||report.edited||!report.events?.length)return report
  return {...report,markdown:composeShoreNarrative({...report,at:record.at})}
 }
 
@@ -50,11 +50,11 @@ export function shoreReportSnapshot(event,form,state,at){
   if(draft.eventId!==event.id)throw Error('报告不属于当前事件，请重新打开上报窗口。')
   if(!markdown)throw Error('上报报告内容不能为空。')
   if(draft.sourceShoreId&&!event.shore.some(r=>r.id===draft.sourceShoreId))throw Error('原上报版本不存在，请重新打开上报窗口。')
-  return {...copy(draft),id:'shore-report-'+crypto.randomUUID(),markdown,originalMarkdown:draft.markdown,edited:markdown!==draft.markdown.trim(),presentationVersion:2,summary:markdown.replace(/^#+.*$/gm,'').trim().replace(/\s+/g,' ').slice(0,180)}
+  return {...copy(draft),id:'shore-report-'+crypto.randomUUID(),markdown,originalMarkdown:draft.markdown,edited:markdown!==draft.markdown.trim(),presentationVersion:3,summary:markdown.replace(/^#+.*$/gm,'').trim().replace(/\s+/g,' ').slice(0,180)}
  }
  if(form.shoreIncludeHistory){
   const value=copy(form.shoreSituation||{}),basis=shoreReportBasis(event,state,value)
-  return {id:'shore-report-'+crypto.randomUUID(),kind:'上报岸基报告',title:event.title+' · 上报岸基报告',eventId:event.id,eventNumber:event.number,summary:`覆盖 ${basis.events.length} 个关联事件、${basis.includedReports.length} 份正式报告。${value.situation||''}`,fields:value,...basis,presentationVersion:2,markdown:composeShoreNarrative({...basis,fields:value,eventId:event.id,title:event.title,at})}
+  return {id:'shore-report-'+crypto.randomUUID(),kind:'上报岸基报告',title:event.title+' · 上报岸基报告',eventId:event.id,eventNumber:event.number,summary:`覆盖 ${basis.events.length} 个关联事件、${basis.includedReports.length} 份正式报告。${value.situation||''}`,fields:value,...basis,presentationVersion:3,markdown:composeShoreNarrative({...basis,fields:value,eventId:event.id,title:event.title,at})}
  }
  if(form.shoreSituation){
   const value=form.shoreSituation

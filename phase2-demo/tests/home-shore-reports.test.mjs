@@ -67,8 +67,11 @@ test('Shore snapshot includes related initial facts, task reports, observation a
 test('Shore basis retains formal report while AI generation is failed or still running',()=>{
  const s=createLifecycleState(),e=s.events[id],t=assign(s);submit(s,t)
  t.status='report-error';t.reportGeneration={factReportId:e.reports[0].id,status:'error'}
- assert.match(shoreReportBasis(e,s).markdown,/AI 分析生成失败，现场报告已提交/)
- t.status='reporting';assert.match(shoreReportBasis(e,s).markdown,/AI 分析生成中，现场报告已提交/)
+ for(const status of ['report-error','reporting']){
+  t.status=status;const basis=shoreReportBasis(e,s)
+  assert.match(basis.markdown,/正式现场事实/);assert.doesNotMatch(basis.markdown,/AI 分析生成/)
+  assert.match(basis.includedReports[0].analysisState,/AI 分析生成/)
+ }
 })
 test('Workbench progresses from initial decision through private draft counts to post-investigation decision',()=>{
  const s=createLifecycleState(),e=s.events[id];assert.equal(decisionStage(e),'初始信息决策')

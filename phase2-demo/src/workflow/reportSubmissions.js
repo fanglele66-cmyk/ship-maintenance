@@ -15,7 +15,7 @@ export function submissionCode(event,task,number){
  return `${event.number}-${kind}-${String(task.round).padStart(2,'0')}-${String(number).padStart(2,'0')}`
 }
 export function submissionSnapshot(task){
- return copy(Object.fromEntries(['id','kind','purpose','round','owner','scope','steps','records','summary','attachments','maintenance','assignedAt','deadline','submittedAt','resumedAt'].filter(key=>task[key]!==undefined).map(key=>[key,task[key]])))
+ return copy(Object.fromEntries(['id','kind','purpose','round','owner','scope','steps','records','summary','summarySource','attachments','maintenance','assignedAt','deadline','submittedAt','resumedAt'].filter(key=>task[key]!==undefined).map(key=>[key,task[key]])))
 }
 export function reportTask(event,report){
  const task=event.tasks.find(t=>t.id===report.taskId)||(event.observationSource&&event.observationSource.taskId===report.taskId?event.observationSource.task:null)

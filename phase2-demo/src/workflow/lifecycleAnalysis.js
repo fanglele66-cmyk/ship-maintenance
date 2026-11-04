@@ -96,7 +96,7 @@ export function decisionAnalysisItems(event,task,report){
  if(confirmedTracking(event,task))return [{label:'本轮趋势判断',text:trackingAssessment(event,task).scope},{label:'AI建议',text:taskRecommendation(event,task).next}]
  if(!report?.analysisMarkdown)return [{label:'本轮判断',text:report?.analysis||event.brief.conclusion}]
  return report.analysisMarkdown.split(/(?:^|\n)### /).filter(Boolean).map(section=>{
-  const [label,...lines]=section.split('\n');return {label:label.replace(/AI后续建议|建议处置|后续建议/,'AI建议'),text:lines.filter(Boolean).join(' ')}
+  const [label,...lines]=section.split('\n');return {label:label.replace(/AI后续建议|建议处置|后续建议/,'AI建议').replace(/^(?:AI分析[（(]原因与措施判断[）)]|原因解释与措施判断)$/,'原因与措施判断'),text:lines.filter(Boolean).join(' ')}
  })
 }
 export function decisionBasis(event,action){

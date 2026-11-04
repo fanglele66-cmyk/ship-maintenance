@@ -6,7 +6,7 @@
    <div class="task-center-intro"><div class="task-intro-copy">
     <div class="task-intro-title"><h2>{{activeLabel}}</h2><label v-if="tab==='assigned'" class="task-history-filter">派发记录 <span class="task-select"><select v-model="assignedFilter" aria-label="派发记录"><option value="active">未完成</option><option value="all">全部历史</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
     <p>{{tabDescription}}</p>
-   </div><label class="task-type-filter">类型<span class="task-select"><select v-model="filter" aria-label="记录类型"><option value="">全部类型</option><option v-if="crossBusiness&&captain&&tab!=='assigned'" value="decision">决策与确认</option><option value="task">执行任务</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
+   </div><label class="task-type-filter">类型<span class="task-select"><select v-model="filter" aria-label="记录类型"><option value="">全部类型</option><option v-if="crossBusiness&&captain&&tab!=='assigned'" value="decision">决策与确认</option><option v-for="type in ['排查任务','维修任务','维保任务','复查任务']" :key="type" :value="type">{{type}}</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
    <div v-if="items.length" class="work-card-grid">
     <article v-for="item in items" :key="item.id" class="work-card" :class="{'is-decision':item.kind==='decision','is-done':item.done}" :data-work-id="item.id">
      <header><span class="work-kind">{{item.type}}</span><small>{{item.number||item.eventNumber}}</small><span class="work-state">{{item.status}}</span></header>
@@ -34,7 +34,7 @@ const captain=computed(()=>store.state.role==='captain'),crossBusiness=computed(
 const tabs=computed(()=>[{key:'pending',label:'待我处理'},...(capabilities[store.state.role]?.dispatch?[{key:'assigned',label:'我派发的'}]:[]),{key:'completed',label:'已完成'},{key:'all',label:'全部记录'}])
 const activeLabel=computed(()=>tabs.value.find(t=>t.key===tab.value)?.label)
 const tabDescription=computed(()=>({pending:'优先处理临近截止的事项。',assigned:'关注未完成项目与受阻原因。',completed:'按完成时间查看记录。',all:'按事件或任务编号检索。'}[tab.value]))
-const items=computed(()=>work.value[tab.value].filter(item=>(tab.value!=='assigned'||assignedFilter.value==='all'||!item.done)&&(!filter.value||item.kind===filter.value)&&[item.title,item.eventTitle,item.eventNumber,item.number,item.device,item.owner].join(' ').toLowerCase().includes(query.value.trim().toLowerCase())))
+const items=computed(()=>work.value[tab.value].filter(item=>(tab.value!=='assigned'||assignedFilter.value==='all'||!item.done)&&(!filter.value||(filter.value==='decision'?item.kind==='decision':item.type===filter.value))&&[item.title,item.eventTitle,item.eventNumber,item.number,item.device,item.owner].join(' ').toLowerCase().includes(query.value.trim().toLowerCase())))
 function cardTitle(item){return workItemPresentation(item,store.state.events[item.eventId])}
 function selectTab(value){tab.value=value;filter.value='';router.replace({path:crossBusiness.value?'/situation/todos':'/event',query:value==='pending'?{}:{view:value}})}
 function open(item){router.push({...item.location,query:{...item.location.query,returnView:tab.value}})}

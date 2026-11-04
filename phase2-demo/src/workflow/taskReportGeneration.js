@@ -12,7 +12,7 @@ export async function generateTaskReport(state,eventId,taskId,request,{ownerSess
  // Only original feedback and the dispatched plan are sent, never UI drafts or chat state.
  context.tasks=context.tasks.map(t=>({...submissionSnapshot(t),status:t.status}))
  try{
-  const result=await request({mode:'submit-report',role,actor:people[role],text:'根据本次已提交的逐项现场记录与汇总结论生成本轮报告。分别写清做过什么、发现什么、尚不能确认什么。现场事实和AI分析建议分开。明确区分：不适用是本项无需执行，按已反馈流转，不列入待恢复；未完成或实施条件受阻才保留补做项目。恢复后以本次记录为准，历史未完成现已完成属于状态更新，不是矛盾。',event:context,taskId},(kind,data)=>{
+  const result=await request({mode:'submit-report',role,actor:people[role],text:'根据本次已提交的逐项现场记录及已填写的补充结论生成本轮报告。分别写清做过什么、发现什么、尚不能确认什么。现场事实和AI分析建议分开。明确区分：不适用是本项无需执行，按已反馈流转，不列入待恢复；未完成或实施条件受阻才保留补做项目。恢复后以本次记录为准，历史未完成现已完成属于状态更新，不是矛盾。',event:context,taskId},(kind,data)=>{
    const c=current();if(!c||c.task.status!=='reporting')return
    if(kind==='progress'){c.task.reportGeneration.progress=data;c.message.progress=data;c.message.progressLog.push(data)}
    if(kind==='report'){c.task.reportGeneration.patch=data.patch;c.message.generatedReport=data.patch}
