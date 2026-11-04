@@ -3,7 +3,7 @@ const commonSource={id:'baseline-readings',title:'六缸排温与主机转速原
 export const cylinderOneBrief={
  id:'real-tracking-exhaust-baseline',title:'一缸排温长期基线抬升跟踪',baselineCylinder:1,
  evidenceCutoff:'2026-08-12 11:39:59',
- discovery:{kind:'ai-data-analysis',label:'AI长期基线分析发现',at:'2026-08-12 12:00',text:'AI复核一缸排温的月度缸间偏差：年初接近其余五缸均值，4 月后相对偏高并延续至 8 月已覆盖样本。该变化跨越多个月份，应核对热平衡、排气温度测量通道及期间调整记录。'},
+ discovery:{kind:'ai-data-analysis',label:'AI长期基线分析发现',at:'2026-08-12 12:00',text:'一缸月度相对排温在年初接近其余五缸均值，4月后偏高，延续至8月已覆盖样本。'},
  conclusion:'一缸相对其余五缸均值的排气温度偏差，由 1—3 月的 −1.31～+1.40°C，抬升至 4—8 月的 +6.36～+8.93°C。先核对一缸排气温度探头、接线端子及校验记录，再对照喷油器维护、排气阀检验与最高燃烧压力平衡资料，明确持续偏高的来源。',
  facts:[
   {label:'年初相对基线',value:'−1.31～+1.40',unit:'°C',at:'2026-01—03',meaning:'一缸减去同刻其余五缸均值，再按月平均；年初围绕零偏差变化。',sourceIds:['baseline-readings']},

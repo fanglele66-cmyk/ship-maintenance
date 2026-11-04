@@ -3,7 +3,7 @@ import {resolve,relative,dirname,extname} from 'node:path'
 import {createHash} from 'node:crypto'
 import {knowledgeDocs} from '../src/mock/knowledge.js'
 import {inspectionReports,inspectionReportDetails} from '../src/mock/inspection.js'
-const root=resolve('.'),out=resolve('docs/审查附件-20261104')
+const root=resolve('.'),out=resolve(process.argv[2]||'docs/审查附件-20261104/修正后')
 await mkdir(out,{recursive:true})
 async function walk(dir){return (await Promise.all((await readdir(dir,{withFileTypes:true})).map(e=>e.isDirectory()?walk(resolve(dir,e.name)):[resolve(dir,e.name)]))).flat()}
 const files=(await Promise.all(['src','server'].map(d=>walk(resolve(d))))).flat().filter(p=>['.vue','.js','.mjs','.json'].includes(extname(p))&&!/ai-config\.(?:local\.)?json$/.test(p))
@@ -18,7 +18,7 @@ const inventory=[]
 for(const [p,s] of texts){const body=clean(s),counts=Object.fromEntries(Object.entries(patterns).map(([k,re])=>[k,[...body.matchAll(re)].length]));inventory.push({file:relative(root,p).replaceAll('\\','/'),lines:s.split('\n').length,reachable:seen.has(p),chineseLines:body.split('\n').filter(l=>/[\u4e00-\u9fff]/.test(l)).length,sha256:createHash('sha256').update(s).digest('hex'),...counts})}
 inventory.sort((a,b)=>a.file.localeCompare(b.file));await writeFile(resolve(out,'内容来源清单.csv'),csv([Object.keys(inventory[0]),...inventory.map(Object.values)]))
 const ksource=texts.get(resolve('src/mock/knowledge.js'))
-const knowledge=knowledgeDocs.map(d=>{const line=ksource.split('\n').findIndex(l=>l.includes("doc('"+d.id+"'"));const call=ksource.split('\n')[line]||'';return {id:d.id,title:d.title,device:d.device,type:d.docType,sourceLine:line+1,source: /,\s*''\s*,/.test(call)?'通用生成模板':'复用静态章节',bodyHash:createHash('sha256').update(d.chapterHTML).digest('hex'),hasPrimarySourceMetadata:Boolean(d.sourcePath||d.sourceUrl)}})
+const knowledge=knowledgeDocs.map(d=>{const line=ksource.split('\n').findIndex(l=>l.includes("doc('"+d.id+"'"));const call=ksource.split('\n')[line]||'';return {id:d.id,title:d.title,device:d.device,type:d.docType,sourceLine:line+1,source:d.sourceKind==='wiki-source'?'提供的 RT-flex50 知识库原文':/,\s*''\s*,/.test(call)?'通用生成模板':'复用静态章节',sourcePath:d.sourcePath||'',sourceHash:d.sha256||'',bodyHash:createHash('sha256').update(d.chapterHTML).digest('hex'),hasPrimarySourceMetadata:Boolean(d.sourcePath||d.sourceUrl)}})
 await writeFile(resolve(out,'知识文档核查.csv'),csv([Object.keys(knowledge[0]),...knowledge.map(Object.values)]))
 const inspections=inspectionReports.map(r=>{const d=inspectionReportDetails[r.id],items=d.systems.flatMap(s=>s.items);return {id:r.id,title:r.title,summary:r.summary,statsTotal:d.stats.slice(0,3).reduce((n,s)=>n+Number(s.value),0),actualRows:items.length,totalsMatch:d.stats.slice(0,3).reduce((n,s)=>n+Number(s.value),0)===items.length,health:d.stats[3].value,source:'src/mock/inspection.js'}})
 await writeFile(resolve(out,'巡检报告核查.csv'),csv([Object.keys(inspections[0]),...inspections.map(Object.values)]))

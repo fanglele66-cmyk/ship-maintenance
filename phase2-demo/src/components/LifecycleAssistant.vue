@@ -1,14 +1,14 @@
 <template>
  <aside class="lc-assistant"><header><strong>{{taskId?'任务助手':'事件助手'}}</strong><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button></header>
   <div ref="stream" class="lc-conversation" @wheel.passive="following=false" @pointerdown="following=false">
-   <article v-if="taskId" class="lc-message advice"><strong>本次任务要求</strong><p>{{task?.scope}}</p><p class="lc-muted">{{task?.status==='submitted'?'本次反馈已提交，可查看结果或补充本任务报告；任务目标与后续安排由轮机长审阅。':captain?'由执行人按步骤填写；此处可查看进度与询问本次任务。':'按本次步骤记录实际结果，汇总后提交给轮机长。'}}</p></article>
+   <article v-if="taskId" class="lc-message advice"><strong>本轮进度</strong><p>{{(task?.status==='submitted'?task?.records:task?.draft?.records||[])?.filter(r=>r.result).length||0}} / {{task?.steps.length||0}} 项{{task?.status==='submitted'?'已提交':'已填写'}}</p><p class="lc-muted">{{task?.status==='submitted'?'已提交，待轮机长审阅。':captain?'等待执行人回交本轮结果。':'补齐未填写项目后提交。'}}</p></article>
    <article v-for="(message,i) in messages" :key="message.id" :class="['lc-message',message.kind]" :data-message-id="message.id">
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>
     <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===messages.length-1,historical:i!==messages.length-1,actionLabel:'',compact:true,basisLabel:'思考过程'}" @stream-progress="follow"/>
     <template v-else><strong v-if="message.title">{{message.title}}</strong><p>{{message.text}}</p></template><time>{{timeText(message.at)}}</time>
    </article>
-   <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>逐项结果及汇总结论已归入关联事件，可回看本次报告。</p><time>{{timeText(task.submittedAt)}}</time></article>
+   <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>本轮报告待审阅。</p><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
    <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>

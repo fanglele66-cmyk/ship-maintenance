@@ -1,3 +1,4 @@
+import {generatedAnalysis} from './generatedReport.js'
 import {reportTask} from './reportSubmissions.js'
 import {makeReport,people} from './eventLifecycle.js'
 const fields=['evidence','interpretation','unverified','next']
@@ -8,8 +9,7 @@ export function supplementaryReports(event,role){
  return event.reports.filter(r=>r.owner===people[role]&&['排查报告','维修报告','维保作业报告'].includes(r.kind)&&event.tasks.some(t=>t.id===r.taskId&&t.status==='submitted'))
 }
 export function revisionAnalysis(patch){
- const labels=['证据与范围核对','原因解释与措施判断','待核实事项','建议处置']
- return fields.map((key,i)=>`### ${labels[i]}\n\n${prose(patch.analysis[key])}`).join('\n\n')
+ return generatedAnalysis({analysis:Object.fromEntries(fields.map(key=>[key,prose(patch.analysis[key])]))})
 }
 export function applyReportSupplement(state,eventId,proposal){
  const event=state.events[eventId],report=event&&supplementaryReports(event,state.role).find(r=>r.id===proposal.reportId)

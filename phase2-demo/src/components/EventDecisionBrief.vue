@@ -1,7 +1,7 @@
 <template>
   <section class="event-decision-brief" aria-label="事件研判摘要">
-    <div class="brief-origin"><span>{{ brief.discovery.label }}</span><time v-if="showTime">{{ brief.discovery.at }}</time></div>
-    <section class="brief-conclusion"><h3>{{ eventType==='异动跟踪'?'跟踪现象':'异常现象' }}</h3><p>{{ brief.discovery.text }}</p><p class="brief-judgement">{{ brief.conclusion }}</p></section>
+    <div class="brief-origin"><span>{{ showTime?brief.discovery.label:'发现记录' }}</span><time v-if="showTime">{{ brief.discovery.at }}</time></div>
+    <section class="brief-conclusion"><h3>{{ eventType==='异动跟踪'?'跟踪现象':'异常现象' }}</h3><p>{{ presentation.phenomenon }}</p><p class="brief-judgement">{{ presentation.judgement }}</p></section>
     <slot name="before-decisions"/>
     <div v-if="showDecisions" class="brief-decisions">
       <section><h3>决策要点</h3><p>{{ brief.captainDecision }}</p></section>
@@ -11,7 +11,10 @@
 </template>
 
 <script setup>
-defineProps({brief:{type:Object,required:true},eventType:{type:String,default:''},showDecisions:{type:Boolean,default:true},showTime:{type:Boolean,default:true}})
+import {computed} from 'vue'
+import {initialBriefText} from '../workflow/initialBriefText.js'
+const props=defineProps({brief:{type:Object,required:true},eventType:{type:String,default:''},showDecisions:{type:Boolean,default:true},showTime:{type:Boolean,default:true}})
+const presentation=computed(()=>initialBriefText(props.brief))
 </script>
 
 <style scoped>

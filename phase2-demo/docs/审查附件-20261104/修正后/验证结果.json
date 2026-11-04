@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-04",
+  "baseline": "2256085",
+  "build": {"command": "npm run build", "status": "passed", "warning": "Existing bundle-size warning"},
+  "tests": {
+    "files": ["content-audit-adjustments", "concise-presentation", "home-shore-reports", "observation-advice", "c4-tracking-process", "report-resubmission", "device-health-assessment", "closed-event-process", "task-report-maintenance", "tracking-disposition"],
+    "total": 69,
+    "passed": 65,
+    "failed": 4,
+    "baselineReproducedFailures": [
+      "first report streams real response fields before final handoff and preserves raw records",
+      "failed or malformed report retains feedback; retry creates exactly one report",
+      "reload recovery is scoped to the generating session; another role tab does not cancel it",
+      "submission API invokes provider, streams report previews and validates completed structure"
+    ],
+    "fixedBaselineFailure": "early maintenance validates plan/window, snapshots selected steps, hands off and closes",
+    "baselineComparison": "Ran task-report-maintenance.test.mjs against an isolated git archive of 2256085: 2 passed, 5 failed; current version: 3 passed, 4 failed."
+  },
+  "knowledge": {"documents": 61, "images": 190, "sourceHashMatches": 61, "uniqueBodies": 61, "missingSourceImageReferences": 7, "localAssetPaths": "passed", "internalLinkTargets": "passed"},
+  "browser": {"viewport": "1600x1000", "pages": ["situation", "real-alarm-0430", "real-warning-0523", "real-tracking-exhaust-baseline", "real-health-c4-baseline", "submitted-task-report", "effect-observation", "knowledge-case", "knowledge-ICU-cross-link"], "pageErrors": [], "sourceImageDecoded": true, "isolatedState": true},
+  "boundaries": ["No production model responses generated for acceptance", "No real ship task dispatch", "No changes to observation thresholds or legal workflow decisions", "Original user reports and submitted shore snapshots retained", "A09 canned knowledge answers deferred"]
+}

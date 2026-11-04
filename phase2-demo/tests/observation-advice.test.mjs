@@ -18,13 +18,13 @@ function fixture(hours=3){
 }
 test('two hours of valid stable observation recommends manual closure without another window',()=>{
  const {event,task}=fixture(),before=JSON.stringify(event),advice=observationAdvice(event,task)
- assert.equal(advice.status,'review');assert.equal(advice.label,'推荐闭环');assert.match(advice.summary,/指标平稳/);assert.match(advice.timing,/推荐本轮闭环/)
+ assert.equal(advice.status,'review');assert.equal(advice.label,'推荐闭环');assert.match(advice.summary,/近期波动平稳/);assert.match(advice.timing,/建议轮机长审阅闭环依据/)
  assert.ok(advice.evidence.completeWindow);assert.equal(JSON.stringify(event),before)
  const prompt=observationAdviceRequest(event,task,advice)
  assert.equal(prompt.mode,'observation');assert.match(prompt.text,/先核对数据时效、缺测和工况/);assert.match(prompt.text,/停机、非稳态或无工况数据/);assert.ok(prompt.text.includes(task.observation.pending.channels[0].value.toString()))
 })
 test('fresh partial windows and missing channels never inherit a previous complete window decision',()=>{
- const {event,task}=fixture(1);assert.equal(observationAdvice(event,task).status,'waiting');assert.match(observationAdvice(event,task).summary,/数据质量良好/);assert.match(observationAdvice(event,task).timing,/未满两小时/)
+ const {event,task}=fixture(1);assert.equal(observationAdvice(event,task).status,'waiting');assert.match(observationAdvice(event,task).summary,/有效工况/);assert.match(observationAdvice(event,task).timing,/继续观察至/)
  const complete=fixture();complete.task.observation.pending.channels[1].value=null;complete.task.observation.pending.channels[1].sampleCount=0
  assert.equal(observationAdvice(complete.event,complete.task).status,'incomplete')
  complete.task.observation.pending.channels[1].value=347;complete.task.observation.pending.channels[1].sampleCount=5;complete.task.observation.pending.channels[1].covered=false

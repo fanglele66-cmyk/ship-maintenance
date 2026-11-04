@@ -1,3 +1,5 @@
+import {taskRecommendation,eventSubject,shortSentence} from './contentRecommendations.js'
+import {reportSections} from './generatedReport.js'
 import {shiftTimelineContent} from './demoTimeline.js'
 import {taskExecution} from './taskExecution.js'
 // User-facing evidence summaries. These describe source records and submitted
@@ -51,40 +53,37 @@ export function trackingAssessment(event,task){
  const subject=(event.sourceEventId||event.id)==='real-health-c4-baseline'?'四缸相对排温基线下移':'一缸相对排温基线抬升'
  if(trackingNotSupported(event,task))return {
   scope:`本轮核实结论不支持“${subject}”。原月度相对偏差记录保留，按执行人提交的比较条件与核实理由重新评估原提醒。`,
-  interpretation:'核对同转速、同负荷的六缸对比、测温来源和期间调整记录，说明原相对变化由什么解释，以及本轮结论适用的时间与工况范围。现场读数对应不等同于跨月基线变化已经证实。',
-  next:'若本轮依据已足以解释原提醒，可说明依据后闭环；仍需看变化是否再次出现，可继续观察。仅在比较口径或关键记录仍有缺口时选择继续排查，不据此安排部件维修。'
+  interpretation:'本轮同工况核实未支持原趋势判断；该结论适用于已提交的比较时段，原月度记录仍保留。',
+  next:taskRecommendation(event,task).next
  }
  if(confirmedTracking(event,task))return {
-  scope:`本轮现场与系统对应，背景信息已记录，支持继续跟踪${subject}；这与确认部件故障是两类判断。`,
-  interpretation:'将同工况六缸相对变化与测温校验、负荷分配和调整记录对应，明确适合提前执行的维保项目；不从排温偏差直接推定喷油器或排气阀损坏。',
-  next:'可选择适用维保计划和靠港时间提前执行；若本轮暂不处置，可记录依据后继续观察。'
+  scope:`本轮现场与系统对应，背景信息已记录，支持${subject}成立；尚未确认部件故障。`,
+  interpretation:'本轮测温与系统记录对应，背景核实支持相对变化成立；尚无喷油器或排气阀损坏的检验结论。',
+  next:taskRecommendation(event,task).next
  }
  return {
-  scope:`本轮已回交${subject}的核实资料。原相对变化记录保留，是否属于该缸自身基线变化及其解释仍需结合本轮结论判断；尚缺的比较条件和原因依据继续留存。`,
-  interpretation:context[event.sourceEventId||event.id]?.comparison+' 对照本轮已取得的工况、调整与测温记录，指出哪些变化已有解释、哪些比较条件仍缺失。',
-  next:'若现有资料不足以解释原变化，可围绕同工况六缸对比、独立测温或调整记录补充核实；若已有充分解释，可说明依据后闭环，也可选择继续观察。'
+  scope:`本轮已回交${subject}核实资料，原因尚未确认。`,
+  interpretation:`现有回交资料尚未将${subject}与测温偏移或运行调整对应，原因仍未定位，不能据此确定故障部件。`,
+  next:taskRecommendation(event,task).next
  }
 }
 export function reportAnalysis(event,task){
- const c=shiftTimelineContent(context[event.sourceEventId||event.id],event.timeline),f=findings(task),isCheck=task.kind==='investigation',text=evidenceText(task),tracking=trackingAssessment(event,task)
- const scope=isCheck
-  ? (tracking?tracking.scope:f.abnormal.length?`现场结果中 ${f.abnormal.length} 项登记异常或持续偏离：${f.abnormal.map(r=>r.label+'（'+r.result+'）').join('；')}。`:'本轮检查尚未定位原报警／预警的具体原因；需对照已查项目、报警是否再现及剩余线索判断下一步。')
-  : `本轮 ${f.records.length} 项作业中，${f.records.filter(r=>r.result==='已完成').length} 项已完成，${f.records.filter(r=>r.result==='未完成').length} 项未完成，${f.records.filter(r=>r.result==='不适用').length} 项不适用。逐项完成状态与总结果一起作为回交依据。`
- const interpretation=isCheck?(c?.match.test(text)&&f.abnormal.length?c.interpretation:tracking?.interpretation||c?.branches):`将本轮措施与批准范围逐项对应，再核对复测条件和剩余问题。${c?.retest||''}“已完成”表示该项工作被登记完成，设备恢复与闭环仍需轮机长结合复测记录确认。`
+ const c=shiftTimelineContent(context[event.sourceEventId||event.id],event.timeline),f=findings(task),isCheck=task.kind==='investigation',tracking=trackingAssessment(event,task),execution=taskExecution(task)
+ const interpretation=isCheck?(c?.match.test(evidenceText(task))&&f.abnormal.length?c.interpretation:tracking?.interpretation||`本轮${f.abnormal.length?'登记'+f.abnormal.length+'项异常结果':'未登记异常结果'}，尚未形成${eventSubject(event).name}的部件定位依据。`):`本轮已登记完成${execution.completed.length}项、未完成${execution.outstanding.length}项。复测重点：${c?.retest||eventSubject(event).retest}`
  const missing=nonempty([
-  f.unknown.length?`仍需落实：${f.unknown.map(r=>r.label+'（'+r.result+'）').join('；')}。这些项目不能视为已检查通过。`: '逐项结果未登记未完成或无法确认事项；这一状态仅覆盖本轮提交范围。',
-  f.unnoted.length?`以下异常项未填写单项备注：${f.unnoted.map(r=>r.label).join('、')}。应从总论或附件确认具体部位与检查依据，派发维修前核清具体部位，未核准部分不得施工。`:'',
-  taskExecution(task).summaryBlocked?'汇总记录实施条件受限：'+task.summary+'；需明确受阻项目与恢复条件。':'',
-  task.attachments?.length?`本轮关联 ${task.attachments.length} 份附件，按文件名保留索引；附件有效性由审阅人核对。`:'本轮未关联附件；分析依据为已提交的文字记录，未增加未上传的照片或检测读数。'
+  execution.outstanding.length?'未执行项目：'+execution.outstanding.map(r=>r.label+'；'+r.reason).join('。')+'。':'未执行项目：无。',
+  f.unknown.filter(r=>!execution.outstanding.some(o=>o.label===r.label)).length?'尚不能确认：'+f.unknown.filter(r=>!execution.outstanding.some(o=>o.label===r.label)).map(r=>r.label+'；'+(r.note||r.result)).join('。')+'。':'',
+  f.unnoted.length?'缺少异常部位与检查读数：'+f.unnoted.map(r=>r.label).join('、')+'。':'',
+  ...new Set((task.records||[]).filter(r=>!isUnknown(r)).flatMap(r=>String(r.note||'').split(/[。\n]/).filter(s=>/待补充|仍待|资料尚不足|资料不足|缺项|尚缺/.test(s)).slice(0,2)).map(s=>s+'。')),
+  execution.summaryBlocked?'作业受阻：'+shortSentence(task.summary)+'。':''
  ])
- const next=!isCheck&&taskExecution(task).incomplete?'本轮仍有未执行或条件受限项目。可保留原任务等待条件，条件具备后恢复执行；另派维修时须带入未执行项目。若终止，写明原因与剩余安排，不作为已完成。':isCheck?(f.abnormal.length&&!confirmedTracking(event,task)?'本轮记录了具体异常表现，先核对问题部位及处理依据；需要维修时，选择派发维修并审阅 AI 建议，未定位的部件不随同换件。':tracking?.next||(task.purpose==='recheck'?'本轮复查未记录原异常再现，结合观察和复测依据决定闭环；仍有待核实事项时再明确复查范围。':'本轮检查尚未定位原因。原报警／预警仍有疑点时可选择继续排查，AI 再据已查范围与剩余线索整理建议；原现象已回落时也可继续观察或说明依据后闭环。')):'对照本轮实际措施、处理后采样和现场复测，决定闭环、继续观察或派发复查。未完成项与异常再现情况应纳入后续安排。'
- return `### 证据与范围核对\n\n${scope}\n\n### ${isCheck?'原因解释与检查方向':'措施对应与复测判断'}\n\n${interpretation}\n\n### 待核实事项\n\n${missing}\n\n### 建议处置\n\n${next}${isCheck?' 轮机长也可说明暂不处置的依据，选择核实后继续观察，跟踪变化是否持续、扩大、恢复或复发。':''}`
+ const parts={interpretation,unverified:missing,next:taskRecommendation(event,task).next}
+ return reportSections.filter(([key])=>key!=='evidence').map(([key,label])=>`### ${label}\n\n${parts[key]}`).join('\n\n')
 }
 export function reportAnalysisSummary(event,task){
- const f=findings(task)
- if(event.tracking&&task.kind==='investigation')return `${trackingAssessment(event,task).scope} 本轮提交结论：${task.summary}`
- if(task.kind==='investigation')return `本轮排查已回交${f.records.length}项结果，${f.abnormal.length}项登记异常或持续偏离${f.unknown.length?'，'+f.unknown.length+'项仍待核实':''}。${task.summary} 建议对照具体检查依据确认下一步范围。`
- return `本轮已提交${f.records.filter(r=>r.result==='已完成').length}/${f.records.length}项完成记录。${task.summary} ${f.unknown.length?'仍有未完成项目，请明确接续安排。':'请核对复测条件、剩余事项及设备安全影响后决定闭环。'}`
+ const f=findings(task),execution=taskExecution(task)
+ if(task.kind==='investigation')return `本轮已回交${f.records.length}项检查结果，${f.abnormal.length}项记录异常${f.unknown.length?'，'+f.unknown.length+'项仍待核实':''}。`
+ return `本轮完成${execution.completed.length}项，未完成${execution.outstanding.length}项，不适用${execution.notApplicable.length}项。`
 }
 const briefChecks={
  'real-alarm-0430':'区分二缸喷射指令、反馈与液压动作，核对已定位的卡滞部位及燃油供给检查结果。',
@@ -93,17 +92,17 @@ const briefChecks={
  'real-health-c4-baseline':'核对四缸相对基线下移是否成立，区分该缸自身变化、其他缸参照均值变化和工况筛选影响。'
 }
 export function decisionAnalysisItems(event,task,report){
- if(trackingNotSupported(event,task)){const assessment=trackingAssessment(event,task);return [{label:'本轮趋势判断',text:assessment.scope},{label:'本轮提交结论',text:task.summary},{label:'建议处置',text:assessment.next}]}
- if(confirmedTracking(event,task))return [{label:'异动已核实',text:'本轮现场与系统一致，背景信息已记录，支持异动成立。可选择适用维保计划和靠港时间提前执行；具体部件原因仍以现场检查为准。'},{label:'本轮提交结论',text:task.summary}]
+ if(trackingNotSupported(event,task)){const assessment=trackingAssessment(event,task);return [{label:'本轮趋势判断',text:assessment.scope},{label:'本轮提交结论',text:task.summary},{label:'AI建议',text:assessment.next}]}
+ if(confirmedTracking(event,task))return [{label:'本轮趋势判断',text:trackingAssessment(event,task).scope},{label:'AI建议',text:taskRecommendation(event,task).next}]
  if(!report?.analysisMarkdown)return [{label:'本轮判断',text:report?.analysis||event.brief.conclusion}]
  return report.analysisMarkdown.split(/(?:^|\n)### /).filter(Boolean).map(section=>{
-  const [label,...lines]=section.split('\n');return {label:label.replace('AI后续建议','AI建议'),text:lines.filter(Boolean).join(' ')}
+  const [label,...lines]=section.split('\n');return {label:label.replace(/AI后续建议|建议处置|后续建议/,'AI建议'),text:lines.filter(Boolean).join(' ')}
  })
 }
 export function decisionBasis(event,action){
  if(event.phase==='reminder')return {points:event.brief.captainDecision,reason:event.brief.dispatchReason}
  const task=event.tasks.find(t=>t.id===event.currentTask)||event.observationSource?.task,report=event.reports.findLast(r=>r.taskId===task?.id)
- const check=briefChecks[event.sourceEventId||event.id]||'核对实际发现、处理范围与复测条件。'
+ const check=event.type==='效果观察'?`对照${eventSubject(event).retest}在原异常窗口与本轮的同工况记录，确认变化是否消除。`:briefChecks[event.sourceEventId||event.id]||'核对实际发现、处理范围与复测条件。'
  const sentences=report?.summary?.split(/(?<=[。！？])/).filter(Boolean)||[]
  const conclusion=event.tracking?report?.summary||task?.summary||'':(task?.kind==='investigation'?sentences[0]:sentences.findLast(sentence=>/复测|稳定|原报警|原低压|偏差|恢复/.test(sentence)))||sentences[0]||''
  const source=report?`第${task.round}轮${report.kind}已回交。${conclusion}`:task?.status==='assigned'?`${task.owner}正在执行本轮任务，报告尚未回交。`:'以原始提醒及已有轮次记录为依据。'
@@ -111,14 +110,14 @@ export function decisionBasis(event,action){
   wait:'保留原任务及已完成记录，写明受阻项目、原因和需要具备的条件；等待期间不重复催办。',
   resume:'确认备件、停机和作业许可等条件已具备，设置新的完成时限，在原任务上补充剩余反馈。',
   terminate:'说明终止未执行部分的依据、残余风险和后续安排；终止任务不等于事件闭环。',
-  observe:'结合现场核实结果，说明暂不处置的依据与后续关注点；持续跟踪变化是否扩大、恢复或复发，观察期内可重新决定下一步。',
+  observe:`记录${eventSubject(event).name}的观察信号、适用工况与汇报时间。`,
   investigate:`${check} 针对剩余缺口安排补查，指定负责人和回交时限。`,
   repair:'按排查确认的具体部位批准维修，明确隔离、材料和复测要求；未定位的部件不随同换件。',
-  maintenance:'选择关联正式工单的适用维保计划和靠港检修窗口，提前派发给轮机员按计划执行，汇报后审阅闭环。',
+  maintenance:'确认本轮校验或保养项目、关联工单及靠港停机窗口。',
   shore:'明确需要岸基提供的技术、备件或计划支持，附上关联报告及船上当前措施。',
   close:event.tracking?'对照原相对排温变化与本轮核实结论，说明提醒是否已得到解释、仍有哪些限制和后续跟踪安排；无需把未发生的维修写入闭环依据。':'核对原报警／预警、本轮检查及实际措施是否对应，说明结束依据与后续监测安排；未实施维修时如实保留。',
-  recheck:isVerificationReview(event)?'根据已核实范围和持续观察记录，复查变化是否持续、扩大、恢复或复发；本轮暂未处置，不预设维修已完成。':'根据维修结果、剩余事项和处理后趋势复查，记录原异常是否再现；复查任务可提前审阅并通过对话修改。'
- }[action]||(task?.status==='waiting'?'原任务等待实施条件。条件具备后恢复原任务并保留已完成反馈；如需终止，应说明剩余事项的接续安排。':taskExecution(task).incomplete?'核对未执行项目、原因及恢复条件，选择等待、接续派工或终止未执行部分。':isVerificationReview(event)?'对照排查报告与观察变化，有处理依据可派发维修，需要补证可派发复查；原异常回落且无复发可确认闭环，也可继续观察。':event.phase==='review'?'对照作业报告、处理后采样与现场复测，确认原异常是否再现，决定闭环或派发复查。':trackingAssessment(event,task)?.next||(hasAbnormalFindings(task)?'本轮已有异常，优先核对处理范围并维修；若决定暂不处置，可说明依据后继续观察。':'本轮尚未定位原报警／预警的具体原因，可针对剩余线索继续排查，或说明依据后继续观察；有结束依据时人工闭环。'))
+  recheck:`复核${eventSubject(event).retest}，记录原异常是否再现。`
+ }[action]||check
  return {points,reason:source}
 }
 function timestamp(value){
@@ -127,12 +126,11 @@ function timestamp(value){
 }
 export function adviceDetails(event,message,role){
  const c=shiftTimelineContent(context[event.sourceEventId||event.id],event.timeline),cutoff=timestamp(message.at)
- // Historical advice only sees records available by the message timestamp.
- const task=[...event.tasks].reverse().find(t=>timestamp(t.assignedAt)<=cutoff)
+ const task=[...(event.tasks||[])].reverse().find(t=>timestamp(t.assignedAt)<=cutoff)
  const submitted=task?.status==='submitted'&&timestamp(task.submittedAt)<=cutoff
- const facts=event.brief.facts.map(f=>`- **${f.label}：${f.value}${f.unit?' '+f.unit:''}**。${f.meaning}（${f.at||event.brief.discovery.at}）`).join('\n')
- const sources=event.brief.sources.map(s=>`- ${s.title} · ${s.date} · ${s.kind}`).join('\n')
- const taskContent=task?`本轮责任人：${task.owner}；安排范围：${task.scope}\n\n`+(submitted?`已提交的现场结论：${task.summary}\n\n${task.records.map(r=>`- **${r.label}：${r.result}**。${r.note||'未填写单项备注；以本轮结论和已有材料核对。'}`).join('\n')}`:`尚未收到本轮执行报告，以下为要求取得的检查信息：\n\n${task.steps.map(s=>`- **${s.label}**：${s.guide||s.recordHint||'提交该项实际结果和检查范围。'}`).join('\n')}`):'当前依据来自提醒发生窗口，尚无本轮现场排查结果。优先安排现场核实，反馈应对应具体部位、方法与发生时刻。'
- return `${event.brief.discovery.text}\n\n${c?.comparison||event.brief.boundary}\n\n${submitted?reportAnalysisSummary(event,task):c?.branches||event.brief.conclusion}\n\n${taskContent}\n\n${message.recommendation}\n\n### 关键依据\n\n${facts}\n\n### 来源与判断边界\n\n${sources}\n\n${event.brief.boundary}`
+ const facts=(event.brief.facts||[]).slice(0,2).map(f=>`- ${f.label}：${f.value}${f.unit?' '+f.unit:''}（${f.at||event.brief.discovery.at}）`).join('\n')
+ const records=submitted?(task.records||[]).filter(r=>isAbnormal(r)||isUnknown(r)).slice(0,2).map(r=>`- ${r.label}：${r.result}${r.note?'；'+shortSentence(r.note):''}`).join('\n'):''
+ const sources=(event.brief.sources||[]).slice(0,2).map(s=>s.title+' · '+s.date).join('；')
+ const gap=submitted?taskRecommendation(event,task).reason+'。':task?'本轮现场结果尚未提交。':'尚缺现场表计或独立校验记录。'
+ return nonempty([c?.comparison,records||facts,'待核实：'+gap,sources?'来源：'+sources:''])
 }
-

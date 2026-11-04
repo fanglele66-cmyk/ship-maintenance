@@ -9,10 +9,10 @@ export const inspectionReports = [
   { id: 'RPT-20260625', title: '每日定时报告 2026-06-25', date: '2026-06-25', summary: '主缸排温偏高需排查，记录异常并已处理' },
   { id: 'RPT-20260624', title: '每日定时报告 2026-06-24', date: '2026-06-24', summary: '空压机启动故障，更换气阀后数据正常' },
   { id: 'RPT-20260623', title: '每日定时报告 2026-06-23', date: '2026-06-23', summary: '分油机因温度传感器导致数据异常，已上报' },
-  { id: 'RPT-20260622', title: '每日定时报告 2026-06-22', date: '2026-06-22', summary: '通滤器因导常导致数据异常，已上报' },
+  { id: 'RPT-20260622', title: '每日定时报告 2026-06-22', date: '2026-06-22', summary: '滤器数据异常，已上报；具体部位待核实' },
   { id: 'RPT-20260621', title: '每日定时报告 2026-06-21', date: '2026-06-21', summary: '空压机启动故障，更换气阀后数据正常' },
   { id: 'RPT-20260620', title: '每日定时报告 2026-06-20', date: '2026-06-20', summary: '分油机因温度传感器导致数据异常，已上报' },
-  { id: 'RPT-20260619', title: '每日定时报告 2026-06-19', date: '2026-06-19', summary: '通滤器因导常导致数据异常，已上报' },
+  { id: 'RPT-20260619', title: '每日定时报告 2026-06-19', date: '2026-06-19', summary: '滤器数据异常，已上报；具体部位待核实' },
   { id: 'RPT-20260618', title: '每日定时报告 2026-06-18', date: '2026-06-18', summary: '分油机因温度传感器导致数据异常，已上报' },
   { id: 'RPT-20260617', title: '每日定时报告 2026-06-17', date: '2026-06-17', summary: '例行巡检完成，各系统运行正常无异常' },
   { id: 'RPT-20260616', title: '每日定时报告 2026-06-16', date: '2026-06-16', summary: '主机滑油压力偏低报警，检查发现滤器堵塞已清洗' },
@@ -71,7 +71,7 @@ function genDetail(rpt, overrides = {}) {
       level: bad > 0 ? 'bad' : warn > 0 ? 'warn' : 'ok',
       score: health,
       tag: health >= 90 ? '优秀' : health >= 80 ? '整体良好' : '需关注',
-      text: overrides.aiText || '今日06:00主机所机状态下各项运行指标、缸间偏差及关键参数处于安全范围内。',
+      text: overrides.aiText || '今日06:00主机各项运行指标、缸间偏差及关键参数处于安全范围内。',
       points: overrides.aiPoints || []
     },
     systems: overrides.systems || defaultSystems(overrides.systemFlags || {})
@@ -86,7 +86,7 @@ function defaultSystems(flags = {}) {
     { name: '3#缸排气温度', unit: '℃',  value: '338',  range: '50 ~ 400',     status: 'normal',  statusText: '✓ 正常', remark: '' },
     { name: '4#缸排气温度', unit: '℃',  value: '345',  range: '50 ~ 400',     status: 'normal',  statusText: '✓ 正常', remark: '' },
     { name: '5#缸排气温度', unit: '℃',  value: flags.cyl5 || '340', range: '50 ~ 400', status: flags.cyl5 ? 'warning' : 'normal', statusText: flags.cyl5 ? '⚠ 关注' : '✓ 正常', remark: flags.cyl5Remark || '' },
-    { name: '主轴承温度',   unit: '℃',  value: flags.bearing || '1.20', range: '60 ~ 150（机站）', status: 'normal', statusText: '✓ 正常', remark: '轴承间偏差运行状态' },
+    { name: '主轴承温度',   unit: '℃',  value: flags.bearing || '1.20', range: '60 ~ 150', status: 'normal', statusText: '✓ 正常', remark: '轴承间偏差运行状态' },
     { name: '增压器转速',   unit: 'rpm', value: flags.turbo || '0.628K', range: '0.01 ~ 0.65', status: flags.turbo ? 'warning' : 'normal', statusText: flags.turbo ? ' 关注' : '✓ 正常', remark: flags.turboRemark || '正常' },
     { name: '扫气温度',     unit: '℃',  value: '42',   range: '30 ~ 55',     status: 'normal',  statusText: '✓ 正常', remark: '' },
     { name: '扫气压力',     unit: 'bar',value: flags.scav || '0.37', range: '0.20 ~ 0.45', status: flags.scav ? 'warning' : 'normal', statusText: flags.scav ? ' 关注' : '✓ 正常', remark: flags.scavRemark || '' }
@@ -146,7 +146,7 @@ function defaultSystems(flags = {}) {
 export const inspectionReportDetails = {
   'RPT-20260626': genDetail(inspectionReports[0], {
     normal: 26, warn: 0, bad: 0, health: 95,
-    aiSummary: { level: 'ok', score: 95, tag: '优秀', text: '今日06:00主机所机状态下各项运行指标、缸间偏差及关键参数处于安全范围内，各系统运行正常无异常。', points: [
+    aiSummary: { level: 'ok', score: 95, tag: '优秀', text: '今日06:00主机各项运行指标、缸间偏差及关键参数处于安全范围内，各系统运行正常无异常。', points: [
       { icon: 'mdi:information', type: 'info', title: '全系统运行正常', text: '主机、辅机、泵系统、甲板机械、燃油、润滑、电气各系统参数均在正常范围内，无需特别关注事项。' }
     ]}
   }),

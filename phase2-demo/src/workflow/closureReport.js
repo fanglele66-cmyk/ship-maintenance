@@ -2,28 +2,25 @@ import {observationTasks} from './observationEvents.js'
 import {taskName} from './lifecycleDecisions.js'
 import {observationStart,isVerificationObservation} from './observationContext.js'
 
-export const closurePresentationVersion=5
+export const closurePresentationVersion=6
 const noValue=value=>value===undefined||value===null||value===''?'未记录':String(value)
 const date=value=>!value?'未记录':!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value)||Number.isNaN(Date.parse(value))?String(value):new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,19)
 const taskTitle=task=>`第${task.round}轮${taskName(task)}`
 const rows=records=>(records||[]).map((r,i)=>`**${i+1}. ${r.label}**\n\n- 实际结果：${noValue(r.result)}\n- 现场记录：${r.note||'未填写具体过程或读数。'}`).join('\n\n')
 
 function taskSection(event,task){
- const report=event.reports.findLast(r=>r.taskId===task.id)
- const revisions=(report?.revisions||[]).map((r,i)=>`- 第${i+1}次补充（${date(r.at)}）：${r.text}`).join('\n')
- const earlier=[...(task.procedureHistory||[]),...(task.feedbackHistory||[])].map(h=>`#### 步骤调整前已填写记录\n\n${rows(h.draft.records.filter(r=>r.result||r.note))||'无已填写记录。'}`).join('\n\n')
- return `### ${taskTitle(task)}\n\n- 负责人：${task.owner}\n- 派发时间：${date(task.assignedAt)}\n- 要求完成：${date(task.deadline)}\n- 提交时间：${date(task.submittedAt)}\n- 批准范围：${task.scope}\n- 执行状态：${task.status==='terminated'?'未执行部分已终止：'+task.terminationReason:task.status==='waiting'?'等待条件：'+task.waiting.reason:task.goalStatus==='unresolved'?'仍有未执行或待核实项目':'反馈已提交'}\n\n#### 实际${task.kind==='investigation'?'核查':'作业'}过程\n\n${rows(task.records)||'未提交逐项现场记录。'}\n\n${earlier?earlier+'\n\n':''}#### ${task.kind==='investigation'?'原因判断与未确认项':'实际措施、用料与剩余事项'}\n\n${report?.summary||task.summary||'未提交结论。'}${report?.analysisMarkdown?'\n\n#### 报告中的分析与证据边界\n\n'+report.analysisMarkdown:''}${revisions?'\n\n#### 执行人补充记录\n\n'+revisions:''}\n\n附件：${task.attachments?.map(a=>a.name).join('、')||'未关联附件。'}`
+ const report=event.reports.findLast(r=>r.taskId===task.id),remaining=(task.records||[]).filter(r=>/未完成|无法确认|受限/.test(r.result))
+ return `### ${taskTitle(task)}\n\n- 负责人：${task.owner}\n- 提交时间：${date(task.submittedAt)}\n- 批准范围：${task.scope}\n- 执行状态：${task.status==='terminated'?'未执行部分已终止：'+task.terminationReason:task.status==='waiting'?'等待条件：'+task.waiting.reason:task.goalStatus==='unresolved'?'仍有未执行或待核实项目':'反馈已提交'}\n\n${report?.summary||task.summary||'未提交结论。'}${remaining.length?'\n\n剩余项目：'+remaining.map(r=>r.label+'（'+r.result+'）').join('、')+'。':''}\n\n记录索引：${report?.number||report?.id||task.number||task.id}${report?.revisions?.length?'；含'+report.revisions.length+'次补充记录':''}。`
 }
 
 function observationSection(task,closedAt){
  const observation=task.observation
  if(!observation)return `### ${taskTitle(task)}后的观察\n\n未保存自动观察数据；效果以现场已提交的复测和复查记录为依据。`
  const windows=[...(task.observationHistory||[]).flatMap(h=>h.records.map(w=>({...w,priorCycle:true}))),...(observation.records||[]),...(observation.pending?[observation.pending]:[])].filter(w=>Date.parse(w.windowEnd)<=Date.parse(closedAt))
- const content=windows.map(w=>{
-  const channels=(w.channels||[]).map(c=>`- ${c.name}：有效采样 ${c.sampleCount||0} 条；范围 ${noValue(c.min)}—${noValue(c.max)} ${c.unit||''}；均值 ${typeof c.mean==='number'?c.mean.toFixed(2):'未记录'} ${c.unit||''}；末值 ${noValue(c.value)} ${c.unit||''}；${c.covered?'采样间隔满足配置要求':'存在缺测或采样间隔不足'}。`).join('\n')
-  return `#### ${date(w.windowStart)} — ${date(w.windowEnd)}\n\n${w.priorCycle?'周期调整前保留的原始记录；':''}${w.complete?'已结束的观察窗口':'闭环前保存的部分观察窗口'}；共 ${w.sampleCount||0} 条有效采样。\n\n${channels||'未记录有效通道读数。'}`
- }).join('\n\n')
- return `### ${taskTitle(task)}后的观察\n\n- 观察类型：${isVerificationObservation(task)?'核实后继续观察，本轮暂未处置':'处理后效果观察'}\n- 开始：${date(observationStart(task))}\n- 截止：${date(task.observationEndedAt||closedAt)}\n- 观察周期：${observation.policy?.label||'以本轮配置为准'}\n- 工况核验：${observation.conditions?.reason||'未保存运行工况核验记录'}\n\n${content||'截至闭环时尚无已保存的有效观察窗口。'}\n\n采样变化用于与现场复测交叉核对；是否工况可比、原报警是否再现，以本次核实、作业、复查及轮机长确认记录为准。未记录的验证项目保留为未确认。`
+ const latest=windows.at(-1)
+ const content=latest?`已保存${windows.length}个观察窗口，其中${windows.filter(w=>w.covered).length}个覆盖达到要求。\n\n最近窗口：${date(latest.windowStart)} — ${date(latest.windowEnd)}\n\n${(latest.channels||[]).map(c=>`- ${c.name}：末值 ${noValue(c.value)} ${c.unit||''}；范围 ${noValue(c.min)}—${noValue(c.max)} ${c.unit||''}；${c.covered?'覆盖达到要求':'存在缺测'}。`).join('\n')}`:''
+
+ return `### ${taskTitle(task)}后的观察\n\n- 观察类型：${isVerificationObservation(task)?'核实后继续观察，本轮暂未处置':'处理后效果观察'}\n- 开始：${date(observationStart(task))}\n- 截止：${date(task.observationEndedAt||closedAt)}\n- 观察周期：${observation.policy?.label||'以本轮配置为准'}\n- 工况核验：${observation.conditions?.reason||'未保存运行工况核验记录'}\n\n${content||'截至闭环时尚无已保存的有效观察窗口。'}`
 }
 
 export function closureContent(event,action,reason,at,captain){
@@ -35,7 +32,9 @@ export function closureContent(event,action,reason,at,captain){
  const timeline=[...event.decisions.filter(d=>Date.parse(d.at)<=Date.parse(at)).map(d=>({at:d.at,text:`${({investigate:'派发排查',repair:'派发维修',maintenance:'安排维保',recheck:'派发复查',observe:'进入效果观察',shore:'同步岸基',close:'确认闭环',false:'确认误报',wait:'等待执行条件',resume:'恢复原任务',terminate:'终止未执行部分'})[d.action]||d.action} · ${d.owner}：${d.reason}`})),...tasks.map(t=>({at:t.submittedAt,text:`${t.owner}提交${taskTitle(t)}报告。`}))]
  if(!timeline.some(t=>t.at===at&&/确认闭环|确认误报/.test(t.text)))timeline.push({at,text:`${captain}${action==='false'?'确认误报':'确认闭环'}：${reason}`})
  timeline.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at))
- const analysisMarkdown=`### 原因、措施与效果的对应关系\n\n${investigations.length?'原因判断以各轮排查报告及执行人补充为据，逐项核查结果与未确认项见下文。':'未提交现场排查报告，原因核实以轮机长说明为限。'}${work.length?'实际维修仅采用已提交作业记录，计划中的步骤不视为已完成。':'未提交维修或维保作业报告，不记为已维修。'}\n\n${rechecks.length?'复查结果、未完成项和观察数据一并保留。':'尚无独立复查报告，效果证据范围以实际保存的复测与观察为限。'}`
+ const remaining=tasks.flatMap(t=>(t.records||[]).filter(r=>/未完成|无法确认|受限/.test(r.result)).map(r=>taskTitle(t)+'：'+r.label+'（'+r.result+'）'))
+ const analysisMarkdown=`### 剩余限制\n\n${remaining.length?remaining.map(r=>'- '+r).join('\n'):'未登记未执行项目。'}${!work.length?'\n\n本事件未实施维修或维保。':''}${!rechecks.length?'\n\n未提交独立复查报告。':''}`
+
  const markdown=`# ${event.title} · 闭环报告
 
 ## 一、事件基础信息
@@ -63,11 +62,11 @@ ${sources||'未关联来源索引。'}
 
 ## 三、排查过程与原因判断
 
-${investigations.map(t=>taskSection(event,t)).join('\n\n')||'本事件未提交现场排查报告；不补写检查过程或部件故障原因。'}
+${investigations.map(t=>taskSection(event,t)).join('\n\n')||'无现场排查报告。'}
 
 ## 四、维修措施、备件与作业记录
 
-${work.map(t=>taskSection(event,t)).join('\n\n')||'本事件未提交维修或维保作业报告。'}
+${work.map(t=>taskSection(event,t)).join('\n\n')||'无维修或维保作业报告。'}
 ${event.maintenance?'\n维保计划：'+event.maintenance.number+'；计划窗口：'+(event.maintenance.window?.label||event.maintenance.window)+'；负责人：'+event.maintenance.owner+'。正式工单：'+(event.maintenance.plan?.workOrder?.number||'未关联')+'；正式工单完工状态独立管理。\n':''}
 ## 五、${tasks.some(isVerificationObservation)?'持续观察':'维修后的效果观察'}与复查反馈
 
@@ -83,13 +82,15 @@ ${event.linkedClosure?event.tasks.filter(t=>t.status==='terminated').map(t=>`- $
 
 ${analysisMarkdown}
 
-## 七、完整处置时间线
+## 七、处置时间线
 
 ${timeline.map(t=>`- ${date(t.at)} · ${t.text}`).join('\n')}
 
 ## 八、过程报告与附件索引
 
-${reports.map(r=>`- ${r.title} · ${date(r.at)}${r.updatedAt?' · 最后补充 '+date(r.updatedAt):''}`).join('\n')||'无已提交的过程报告。'}
+完整逐项记录、历轮分析及补充版本保存在以下过程报告中：
+
+${reports.map(r=>`- ${r.title} · ${date(r.at)} · 编号 ${r.number||r.id}${r.updatedAt?' · 最后补充 '+date(r.updatedAt):''}`).join('\n')||'无已提交的过程报告。'}
 
 ${tasks.flatMap(t=>(t.attachments||[]).map(a=>`- ${taskTitle(t)}：${a.name}`)).join('\n')||'未关联现场附件。'}
 `

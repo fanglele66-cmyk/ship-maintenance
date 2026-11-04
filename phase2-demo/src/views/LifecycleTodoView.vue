@@ -1,6 +1,6 @@
 <template>
  <main class="task-center">
-  <header class="task-center-head"><div><h1>{{crossBusiness?'个人待办':'我的任务'}}</h1><p>{{crossBusiness?'汇总当前决策、执行与等待事项。':'执行本人任务，跟进本人派发的工作，保留历史记录。'}}</p></div><label class="task-search"><span class="sr-only">搜索任务、事件或设备</span><input v-model="query" type="search" placeholder="搜索任务、事件或设备"/></label></header>
+  <header class="task-center-head"><div><h1>{{crossBusiness?'个人待办':'我的任务'}}</h1><p>{{crossBusiness?'当前待办与历史记录':'执行进度与提交记录'}}</p></div><label class="task-search"><span class="sr-only">搜索任务、事件或设备</span><input v-model="query" type="search" placeholder="搜索任务、事件或设备"/></label></header>
   <nav class="task-center-tabs" aria-label="待办分类"><button v-for="item in tabs" :key="item.key" :class="{active:tab===item.key}" :aria-current="tab===item.key?'page':undefined" @click="selectTab(item.key)">{{item.label}}<span>{{work[item.key].length}}</span></button></nav>
   <section class="task-center-body">
    <div class="task-center-intro"><div class="task-intro-copy">
@@ -33,7 +33,7 @@ const store=useEventLifecycleStore(),route=useRoute(),router=useRouter(),query=r
 const captain=computed(()=>store.state.role==='captain'),crossBusiness=computed(()=>route.name==='SituationTodos'),work=computed(()=>Object.fromEntries(Object.entries(store.workItems).map(([key,items])=>[key,crossBusiness.value?items:items.filter(i=>i.kind==='task')])) )
 const tabs=computed(()=>[{key:'pending',label:'待我处理'},...(capabilities[store.state.role]?.dispatch?[{key:'assigned',label:'我派发的'}]:[]),{key:'completed',label:'已完成'},{key:'all',label:'全部记录'}])
 const activeLabel=computed(()=>tabs.value.find(t=>t.key===tab.value)?.label)
-const tabDescription=computed(()=>({pending:crossBusiness.value?'显示当前需要本人执行、决策、派发或确认的工作；等待项保留原因。':'仅显示本人的已派发执行任务，等待任务保留。',assigned:'查看本人派发的任务及执行进度；派发记录与执行人看到的是同一项任务。',completed:crossBusiness.value?'保留已完成的工作与决策记录。':'按约定工作已完成的执行任务；AI 报告状态单独展示。',all:crossBusiness.value?'汇总本人可见的工作与决策记录。':'本人可见的执行任务历史，不包含事件决策。'}[tab.value]))
+const tabDescription=computed(()=>({pending:'优先处理临近截止的事项。',assigned:'关注未完成项目与受阻原因。',completed:'按完成时间查看记录。',all:'按事件或任务编号检索。'}[tab.value]))
 const items=computed(()=>work.value[tab.value].filter(item=>(tab.value!=='assigned'||assignedFilter.value==='all'||!item.done)&&(!filter.value||item.kind===filter.value)&&[item.title,item.eventTitle,item.eventNumber,item.number,item.device,item.owner].join(' ').toLowerCase().includes(query.value.trim().toLowerCase())))
 function cardTitle(item){return workItemPresentation(item,store.state.events[item.eventId])}
 function selectTab(value){tab.value=value;filter.value='';router.replace({path:crossBusiness.value?'/situation/todos':'/event',query:value==='pending'?{}:{view:value}})}

@@ -355,9 +355,10 @@ function generateFilterSummary() {
 
 function generateWelcome() {
   const totalDocs = props.filteredDocCount || knowledgeDocs.length
-  const featured = ['📋 增压器故障分析及处理案例集', '📋 冷却系统维护与故障诊断', '📋 舵机系统操作与故障处理', '📋 分油机操作与故障排除']
-  const items = featured.map(t => `• ${t}`).join('<br>')
-  return `你好！知识库共 <b>${totalDocs}</b> 篇技术文档。<br><br>📂 文档覆盖：主机 · 辅机 · 锅炉 · 舵机 · 分油机<br>📂 文档类型：设备手册 · 操作规程 · 故障案例 · 技术通告<br><br>📖 推荐阅读：<br>${items}<br><br>💡 你可以：<br>• 在搜索框输入关键词，AI 自动总结<br>• 在上方按设备、文档类型和系统筛选<br>• 直接输入问题，我来帮你找答案`
+  const featured = knowledgeDocs.filter(d=>['第3章-操作规程','喷射控制单元ICU','控制空气系统'].includes(d.title))
+  const items = featured.map(d=>`<div class="km-ref" data-doc-id="${d.id}">📄 ${d.title}</div>`).join('')
+  return `已收录 <b>${totalDocs}</b> 篇 RT-flex50 资料，包含手册章节、系统说明、历史故障案例与来源页。<br><br>${items}`
+
 }
 
 // ============ 文档搜索 ============
@@ -488,7 +489,7 @@ const chips = computed(() => {
       { text: '帮我找增压器故障案例', highlight: false },
       { text: '搜索冷却系统操作规程', highlight: false },
       { text: '主机设备手册有哪些', highlight: false },
-      { text: '查找舵机相关文档', highlight: true }
+      { text: '查找控制空气系统资料', highlight: true }
     ]
   }
   // 有搜索关键词 → 基于搜索结果推荐

@@ -2,7 +2,7 @@
  * 设备数据 + 船舶信息 Mock
  */
 export const shipInfo = {
-  name: '远洋6号',
+  name: '长航碧玉',
   status: 'sailing',
   latitude: '23°N',
   longitude: '118°E',

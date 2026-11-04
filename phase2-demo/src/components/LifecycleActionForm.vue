@@ -2,7 +2,7 @@
  <form class="lc-form" @submit.prevent="submit" :aria-label="shoreOnly?'上报岸基表单':captain?'轮机长处置表单':'执行反馈表单'">
   <template v-if="captain">
    <LifecycleDecisionBasis v-if="showBasis&&!shoreOnly" :event="event" :action="decision.action"/>
-   <p v-if="shoreOnly" class="lc-muted">汇集已有资料并上报岸基，事件状态与船上工作保持不变。</p>
+   <p v-if="shoreOnly" class="lc-muted">填写当前问题及需要岸基支持的具体事项。</p>
    <div v-if="!shoreOnly" class="decision-choice-bar"><fieldset class="decision-options"><legend>选择本次决策</legend><label v-for="o in options" :key="o.value" :class="{selected:decision.action===o.value}"><input type="radio" name="decision-action" v-model="decision.action" :value="o.value" @change="changeAction"/>{{o.label}}</label></fieldset><button v-if="dispatch" type="button" class="decision-plan-link" @click="$emit('plan',decision.action)">查看{{planTabLabel(decision.action)}} ↗</button></div>
    <template v-if="decision.action"><section v-if="decision.action==='shore'&&decision.shoreDraftReport" class="shore-editor">
      <p>{{decision.shoreDraftReport.sourceShoreId?'修改后重新上报，原上报版本保留。':'已汇集事件已有资料，可直接修改下方正文后上报。'}}已收录 {{decision.shoreDraftReport.includedReports?.length||0}} 份正式报告。</p>
@@ -10,13 +10,13 @@
      <div v-if="shorePreview" class="shore-body-preview"><MarkdownContent :content="decision.shoreMarkdown"/></div>
      <label v-else class="shore-body-label">上报报告正文<textarea class="shore-body-input" v-model="decision.shoreMarkdown" required rows="16" placeholder="填写本次上报的完整内容"/></label>
     </section>
-    <label v-if="!dispatch&&!['shore','observe'].includes(decision.action)">决定依据与后续安排<textarea v-model="reason" required rows="3" placeholder="说明判断依据、设备安全影响与后续安排"/></label>
+    <label v-if="!dispatch&&!['shore','observe'].includes(decision.action)">决定依据与后续安排<textarea v-model="reason" required rows="3" :placeholder="reasonHint"/></label>
     <label v-if="decision.action==='resume'">恢复后的完成时限（不调整可留空）<input type="datetime-local" v-model="decision.deadline"/></label><template v-if="dispatch">
      <label>负责人<select v-model="decision.owner" required><option v-for="person in executors" :key="person.role" :value="person.name">{{person.name}}</option></select></label>
      <label>要求完成时间<input type="datetime-local" v-model="decision.deadline" required/></label>
      <template v-if="decision.action==='maintenance'"><label>维保计划<select aria-label="维保计划" v-model="decision.maintenancePlanId" required @change="changeMaintenancePlan"><option value="" disabled>选择要提前执行的维保计划</option><option v-for="item in plans" :key="item.id" :value="item.id">{{item.id}} · {{item.title}} · 工单 {{item.workOrder.number}}</option></select></label><p v-if="selectedMaintenance">正式工单：{{selectedMaintenance.workOrder.number}} · {{selectedMaintenance.workOrder.status}}<br/>{{selectedMaintenance.workOrder.content.join('；')}}<br/><small>计划与工单一并关联，正式完工状态单独确认。</small></p><label>靠港检修时间<select aria-label="靠港检修时间" v-model="decision.window" required @change="changeWindow"><option value="" disabled>选择适合的靠港停机窗口</option><option v-for="item in windows" :key="item.id" :value="item.id">{{item.label}}</option></select></label><p v-if="!windows.length" class="lc-error">当前没有可用的靠港检修窗口，请更新航次计划后安排。</p></template>
     </template>
-    <div class="lc-plan-preview" v-if="dispatch"><strong>{{planTabLabel(decision.action)}}</strong><ol v-if="plan?.steps.length"><li v-for="step in plan.steps" :key="step.label">{{step.label}}</li></ol><small>{{plan?.status==='ready'?decision.action==='maintenance'?'将按所选维保计划提前执行，范围与步骤随任务保存。':'派发将采用任务 Tab 中的当前范围与步骤。':plan?.error||'AI 正在预生成任务，请完成后核对。'}}</small></div>
+    <div class="lc-plan-preview" v-if="dispatch"><strong>{{planTabLabel(decision.action)}}</strong><ol v-if="plan?.steps.length"><li v-for="step in plan.steps" :key="step.label">{{step.label}}</li></ol><small>{{plan?.status==='ready'?decision.action==='maintenance'?'核对所选计划的作业项目。':'核对本轮作业项目与回交要求。':plan?.error||'正在整理本轮作业项目…'}}</small></div>
     <LifecycleConfirmationFields :event="event" :draft="decision" :action="decision.action"/><button class="lc-primary" type="submit" :disabled="dispatch&&plan?.status!=='ready'">{{submitLabel}}</button>
    </template>
   </template>
@@ -45,6 +45,7 @@ import LifecycleDecisionBasis from './LifecycleDecisionBasis.vue'
 const props=defineProps({event:{type:Object,required:true},showBasis:{type:Boolean,default:true},shoreOnly:{type:Boolean,default:false},taskId:{type:String,default:''}}),emit=defineEmits(['submitted','expanded','plan'])
 const store=useEventLifecycleStore(),error=ref(''),captain=computed(()=>store.state.role==='captain'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),options=computed(()=>decisionOptions(props.event).filter(o=>props.shoreOnly||props.event.decisionDraft?.action==='shore'?o.value==='shore':o.value!=='shore'))
 const decision=computed(()=>props.event.decisionDraft||(props.event.decisionDraft={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}))
+const reasonHint=computed(()=>({resume:'写明已具备的备件、停机或许可条件；需要延期时填写新的完成时限。',wait:'写明受阻项目、缺少的条件及预计具备时间。',terminate:'写明终止哪些项目、原因及剩余风险的承担人。',close:'写明原异常的解释或验证依据，以及仍需保留的限制。',false:'写明排除原提醒的测点、时段与核实依据。'}[decision.value.action]||'写明本次决定对应的现场依据。'))
 const shorePreview=ref(false)
 const plan=computed(()=>captain.value&&suggestionAction(props.event)?ensureTaskPlan(props.event):null)
 const dispatch=computed(()=>['investigate','repair','maintenance','recheck'].includes(decision.value.action))

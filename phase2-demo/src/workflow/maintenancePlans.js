@@ -13,8 +13,8 @@ export function maintenancePlans(event){
 }
 // Planned port calls; elapsed windows are never offered for a new dispatch.
 export const maintenancePortCalls=[
- {id:'V261031-SHA',port:'上海',start:'2026-10-31T09:00:00+08:00',end:'2026-10-31T16:00:00+08:00',label:'上海靠港 · 10月31日 09:00—16:00 · 停机检修'},
- {id:'V261102-NBO',port:'宁波',start:'2026-11-02T08:00:00+08:00',end:'2026-11-02T15:00:00+08:00',label:'宁波靠港 · 11月2日 08:00—15:00 · 停机检修'},
+ {id:'V270131-SHA',port:'上海',start:'2027-01-31T09:00:00+08:00',end:'2027-01-31T16:00:00+08:00',label:'上海靠港 · 2027年1月31日 09:00—16:00 · 停机检修'},
+ {id:'V270202-NBO',port:'宁波',start:'2027-02-02T08:00:00+08:00',end:'2027-02-02T15:00:00+08:00',label:'宁波靠港 · 2027年2月2日 08:00—15:00 · 停机检修'},
 ]
 export const availableMaintenanceWindows=(now=Date.now())=>maintenancePortCalls.filter(w=>Date.parse(w.end)>now)
 export function maintenanceSelection(event,form,now=Date.now()){

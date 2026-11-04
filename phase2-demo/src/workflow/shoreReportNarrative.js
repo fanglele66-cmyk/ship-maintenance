@@ -1,7 +1,7 @@
 // Compose one event account from immutable facts; source reports stay in the
 // separate index instead of being pasted as repeated documents in the body.
 const text=value=>String(value??'').trim()
-const unique=values=>[...new Set(values.map(text).filter(Boolean))]
+const unique=values=>{const result=[];for(const value of values.map(text).filter(Boolean)){const key=value.replace(/[\s，。；：、]/g,'');if(!result.some(previous=>{const old=previous.replace(/[\s，。；：、]/g,'');return old===key||old.includes(key)}))result.push(value)}return result}
 const sentence=value=>{const s=text(value).replace(/\n+/g,'；');return s?(s.match(/[。！？；]$/)?s:s+'。'):''}
 const time=value=>!value?'未记录':String(value).includes('T')&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16):String(value)
 const timestamp=value=>Date.parse(String(value||'').replace(' ','T')+(/(?:Z|[+-]\d\d:?\d\d)$/.test(value||'')?'':'+08:00'))||0
@@ -28,7 +28,7 @@ export function composeShoreNarrative({events=[],includedReports=[],fields={},ev
   if(task&&report.taskId){
    const records=task.records||[],facts=unique(records.map(r=>sentence(r.label+'：'+(r.result||'未记录')+(r.note?'；'+r.note:'')))).join('')
    const original=task.summary||report.summary,analysis=analysisOf(report)
-   process.push({at:report.at,body:`${time(report.at)}，${report.owner||task.owner||'执行人员'}回交${kind(task)}结果${report.submissionNumber>1?'（恢复后第'+report.submissionNumber+'次提交）':''}。${facts}\n\n${original?'执行结论：'+sentence(original):''}${report.id!==latest?.id&&analysis?.interpretation?'\n\n当时分析认为：'+sentence(analysis.interpretation):''}${report.analysisState?'\n\n'+sentence(report.analysisState):''}`})
+   process.push({at:report.at,body:`${time(report.at)}，${report.owner||task.owner||'执行人员'}回交${kind(task)}结果${report.submissionNumber>1?'（恢复后第'+report.submissionNumber+'次提交）':''}。${facts}${original&&(report.id!==latest?.id||fields.situation)&&!facts.includes(original)?'\n\n执行汇总：'+sentence(original):''}\n\n记录索引：${report.number||report.id}。${report.analysisState?'\n\n'+sentence(report.analysisState):''}`})
   }else if(report.kind==='观察报告'){
    const snapshot=report.observationSnapshot,obs=snapshot?.observation
    const windows=[...(obs?.records||[]),...(obs?.pending?[obs.pending]:[])]
@@ -58,9 +58,9 @@ export function composeShoreNarrative({events=[],includedReports=[],fields={},ev
  if(latest?.kind==='观察报告'&&latest.observationSnapshot?.observation?.conditions?.reason)outstanding.push(latest.observationSnapshot.observation.conditions.reason)
  if(fields.uncertainty)outstanding.push(fields.uncertainty)
  const pendingTasks=tasks.filter(t=>['assigned','waiting'].includes(t.status))
- const next=unique([fields.support,...pendingTasks.map(t=>`${t.owner}继续${kind(t)}，要求 ${time(t.deadline)} 前完成${t.status==='waiting'?'；当前等待实施条件':''}`),currentAnalysis.next])
+ const next=unique([fields.support,...pendingTasks.map(t=>`${t.owner}继续${kind(t)}，要求 ${time(t.deadline)} 前完成${t.status==='waiting'?'；等待条件：'+(t.waiting?.reason||'未记录'):''}`),...(!pendingTasks.length&&currentAnalysis.next?['AI建议：'+currentAnalysis.next]:[])])
  if(fields.actions)process.push({at:at||ordered.at(-1)?.createdAt,body:'本次补充已采取安排：'+sentence(fields.actions)})
- const summary=unique([fields.situation,latest?.summary]).map(sentence).join('')
+ const summary=sentence(fields.situation||latest?.summary)
  const facts=unique((root.brief?.facts||[]).map(f=>`${f.label} ${f.value??'未记录'}${f.unit?' '+f.unit:''}`)).join('；')
- return `# ${(title||root.title).replace(/ · (?:上报岸基报告|效果观察)$/,'')} · 事件处置情况报告\n\n事件编号：${root.number}　设备：${root.device}${at?'　上报时间：'+time(at):''}\n\n## 当前情况\n\n截至本次上报，${current.title}处于“${current.status}”。${summary}\n\n## 事件发现\n\n${time(root.createdAt)}，${root.brief?.discovery?.label||'系统发现异常线索'}。${sentence(root.brief?.conclusion)}${facts?'\n\n发现时关键数据：'+sentence(facts):''}\n\n## 排查与处置经过\n\n${unique(process.sort((a,b)=>timestamp(a.at)-timestamp(b.at)).map(p=>p.body)).join('\n\n')||'尚未安排人员开展现场工作，当前依据初始信息等待轮机长决策。'}\n\n## 当前判断与待解决事项\n\n${unique([currentAnalysis.interpretation?'当前分析认为：'+currentAnalysis.interpretation:'',...outstanding]).map(sentence).join('\n\n')||'尚无进一步的正式核实结论，后续判断以现场回传及有效观测为依据。'}\n\n## 后续安排\n\n${next.map(sentence).join('\n\n')||(current.phase==='closed'?'本事件已由轮机长确认闭环，保留处置过程和证据，供岸基查阅。':'由轮机长结合当前资料确认后续安排，并向岸基同步进展。')}`
+ return `# ${(title||root.title).replace(/ · (?:上报岸基报告|效果观察)$/,'')} · 事件处置情况报告\n\n事件编号：${root.number}　设备：${root.device}${at?'　上报时间：'+time(at):''}\n\n## 当前情况\n\n截至本次上报，${current.title}处于“${current.status}”。${summary}\n\n## 事件发现\n\n${time(root.createdAt)}，${root.brief?.discovery?.label||'系统发现异常线索'}。${sentence(root.brief?.discovery?.text||root.brief?.conclusion)}${facts?'\n\n发现时关键数据：'+sentence(facts):''}\n\n## 排查与处置经过\n\n${unique(process.sort((a,b)=>timestamp(a.at)-timestamp(b.at)).map(p=>p.body)).join('\n\n')||'尚无现场处置记录。'}\n\n## 当前判断与待解决事项\n\n${unique([currentAnalysis.interpretation?'当前分析认为：'+currentAnalysis.interpretation:'',...outstanding]).map(sentence).join('\n\n')||'尚未取得现场核实结论。'}\n\n## 后续安排\n\n${next.map(sentence).join('\n\n')||(current.phase==='closed'?'本事件已闭环，暂无新增岸基支持诉求。':'暂无已填写的岸基支持诉求。')}`
 }

@@ -11,11 +11,11 @@ test('responsibility stays concise across initial, execution, review and observa
  const check=e=>{const text=currentResponsibility(e).detail;assert.ok(text.length<=55,text);assert.match(text,/；/);assert.doesNotMatch(text,/\n/);return text}
  for(const e of Object.values(state.events))check(e)
  decide(state,event.id,{action:'investigate',owner:people.engineer,deadline:new Date(Date.now()+86400000).toISOString(),reason:'按批准范围排查'})
- assert.match(check(event),/尚待现场核实/)
+ assert.match(check(event),/二缸|C2/)
  state.role='engineer';const task=currentTask(event);task.draft.records.forEach(r=>r.result='发现异常');task.draft.summary='现场记录异常，待审阅范围。';submitTask(state,event.id,task.id)
- assert.match(check(event),/已记录异常/)
+ assert.match(check(event),/排查记录异常/)
  state.role='captain';const observation=startObservation(state,event).event
- assert.match(check(observation),/观察尚未到期/);assert.match(check(event),/关联观察方案/)
+ assert.match(check(observation),/观察中/);assert.match(check(event),/观察中/)
 })
 
 test('report display and download omit duplicated summary while retaining raw evidence and old versions',()=>{

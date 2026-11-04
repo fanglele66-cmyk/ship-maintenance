@@ -17,7 +17,7 @@ export function executionFacts(task){
  const result=taskExecution(task)
  const list=task.records.map(r=>`- ${r.label}：${r.result||'未记录'}${r.note?'；'+r.note:'；未提供详细过程记录。'}`).join('\n')
  const remaining=result.outstanding.map(r=>`- ${r.label}：${r.result}；${r.reason}`).join('\n')
- return `## 现场事实（执行人原始记录）\n\n${list}\n\n### 执行人汇总\n\n${task.summary}${result.notApplicable.length?'\n\n### 本轮无需执行项目\n\n'+result.notApplicable.map(r=>'- '+r.label+'：不适用，本项无需执行。'+(r.note||'')).join('\n'):''}\n\n## 未执行与待核实事项\n\n${remaining||'逐项结果未登记需补做的未执行项目；不适用项无需执行，原因是否明确以本轮证据为准。'}${result.summaryBlocked?'\n\n汇总中记录实施条件受限：'+task.summary+'\n请核对具体受阻项目与恢复条件，不据此认定任务全部完成。':''}`
+ return `## 现场事实（执行人原始记录）\n\n${list}\n\n### 执行人汇总\n\n${task.summary}${result.notApplicable.length?'\n\n### 本轮无需执行项目\n\n'+result.notApplicable.map(r=>'- '+r.label+'：不适用，本项无需执行。'+(r.note||'')).join('\n'):''}${remaining?'\n\n## 未执行项目\n\n'+remaining:''}${result.summaryBlocked?'\n\n汇总中记录实施条件受限，具体条件见执行人汇总。':''}`
 }
 export function carryForwardSteps(event){
  const previous=event.tasks.findLast(t=>['repair','maintenance'].includes(t.kind))

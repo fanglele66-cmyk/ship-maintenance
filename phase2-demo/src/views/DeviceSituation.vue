@@ -33,14 +33,14 @@ const activeTab=ref('overview'),deviceScroll=ref(null)
 const isMainEngine=computed(()=>props.deviceId==='main-engine-1')
 const lifecycle=useEventLifecycleStore()
 const healthAssessment=computed(()=>deviceHealthAssessment({deviceId:props.deviceId,sensors:sensorStore.allSensors,events:Object.values(lifecycle.state.events),period:navigationChronology(sensorStore,sensorStore.sampledAt,{timeBase:lifecycle.state.timeBase}).periods.at(-1)}))
-const runningAssessment=computed(()=>({...healthAssessment.value,recommendation:healthAssessment.value.next,completedAt:new Date(sensorStore.sampledAt).toLocaleTimeString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'}),dataCutoff:'当前测点与航行回放；事件使用各自历史窗口',conditions:healthAssessment.value.context,coverage:'不以当前读数替代历史核实',sections:[{title:'后续判断',paragraphs:['以现场核实与独立测量确认原因；任务提交、事件闭环和设备恢复分别判断，观察同时核对数据覆盖与可比工况。']}]}))
+const runningAssessment=computed(()=>({...healthAssessment.value,recommendation:healthAssessment.value.next,completedAt:new Date(sensorStore.sampledAt).toLocaleTimeString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'}),dataCutoff:'当前测点与航行回放；事件使用各自历史窗口',conditions:healthAssessment.value.context,coverage:'不以当前读数替代历史核实',sections:[]}))
 
 const assessmentConclusion=computed(()=>overviewCopy(healthAssessment.value.conclusion))
 const assessmentNext=computed(()=>{
   const recommendation=overviewCopy(healthAssessment.value.next)
   return recommendation.match(/^[^。！？]+[。！？]?/)?.[0]||recommendation
 })
-const assessmentDetail=computed(()=>overviewCopy(`### ${isMainEngine.value?'事件结论与工况依据':'工况与测点依据'}\n\n${healthAssessment.value.basis}\n\n### 建议\n\n${healthAssessment.value.next}`))
+const assessmentDetail=computed(()=>overviewCopy(`### ${isMainEngine.value?'事件结论与工况依据':'工况与测点依据'}\n\n${healthAssessment.value.basis}`))
 const additionalSections=computed(()=>runningAssessment.value.sections.filter(section=>!['关联分析与判断边界','当前安排'].includes(section.title)))
 const deviceReadings=computed(()=>sensorStore.allSensors.filter(sensor=>props.deviceId==='aux-system'?sensor.deviceId.startsWith('aux-engine-'):sensor.deviceId===props.deviceId))
 const previewReadings=computed(()=>overviewSensorReadings(deviceReadings.value))

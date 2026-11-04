@@ -1,0 +1,3 @@
+# Keep source bytes (including original whitespace) identical to the SHA-256.
+wiki_rt-flex50/**/*.md -text -whitespace
+public/wiki_rt-flex50/**/*.md -text -whitespace

@@ -1,0 +1,443 @@
+{
+  "sourceRoot": "D:\\zstech\\ship_sop\\wiki_rt-flex50",
+  "documents": 61,
+  "images": 190,
+  "missingImages": [
+    "2a63bb36a5934cd8443b46027a4b536d3ebb38f3325593e9c9822898236c1db3.jpg",
+    "50fd5921722c86d726a95ea01401d5d1014c8049b3df2ef553c707d3fe0ddeb2.jpg",
+    "52f01c1e1c0273d31f57b5c9d449a43597be1b6f1ce49cc954c867ece4cd3c9f.jpg",
+    "628b77381fceb607280234f1fcdb67a81016241501d7c671f77a8a458bdd625.jpg",
+    "df5433fa6e7ed1c80d1eea773604f2315e39f6a22467c629a48162bf5737301.jpg",
+    "f94d82f30c139978d5ebbe477af196310b9be7ff123f8b0c3e2effd48f8f2ef.jpg",
+    "fdaaabba5b5d0b7d4780b0fad2ee65c45e9b1394878b6215d568b7c263eb101.jpg"
+  ],
+  "entries": [
+    {
+      "id": "RTF-31E6CA21E6",
+      "title": "第1章-发动机概述",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/chapters/第1章-发动机概述.md",
+      "sha256": "2be7f43a7568aab04c3b0dea1cb210f0f3598f01f03221319ed4d24525e47584"
+    },
+    {
+      "id": "RTF-5599F20C5E",
+      "title": "第2章-系统描述",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/chapters/第2章-系统描述.md",
+      "sha256": "53ad9b97d525281dfbce08e3035a373e7a4a5d077f898da884e076d5571c5020"
+    },
+    {
+      "id": "RTF-C9F2F8E3C9",
+      "title": "第3章-操作规程",
+      "docType": "操作规程",
+      "sourcePath": "wiki_rt-flex50/chapters/第3章-操作规程.md",
+      "sha256": "769ced66a99c55dfdc04246381a9273ce20f7a56b56085ee961e25e692eff8e5"
+    },
+    {
+      "id": "RTF-78059F051E",
+      "title": "第4章-异常操作规程",
+      "docType": "操作规程",
+      "sourcePath": "wiki_rt-flex50/chapters/第4章-异常操作规程.md",
+      "sha256": "8dd15012c11a41085895701ad1e0d80f862153b8bda1ab8c3f65d45c3f37a281"
+    },
+    {
+      "id": "RTF-98036A2C3A",
+      "title": "第5章-故障诊断",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/chapters/第5章-故障诊断.md",
+      "sha256": "9ec44613cb2fd7b2a3ae961afacb2efc116dede5ec4c89f747eb0b02845038b6"
+    },
+    {
+      "id": "RTF-9AAF2EF48E",
+      "title": "第6章-技术参数与报警设定",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/chapters/第6章-技术参数与报警设定.md",
+      "sha256": "5f1e77c7423e1631cc2c3a7ea97a3fa227ac24fe36c39e343fd66ce1e2236096"
+    },
+    {
+      "id": "RTF-07BAEF4EB5",
+      "title": "第7章-发动机特性图与原理图",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/chapters/第7章-发动机特性图与原理图.md",
+      "sha256": "d6d97e389e3353f3387c6c6e7eb16d73ce78f47c0d6191b1c7c2b5cd3748ed81"
+    },
+    {
+      "id": "RTF-B98B33E795",
+      "title": "ABB增压器操作维护提示",
+      "docType": "操作规程",
+      "sourcePath": "wiki_rt-flex50/concepts/ABB增压器操作维护提示.md",
+      "sha256": "ad35be3605885d96684e4e9deafcc7a3cd9eb220ae3dc6bb0b7e74086ec37de7"
+    },
+    {
+      "id": "RTF-F8DA46E464",
+      "title": "FCM-20模块",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/FCM-20模块.md",
+      "sha256": "b6b85a37cd4eb7fd13f04f0d8a6bae084fe9d84221e94f89e507f0e160f22fb9"
+    },
+    {
+      "id": "RTF-9270CC71B9",
+      "title": "flexView诊断工具",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/flexView诊断工具.md",
+      "sha256": "fdf2d461f94bc779cf455d72ca642ed9967059544fbd194bf9036b1a328d813a"
+    },
+    {
+      "id": "RTF-BE9F280662",
+      "title": "ICU流量活塞探头杆脱落故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/ICU流量活塞探头杆脱落故障案例.md",
+      "sha256": "18f65cc0a1e436de28a0dd227019d3e83d5f202edaced0c3855972f300792cd4"
+    },
+    {
+      "id": "RTF-1DC237E404",
+      "title": "RT-flex伺服油泵",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/RT-flex伺服油泵.md",
+      "sha256": "aaa1949d0c3e7adbcc5ca92fab971123a46bc86a026db570ac7bf2c48b0e7f96"
+    },
+    {
+      "id": "RTF-7D9E630AF5",
+      "title": "RT-flex报警对策对照表",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/RT-flex报警对策对照表.md",
+      "sha256": "a2dbcf714a41be727f6c146b2c11497149eaaad7ece62eee4aefcb59cd921737"
+    },
+    {
+      "id": "RTF-CE0753AA8A",
+      "title": "RT-flex故障排查方法论",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/RT-flex故障排查方法论.md",
+      "sha256": "b3f60043c9bd9ab3050ab7f5cfb7aa516b3fc258d5a24a70487baa6539eb1a0f"
+    },
+    {
+      "id": "RTF-DA4F406764",
+      "title": "RT-flex日常维护检查清单",
+      "docType": "操作规程",
+      "sourcePath": "wiki_rt-flex50/concepts/RT-flex日常维护检查清单.md",
+      "sha256": "163495d13dbffa6df99ec3e406f89d1ef8ba02e517d24fb78c320deb628bc6ea"
+    },
+    {
+      "id": "RTF-38DFEC54BD",
+      "title": "RT-flex燃油泵",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/RT-flex燃油泵.md",
+      "sha256": "836b9fbb758af29cbb125a7a2369182dd6cc62ca9e363116b32a238359d0992c"
+    },
+    {
+      "id": "RTF-F06A6AFD9E",
+      "title": "VIT_VEC_VEO_FQS控制函数",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/VIT_VEC_VEO_FQS控制函数.md",
+      "sha256": "85b5630f73ea792bb2ae869d82af9aba76ca21452084b0a1bfeb2d3024deda60"
+    },
+    {
+      "id": "RTF-4F760C3AA9",
+      "title": "WECS-9520控制系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/WECS-9520控制系统.md",
+      "sha256": "41fb8ebb9e66692bf768e76f46beef41a4f7cffb974bbdf530083aada0849ba4"
+    },
+    {
+      "id": "RTF-C6E2BCD435",
+      "title": "主机不能正常启动故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/主机不能正常启动故障案例.md",
+      "sha256": "88067e5e5c730c59ecd14f6fbc22375ee957193d5e38b7c37e74868e7ab7ffc8"
+    },
+    {
+      "id": "RTF-6EE3FBB042",
+      "title": "主机主启动阀漏气故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/主机主启动阀漏气故障案例.md",
+      "sha256": "83f0e4c6d7bb3adb4783540f5ab617231f89a360569836895175559cff01e8bc"
+    },
+    {
+      "id": "RTF-17F72913A4",
+      "title": "主机偶发超速报警停车故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/主机偶发超速报警停车故障案例.md",
+      "sha256": "09196b67e4d789a31dd572c26ed7edeebdd84ad8614e4217d50d53f72a4ae0c8"
+    },
+    {
+      "id": "RTF-413EEFF032",
+      "title": "主机启动无转速故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/主机启动无转速故障案例.md",
+      "sha256": "9b271ce29cf842c4509828033f58e2c56cd189de4b5bdc5c997981d691845ab7"
+    },
+    {
+      "id": "RTF-E3763CC05A",
+      "title": "传感器测点清单",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/传感器测点清单.md",
+      "sha256": "0b56f5658b4783442726e9d05c149585ad2190defd6a906461685b5498f81035"
+    },
+    {
+      "id": "RTF-AC68A8E931",
+      "title": "伺服油系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/伺服油系统.md",
+      "sha256": "29bfb6ae81e5cd27a6091758c6fc91bf582b7c4d9ae7e36a3cfb0c9f753cac0c"
+    },
+    {
+      "id": "RTF-AA632214AE",
+      "title": "伺服油轨",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/伺服油轨.md",
+      "sha256": "0cae719022f4357c1d44b2ac3fa5286e29efeb26065f6c9ec5c9ce804047611a"
+    },
+    {
+      "id": "RTF-997BC04721",
+      "title": "伺服油过滤系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/伺服油过滤系统.md",
+      "sha256": "79f0d5b92fb46452a25f934d097358db5b1844ec6b5745d1d4566dc4555ae6af"
+    },
+    {
+      "id": "RTF-C553A9A50D",
+      "title": "共轨柴油机运行管理要点",
+      "docType": "操作规程",
+      "sourcePath": "wiki_rt-flex50/concepts/共轨柴油机运行管理要点.md",
+      "sha256": "cecd044f31b280fff74daa1a1eb6a3009634c6857530272ab0ec2d14c4896a31"
+    },
+    {
+      "id": "RTF-AFE9AE98F5",
+      "title": "发动机停机功能",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/发动机停机功能.md",
+      "sha256": "4ffd6356dcf668d474f86ef41ecc9ffbd4d3054d7f628373582b8e0e5e43883f"
+    },
+    {
+      "id": "RTF-366D962128",
+      "title": "启动系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/启动系统.md",
+      "sha256": "b05c097fd3dee57bdada8e5459d6a211d5533d7a20ad58de164cc335c7e30c6d"
+    },
+    {
+      "id": "RTF-247DBF8810",
+      "title": "喷射控制单元ICU",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/喷射控制单元ICU.md",
+      "sha256": "fdf44dec8c6803787e1f018bfc486a63ef4900400ea5b9896f03b4ea06699c81"
+    },
+    {
+      "id": "RTF-2AED0E71E5",
+      "title": "增压器轴承损坏故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/增压器轴承损坏故障案例.md",
+      "sha256": "fef4ff3a7f66139892358a2b6118310ca1d89dc9017a3f54d422cd9d1377b43e"
+    },
+    {
+      "id": "RTF-C26497D32B",
+      "title": "安全系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/安全系统.md",
+      "sha256": "e9c55757c38d8da12e3122eb807dae98d7a70cb54d66a1277d3438f301e357c5"
+    },
+    {
+      "id": "RTF-D7E56603BF",
+      "title": "工作介质规格",
+      "docType": "操作规程",
+      "sourcePath": "wiki_rt-flex50/concepts/工作介质规格.md",
+      "sha256": "f8f1855345a66dddd3cf7f5e343f2de0765bd0b4a93fa40cd6ffdca623a4c07b"
+    },
+    {
+      "id": "RTF-DAD6D3AF6D",
+      "title": "报警监控系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/报警监控系统.md",
+      "sha256": "f9be1e7017caca6c49e9309dc3d7499febcf58a88ac7ae561f4883abc008e589"
+    },
+    {
+      "id": "RTF-1D22679A77",
+      "title": "排气阀驱动活塞卡滞故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/排气阀驱动活塞卡滞故障案例.md",
+      "sha256": "a66fda3919e8d30dd2aab8803979a07a0d11b8ad2d65af483869f79f8a4ba5fa"
+    },
+    {
+      "id": "RTF-4D8F00FF29",
+      "title": "控制空气系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/控制空气系统.md",
+      "sha256": "0a6e002d23a0aaa50d19cd08f3d918d1cd6874f7266cfba26f5badad7b3868e1"
+    },
+    {
+      "id": "RTF-1B1DBAD4C5",
+      "title": "曲柄角度传感器",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/曲柄角度传感器.md",
+      "sha256": "3463b119775072b798b3412b73a8d4a83a0744bbc5e85fa7cd903a5f52a03847"
+    },
+    {
+      "id": "RTF-81EBAF92B5",
+      "title": "气门控制单元VCU",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/气门控制单元VCU.md",
+      "sha256": "66d37a3048826486d619bc959cde5dc6779ced857bab396561734f6ea7308531"
+    },
+    {
+      "id": "RTF-140B2188A8",
+      "title": "活塞冷却油伸缩管断裂故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/活塞冷却油伸缩管断裂故障案例.md",
+      "sha256": "ce9b802b1c4eebc56d8f2e6c9341531696c7012de98a876c04ae812681afc0a5"
+    },
+    {
+      "id": "RTF-C7C2DCE360",
+      "title": "滑油变质致排气阀故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/滑油变质致排气阀故障案例.md",
+      "sha256": "21251ccc59f766e4d749a04bf59130e79646af32b4f5b61a33ecdb288ba4a787"
+    },
+    {
+      "id": "RTF-2219434B4E",
+      "title": "燃油泵止回阀NRV",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/燃油泵止回阀NRV.md",
+      "sha256": "672e556a03fdf3ec7c8712a9f5515493171ae91a59e5922ba4632dac4f0a26bf"
+    },
+    {
+      "id": "RTF-14D3754054",
+      "title": "燃油系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/燃油系统.md",
+      "sha256": "b8bbfdba89e6f52b4adffafc4a18866afac48be3f7fcd8c62eb4e0296cfd3f74"
+    },
+    {
+      "id": "RTF-31374FF30F",
+      "title": "燃油超压调节阀",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/燃油超压调节阀.md",
+      "sha256": "15a55315ff9389b9626dfb7e748fd3203f225e149509ce4444fd9bdd61d00ab9"
+    },
+    {
+      "id": "RTF-CE818A3631",
+      "title": "燃油轨",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/燃油轨.md",
+      "sha256": "c4286a2a844488576257bbea8498d4bed0da225dc915ff6280d837455ef517db"
+    },
+    {
+      "id": "RTF-5E8881ACDD",
+      "title": "缩写术语表",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/缩写术语表.md",
+      "sha256": "2c41d5d93cfff30793bbf116b796e3a1fd970e9a5c546aab2e7cec4f327f209f"
+    },
+    {
+      "id": "RTF-8B52180736",
+      "title": "缸套异常磨损致活塞环断裂故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/缸套异常磨损致活塞环断裂故障案例.md",
+      "sha256": "34683aa68c7923ca5e137222f35d27498155a48a5da9afb7cccf4b25ef0428c4"
+    },
+    {
+      "id": "RTF-5C1063F62F",
+      "title": "轨阀RV-2",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/轨阀RV-2.md",
+      "sha256": "aafe120615139df91b26ca8aa3ee154c80d02facafe527cec5352106c04a49bf"
+    },
+    {
+      "id": "RTF-C7D641B38E",
+      "title": "远程控制系统",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/远程控制系统.md",
+      "sha256": "f3db912f7c475fee6dc3d815e2b5722d102663b0c99403493b98abeceb226d43"
+    },
+    {
+      "id": "RTF-79B7452B99",
+      "title": "长航碧玉30KG到8KG减压阀损坏故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/长航碧玉30KG到8KG减压阀损坏故障案例.md",
+      "sha256": "c9ca7794ca08c483e1fd6e28c04f518af71115229edfe20e6af0204b8e68cbd7"
+    },
+    {
+      "id": "RTF-5EB064608C",
+      "title": "长航碧玉主机2缸ICU伺服油液压活塞卡阻故障案例",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/concepts/长航碧玉主机2缸ICU伺服油液压活塞卡阻故障案例.md",
+      "sha256": "ce83c0559c34f08edf8df08193e557c73a6b7dbeeceac6f3fd4948cac594fd9a"
+    },
+    {
+      "id": "RTF-E9C9301A85",
+      "title": "RT-flex-01服务通报",
+      "docType": "技术通告",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex-01服务通报.md",
+      "sha256": "b98624e043449e64b14ec144f561333692cb36d525a3de55910954da298fb2de"
+    },
+    {
+      "id": "RTF-9761EB948A",
+      "title": "RT-flex-10服务函",
+      "docType": "技术通告",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex-10服务函.md",
+      "sha256": "77c96c4f688f94131df251f14c10c4e94405cb386b03772be31480cfca83452a"
+    },
+    {
+      "id": "RTF-7D30168981",
+      "title": "RT-flex50控制图107344463",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex50控制图107344463.md",
+      "sha256": "76558084e61ebadf5d737f62e4e1b2ede3eb77f288e7b8340924e8b8a4df771c"
+    },
+    {
+      "id": "RTF-225161E942",
+      "title": "RT-flex50操作手册",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex50操作手册.md",
+      "sha256": "c3ec3c55a2286f2765b8a38cee5ccac22433c4686df860144075cb3e4da7014f"
+    },
+    {
+      "id": "RTF-69B168EDDB",
+      "title": "RT-flex控制系统培训",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex控制系统培训.md",
+      "sha256": "63d98c5833ba62d9b591f4f06653ebb9b0194fed250a44a05c9c5f1a4f3e465a"
+    },
+    {
+      "id": "RTF-73BAFCF995",
+      "title": "RT-flex机械特性培训",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex机械特性培训.md",
+      "sha256": "c0436f5069463e1100f790b60d244986049abbaca2f92b2351478aabe5b84cd0"
+    },
+    {
+      "id": "RTF-C5D719CFED",
+      "title": "RT-flex液压与气动部件培训",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex液压与气动部件培训.md",
+      "sha256": "99f3d7bdaf3e6bdb5650202561df8b9b191aae08384a05ead35eeb9ba45b9f20"
+    },
+    {
+      "id": "RTF-2D60392A62",
+      "title": "RT-flex维修操作培训",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/RT-flex维修操作培训.md",
+      "sha256": "9a61d9870bc573518f06b94db41d20d8ccc9564a54784f708d601605e228a4b5"
+    },
+    {
+      "id": "RTF-8E68FEF35F",
+      "title": "历史故障案例集",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/sources/历史故障案例集.md",
+      "sha256": "42d8a0e4b861e1d9e911cc9ca5704f1922e2143de9f9e62210173bbb139b6948"
+    },
+    {
+      "id": "RTF-25E75F3443",
+      "title": "长航碧玉30KG到8KG减压阀损坏故障报告0523",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/sources/长航碧玉30KG到8KG减压阀损坏故障报告0523.md",
+      "sha256": "2f15078a79846b8160f60581f76ef48c77b1a8ba8ac6b10db7d470276721adc3"
+    },
+    {
+      "id": "RTF-F253E4FC2B",
+      "title": "长航碧玉主机2缸ICU伺服油液压活塞故障报告0430",
+      "docType": "故障案例",
+      "sourcePath": "wiki_rt-flex50/sources/长航碧玉主机2缸ICU伺服油液压活塞故障报告0430.md",
+      "sha256": "fec554de0a079509e02b9c8164c7af9c37ade7346e6af696e58f612642512c75"
+    }
+  ]
+}

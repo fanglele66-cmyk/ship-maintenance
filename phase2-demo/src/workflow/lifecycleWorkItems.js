@@ -1,3 +1,4 @@
+import {currentResponsibility} from './lifecyclePresentation.js'
 import {ownsTask,capabilities} from './lifecyclePermissions.js'
 import {people,pendingDecision,taskName} from './eventLifecycle.js'
 
@@ -19,7 +20,7 @@ const decisionLabels={investigate:'派发排查',repair:'派发维修',maintenan
 export function decisionWorkItem(event){
  const phase=event.phases.at(-1),task=event.tasks.find(t=>t.id===event.currentTask)
  const label=event.phase==='reminder'?'评估风险并安排排查':event.phase==='decision'?'审阅排查结果并决定下一步':phase?.observationReview?'审阅观察结果并确认后续安排':'审阅作业结果并决定后续安排'
- return {id:'decision:'+event.id+':'+phase.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策 / 确认',eventType:event.type,title:label,summary:event.phase==='reminder'?event.brief.conclusion:event.reports.findLast(r=>r.taskId===task?.id)?.summary||event.brief.conclusion,owner:people.captain,status:'待我处理',at:phase.observationCompletedAt||(event.phase==='reminder'?event.createdAt:null)||phase.at,location:{path:'/situation/issue/'+event.id,query:{from:'workbench'}},actionLabel:'查看并决策'}
+ return {id:'decision:'+event.id+':'+phase.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策 / 确认',eventType:event.type,title:label,summary:currentResponsibility(event).detail,owner:people.captain,status:'待我处理',at:phase.observationCompletedAt||(event.phase==='reminder'?event.createdAt:null)||phase.at,location:{path:'/situation/issue/'+event.id,query:{from:'workbench'}},actionLabel:'查看并决策'}
 }
 export function lifecycleWorkItems(state){
  const role=state.role,actor=people[role],tasks=[],pending=[],completed=[]
