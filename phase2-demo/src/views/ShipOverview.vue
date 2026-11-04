@@ -1,4 +1,5 @@
 <template>
+ <div class="ship-home-layout" :class="{'assistant-open':assistantOpen}">
  <div class="captain-workbench">
   <section class="captain-twin">
    <header><strong>长航碧玉</strong><span class="ship-scope">设备健康态势</span></header>
@@ -23,11 +24,12 @@
   <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
     <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span><button class="home-assistant-toggle" type="button" :aria-expanded="assistantOpen" aria-controls="home-situation-assistant" @click="assistantOpen=!assistantOpen">✦ 态势助手</button></ModuleHeader>
-    <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events" :captain="lifecycle.state.role==='captain'"/>
+    <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events" :captain="lifecycle.state.role==='captain'" :compact="assistantOpen"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
-  <HomeSituationAssistant v-if="assistantOpen" id="home-situation-assistant" @close="assistantOpen=false"/>
+ </div>
+  <HomeSituationAssistant v-show="assistantOpen" id="home-situation-assistant" :open="assistantOpen" :chronology="chronology" :readings="{speed:formatReading('ship-speed'),rpm:formatReading('s-012'),load:formatReading('main-load'),sampledAt:sampleTimeIso}" @close="assistantOpen=false"/>
  </div>
 </template>
 <script setup>
@@ -179,4 +181,11 @@ const devices=computed(()=>{
 .captain-right :deep(.issue-row p){font-size:12px;margin-top:4px}
 .captain-right :deep(.captain-issues .module-header){padding-top:8px;padding-bottom:8px}
 }
+</style>
+
+<style scoped>
+.ship-home-layout{display:grid;grid-template-columns:minmax(0,1fr);width:100%;height:100%;min-width:0;min-height:0;gap:12px;overflow:hidden}.ship-home-layout.assistant-open{grid-template-columns:minmax(0,1fr) 400px}.assistant-open .captain-workbench{grid-template-columns:clamp(220px,21vw,360px) minmax(0,1fr)}
+@media(max-width:1400px){.ship-home-layout.assistant-open{grid-template-columns:minmax(0,1fr) 340px}.assistant-open .captain-workbench{grid-template-columns:220px minmax(0,1fr)}}
+@media(max-width:1000px){.assistant-open .captain-workbench{grid-template-columns:minmax(0,1fr);overflow:auto;align-content:start}.assistant-open .captain-twin{min-height:360px}.assistant-open .captain-right{overflow:visible}}
+@media(max-width:600px){.ship-home-layout.assistant-open{grid-template-columns:minmax(220px,1fr) 300px;overflow-x:auto}.ship-home-layout>.captain-workbench{min-height:0;overflow:auto}}
 </style>

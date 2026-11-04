@@ -1,6 +1,6 @@
 <template>
- <section class="voyage" aria-label="航行阶段时间线，从早到晚">
-  <div class="voyage-scroll">
+ <section class="voyage" :class="{'voyage-compact':compact}" aria-label="航行阶段时间线，从早到晚">
+  <div ref="scroll" class="voyage-scroll" tabindex="0" aria-label="横向滚动查看航行阶段">
    <ol class="voyage-timeline">
     <li v-for="(stage,index) in stages" :key="stage.id" class="voyage-stage" :class="[stage.tone,stage.severity,{'is-latest':index===stages.length-1}]" :style="{'--stage-delay':index*80+'ms','--flow-delay':index*.7+'s'}">
      <div class="stage-clock"><time :datetime="new Date(stage.start).toISOString()">{{shortTime(stage.start)}}</time><span aria-hidden="true">—</span><time :datetime="new Date(stage.end).toISOString()">{{shortTime(stage.end)}}</time></div>
@@ -24,9 +24,11 @@
  </section>
 </template>
 <script setup>
-import {computed} from 'vue'
+import {computed,ref,watch,nextTick} from 'vue'
 import {navigationStages} from '../workflow/navigationStages.js'
-const props=defineProps({periods:{type:Array,required:true},events:{type:Array,default:()=>[]},captain:{type:Boolean,default:false}})
+const props=defineProps({periods:{type:Array,required:true},events:{type:Array,default:()=>[]},captain:{type:Boolean,default:false},compact:{type:Boolean,default:false}})
+const scroll=ref(null)
+watch(()=>props.compact,async compact=>{await nextTick();if(scroll.value)scroll.value.scrollLeft=compact?scroll.value.scrollWidth:0})
 const stages=computed(()=>navigationStages(props.periods,props.events,{captain:props.captain}).slice(-4))
 const shortTime=at=>new Date(at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Shanghai'})
 </script>
@@ -63,5 +65,6 @@ const shortTime=at=>new Date(at).toLocaleString('zh-CN',{month:'2-digit',day:'2-
 @keyframes arrow-flow{0%,65%,100%{opacity:.4;transform:translateX(0)}40%,50%{opacity:1;transform:translateX(2px)}}
 @media(max-width:1400px){.voyage-timeline{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}.stage-clock{font-size:12px}.stage-content{margin-right:10px}.stage-description{min-height:0}.stage-average{margin:8px 0}.stage-operations{margin-top:10px}}
 @media(max-width:760px){.voyage{padding:0 4px 12px}.voyage-timeline{grid-template-columns:1fr}.stage-content{margin-right:0}.stage-track svg{display:none}}
+.voyage-compact .voyage-timeline{grid-template-columns:repeat(3,minmax(220px,1fr)) minmax(280px,1.35fr);gap:0}.voyage-compact .stage-track svg{display:block}
 @media(prefers-reduced-motion:reduce){.voyage-stage,.track-line,.track-node:after,.track-line:after,.stage-track svg{animation:none}.track-node:after,.track-line:after{display:none}}
 </style>
