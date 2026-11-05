@@ -1,4 +1,6 @@
 import {analyzeManualAnomaly} from './manual-anomaly.mjs'
+import {assistTaskStep,maxStepAssistRequestBytes} from './step-assist.mjs'
+import {prepareStepAssistInput} from '../src/workflow/stepAssistContract.js'
 import {capabilities} from '../src/workflow/lifecyclePermissions.js'
 import {taskExecution,carryForwardSteps} from '../src/workflow/taskExecution.js'
 import {join} from 'node:path'
@@ -27,10 +29,22 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
   if(!local||!originOK||req.headers['x-engine-room-client']!=='local-ui')return send(403,{error:'仅允许本机页面访问模型后台。'})
   try{
    if(req.method!=='POST')return send(405,{error:'不支持的请求方法。'})
-   let raw='';for await(const part of req){raw+=part;if(Buffer.byteLength(raw)>300000)return send(413,{error:'内容过长，请分段补充。'})}
+   const chunks=[];let size=0
+   for await(const part of req){const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);size+=chunk.length;if(size>maxStepAssistRequestBytes)return send(413,{error:'请求内容过大，图片与附件请分批补充。'});chunks.push(chunk)}
+   const raw=Buffer.concat(chunks).toString('utf8')
    let input;try{input=JSON.parse(raw)}catch{return send(400,{error:'请求格式不正确。'})}
+   if(input?.mode!=='step-assist'&&size>300000)return send(413,{error:'内容过长，请分段补充。'})
    if(path!=='/api/ai/chat')return send(404,{error:'接口不存在。'})
    if(busy>=2)return send(429,{error:'模型正在处理其他请求，请稍后重试。'})
+   if(input?.mode==='step-assist'){
+    try{prepareStepAssistInput(input)}catch(error){return send(400,{error:error.message})}
+    busy++;counted=true
+    streaming=input.stream===true
+    if(streaming){res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('X-Accel-Buffering','no');res.flushHeaders?.()}
+    const controller=new AbortController(),disconnect=()=>{if(!res.writableEnded)controller.abort()}
+    res.on?.('close',disconnect)
+    try{const output=await assistTaskStep(input,{configuration,knowledge,fetcher,emit:streaming?emit:()=>{},signal:controller.signal});if(streaming){emit('done',output);return res.end()}return send(200,output)}finally{res.off?.('close',disconnect)}
+   }
    const text=input.text?.trim()
    if(!text||text.length>12000)return send(400,{error:'请输入 1—12000 字的问题或补充内容。'})
    const situation=input.mode==='situation',polishing=input.mode==='note'

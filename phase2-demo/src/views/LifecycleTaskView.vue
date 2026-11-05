@@ -8,13 +8,13 @@
    <TaskReportGeneration v-if="task.status==='report-error'" :event="event" :task="task" @submitting="showSubmission" @submitted="submitted"/>
    <section class="task-detail-content">
     <template v-if="tab!=='提交记录'">
-     <LifecycleTaskSteps v-if="executable" :event="event" :task="task" :key="task.id" @submitting="showSubmission" @submitted="submitted"/>
+     <LifecycleTaskSteps v-if="executable" :event="event" :task="task" :key="task.id" @assist="assistStep" @submitting="showSubmission" @submitted="submitted"/>
      <template v-else><div class="task-progress"><strong>{{task.status==='submitted'?'本轮执行记录':'执行进度'}}</strong><span>{{task.status==='assigned'?(task.draft?.records||[]).filter(r=>r.result).length:records.filter(r=>r.result).length}} / {{task.steps.length}} 项{{task.status==='submitted'?'已提交':'已填写'}}{{task.status==='assigned'?' · 等待执行人提交':''}}</span></div><p v-if="!own&&task.status==='assigned'" class="lc-muted">本轮结果尚未提交。<span v-if="task.draft?.updatedAt"> 最近记录更新：{{timeText(task.draft.updatedAt)}}。</span></p><ol class="lc-step-list"><li v-for="(step,i) in task.steps" :key="i"><span class="lc-step-number">{{i+1}}</span><div><h3>{{step.label}}</h3><LifecycleStepInstructions :event="event" :task="task" :number="i+1" :step="step" :compact="task.kind!=='investigation'"/><p v-if="own||task.status!=='assigned'||records.length" class="task-record"><strong>{{records[i]?.result||'尚未填写'}}</strong><span v-if="records[i]?.note">{{records[i].note}}</span></p></div></li></ol></template>
     </template>
     <template v-else><nav v-if="taskReports.length>1" class="report-submissions" aria-label="任务报告提交记录"><button v-for="item in taskReports" :key="item.id" :aria-pressed="report?.id===item.id" @click="selectedReportId=item.id">第{{item.submissionNumber}}次提交{{item.submissionNumber>1?'（恢复后）':''}} · {{timeText(item.at)}}</button></nav><LifecycleReport v-if="report" :report="report" :show-download="false"/></template>
    </section>
   </main>
-  <LifecycleAssistant v-if="assistantOpen" @collapse="assistantOpen=false" ref="assistant" :event="event" :task-id="task.id" :key="task.id" @submitted="submitted" @report="openReport"/>
+  <LifecycleAssistant v-show="assistantOpen" @collapse="assistantOpen=false" ref="assistant" :event="event" :task-id="task.id" :active-step-index="task.draft?.stepIndex||0" :key="task.id" @submitted="submitted" @report="openReport"/>
  </div>
  <main v-else class="lc-access"><h2>{{task?'当前身份无权查看此任务':'未找到该任务'}}</h2><p>执行人只能查看分派给本人的任务。</p><button @click="back">返回我的任务</button></main>
 </template>
@@ -43,6 +43,7 @@ const own=computed(()=>ownsTask(store.state.role,task.value)),resumeReason=ref('
 function resume(){try{store.resumeTask(event.value.id,task.value.id,{reason:resumeReason.value,unchanged:unchanged.value});resumeError.value=''}catch(e){resumeError.value=e.message}}
 const selectedReportId=ref(null),taskReports=computed(()=>event.value?.reports.filter(r=>r.taskId===task.value?.id)||[]),latestReport=computed(()=>taskReports.value.at(-1))
 const report=computed(()=>taskReports.value.find(r=>r.id===selectedReportId.value)||latestReport.value)
+async function assistStep(index){assistantOpen.value=true;await nextTick();assistant.value?.assistStep(index)}
 async function supplement(){assistantOpen.value=true;await nextTick();assistant.value?.supplementReport(report.value.id)}
 function openReport(id){selectedReportId.value=id;tab.value='提交记录'}
 const canSupplement=computed(()=>report.value&&supplementaryReports(event.value,store.state.role).some(r=>r.id===report.value.id))
