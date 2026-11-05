@@ -6,7 +6,7 @@
    <div class="task-center-intro"><div class="task-intro-copy">
     <div class="task-intro-title"><h2>{{activeLabel}}</h2><label v-if="tab==='assigned'" class="task-history-filter">派发记录 <span class="task-select"><select v-model="assignedFilter" aria-label="派发记录"><option value="active">未完成</option><option value="all">全部历史</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
     <p>{{tabDescription}}</p>
-   </div><label class="task-type-filter">类型<span class="task-select"><select v-model="filter" aria-label="记录类型"><option value="">全部类型</option><option v-if="crossBusiness&&captain&&tab!=='assigned'" value="decision">决策与确认</option><option v-for="type in ['排查任务','维修任务','维保任务','复查任务']" :key="type" :value="type">{{type}}</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
+   </div><label class="task-type-filter">类型<span class="task-select"><select v-model="filter" aria-label="记录类型"><option value="">全部类型</option><option v-if="crossBusiness&&captain&&tab!=='assigned'" value="decision">决策与确认</option><option v-for="type in taskTypes" :key="type" :value="type">{{type}}</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label></div>
    <div v-if="items.length" class="work-card-grid">
     <article v-for="item in items" :key="item.id" class="work-card" :class="{'is-decision':item.kind==='decision','is-done':item.done}" :data-work-id="item.id">
      <header><span class="work-kind">{{item.type}}</span><small>{{item.number||item.eventNumber}}</small><span class="work-state">{{item.status}}</span></header>
@@ -28,6 +28,7 @@ import {computed,ref,watch} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {timeText} from '../workflow/eventLifecycle'
+import {taskTypes} from '../workflow/taskLabels.js'
 import {workItemPresentation} from '../workflow/lifecycleWorkItems'
 const store=useEventLifecycleStore(),route=useRoute(),router=useRouter(),query=ref(''),filter=ref(''),tab=ref('pending'),assignedFilter=ref('active')
 const captain=computed(()=>store.state.role==='captain'),crossBusiness=computed(()=>route.name==='SituationTodos'),work=computed(()=>Object.fromEntries(Object.entries(store.workItems).map(([key,items])=>[key,crossBusiness.value?items:items.filter(i=>i.kind==='task')])) )

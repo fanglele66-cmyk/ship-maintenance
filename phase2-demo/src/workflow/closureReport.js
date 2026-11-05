@@ -1,11 +1,10 @@
 import {observationTasks} from './observationEvents.js'
-import {taskName} from './lifecycleDecisions.js'
+import {taskRoundLabel as taskTitle} from './taskLabels.js'
 import {observationStart,isVerificationObservation} from './observationContext.js'
 
 export const closurePresentationVersion=6
 const noValue=value=>value===undefined||value===null||value===''?'未记录':String(value)
 const date=value=>!value?'未记录':!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value)||Number.isNaN(Date.parse(value))?String(value):new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,19)
-const taskTitle=task=>`第${task.round}轮${taskName(task)}`
 const rows=records=>(records||[]).map((r,i)=>`**${i+1}. ${r.label}**\n\n- 实际结果：${noValue(r.result)}\n- 现场记录：${r.note||'未填写具体过程或读数。'}`).join('\n\n')
 
 function taskSection(event,task){

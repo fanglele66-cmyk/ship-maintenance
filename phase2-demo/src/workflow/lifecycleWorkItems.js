@@ -1,9 +1,10 @@
 import {currentResponsibility} from './lifecyclePresentation.js'
 import {ownsTask,capabilities} from './lifecyclePermissions.js'
 import {people,pendingDecision,taskName} from './eventLifecycle.js'
+import {taskTitle} from './taskLabels.js'
+export {taskTitle} from './taskLabels.js'
 
 export const taskLocation=task=>({path:'/tasks/'+task.id})
-export const taskTitle=task=>task.title||`第${task.round}轮${taskName(task)}任务 · ${task.steps?.[0]?.short||task.steps?.[0]?.label||'现场执行'}`
 export const taskNumber=(event,task)=>task.number||`${event.number?.replace('EVT','TSK')||event.id}-${String(event.tasks.indexOf(task)+1).padStart(2,'0')}`
 export const canViewTask=(role,task)=>Boolean(task&&people[role]&&(role==='captain'||ownsTask(role,task)||task.assignedBy===people[role]))
 export const canExecuteTask=(state,event,task)=>ownsTask(state.role,task)&&task.status==='assigned'&&event.currentTask===task.id

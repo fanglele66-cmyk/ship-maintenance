@@ -4,6 +4,7 @@ import {eventBriefingFor} from '../mock/eventBriefings.js'
 import {trackingProcessReference} from '../mock/trackingProcessReferences.js'
 import {adviceDetails,reportAnalysis,reportAnalysisSummary,trackingAssessment} from './lifecycleAnalysis.js'
 import {lifecycleDecisionOptions,dispatchAction,hasAbnormalFindings,confirmedTracking,taskName} from './lifecycleDecisions.js'
+import {taskTitle,taskRoundLabel} from './taskLabels.js'
 import {maintenancePlans,maintenanceSelection} from './maintenancePlans.js'
 import {generatedAnalysis,validateGeneratedReport} from './generatedReport.js'
 import {ensurePlanDraft,taskPlanKey} from './taskPlanning.js'
@@ -225,12 +226,12 @@ export function decide(state,id,form){
   task.assignedBy=actor(state)
   task.implementationBasis=form.evidence?.trim()||''
   task.number=`${e.number.replace('EVT','TSK')}-${String(e.tasks.length+1).padStart(2,'0')}`
-  task.title=`第${round}轮${taskName(task)}任务 · ${task.steps[0].short||task.steps[0].label}`
+  task.title=taskTitle(task)
   if(selectedMaintenance)task.title='提前维保 · '+selectedMaintenance.plan.title
   settleTaskAnalysis(currentTask(e),'已作出后续安排，停止旧轮次的 AI 生成')
   e.tasks.push(task);e.currentTask=task.id
   if(!e.participants.includes(task.owner))e.participants.push(task.owner)
-  const p=phase(e,kind,`第${round}轮${taskName(task)}`,{taskId:task.id});p.id=task.id
+  const p=phase(e,kind,taskRoundLabel(task),{taskId:task.id});p.id=task.id
   e.status=task.purpose==='recheck'?'复查中':kind==='investigation'?'排查中':kind==='repair'?'维修中':'维保执行中'
   if(kind==='maintenance')e.maintenance={number:selectedMaintenance.plan.id,window:selectedMaintenance.window.label,owner:form.owner,scope:task.scope,at,taskId:task.id,...copy(selectedMaintenance)}
   const ownerRole=Object.keys(people).find(role=>people[role]===task.owner)

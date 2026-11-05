@@ -49,7 +49,7 @@ const data = {
 const nodes = new Map(data.nodes.map(node => [node.id, node]))
 const views = new Map(data.views.map(view => [view.id, view]))
 const layers = ['raw', 'processing', 'scenario', 'event', 'task', 'result']
-const taskTypes = { 'task-investigation': 'investigation', 'task-repair': 'repair', 'task-recheck': 'recheck', 'maintenance-compat': 'maintenance' }
+const taskTypes = { 'task-investigation': 'investigation', 'task-repair': 'repair', 'task-recheck': 'investigation', 'maintenance-compat': 'maintenance' }
 assert.equal(nodes.size, data.nodes.length, 'Duplicate map node IDs')
 assert.deepEqual([...views.keys()], ['overview', 'alarm', 'warning', 'tracking', 'observation', 'states', 'pages'])
 assert.deepEqual(data.informationLayers.map(layer => layer.id), layers)
@@ -184,7 +184,7 @@ console.log(JSON.stringify({
   cases: cases.length,
   sourceEvents: new Set(cases.map((item) => item.sourceEventId)).size,
   informationLayers: layers,
-  confirmedTaskTypes: Object.keys(taskTypes).length,
+  confirmedTaskTypes: new Set(Object.values(taskTypes)).size,
   workspaceDocSynced: process.argv.includes('--sync-workspace-doc'),
   bytes: Buffer.byteLength(html),
 }, null, 2))

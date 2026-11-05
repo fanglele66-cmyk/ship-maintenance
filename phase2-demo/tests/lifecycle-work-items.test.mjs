@@ -3,7 +3,9 @@ import {startObservation,shoreForm} from './helpers/observation-fixture.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,newEvent,submitTask,currentTask,ensureTaskPlan,people,pendingDecision,refreshLifecyclePresentation} from '../src/workflow/eventLifecycle.js'
-import {lifecycleWorkItems,lifecycleNotifications,workItemPresentation,taskNumber,findTask,canViewTask} from '../src/workflow/lifecycleWorkItems.js'
+import {lifecycleWorkItems,lifecycleNotifications,workItemPresentation,taskNumber,findTask,canViewTask,taskTitle} from '../src/workflow/lifecycleWorkItems.js'
+import {taskTypes,taskName} from '../src/workflow/taskLabels.js'
+import {eventRounds} from '../src/workflow/lifecyclePresentation.js'
 import {syncLifecycleObservations} from '../src/workflow/lifecycleObservation.js'
 const id='real-alarm-0430'
 function assign(state,action='investigate'){
@@ -16,6 +18,40 @@ function submit(state){
  task.draft.records.forEach((r,i)=>r.result=task.steps[i].options[0]);task.draft.summary='按本轮范围完成并记录现场结果。'
  return submitTask(state,id,task.id)
 }
+test('rechecks share investigation classification across roles, lists and reloads',()=>{
+ const state=createLifecycleState(),first=assign(state);submit(state);assign(state,'repair');submit(state)
+ const recheck=assign(state,'recheck'),event=state.events[id]
+ assert.deepEqual(Object.values(taskTypes),['排查任务','维修任务','维保任务'])
+ assert.equal(recheck.kind,'investigation');assert.equal(recheck.purpose,'recheck')
+ assert.equal(taskName(recheck),'排查');assert.match(recheck.title,/排查任务（复查）/)
+ assert.equal(lifecycleWorkItems(state).assigned.find(i=>i.taskId===recheck.id).type,'排查任务')
+ state.role='engineer'
+ assert.equal(lifecycleWorkItems(state).pending.find(i=>i.taskId===recheck.id).type,'排查任务')
+ assert.ok(lifecycleNotifications(state).find(n=>n.taskId===recheck.id).title.includes('排查任务（复查）'))
+ // Old saved titles remain intact; all entry points use their current presentation.
+ recheck.title=`第${recheck.round}轮复查任务 · 核对处置效果`
+ const savedTitle=recheck.title
+ const reloaded=refreshLifecyclePresentation(JSON.parse(JSON.stringify(state))),oldTask=currentTask(reloaded.events[id])
+ const work=lifecycleWorkItems(reloaded),filtered=work.all.filter(i=>i.eventId===id&&i.type==='排查任务')
+ assert.deepEqual(new Set(filtered.map(i=>i.taskId)),new Set([first.id,recheck.id]))
+ assert.equal(oldTask.title,savedTitle);assert.match(taskTitle(oldTask),/排查任务（复查）/)
+ assert.match(eventRounds(reloaded.events[id]).find(p=>p.id===recheck.id).label,/排查（复查）/)
+ assert.equal(taskTitle({...oldTask,title:'核对二缸维修效果'}),'核对二缸维修效果')
+})
+for(const abnormal of [false,true])test(`recheck remains an investigation after submission; abnormal=${abnormal}`,()=>{
+ const state=createLifecycleState();assign(state);submit(state);assign(state,'repair');submit(state)
+ const task=assign(state,'recheck'),event=state.events[id],number=task.number
+ state.role='engineer'
+ task.draft.records.forEach(r=>{r.result=abnormal?'发现异常':'未见异常';r.note=abnormal?'复查时原报警再次出现。':'复查时原报警未出现。'})
+ task.draft.summary=abnormal?'复查发现原报警再次出现。':'复查未见异常。'
+ const report=submitTask(state,id,task.id)
+ assert.equal(report.kind,'排查报告');assert.match(report.title,/排查报告（复查）/)
+ assert.match(report.number,/-FC-/);assert.equal(task.number,number)
+ assert.equal(event.phase,abnormal?'decision':'review')
+ assert.equal(lifecycleWorkItems(state).completed.find(i=>i.taskId===task.id).type,'排查任务')
+ state.role='captain'
+ assert.ok(lifecycleWorkItems(state).pending.some(i=>i.kind==='decision'&&i.eventId===id))
+})
 test('dispatch resolves the captain todo; one stable task is shared by dispatcher and assignee',()=>{
  const state=createLifecycleState(),before=lifecycleWorkItems(state)
  assert.equal(before.pending.length,4);assert.ok(before.pending.every(i=>i.kind==='decision'))

@@ -1,4 +1,5 @@
 import {responsibilitySummary} from './responsibilitySummary.js'
+import {taskRoundLabel} from './taskLabels.js'
 // Public event state is independent of the viewer and internal processing labels.
 export const eventStates=['研判中','待决策','处理中','观察中','已闭环']
 export function eventState(event){
@@ -29,7 +30,7 @@ export function eventRounds(event){
   const task=event.tasks.find(t=>t.id===phase.taskId)
   const key=task&&!['transferred','closed'].includes(phase.kind)&&!phase.observationWaiting&&!phase.observationReview?task.id:phase.id
   let round=rounds.find(p=>p.id===key)
-  if(!round){round={...phase,id:key,aliases:[],label:phase.kind==='reminder'?'初始信息':task&&key===task.id?`第${task.round}轮${task.purpose==='recheck'?'复查':task.kind==='investigation'?'排查':task.kind==='maintenance'?'维保':'维修'}`:phase.label};rounds.push(round)}
+  if(!round){round={...phase,id:key,aliases:[],label:phase.kind==='reminder'?'初始信息':task&&key===task.id?taskRoundLabel(task):phase.label};rounds.push(round)}
   round.aliases.push(phase.id);round.kind=task?.status==='assigned'&&task.id===event.currentTask&&key===task.id?task.kind:phase.kind;round.reportId=phase.reportId||round.reportId
   round.latestTransitionId=phase.id
  }

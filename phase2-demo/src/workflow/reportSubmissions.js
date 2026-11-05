@@ -7,7 +7,7 @@ export function submissionNumber(event,task,reportId){
  return index<0?reports.length+1:reports[index].submissionNumber||index+1
 }
 export function submissionTitle(event,task,number){
- const kind=task.purpose==='recheck'?'复查报告':task.kind==='investigation'?'排查报告':task.kind==='maintenance'?'维保作业报告':'维修报告'
+ const kind=task.kind==='investigation'?`排查报告${task.purpose==='recheck'?'（复查）':''}`:task.kind==='maintenance'?'维保作业报告':'维修报告'
  return `${event.title} · ${kind}`
 }
 export function submissionCode(event,task,number){

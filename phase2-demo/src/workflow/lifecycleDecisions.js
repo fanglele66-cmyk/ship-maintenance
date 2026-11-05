@@ -44,7 +44,7 @@ export function suggestionAction(event){
  const selected=event.decisionDraft?.action
  return ['investigate','repair','maintenance','recheck'].includes(selected)&&lifecycleDecisionOptions(event).some(o=>o.value===selected)?selected:null
 }
-export const taskName=task=>task?.purpose==='recheck'?'复查':task?.kind==='investigation'?'排查':task?.kind==='maintenance'?'维保':'维修'
+export {taskName} from './taskLabels.js'
 
 export function validateDecisionEvidence(event,form){
  const task=event.tasks.find(t=>t.id===event.currentTask)
