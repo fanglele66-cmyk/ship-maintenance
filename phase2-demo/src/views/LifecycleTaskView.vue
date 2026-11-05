@@ -93,8 +93,8 @@ function back(){router.push({path:'/event',query:route.query.returnView&&route.q
  .task-main:has(.lc-task-wizard)>.task-detail-content{display:flex;flex-direction:column;flex:1;min-height:0}
  .task-main :deep(.lc-task-wizard){display:flex;flex-direction:column;flex:1;min-height:0}
  .task-main :deep(.lc-stepper){flex:none}
- .task-main :deep(.lc-task-wizard .lc-step-editor){display:flex!important;flex:1;min-height:0;overflow:hidden}
- .task-main :deep(.lc-step-instructions){flex:1;min-height:0;overflow:auto;padding-right:5px}
+ .task-main :deep(.lc-task-wizard .lc-step-editor){display:flex!important;flex:0 1 auto;min-height:0;overflow:hidden}
+ .task-main :deep(.lc-step-instructions){flex:0 1 auto;min-height:0;overflow:auto;padding-right:5px}
  .task-main :deep(.lc-task-feedback),.task-main :deep(.lc-step-editor>footer),.task-main :deep(.lc-final-supplement){flex:none}
 }
 </style>

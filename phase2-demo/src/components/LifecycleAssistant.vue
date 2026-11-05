@@ -12,11 +12,11 @@
    <div v-if="introduction.length" class="task-assistant-intro"><p v-for="(sentence,i) in introduction" :key="i">{{sentence}}</p></div>
    <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
-  <form class="lc-composer" @submit.prevent="ask(input)"><div v-if="editableReports.length||editablePlan" class="lc-chat-mode"><button v-if="editableReports.length" type="button" :aria-pressed="mode==='report'" @click="mode=mode==='report'?'chat':'report'">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="mode=mode==='plan'?'chat':'plan'">修改AI建议</button><select v-if="mode==='report'" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div><textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="mode==='plan'?'说明要增加、删除或调整的任务步骤，修改后在建议页签核对…':mode==='report'?'输入要补充的事实，生成修订稿后核对写入…':'询问依据、补充现场情况或后续安排…'" @keydown.enter.exact.prevent="ask(input)"/><footer><button type="button" aria-label="添加文件" @click="upload.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><small v-if="fileNotice">{{fileNotice}}</small><button type="submit" aria-label="发送" :disabled="pending||!input.trim()" :aria-busy="pending"><svg v-if="!pending" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></footer><input ref="upload" type="file" hidden accept=".txt,.md,.csv,.json" @change="attach"/></form>
+  <form class="lc-composer" @submit.prevent="ask(input)"><div v-if="editableReports.length||editablePlan" class="lc-chat-mode"><button v-if="editableReports.length" type="button" :aria-pressed="mode==='report'" @click="mode=mode==='report'?'chat':'report'">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="mode=mode==='plan'?'chat':'plan'">修改AI建议</button><select v-if="mode==='report'" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div><textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="mode==='plan'?'说明要增加、删除或调整的任务步骤，修改后在建议页签核对…':mode==='report'?'输入要补充的事实，生成修订稿后核对写入…':'询问依据、补充现场情况或后续安排…'" @keydown.enter.exact.prevent="ask(input)"/><footer><button type="button" aria-label="添加文件" @click="upload.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><small v-if="fileNotice">{{fileNotice}}</small><button type="button" class="composer-voice" :aria-label="speech.listening?'停止语音输入':'开始语音输入'" :title="speech.listening?'停止语音输入':'开始语音输入'" :aria-pressed="speech.listening" :disabled="!!pending" @click="voice.toggle()"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></button><button type="submit" aria-label="发送" :disabled="pending||!input.trim()" :aria-busy="pending"><svg v-if="!pending" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></footer><small v-if="speech.listening" class="composer-voice-status" role="status">{{speech.stopping?'正在结束录音…':'正在听取语音…'}} {{speech.interim}}</small><small v-if="speech.error" class="composer-voice-error" role="alert">{{speech.error}}</small><input ref="upload" type="file" hidden accept=".txt,.md,.csv,.json" @change="attach"/></form>
  </aside>
 </template>
 <script setup>
-import {computed,ref,watch,nextTick} from 'vue'
+import {computed,ref,watch,nextTick,onBeforeUnmount} from 'vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {currentTask,timeText} from '../workflow/eventLifecycle'
 import AssistantAdviceMessage from './messages/AssistantAdviceMessage.vue'
@@ -25,6 +25,7 @@ import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {supplementaryReports} from '../workflow/reportRevisions'
 import {taskConversation} from '../workflow/lifecycleWorkItems'
 import {taskAssistantIntro} from '../workflow/taskAssistantIntro.js'
+import {createSpeechDraftInput} from '../workflow/speechDraftInput.js'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
 const introduction=computed(()=>props.taskId?taskAssistantIntro(props.event,task.value):[])
@@ -49,18 +50,23 @@ const mode=ref('chat'),targetReport=ref(''),submitError=ref('')
 const editableReports=computed(()=>supplementaryReports(props.event,store.state.role).filter(r=>!props.taskId||r.taskId===props.taskId)),pending=computed(()=>store.pendingRequests[props.event.id+':'+store.state.role+(props.taskId?':'+props.taskId:'')])
 watch(editableReports,list=>{if(!list.some(r=>r.id===targetReport.value))targetReport.value=list.at(-1)?.id||'';if(!list.length&&mode.value==='report')mode.value='chat'},{immediate:true})
 const input=ref(''),stream=ref(null),upload=ref(null),fileNotice=ref(''),following=ref(false)
+const speech=ref({listening:false,stopping:false,interim:'',error:''})
+const voice=createSpeechDraftInput({readDraft:()=>input.value,writeDraft:text=>input.value=text,disabled:()=>!!pending.value,onChange:state=>speech.value=state})
+watch(pending,value=>{if(value)voice.cancel()})
+onBeforeUnmount(()=>voice.dispose())
 function follow(){if(following.value&&stream.value)stream.value.scrollTo({top:stream.value.scrollHeight,behavior:'smooth'})}
-async function ask(text){if(!text.trim()||pending.value)return;submitError.value='';following.value=true;const selectedMode=mode.value;input.value='';try{await store.ask(props.event.id,text,{mode:selectedMode,reportId:targetReport.value,taskId:props.taskId,phaseId:props.phaseId})}catch(e){submitError.value=e.message;input.value=text}nextTick(follow)}
+async function ask(text){if(!text.trim()||pending.value)return;voice.cancel();submitError.value='';following.value=true;const selectedMode=mode.value;input.value='';try{await store.ask(props.event.id,text,{mode:selectedMode,reportId:targetReport.value,taskId:props.taskId,phaseId:props.phaseId})}catch(e){submitError.value=e.message;input.value=text}nextTick(follow)}
 function askFollowup(text){mode.value='chat';return ask(text)}
 function apply(messageId){submitError.value='';try{const report=store.applySupplement(props.event.id,messageId,props.taskId);emit('report',report.id)}catch(e){submitError.value=e.message}}
 watch(()=>[props.taskId,task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
 watch(()=>messages.value.length,(count,previous)=>{if(count>previous){following.value=true;nextTick(follow)}})
 watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.status]},()=>nextTick(follow))
-watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{following.value=false;input.value='';fileNotice.value='';mode.value='chat';submitError.value='';nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
+watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{voice.cancel();following.value=false;input.value='';fileNotice.value='';mode.value='chat';submitError.value='';nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
 async function attach(ev){const file=ev.target.files?.[0];if(!file)return;fileNotice.value='';try{if(file.size>2*1024*1024)throw Error('请选择不超过 2 MB 的文字记录。');input.value=await file.text();fileNotice.value='文件内容已加入会话草稿'}catch(e){fileNotice.value=e.message}ev.target.value=''}
 </script>
 
 <style scoped>
+.lc-composer footer .composer-voice{margin-left:auto}.lc-composer footer .composer-voice[aria-pressed=true]{background:#f9e9e5;color:#b55f51}.composer-voice-status,.composer-voice-error{display:block;margin-top:6px;font-size:11px;line-height:1.5;color:#7d8b9d;overflow-wrap:anywhere}.composer-voice-error{color:#b47546}
 .task-assistant-intro{margin:14px 0 10px;color:#687c8c;font-size:12px;line-height:1.75}.task-assistant-intro p{margin:0 0 5px}
 .lc-message>time{text-align:left!important}.lc-conversation .lc-message :deep(.assistant-basis-content){background:transparent}
 
