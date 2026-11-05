@@ -1,3 +1,4 @@
+import {analyzeManualAnomaly} from './manual-anomaly.mjs'
 import {capabilities} from '../src/workflow/lifecyclePermissions.js'
 import {taskExecution,carryForwardSteps} from '../src/workflow/taskExecution.js'
 import {join} from 'node:path'
@@ -40,6 +41,13 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    if(planning&&(input.role!=='captain'||!input.event||!Array.isArray(input.event.tasks)||!dispatchAction(input.event)||input.plan?.action!==dispatchAction(input.event)))return send(400,{error:'当前阶段或身份不能修改待派任务。'})
    if(revision&&(!capabilities[input.role]?.execute||!report?.id||!report.taskId||!['排查报告','维修报告','维保作业报告'].includes(report.kind)||report.eventId!==input.event?.id||report.owner!==input.actor||input.event?.phase==='closed'))return send(400,{error:'只能补充本人已提交且尚未闭环的排查或作业报告。'})
    busy++;counted=true
+   if(input.mode==='manual-anomaly'){
+    streaming=input.stream===true
+    if(streaming){res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache');res.flushHeaders?.()}
+    const controller=new AbortController(),disconnect=()=>{if(!res.writableEnded)controller.abort()}
+    res.on?.('close',disconnect)
+    try{const output=await analyzeManualAnomaly(input,{configuration,knowledge,fetcher,emit:streaming?emit:()=>{},signal:controller.signal});if(streaming){emit('done',output);return res.end()}return send(200,output)}finally{res.off?.('close',disconnect)}
+   }
    if(input.stream===true){
     streaming=true;res.statusCode=200
     res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('X-Accel-Buffering','no');res.flushHeaders?.()
@@ -52,7 +60,7 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    if(streaming)emit('progress',{stage:'retrieval',label:situation?'正在整理航行阶段与运行参数':config.knowledgeEnabled&&!polishing?'正在检索本地知识库':'正在整理已提交的事件资料'})
    const sources=config.knowledgeEnabled&&!polishing&&!situation?await knowledge.search(planning||generating?[input.event.title,generating?submittedTask.summary:input.event.reports?.at(-1)?.summary,text].filter(Boolean).join(' '):text):[]
    if(streaming){emit('meta',{sources});emit('progress',{stage:'evidence',label:`已整理事件资料${sources.length?'，检索到 '+sources.length+' 处参考资料':''}`,summary:input.event?.reports?.at(-1)?.summary?'最近报告：'+input.event.reports.at(-1).summary.slice(0,300):input.event?.brief?.discovery?.text||'将依据本次问题生成回答。'})}
-   const data={question:text,event:input.event?{title:input.event.title,tracking:input.event.tracking,phase:input.event.phase,status:input.event.status,currentResponsibility:input.event.currentResponsibility,phases:input.event.phases,selectedHistoricalRound:input.event.selectedHistoricalRound,decisions:input.event.decisions,observationPlan:input.event.observationPlan,number:input.event.number,brief:input.event.brief,submissionContext:input.event.submissionContext,reports:input.event.reports?.map(r=>({id:r.id,taskId:r.taskId,title:r.title,at:r.at,submissionNumber:r.submissionNumber,kind:r.kind,summary:r.summary,submissionSnapshot:r.submissionSnapshot,revisions:r.revisions,...(planning?{markdown:r.markdown}: {})})),tasks:input.event.tasks,...(input.event.taskContext?{taskContext:input.event.taskContext}:{})}:null,history:(input.history||[]).slice(-8),knowledge:sources.map(({id,file,title,startLine,endLine,text})=>({id,file,title,startLine,endLine,text})),...(revision?{report:{kind:report.kind,owner:report.owner,summary:report.summary,markdown:report.markdown}}: {}),...(planning?{pendingTask:input.plan,decision:dispatchAction(input.event),observations:input.observations}: {})}
+   const data={question:text,event:input.event?{title:input.event.title,tracking:input.event.tracking,phase:input.event.phase,status:input.event.status,currentResponsibility:input.event.currentResponsibility,phases:input.event.phases,selectedHistoricalRound:input.event.selectedHistoricalRound,decisions:input.event.decisions,observationPlan:input.event.observationPlan,number:input.event.number,brief:input.event.brief,manualReport:input.event.manualReport,submissionContext:input.event.submissionContext,reports:input.event.reports?.map(r=>({id:r.id,taskId:r.taskId,title:r.title,at:r.at,submissionNumber:r.submissionNumber,kind:r.kind,summary:r.summary,submissionSnapshot:r.submissionSnapshot,revisions:r.revisions,...(planning?{markdown:r.markdown}: {})})),tasks:input.event.tasks,...(input.event.taskContext?{taskContext:input.event.taskContext}:{})}:null,history:(input.history||[]).slice(-8),knowledge:sources.map(({id,file,title,startLine,endLine,text})=>({id,file,title,startLine,endLine,text})),...(revision?{report:{kind:report.kind,owner:report.owner,summary:report.summary,markdown:report.markdown}}: {}),...(planning?{pendingTask:input.plan,decision:dispatchAction(input.event),observations:input.observations}: {})}
    if(situation){data.event=null;data.situation=input.situation}
    if(polishing){data.noteContext=String(input.noteContext||'').slice(0,300);data.event=null;data.history=[]}
    if(generating){const execution=taskExecution(submittedTask);data.executionFacts={已回交项目:execution.completed.map(({label,result,note})=>({项目:label,结果:result,备注:note})),无需执行项目:execution.notApplicable.map(({label,note})=>({项目:label,结果:'不适用',备注:note})),未执行项目:execution.outstanding.map(({label,result,reason})=>({项目:label,结果:result,原因:reason})),汇总受阻说明:execution.summaryBlocked?submittedTask.summary:'未登记'}}

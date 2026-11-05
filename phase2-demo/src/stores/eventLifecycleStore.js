@@ -1,3 +1,4 @@
+import {validateAnomalyReport,reportEvidence,createManualAnomaly} from '../workflow/manualAnomaly.js'
 import {shoreReportEntries} from '../workflow/shoreReports.js'
 import {lifecycleModelContext} from '../workflow/lifecycleModelContext.js'
 import {capabilities,actor,ownsTask} from '../workflow/lifecyclePermissions.js'
@@ -47,6 +48,16 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
    lastStored=lifecycleSnapshot(incoming);state.timeBase=incoming.timeBase;state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
  })
+ const anomalyRequests=new Map()
+ function reportAnomaly(form,requestId,onProgress){
+  if(anomalyRequests.has(requestId))return anomalyRequests.get(requestId)
+  if(state.events['manual-'+requestId])return Promise.resolve(state.events['manual-'+requestId])
+  const report=validateAnomalyReport(form,state.role)
+  report.submittedAt=new Date().toISOString()
+  report.evidence=reportEvidence(report,sensors.recordedSensorChannels(report.sensorIds,Date.parse(report.start),Date.parse(report.end)))
+  const run=(async()=>{try{const result=await aiStreamRequest({mode:'manual-anomaly',text:report.description,role:report.submitter.role,report},onProgress||(()=>{}));return createManualAnomaly(state,report,result,requestId)}finally{anomalyRequests.delete(requestId)}})()
+  anomalyRequests.set(requestId,run);return run
+ }
  const shoreReports=computed(()=>shoreReportEntries(state))
  const events=computed(()=>visibleEvents(state)),pending=computed(()=>events.value.filter(pendingDecision)),tasks=computed(()=>events.value.filter(e=>activeTask(e))),reports=computed(()=>events.value.flatMap(e=>e.reports.filter(r=>!r.linkedSource)).sort((a,b)=>b.at.localeCompare(a.at)))
  const workItems=computed(()=>lifecycleWorkItems(state)),notifications=computed(()=>lifecycleNotifications(state))
@@ -155,5 +166,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.[state.role]:event?.conversations[state.role])?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
  async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
- return {resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
+ return {reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

@@ -14,6 +14,7 @@ const names=rows=>rows.slice(0,2).map(r=>r.label).join('、')+(rows.length>2?`�
 // Text selection only. Available decisions and workflow transitions stay unchanged.
 export function taskRecommendation(event,task){
  const subject=eventSubject(event),execution=taskExecution(task),rows=task?.records||[]
+ if(!task&&event.manualReport)return {reason:event.title+'待核实',next:event.manualReport.analysis.recommendation}
  if(!task)return {reason:subject.name+'待核实',next:subject.check+'。'}
  if(execution.incomplete)return {reason:(names(execution.outstanding.slice(0,1))||subject.name+'作业')+'尚未完成',shortNext:execution.summaryBlocked?'先落实缺少的作业条件。':'先补做未完成项目并回交结果。',next:execution.summaryBlocked?'先落实记录中尚缺的作业条件，再完成剩余项目。':'先补做'+(names(execution.outstanding)||'本轮未完成项目')+'并回交结果。'}
  if(task.kind!=='investigation')return {reason:subject.name+'处理记录已回交',shortNext:'核对复测结果并安排效果观察。',next:'核对'+subject.retest+'，安排效果观察。'}

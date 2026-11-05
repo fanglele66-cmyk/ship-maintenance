@@ -13,7 +13,7 @@ export function ensurePlanDraft(event,seed){
  if(!action)return null
  const key=taskPlanKey(event)
  if(event.pendingPlan?.key===key&&event.pendingPlan.action===action)return event.pendingPlan
- const needsModel=(action==='investigate'&&event.phase!=='reminder')||action==='recheck'
+ const needsModel=(action==='investigate'&&event.phase!=='reminder')||action==='recheck'||(!!event.manualReport&&action==='repair')
  const savedScope=event.decisionDraft?.action===action?event.decisionDraft.reason?.trim():''
  const preset=action==='recheck'
  event.pendingPlan={key,action,version:0,status:needsModel?'pending':'ready',source:preset?'preset':needsModel?'':'existing',scope:needsModel&&!preset?'':savedScope||seed.scope,rationale:seed.rationale,steps:needsModel&&!preset?[]:seed.steps,procedureVersion:seed.procedureVersion,sourceReportId:event.reports.at(-1)?.id||null,usage:null,sources:[],error:''}

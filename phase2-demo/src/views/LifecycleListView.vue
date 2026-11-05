@@ -10,6 +10,7 @@
     <label>事件类型<FormSelect v-model="type" :options="typeOptions" placeholder="" aria-label="事件类型"/></label>
     <label>事件状态<FormSelect v-model="status" :options="eventStatusOptions" placeholder="" aria-label="事件状态"/></label>
     <button v-if="hasFilters" class="clear-filters" @click="clearFilters">清除筛选</button>
+    <button class="report-anomaly-button" type="button" @click="reportDialog.open()">＋ 异常上报</button>
    </IssueFilterToolbar>
    <div  class="issues-scroll">
     <p class="result-count">共 {{ filtered.length }} 项<span>已闭环事件及完整处置记录保留在这里。</span></p>
@@ -21,7 +22,7 @@
       <dl class="event-progress">
        <div><dt>事件状态</dt><dd :class="{closed:item.eventState==='已闭环'}">{{item.eventState}}</dd></div>
        <div v-if="item.stage"><dt>当前记录</dt><dd>{{item.stage}}</dd></div>
-       <div v-if="item.taskOwner"><dt>负责人</dt><dd>{{item.taskOwner}}</dd></div>
+       <div v-if="item.submitter"><dt>提交人</dt><dd>{{item.submitter.name}}</dd></div><div v-if="item.taskOwner"><dt>负责人</dt><dd>{{item.taskOwner}}</dd></div>
       </dl>
       <p class="progress-note">{{item.reference?'核实、复核与闭环签认过程可回查':item.progressNote}}</p>
       <p v-if="item.continuation" class="continuation">{{item.continuation}}</p>
@@ -35,9 +36,11 @@
     <p v-if="filtered.length" class="list-end">已显示全部符合条件的事件</p>
    </div>
   </section>
+  <ManualAnomalyDialog ref="reportDialog" @submitted="submitted"/>
  </main>
 </template>
 <script setup>
+import ManualAnomalyDialog from '../components/ManualAnomalyDialog.vue'
 import {eventState,eventStates,currentResponsibility} from '../workflow/lifecyclePresentation.js'
 import {computed,ref} from 'vue'
 import {useRouter} from 'vue-router'
@@ -46,6 +49,8 @@ import {historicalDecisions} from '../mock/fourStoryWorkflow'
 import {currentTask,activeTask,timeText,stageNames} from '../workflow/eventLifecycle'
 import FormSelect from '../components/forms/FormSelect.vue'
 import IssueFilterToolbar from '../components/IssueFilterToolbar.vue'
+const reportDialog=ref(null)
+function submitted(event){clearFilters();open(event)}
 const store=useEventLifecycleStore(),router=useRouter(),device=ref(''),type=ref(''),status=ref('')
 const history=historicalDecisions.filter(e=>!e.parentIssueId).map(e=>({...e,rank:1,summary:e.reason,eventState:'已闭环',firstObserved:e.at,reference:true}))
 const rows=computed(()=>[...store.events.map(e=>({...e,rank:['报警事件','预警事件','异动跟踪','效果观察'].indexOf(e.type),summary:currentResponsibility(e).detail,eventState:eventState(e),stage:stageNames[e.phase],taskOwner:currentResponsibility(e).owner,progressNote:e.tasks.length?e.tasks.length+' 项关联任务 · '+e.tasks.filter(t=>t.status==='submitted').length+' 项已提交':'尚未建立人工执行任务',firstObserved:timeText(e.brief.discovery.at),actionTaskId:activeTask(e)?.id,continuation:e.phases.at(-1)?.observationWaiting?'观察中，按计划到期汇报。':['decision','review'].includes(e.phase)?'报告已回交，待审阅。':''})),...(store.state.role==='captain'?history:[])])
@@ -59,6 +64,7 @@ function open(e){router.push({path:'/situation/issue/'+e.id,query:{from:'issues'
 function openTask(e){router.push({path:'/tasks/'+e.actionTaskId})}
 </script>
 <style scoped>
+.report-anomaly-button{margin-left:auto;border:1px solid #34362e;border-radius:6px;padding:9px 16px;background:#30322a;color:white;font:inherit;font-size:13px;cursor:pointer}.report-anomaly-button:hover{background:#46483c}
 .issues-page{height:100%;width:100%;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;padding:22px 24px 16px;background:#f3f5f8;box-sizing:border-box;overflow:hidden}
 .issues-page-head{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:0 0 20px;flex-shrink:0}.issues-page-head h2{font-size:var(--wb-title);font-weight:600;margin:0 0 7px;color:#202020}.issues-page-head p{font-size:var(--wb-body);margin:0;color:#778397}.directory-count{display:flex;align-items:baseline;gap:7px;font-size:var(--wb-body);color:#718094;white-space:nowrap}.directory-count strong{color:#263951;font-size:calc(var(--wb-title) + 4px);font-weight:600}.directory-count i{height:14px;width:1px;background:#d4dce6;margin:0 7px}
 .issues-browser{width:100%;background:#fff;border:1px solid #e6ebf2;border-radius:8px;flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}.clear-filters{border:0;background:none;color:#386eae;font:inherit;font-size:var(--wb-body);cursor:pointer;padding:6px 0}.issues-scroll{padding:0 22px;overflow:auto;flex:1;min-height:0;min-width:0;scrollbar-gutter:stable}.result-count{display:flex;justify-content:space-between;gap:20px;color:#52647b;font-size:var(--wb-body);margin:18px 0}.result-count span{color:#8a94a5;font-size:var(--wb-label)}

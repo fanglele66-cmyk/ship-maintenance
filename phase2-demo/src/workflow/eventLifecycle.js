@@ -79,7 +79,7 @@ export const decisionOptions=lifecycleDecisionOptions
 export function ensureTaskPlan(event){
  const action=dispatchAction(event);if(!action)return null
  const report=event.reports.at(-1),prior=currentTask(event)||event.observationSource?.task
- const steps=action==='investigate'?shiftTimelineContent(checkSteps(event.sourceEventId||event.id),event.timeline):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
+ const steps=action==='investigate'?shiftTimelineContent(event.manualReport?copy(event.manualReport.analysis.steps):checkSteps(event.sourceEventId||event.id),event.timeline):action==='maintenance'?maintenancePlan(event):action==='repair'?proposedPlan(event):presetRecheckSteps(event)
  const scope=action==='recheck'?`依据${report?.title||'本轮报告'}，${isVerificationReview(event)?'核对已查范围、观察中变化是否持续、扩大、恢复或复发；本轮未实施维修，不预设故障原因':'复核实际维修措施、剩余事项、修后数据和原异常是否再现'}，提交现场复查结果。`:action==='investigate'?event.brief.dispatchReason:`依据${report?.title||'现场记录'}，处理本轮登记的异常：${prior?.records.filter(r=>/发现异常|读数不一致|偏离仍存在/.test(r.result)).map(r=>r.label).join('、')||'已批准部位'}。保留实际措施、隔离与复测记录。`
  const draft=ensurePlanDraft(event,{steps,scope,procedureVersion:repairProcedureVersion,rationale:report?`依据《${report.title}》：${report.summary}`:event.brief.conclusion})
  if(action==='maintenance'){

@@ -8,6 +8,7 @@ export function responsibilitySummary(event,state,task){
  if(state==='观察中')return `${subject.name}观察中；跟踪原异常信号至${clock(event.observationPlan?.dueAt||phase?.observationDueAt)}。`
  if(['reporting','report-error'].includes(task?.status))return `${subject.name}现场记录已提交；${task.status==='report-error'?'重试生成本轮报告':'等待本轮报告生成'}。`
  if(state==='待决策'){
+  if(!task&&event.manualReport&&event.phase==='reminder')return event.manualReport.analysis.summary
   if(event.type==='效果观察'){
    const report=event.reports?.findLast(r=>r.kind==='观察报告')
    return report?.responsibility||`${subject.name}观察结果已回交；核对原异常信号与本轮可比工况。`
