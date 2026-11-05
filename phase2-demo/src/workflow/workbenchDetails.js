@@ -1,5 +1,14 @@
 import {pendingDecision,taskName,timeText} from './eventLifecycle.js'
 import {taskLocation,taskTitle} from './lifecycleWorkItems.js'
+import {lifecycleDecisionOptions} from './lifecycleDecisions.js'
+
+export function currentDecisionPrompt(event){
+ const choices=lifecycleDecisionOptions(event).filter(o=>o.value!=='shore')
+ if(event.phase==='reminder')return '当前需决定：是否安排本轮现场核实/排查'
+ if(!choices.length)return '当前需决定：是否上报岸端协调支持'
+ const descriptions={investigate:'继续现场核实/排查',recheck:'安排复查',repair:'安排维修',maintenance:'提前安排维保',observe:'转入效果观察',close:'闭环归档',false:'确认误报',resume:'恢复原任务',wait:'保留任务等待条件',terminate:'终止未执行部分'}
+ return '当前需决定：'+choices.map(o=>o.value==='repair'&&/剩余/.test(o.label)?'派发剩余维修':descriptions[o.value]||o.label).join('、')
+}
 
 export function decisionStage(event){
  const phase=event.phases.at(-1),task=event.tasks.find(t=>t.id===event.currentTask)
@@ -13,7 +22,7 @@ export function decisionStage(event){
 export function workbenchDetails(event,item){
  const task=event.tasks.find(t=>t.id===(item.taskId||event.currentTask)),phase=event.phases.at(-1)
  if(phase?.observationWaiting)return ['系统持续观测',phase.observationDueAt?'计划汇报 '+timeText(phase.observationDueAt):'按计划汇报']
- if(item.kind==='decision')return [task?.submittedAt?`${task.owner}已回交${taskName(task)}报告`:phase?.observationReview?'观察报告已生成':'轮机长审阅并安排下一步',task?.status==='reporting'?'AI 分析生成中':task?.status==='report-error'?'AI 分析待重试':''].filter(Boolean)
+ if(item.kind==='decision')return [currentDecisionPrompt(event),task?.submittedAt?`${task.owner}已回交${taskName(task)}报告`:phase?.observationReview?'观察报告已生成':'',task?.status==='reporting'?'AI 分析生成中':task?.status==='report-error'?'AI 分析待重试':''].filter(Boolean)
  if(!task)return []
  const formal=Boolean(task.submittedAt)&&task.status!=='assigned'
  const count=(formal?task.records:task.draft?.records||[]).filter(r=>r.result).length

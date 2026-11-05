@@ -1,24 +1,37 @@
 import {mockSensors} from '../mock/sensors.js'
+import {mockDevices} from '../mock/devices.js'
+import {buildSimulationSensors} from '../mock/sensorSimulation.js'
 import {people} from './lifecyclePermissions.js'
 import {normalizeTaskPlan} from './taskPlanning.js'
 
-export const reportDevices=[...new Map(mockSensors.map(s=>[s.deviceId,{id:s.deviceId,name:s.device}])).values()]
-export const reportSensors=deviceId=>mockSensors.filter(s=>s.deviceId===deviceId)
+// Use the same definitions as sensorStore.allSensors / the situation device page.
+// This includes numbered-cylinder, common-rail, control-air and auxiliary points.
+export const reportDevices=mockDevices.filter(d=>buildSimulationSensors(mockSensors).some(s=>s.deviceId===d.id)).map(({id,name})=>({id,name}))
+export const reportSensors=deviceId=>buildSimulationSensors(mockSensors).filter(s=>s.deviceId===deviceId)
+export const reportSensorsForSystems=(deviceId,systems=[])=>reportSensors(deviceId).filter(s=>!systems.length||systems.includes(s.subsystem))
 const copy=value=>JSON.parse(JSON.stringify(value))
 const instant=value=>Date.parse(/T\d{2}:\d{2}$/.test(String(value))?value+':00+08:00':value)
 export function validateAnomalyReport(form,role,now=Date.now()){
  if(!people[role])throw Error('当前身份不能上报异常。')
  const device=reportDevices.find(d=>d.id===form?.deviceId)
  if(!device)throw Error('请选择设备。')
- const ids=[...new Set(form.sensorIds||[])],catalog=reportSensors(device.id)
- if(!ids.length||ids.length>20||ids.some(id=>!catalog.some(s=>s.id===id)))throw Error('请选择该设备的 1—20 个传感器。')
+ const catalog=reportSensors(device.id),systems=Array.isArray(form.systems)?form.systems:[]
+ if(systems.some(name=>!catalog.some(s=>s.subsystem===name)))throw Error('请选择该设备的有效系统。')
+ if(form.selectionMode==='selected'&&!systems.length)throw Error('请先选择关联传感器所属系统。')
+ // Automatic association is no longer accepted for a new request. Only a
+ // normalized legacy snapshot can retain its existing explicit sensor IDs.
+ const ids=[...new Set(Array.isArray(form.sensorIds)?form.sensorIds:[])]
+ if(form.selectionMode==='system'&&(!ids.length||!Array.isArray(form.sensors)||form.sensors.length!==ids.length||ids.some(id=>!form.sensors.some(sensor=>sensor?.id===id))))throw Error('请在所选系统内明确选择测点，不能自动关联整个系统。')
+ if(form.selectionMode&&!['selected','system'].includes(form.selectionMode))throw Error('请在所选系统内明确选择测点。')
+ if(!ids.length||ids.some(id=>!catalog.some(s=>s.id===id)))throw Error('请在该设备的系统内选择至少一个传感器。')
+ if(systems.length&&ids.some(id=>!catalog.some(s=>s.id===id&&systems.includes(s.subsystem))))throw Error('所选传感器不属于当前设备的所选系统，请重新选择。')
  const start=instant(form.start),end=instant(form.end)
  if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end)throw Error('请选择完整时间段，结束时间须晚于开始时间。')
  if(end>now+60000)throw Error('异常时间不能晚于当前时间。')
  const description=typeof form.description==='string'?form.description.trim():''
  if(description.length<5||description.length>3000)throw Error('请填写 5—3000 字的异常描述。')
  const sensors=ids.map(id=>{const s=catalog.find(s=>s.id===id);return {id,name:s.nameCn,unit:s.unit,subsystem:s.subsystem}})
- return {deviceId:device.id,device:device.name,systems:[...new Set(sensors.map(s=>s.subsystem))],sensorIds:ids,sensors,start:new Date(start).toISOString(),end:new Date(end).toISOString(),description,submitter:{role,name:people[role]}}
+ return {deviceId:device.id,device:device.name,systems:[...new Set(sensors.map(s=>s.subsystem))],...(['selected','system'].includes(form.selectionMode)?{selectionMode:form.selectionMode}:{}),sensorIds:ids,sensors,start:new Date(start).toISOString(),end:new Date(end).toISOString(),description,submitter:{role,name:people[role]}}
 }
 export function normalizeAnomalyAnalysis(value){
  const text=(key,max)=>{if(typeof value?.[key]!=='string'||!value[key].trim()||value[key].length>max)throw Error('AI 分析结果不完整，请重试。');return value[key].trim()}

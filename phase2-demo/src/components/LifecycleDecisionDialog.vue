@@ -31,7 +31,7 @@ function open(selected,sourceShoreId){
  nextTick(()=>!dialog.value?.open&&dialog.value?.showModal())
 }
 function showReport(id){archive.value=props.event.shore.find(s=>s.id===id);visible.value=true;nextTick(()=>!dialog.value?.open&&dialog.value?.showModal())}
-function close(){dialog.value?.close();visible.value=false;if(props.event.decisionDraft){delete props.event.decisionDraft.closureDraft;delete props.event.decisionDraft.observationPlan;props.event.decisionDraft.action=''}}
+function close(){dialog.value?.close();visible.value=false;if(props.event.decisionDraft?.action==='shore')props.event.decisionDraft.action=''}
 function outside(e){if(e.target===dialog.value){const r=dialog.value.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}}
 function showPlan(action){close();emit('plan',action)}
 function submitted(action){close();emit('submitted',action)}

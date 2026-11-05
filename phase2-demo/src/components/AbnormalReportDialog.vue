@@ -53,38 +53,7 @@
               </el-select>
             </div>
 
-            <div
-              class="report-field"
-              :class="{
-                'is-filled': form.sensorIds.length > 0,
-                'is-locked': !form.deviceId || !form.systems.length,
-                'is-context-locked': contextLocked
-              }"
-            >
-              <label>关联传感器</label>
-              <el-select
-                v-model="form.sensorIds"
-                multiple
-                collapse-tags
-                :max-collapse-tags="1"
-                collapse-tags-tooltip
-                filterable
-                :clearable="!contextLocked"
-                :disabled="!form.deviceId || !form.systems.length || contextLocked"
-                popper-class="report-select-popper report-sensor-popper"
-                :placeholder="sensorPlaceholder"
-              >
-                <el-option
-                  v-for="sensor in sensorOptions"
-                  :key="sensor.id"
-                  :label="`${sensor.nameCn}（${sensor.nameEn}）`"
-                  :value="sensor.id"
-                >
-                  <span class="report-option-main">{{ sensor.nameCn }}</span>
-                  <span class="report-option-meta">{{ sensor.nameEn }} · {{ sensor.value }}{{ sensor.unit }}</span>
-                </el-option>
-              </el-select>
-            </div>
+            <div class="report-field report-field-wide"><label>关联传感器</label><el-select v-model="form.sensorIds" multiple collapse-tags :max-collapse-tags="2" collapse-tags-tooltip filterable :clearable="!contextLocked" :disabled="!form.systems.length || contextLocked" aria-label="选择关联传感器" popper-class="report-select-popper report-sensor-popper" :placeholder="form.systems.length?'请选择本次异常涉及的测点':'请先选择系统'"><el-option v-for="sensor in sensorOptions" :key="sensor.id" :label="sensor.nameCn + '（' + sensor.nameEn + '）'" :value="sensor.id"><span class="report-option-main">{{sensor.nameCn}}</span><span class="report-option-meta">{{sensor.nameEn}} · {{sensor.unit}}</span></el-option></el-select></div>
 
             <div class="report-field" :class="{ 'is-filled': form.timeRange?.length === 2 }">
               <label>异常时间段</label>
@@ -100,7 +69,7 @@
             </div>
 
             <div v-if="contextLocked" class="report-context-note">
-              设备、系统和传感器已从趋势图关联，不可修改
+              设备、系统及测点已从当前趋势关联
             </div>
 
             <div class="report-field report-field-wide">
@@ -124,19 +93,7 @@
               </div>
             </div>
 
-            <div class="report-field report-field-wide">
-              <label>图片</label>
-              <el-upload
-                v-model:file-list="form.images"
-                class="report-upload"
-                action="#"
-                list-type="picture-card"
-                :auto-upload="false"
-                :limit="4"
-              >
-                <span class="report-upload-plus">＋</span>
-              </el-upload>
-            </div>
+
           </div>
 
           <footer class="report-dialog-footer">
@@ -152,7 +109,7 @@
           >
             <div class="report-device-confirm">
               <h3 id="device-change-confirm-title">更换设备？</h3>
-              <p>切换设备后，需要重新选择系统和传感器。其他已填写内容会保留。</p>
+              <p>切换设备后，重新选择系统和相关测点。其他已填写内容会保留。</p>
               <div class="report-device-confirm-actions">
                 <button type="button" class="report-confirm-cancel" @click="cancelDeviceChange">取消</button>
                 <button type="button" class="report-confirm-submit" @click="confirmDeviceChange">确定更换</button>
@@ -168,10 +125,9 @@
 <script setup>
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/date-picker/style/css'
-import 'element-plus/es/components/upload/style/css'
 import 'element-plus/es/components/message/style/css'
 import { computed, reactive, ref, watch, onBeforeUnmount } from 'vue'
-import { ElMessage, ElSelect, ElOption, ElDatePicker, ElUpload } from 'element-plus'
+import { ElMessage, ElSelect, ElOption, ElDatePicker } from 'element-plus'
 import { useDeviceStore } from '@/stores/deviceStore'
 import { useSensorStore } from '@/stores/sensorStore'
 
@@ -212,13 +168,8 @@ const systemOptions = computed(() => {
 const sensorOptions = computed(() => {
   if (!form.systems.length) return []
   return sensorsForDevice.value.filter(sensor => (
-    form.systems.includes(sensor.subsystem) || form.systems.includes(sensor.system)
+    form.systems.includes(sensor.subsystem || sensor.system)
   ))
-})
-const sensorPlaceholder = computed(() => {
-  if (!form.deviceId) return '请先选择设备'
-  if (!form.systems.length) return '请先选择系统'
-  return '请选择传感器（可多选）'
 })
 const canSubmit = computed(() => form.deviceId && form.systems.length && form.sensorIds.length && form.timeRange?.length === 2)
 
@@ -271,7 +222,7 @@ function confirmDeviceChange() {
 
 function handleSystemChange() {
   if (props.contextLocked) return
-  form.sensorIds = sensorOptions.value.map(sensor => sensor.id)
+  form.sensorIds = form.sensorIds.filter(id => sensorOptions.value.some(sensor => sensor.id === id))
 }
 
 function stopVoiceDescription() {
@@ -352,6 +303,8 @@ onBeforeUnmount(stopVoiceDescription)
 </script>
 
 <style scoped>
+.sensor-auto-summary{color:#80909c;font-size:12px}.sensor-auto-summary summary{cursor:pointer}.sensor-auto-summary p{margin:8px 0;line-height:1.7}
+
 .report-dialog-mask {
   position: fixed;
   inset: 0;

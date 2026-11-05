@@ -4,8 +4,8 @@
   <details v-if="task.feedbackHistory?.length" class="lc-procedure-history"><summary>前次提交记录</summary><section v-for="(history,i) in task.feedbackHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
   <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :disabled="submitting" :class="{active:index===i,complete:task.draft.records[i].result}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{step.short||step.label}}</button></nav>
   <form v-if="step" class="lc-step-editor" @submit.prevent="next">
-   <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :number="index+1" :step="step" :compact="repair"/><RecordGuidance v-if="!step.substeps?.length" :text="step.recordHint"/></div>
-   <div class="lc-task-feedback"><fieldset><legend>{{task.kind==='investigation'?'检查结果':'作业反馈'}}</legend><label v-for="option in step.options" :key="option" :class="{selected:record.result===option}"><input type="radio" :name="task.id+'-'+index" v-model="record.result" :value="option" required/>{{option}}</label></fieldset>
+   <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :event="event" :task="task" :number="index+1" :step="step" :compact="repair" :paginate="repair"/><RecordGuidance v-if="!repair&&!step.substeps?.length" :text="step.recordHint"/></div>
+   <div class="lc-task-feedback"><fieldset><legend>{{task.kind==='investigation'?'检查结果':'作业反馈'}}<small v-if="step.substeps?.length">（本步骤共 {{step.substeps.length}} 个子项）</small></legend><label v-for="option in step.options" :key="option" :class="{selected:record.result===option}"><input type="radio" :name="task.id+'-'+index" v-model="record.result" :value="option" required/>{{option}}</label></fieldset>
    <label v-if="/无法确认|受限/.test(record.result||'')" class="execution-confirmation">本步骤实际执行情况<select v-model="record.executionStatus" required><option value="">请选择</option><option>已完成</option><option>未完成</option></select><small>已完成检查但原因未明，与检查尚未实施分别记录。</small></label><LifecycleNoteEditor :key="task.id+'-'+index" v-model="record.note" :rows="repair?2:3" :context="step.label" :placeholder="'记录本步骤的部位、读数、实际措施或未完成原因。'"/></div>
    <details v-if="lastStep" class="lc-final-supplement" :open="!!task.draft.summary"><summary>补充结论（选填）</summary><LifecycleNoteEditor :key="task.id+'-summary'" v-model="task.draft.summary" :rows="3" :context="task.title" placeholder="补充逐项记录中未涵盖的结论或待核实事项。"/></details>
    <p v-if="lastStep&&task.draft.attachments.length" class="lc-muted">已关联：{{task.draft.attachments.map(a=>a.name).join('、')}}</p>
@@ -21,7 +21,7 @@ import RecordGuidance from './RecordGuidance.vue'
 import LifecycleNoteEditor from './LifecycleNoteEditor.vue'
 import {taskName} from '../workflow/lifecycleDecisions'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
-const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}}),emit=defineEmits(['submitted']),store=useEventLifecycleStore(),error=ref(''),submitting=ref(false)
+const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}}),emit=defineEmits(['submitting','submitted']),store=useEventLifecycleStore(),error=ref(''),submitting=ref(false)
 const index=computed({get:()=>Math.max(0,Math.min(props.task.draft.stepIndex||0,props.task.steps.length-1)),set:value=>props.task.draft.stepIndex=value})
 const step=computed(()=>props.task.steps[index.value]),record=computed(()=>props.task.draft.records[index.value])
 const lastStep=computed(()=>index.value===props.task.steps.length-1)
@@ -34,7 +34,7 @@ async function next(){
  if(!lastStep.value){go(index.value+1);return}
  const missing=props.task.draft.records.findIndex((r,i)=>!props.task.steps[i].options.includes(r.result)||(/无法确认|受限/.test(r.result)&&!['已完成','未完成'].includes(r.executionStatus)))
  if(missing>=0){go(missing);error.value='请补齐本步骤的实际结果和执行情况。';return}
- submitting.value=true;error.value=''
+ submitting.value=true;error.value='';emit('submitting')
  try{await store.submit(props.event.id,props.task.id);emit('submitted')}catch(e){error.value=e.message}finally{submitting.value=false}
 }
 </script>
@@ -49,4 +49,10 @@ async function next(){
 <style scoped>
 .lc-task-feedback{display:flex;flex-direction:column;gap:8px;grid-column:1/-1}.lc-task-feedback fieldset{flex:none}.lc-task-feedback legend{margin-bottom:6px}.lc-task-feedback fieldset label{margin-bottom:2px}.lc-task-feedback :deep(.note-editor){gap:6px}.lc-repair-wizard .lc-task-feedback :deep(textarea){min-height:92px;height:92px;padding-bottom:38px}.lc-repair-wizard .lc-step-editor{gap:8px}.lc-repair-wizard .lc-step-instructions :deep(.record-guidance){margin:5px 0}.lc-repair-wizard .lc-step-instructions :deep(.instruction-list){margin:4px 0}.lc-repair-wizard .lc-step-instructions :deep(.instruction-list>li){padding:1px 0!important}
 @media(min-width:1101px){.lc-repair-wizard .lc-task-feedback{display:flex;flex-direction:column;gap:14px;align-items:stretch}.lc-repair-wizard .lc-step-editor :deep(.note-input textarea){font-size:13px}}
+</style>
+
+<style scoped>
+.lc-task-feedback fieldset small{font-size:11px;color:#8b949c;font-weight:400}
+.lc-step-editor>footer{position:sticky;bottom:0;z-index:3;background:#fff;padding-bottom:8px;box-shadow:0 -5px 10px #ffffffed}
+@media(min-width:1101px){.lc-task-feedback{display:flex!important;flex-direction:column;align-items:stretch!important;gap:8px!important}.lc-task-feedback>fieldset{padding-top:3px}.lc-task-feedback :deep(textarea){height:80px!important;min-height:80px!important}.lc-task-feedback .execution-confirmation{grid-column:1/-1}.lc-step-editor{gap:8px!important}.lc-final-supplement{margin:0}.lc-step-editor footer{padding-top:7px}}
 </style>

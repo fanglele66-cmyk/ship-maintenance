@@ -206,7 +206,7 @@ export function decide(state,id,form){
  form={...form,reason:form.reason?.trim()||''}
  if(!['investigate','repair','maintenance','recheck','observe'].includes(action)&&!(action==='shore'&&form.shoreIncludeHistory))required(form.reason,'请填写决定依据或本次安排。')
  validateDecisionEvidence(e,form)
- const observationPlan=action==='observe'?validateObservationPlan({...observationPlanDraft(e),...form.observationPlan,purpose:form.reason||'依据已提交报告，核对相关变化是否持续、恢复或复发。'}):null
+ const observationPlan=action==='observe'?validateObservationPlan({...observationPlanDraft(e),...form.observationPlan,purpose:form.reason||form.observationPlan?.purpose||'依据已提交报告，核对相关变化是否持续、恢复或复发。'}):null
  if(observationPlan&&!form.reason)form.reason=`安排效果观察，计划 ${timeText(observationPlan.dueAt)} 汇报。`
  const closure= ['close','false'].includes(action)?validateClosureDraft({...closureDraft(e),conclusion:form.reason.trim(),...Object.fromEntries(Object.entries(form.closureDraft||{}).filter(([,v])=>typeof v==='string'&&v.trim()))}):null
  if(['investigate','repair','maintenance','recheck'].includes(action)){

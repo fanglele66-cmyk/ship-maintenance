@@ -33,6 +33,7 @@ export function normalizeTaskPlan(value,action){
   return {label:text(step.label,'步骤标题',120),guide:text(step.guide,'步骤说明',1800),checks:step.checks.map(v=>text(v,'检查要求',1200)),recordHint:text(step.recordHint,'回交要求',grouped?16000:1200),options:[...options],...(grouped?{substeps:step.substeps.map(s=>normalizeStep(s,true))}:{})}
  }
  const steps=value.steps.map(s=>normalizeStep(s))
+ if(work&&steps.reduce((total,step)=>total+(step.substeps?.length||1),0)>12)throw Error('维修作业子项合计最多 12 项，请合并重复准备、隔离与复装要求后重新生成。')
  return {scope,rationale,steps:['repair','maintenance'].includes(action)?groupRepairSteps(steps).map(({sourceIndices,...step})=>step):steps}
 }
 export function acceptTaskPlan(event,expected,result){

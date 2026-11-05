@@ -9,6 +9,7 @@
    </article>
    <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>本轮报告待审阅。</p><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
+   <div v-if="introduction.length" class="task-assistant-intro"><p v-for="(sentence,i) in introduction" :key="i">{{sentence}}</p></div>
    <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
   <form class="lc-composer" @submit.prevent="ask(input)"><div v-if="editableReports.length||editablePlan" class="lc-chat-mode"><button v-if="editableReports.length" type="button" :aria-pressed="mode==='report'" @click="mode=mode==='report'?'chat':'report'">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="mode=mode==='plan'?'chat':'plan'">修改AI建议</button><select v-if="mode==='report'" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div><textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="mode==='plan'?'说明要增加、删除或调整的任务步骤，修改后在建议页签核对…':mode==='report'?'输入要补充的事实，生成修订稿后核对写入…':'询问依据、补充现场情况或后续安排…'" @keydown.enter.exact.prevent="ask(input)"/><footer><button type="button" aria-label="添加文件" @click="upload.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><small v-if="fileNotice">{{fileNotice}}</small><button type="submit" aria-label="发送" :disabled="pending||!input.trim()" :aria-busy="pending"><svg v-if="!pending" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></footer><input ref="upload" type="file" hidden accept=".txt,.md,.csv,.json" @change="attach"/></form>
@@ -23,8 +24,10 @@ import ModelReply from './ModelReply.vue'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {supplementaryReports} from '../workflow/reportRevisions'
 import {taskConversation} from '../workflow/lifecycleWorkItems'
+import {taskAssistantIntro} from '../workflow/taskAssistantIntro.js'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
+const introduction=computed(()=>props.taskId?taskAssistantIntro(props.event,task.value):[])
 const questions=computed(()=>props.taskId?['本次任务需要注意哪些事项？','这次记录还需要补充什么？']:props.event.phase==='closed'?['回顾本次处理过程']:captain.value?['这次决定的依据是什么？','下一步应如何安排？']:['还需要补充哪些排查依据？','维修范围如何确定？'])
 const inputEl=ref(null),editablePlan=computed(()=>!props.taskId&&captain.value&&suggestionAction(props.event)?props.event.pendingPlan:null)
 function editTask(){if(editablePlan.value?.status!=='ready')return;mode.value='plan';emit('plan');nextTick(()=>inputEl.value?.focus())}
@@ -33,7 +36,14 @@ function supplementReport(reportId){
  targetReport.value=reportId;mode.value='report'
  nextTick(()=>{inputEl.value?.scrollIntoView({block:'nearest'});inputEl.value?.focus({preventScroll:true})})
 }
-defineExpose({editTask,supplementReport})
+async function revealReport(){
+ following.value=false
+ await nextTick()
+ const message=[...messages.value].reverse().find(m=>m.generatedReport)
+ const article=message&&[...(stream.value?.querySelectorAll('[data-message-id]')||[])].find(el=>el.dataset.messageId===message.id)
+ article?.scrollIntoView({block:'start',behavior:'auto'})
+}
+defineExpose({editTask,supplementReport,revealReport})
 watch(editablePlan,plan=>{if(!plan&&mode.value==='plan')mode.value='chat'})
 const mode=ref('chat'),targetReport=ref(''),submitError=ref('')
 const editableReports=computed(()=>supplementaryReports(props.event,store.state.role).filter(r=>!props.taskId||r.taskId===props.taskId)),pending=computed(()=>store.pendingRequests[props.event.id+':'+store.state.role+(props.taskId?':'+props.taskId:'')])
@@ -43,6 +53,7 @@ function follow(){if(following.value&&stream.value)stream.value.scrollTo({top:st
 async function ask(text){if(!text.trim()||pending.value)return;submitError.value='';following.value=true;const selectedMode=mode.value;input.value='';try{await store.ask(props.event.id,text,{mode:selectedMode,reportId:targetReport.value,taskId:props.taskId,phaseId:props.phaseId})}catch(e){submitError.value=e.message;input.value=text}nextTick(follow)}
 function askFollowup(text){mode.value='chat';return ask(text)}
 function apply(messageId){submitError.value='';try{const report=store.applySupplement(props.event.id,messageId,props.taskId);emit('report',report.id)}catch(e){submitError.value=e.message}}
+watch(()=>[props.taskId,task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
 watch(()=>messages.value.length,(count,previous)=>{if(count>previous){following.value=true;nextTick(follow)}})
 watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.status]},()=>nextTick(follow))
 watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{following.value=false;input.value='';fileNotice.value='';mode.value='chat';submitError.value='';nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
@@ -50,6 +61,7 @@ async function attach(ev){const file=ev.target.files?.[0];if(!file)return;fileNo
 </script>
 
 <style scoped>
+.task-assistant-intro{margin:14px 0 10px;color:#687c8c;font-size:12px;line-height:1.75}.task-assistant-intro p{margin:0 0 5px}
 .lc-message>time{text-align:left!important}.lc-conversation .lc-message :deep(.assistant-basis-content){background:transparent}
 
 .lc-assistant>header{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}.lc-assistant>header small{grid-column:1/-1}.lc-assistant>header .assistant-collapse{justify-self:end;width:auto;padding:4px 8px;border:0;background:transparent;font-size:12px}
