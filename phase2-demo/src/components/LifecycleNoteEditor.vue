@@ -1,6 +1,6 @@
 <template>
  <div class="lc-step-note note-editor">
-  <div class="note-heading"><label :for="id">{{label}}</label><button v-if="assistMode" type="button" @click="$emit('assist')">✦ AI 协助</button><button v-else type="button" :disabled="busy||listening||!(sourceText||modelValue).trim()" @click="polish">✦ {{busy?'正在整理…':'AI 总结'}}</button></div>
+  <div class="note-heading"><label :for="id">{{label}}</label><button v-if="!assistMode" type="button" :disabled="busy||listening||!(sourceText||modelValue).trim()" @click="polish">✦ {{busy?'正在整理…':'AI 总结'}}</button></div>
   <div class="note-input"><textarea :id="id" :value="modelValue" @input="$emit('update:modelValue',$event.target.value)" :rows="rows" :required="required" :placeholder="placeholder"/>
    <button v-if="!assistMode" type="button" class="voice-button" :class="{listening}" :disabled="busy" :aria-pressed="listening" @click="voice"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>{{listening?'结束录音':'语音输入'}}</button>
   </div>

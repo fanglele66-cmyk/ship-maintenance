@@ -14,8 +14,9 @@
    </article>
    <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>本轮报告待审阅。</p><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
-   <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
+   <div v-if="!stepAvailable" class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
+  <AssistantQuestionCard v-if="decisionQuestion" :key="decisionQuestion.key" :title="decisionQuestion.title" :context="decisionQuestion.context" :choices="decisionQuestion.choices" :disabled="!!pending||readingFiles" @confirm="confirmQuestion" @custom="customQuestion"/>
   <form class="lc-composer" :class="{'step-focus':composerHighlight}" @submit.prevent="ask(input)">
    <div v-if="(!taskId&&editableReports.length)||editablePlan||(mode==='report'&&editableReports.length>1)" class="lc-chat-mode"><button v-if="!taskId&&editableReports.length" type="button" :aria-pressed="mode==='report'" @click="setMode(mode==='report'?'chat':'report')">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="setMode(mode==='plan'?'chat':'plan')">修改AI建议</button><select v-if="mode==='report'&&editableReports.length>1" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div>
    <textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="composerPlaceholder" @keydown.enter.exact.prevent="ask(input)"/>
@@ -41,18 +42,20 @@ import {currentTask,timeText} from '../workflow/eventLifecycle'
 import AssistantAdviceMessage from './messages/AssistantAdviceMessage.vue'
 import ModelReply from './ModelReply.vue'
 import StepNoteProposal from './StepNoteProposal.vue'
+import AssistantQuestionCard from './AssistantQuestionCard.vue'
 import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {supplementaryReports} from '../workflow/reportRevisions'
 import {taskConversation} from '../workflow/lifecycleWorkItems'
 import {taskAssistantIntro} from '../workflow/taskAssistantIntro.js'
 import {createSpeechDraftInput} from '../workflow/speechDraftInput.js'
 import {canUseStepAssist,STEP_ASSIST_LIMITS} from '../workflow/stepAssistContract.js'
-import {isStepAssistScriptInput} from '../workflow/stepAssistDemo.js'
+import {taskAssistantOpening} from '../workflow/taskAssistantOpening.js'
 import {prepareStepPhoto,stepPhotoBytes,isStepPhotoCopy} from '../workflow/stepPhotoUpload.js'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},activeStepIndex:{type:Number,default:0},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
 const isC2Task=computed(()=>!!props.taskId&&(props.event.sourceEventId||props.event.id)==='real-alarm-0430'&&['investigation','repair'].includes(task.value?.kind)),stepAvailable=computed(()=>!!props.taskId&&canUseStepAssist(props.event,task.value,store.state.role))
 const introduction=computed(()=>props.taskId?taskAssistantIntro(props.event,task.value):[])
+const opening=computed(()=>taskAssistantOpening(task.value))
 const questions=computed(()=>mode.value==='step'?['本步骤还需要核对哪些现场信息？','帮我根据已提供的情况整理本步骤备注。']:props.taskId?['本次任务需要注意哪些事项？','这次记录还需要补充什么？']:props.event.phase==='closed'?['回顾本次处理过程']:captain.value?['这次决定的依据是什么？','下一步应如何安排？']:['还需要补充哪些排查依据？','维修范围如何确定？'])
 const inputEl=ref(null),editablePlan=computed(()=>!props.taskId&&captain.value&&suggestionAction(props.event)?props.event.pendingPlan:null)
 function editTask(){if(editablePlan.value?.status!=='ready')return;setMode('plan');emit('plan');nextTick(()=>inputEl.value?.focus())}
@@ -77,6 +80,18 @@ const input=ref(''),stream=ref(null),upload=ref(null),photoUpload=ref(null),file
 const hasMessage=computed(()=>!!input.value.trim()||(mode.value==='step'&&(images.value.length>0||attachments.value.length>0)))
 const composerPlaceholder=computed(()=>mode.value==='step'?`描述第 ${stepIndex.value+1} 步现场情况，可添加照片；我会帮你核实信息、整理备注…`:mode.value==='plan'?'说明要增加、删除或调整的任务步骤，修改后在建议页签核对…':mode.value==='report'?'输入要补充的事实，生成修订稿后核对写入…':'询问依据、补充现场情况或后续安排…')
 const stepDrafts=new Map()
+const dismissedOpening=ref(false)
+const currentProposal=computed(()=>{
+ if(!stepAvailable.value||mode.value!=='step')return null
+ const latest=messages.value.findLast(message=>message.kind==='step-assist'&&message.stepIndex===props.activeStepIndex&&message.status==='complete'&&message.response?.kind==='draft')
+ return latest&&!latest.appliedAt&&!latest.supersededAt&&latest.id!==editingMessageId.value?latest:null
+})
+const decisionQuestion=computed(()=>{
+ if(!stepAvailable.value||pending.value)return null
+ if(currentProposal.value)return {key:currentProposal.value.id,title:'这份备注草稿怎么处理？',context:`第 ${props.activeStepIndex+1} 步`,choices:[{id:'apply',label:'采用到本步骤'},{id:'revise',label:'继续修改'}]}
+ if(opening.value&&!dismissedOpening.value&&!messages.value.some(message=>message.kind==='user'))return {key:`opening-${props.taskId}`,context:'先回答一个简单问题',...opening.value}
+ return null
+})
 let nonStepDraft='',highlightTimer,contextVersion=0
 const snapshot=()=>({text:input.value,images:images.value.map(photo=>({...photo})),attachments:attachments.value.map(file=>({...file})),editingMessageId:editingMessageId.value})
 function loadDraft(draft={}){input.value=draft.text||'';images.value=draft.images||[];attachments.value=draft.attachments||[];editingMessageId.value=draft.editingMessageId||''}
@@ -90,7 +105,7 @@ async function focusComposer(){
  inputEl.value?.scrollIntoView({block:'nearest'});inputEl.value?.focus({preventScroll:true})
  composerHighlight.value=true;highlightTimer=setTimeout(()=>{composerHighlight.value=false},1200)
 }
-function assistStep(index){
+function assistStep(index,focus=true){
  if(!stepAvailable.value||!Number.isInteger(index)||!task.value?.steps?.[index]){submitError.value='当前任务不能使用步骤协助。';return false}
  if(index!==props.activeStepIndex){submitError.value=`请先返回第 ${index+1} 步，再继续本步骤协助。`;return false}
  if(mode.value!=='step'||stepIndex.value!==index){
@@ -100,10 +115,20 @@ function assistStep(index){
   if(!saved&&previousMode!=='step')nonStepDraft=''
   stepIndex.value=index;mode.value='step'
  }
- submitError.value='';fileNotice.value='';void focusComposer();return true
+ submitError.value='';fileNotice.value='';if(focus)void focusComposer();return true
 }
 function reviseStep(message){if(assistStep(message.stepIndex))editingMessageId.value=message.id}
 function applyStepNote(messageId){submitError.value='';try{store.applyStepNote(props.event.id,props.taskId,messageId);following.value=true;nextTick(follow)}catch(error){submitError.value=error.message}}
+function confirmQuestion(choice){
+ if(pending.value||readingFiles.value)return
+ if(currentProposal.value){if(choice==='apply')applyStepNote(currentProposal.value.id);else if(choice==='revise')reviseStep(currentProposal.value);return}
+ const option=opening.value?.choices.find(item=>item.id===choice)
+ if(!option)return
+ // A prepared message or uploaded material remains in the composer until sent.
+ if(hasMessage.value){dismissedOpening.value=true;void focusComposer();return}
+ void ask(option.prompt)
+}
+function customQuestion(){if(currentProposal.value)reviseStep(currentProposal.value);else{dismissedOpening.value=true;void focusComposer()}}
 const speech=ref({listening:false,stopping:false,interim:'',error:''})
 const voice=createSpeechDraftInput({readDraft:()=>input.value,writeDraft:text=>input.value=text,disabled:()=>!!pending.value,onChange:state=>speech.value=state})
 watch(pending,value=>{if(value)voice.cancel()})
@@ -111,7 +136,7 @@ onBeforeUnmount(()=>{contextVersion++;voice.dispose();clearTimeout(highlightTime
 function follow(){if(following.value&&stream.value)stream.value.scrollTo({top:stream.value.scrollHeight,behavior:'smooth'})}
 async function ask(text){
  if(pending.value||readingFiles.value||(!text.trim()&&!(mode.value==='step'&&(images.value.length||attachments.value.length))))return
- if(mode.value==='chat'&&stepAvailable.value&&Number.isInteger(props.activeStepIndex)&&task.value?.steps?.[props.activeStepIndex]&&isStepAssistScriptInput({event:props.event,task:task.value,stepIndex:props.activeStepIndex,text})){
+ if(mode.value==='chat'&&stepAvailable.value&&Number.isInteger(props.activeStepIndex)&&task.value?.steps?.[props.activeStepIndex]){
   // Route the visible draft, without restoring another cached step draft or
   // borrowing any text or photographs from a previously visited step.
   mode.value='step';stepIndex.value=props.activeStepIndex;nonStepDraft=''
@@ -139,10 +164,10 @@ function apply(messageId){submitError.value='';try{const report=store.applySuppl
 watch(()=>[props.taskId,task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
 watch(()=>messages.value.length,(count,previous)=>{if(count>previous){following.value=true;nextTick(follow)}})
 watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.response?.text,m?.response?.note,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.progressLog?.length,m?.progressLog?.at(-1)?.label,m?.status]},()=>nextTick(follow))
-watch(()=>props.activeStepIndex,index=>{if(mode.value==='step'&&stepIndex.value!==index){voice.cancel();setMode('chat');submitError.value=''}})
-watch(stepAvailable,available=>{if(!available&&mode.value==='step'){voice.cancel();setMode('chat')}})
-watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{contextVersion++;voice.cancel();following.value=false;loadDraft();stepDrafts.clear();nonStepDraft='';fileNotice.value='';mode.value='chat';submitError.value='';imageDialog.value?.close();nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
-function choosePhoto(){if(mode.value!=='step'||!stepAvailable.value){fileNotice.value='请先从当前步骤开启 AI 协助，再添加现场照片。';return}photoUpload.value?.click()}
+watch(()=>props.activeStepIndex,index=>{if(stepAvailable.value&&stepIndex.value!==index){voice.cancel();assistStep(index,false)}})
+watch(stepAvailable,available=>{if(available)assistStep(props.activeStepIndex,false);else if(mode.value==='step'){voice.cancel();setMode('chat')}},{immediate:true})
+watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{contextVersion++;voice.cancel();following.value=false;loadDraft();stepDrafts.clear();nonStepDraft='';fileNotice.value='';mode.value='chat';submitError.value='';dismissedOpening.value=false;imageDialog.value?.close();if(stepAvailable.value)assistStep(props.activeStepIndex,false);nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
+function choosePhoto(){if(!stepAvailable.value){fileNotice.value='当前任务已不可填写，可在报告中补充现场资料。';return}if(mode.value!=='step')assistStep(props.activeStepIndex,false);photoUpload.value?.click()}
 function draftDestination(){return {version:contextVersion,index:stepIndex.value,mode:mode.value}}
 function matchingDestination(destination){return destination.version===contextVersion&&destination.mode===mode.value&&(destination.mode!=='step'||destination.index===stepIndex.value)}
 async function attach(ev){
@@ -151,7 +176,7 @@ async function attach(ev){
  fileNotice.value='';readingFiles.value=true
  try{
   if(destination.mode==='step'){
-   if(!stepAvailable.value)throw Error('请从当前步骤开启 AI 协助。')
+   if(!stepAvailable.value)throw Error('当前任务已不可填写。')
    if(attachments.value.length+files.length>STEP_ASSIST_LIMITS.maxAttachments)throw Error('每次最多添加 3 份文字附件。')
    const added=[]
    for(const file of files){
@@ -172,7 +197,7 @@ async function attach(ev){
 async function attachPhotos(ev){
  const files=Array.from(ev.target.files||[]),destination=draftDestination();ev.target.value=''
  if(!files.length||pending.value||readingFiles.value)return
- if(mode.value!=='step'||!stepAvailable.value){fileNotice.value='请先从当前步骤开启 AI 协助，再添加现场照片。';return}
+ if(mode.value!=='step'||!stepAvailable.value){fileNotice.value='当前任务已不可填写。';return}
  fileNotice.value='';readingFiles.value=true
  try{
   if(images.value.length+files.length>STEP_ASSIST_LIMITS.maxImages)throw Error('每次最多添加 4 张照片。')
@@ -192,6 +217,7 @@ function closeImageBackdrop(ev){if(ev.target===imageDialog.value)imageDialog.val
 <style scoped>
 .lc-composer footer{justify-content:flex-start;gap:7px}.lc-composer footer .composer-send{margin-left:auto}.lc-composer footer .composer-voice[aria-pressed=true]{background:#f9e9e5;color:#b55f51}.composer-voice-status,.composer-voice-error,.composer-file-notice{display:block;margin-top:6px;font-size:11px;line-height:1.5;color:#7d8b9d;overflow-wrap:anywhere}.composer-voice-error,.composer-file-notice{color:#b47546}
 .task-assistant-intro p{margin:0 0 8px}.task-assistant-intro p:last-child{margin-bottom:0}
+.lc-message p,.lc-message :deep(p){text-align:justify;text-align-last:left;overflow-wrap:anywhere}
 .lc-message>time{text-align:left!important}.lc-conversation .lc-message :deep(.assistant-basis-content){background:transparent}
 
 .lc-assistant>header{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}.lc-assistant>header small{grid-column:1/-1}.lc-assistant>header .assistant-collapse{justify-self:end;width:auto;padding:4px 8px;border:0;background:transparent;font-size:12px}

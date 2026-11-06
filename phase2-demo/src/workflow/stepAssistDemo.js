@@ -1,3 +1,4 @@
+import {taskAssistantOpeningReply} from './taskAssistantOpening.js'
 // Exact opt-in script lines. Image content never supplies scripted facts.
 const normalizeText=value=>typeof value==='string'?value.normalize('NFKC').replace(/[【]/g,'[').replace(/[】]/g,']').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[，、]/g,',').replace(/[。]/g,'.').replace(/[—–−]/g,'-').replace(/\s+/gu,'').replace(/[.!?]+$/u,'').trim():''
 
@@ -112,12 +113,15 @@ const acknowledgments=new Set(['谢谢','谢谢你','多谢','好的','好','收
 
 export function matchStepAssistDemo({context,images=[]}={}){
  if(!context)return null
+ const opening=(context.event?.sourceEventId||context.event?.id)==='real-alarm-0430'&&taskAssistantOpeningReply(context.task,context.message?.text)
+ if(opening)return opening
  let rule=scopedRule({...context,text:context.message?.text})
  if(!rule)return null
  const currentPrompt=rule.prompt
  const users=(Array.isArray(context.history)?context.history:[]).filter(message=>message?.role==='user'&&message.stepIndex===context.stepIndex&&(!message.scope||message.scope==='current-step')&&(!message.eventId||message.eventId===context.event.id)&&(!message.taskId||message.taskId===context.task.id))
  const prior=new Set()
  for(const message of users){
+  if(taskAssistantOpeningReply(context.task,message.text))continue
   if(acknowledgments.has(normalizeText(message.text)))continue
   const previous=scopedRule({...context,text:message.text})
   // Never overwrite an intervening correction with an old fixed draft. A fresh

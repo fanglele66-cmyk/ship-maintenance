@@ -38,6 +38,18 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
   const state=mounted.state,sent=[]
   store.assistStep=async(...args)=>{sent.push(args)}
 
+  await t.test('opening offers an explicit choice and direct current-step input without the left entry button',async()=>{
+   assert.equal(state.mode,'step');assert.equal(state.stepIndex,0)
+   assert.match(state.decisionQuestion.title,/从哪里开始/)
+   const option=state.decisionQuestion.choices[0]
+   state.confirmQuestion(option.id);await nextTick()
+   assert.equal(sent.at(-1)[3],option.prompt)
+   assert.equal(task.draft.records[0].note,'');assert.equal(task.draft.records[0].result,'')
+   sent.length=0;state.input='尚未发送的现场描述'
+   state.confirmQuestion(option.id);await nextTick()
+   assert.equal(sent.length,0);assert.equal(state.input,'尚未发送的现场描述');assert.equal(state.decisionQuestion,null)
+  })
+
   await t.test('focus and continue editing preserve manual text and never send automatically',async()=>{
    state.input='人工输入尚未发送';assert.equal(state.assistStep(0),true);await nextTick()
    assert.equal(state.mode,'step');assert.equal(state.input,'人工输入尚未发送');assert.equal(sent.length,0)
@@ -47,7 +59,7 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
    state.input='人工输入尚未发送'
    state.images=[photo];state.attachments=[{name:'记录.txt',text:'待复核的现场记录'}]
    mounted.props.activeStepIndex=1;await nextTick()
-   assert.equal(state.mode,'chat');assert.equal(state.input,'');assert.deepEqual(state.images,[])
+   assert.equal(state.mode,'step');assert.equal(state.stepIndex,1);assert.equal(state.input,'');assert.deepEqual(state.images,[])
    assert.equal(state.assistStep(1),true);state.input='第二步未发送'
    mounted.props.activeStepIndex=0;await nextTick();state.assistStep(0)
    assert.equal(state.input,'人工输入尚未发送');assert.equal(state.images[0].name,'现场.png');assert.equal(state.attachments[0].name,'记录.txt')
@@ -88,11 +100,11 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
    task.conversations.engineer.push(proposal)
    assert.equal(task.draft.records[0].note,'','receiving a proposal does not adopt it')
    const render=message=>renderToString(createSSRApp(Proposal,{message}))
-   const draftHtml=await render(proposal);assert.match(draftHtml,/采用到本步骤/);assert.match(draftHtml,/继续修改/);assert.doesNotMatch(draftHtml,/radio|checkbox/)
+   const draftHtml=await render(proposal);assert.match(draftHtml,/本步骤备注草稿/);assert.doesNotMatch(draftHtml,/<button|radio|checkbox/);assert.equal(state.currentProposal.id,proposal.id);assert.deepEqual(state.decisionQuestion.choices.map(choice=>choice.id),['apply','revise'])
    state.applyStepNote(proposal.id)
    assert.equal(task.draft.records[0].note,proposal.response.note);assert.equal(task.draft.records[0].result,'')
    assert.equal(task.conversations.engineer.filter(m=>m.response?.kind==='receipt').length,1)
-   assert.match(await render(proposal),/disabled[^>]*>已采用到本步骤/)
+   assert.match(await render(proposal),/已采用到本步骤/)
    assert.doesNotMatch(await render({response:{kind:'question',text:'现场核对的读数是多少？'}}),/采用到本步骤|继续修改/)
    assert.match(await render({status:'streaming',progress:'正在核对现场图片…'}),/正在核对现场图片/)
   })
@@ -152,14 +164,15 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
    assert.equal(state.input,script.input);assert.deepEqual(state.images,[photo]);assert.match(state.submitError,/暂时无法处理/)
   })
 
-  await t.test('automatic script routing never intercepts ordinary chat, another step, or report and plan modes',async()=>{
+  await t.test('all task input uses current-step assistance while explicit report and plan modes remain separate',async()=>{
    const current=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===1),other=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===0),sentStep=[],sentChat=[]
    store.assistStep=async(...args)=>{sentStep.push(args)};store.ask=async(...args)=>{sentChat.push(args)}
    for(const [mode,text] of [['chat','请解释燃油供给的工作原理'],['chat',other.input],['chat',current.input+' 另外现场还有一个新异常。'],['report',current.input],['plan',current.input]]){
     state.setMode(mode);state.input=text;await state.ask(state.input)
-    assert.equal(sentChat.at(-1)[1],text);assert.equal(sentChat.at(-1)[2].mode,mode)
+    if(mode==='chat'){assert.equal(sentStep.at(-1)[2],1);assert.equal(sentStep.at(-1)[3],text)}
+    else{assert.equal(sentChat.at(-1)[1],text);assert.equal(sentChat.at(-1)[2].mode,mode)}
    }
-   assert.equal(sentStep.length,0);assert.equal(sentChat.length,5)
+   assert.equal(sentStep.length,3);assert.equal(sentChat.length,2)
   })
 
   await t.test('automatic routing is disabled for another owner and submitted tasks',async()=>{

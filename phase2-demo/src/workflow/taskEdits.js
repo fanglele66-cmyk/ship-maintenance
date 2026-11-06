@@ -1,3 +1,5 @@
+import {taskStepLabel} from './taskStepPresentation.js'
+
 const clone=value=>JSON.parse(JSON.stringify(value))
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
 const fail=message=>{throw Error(message+' 原待派任务未修改。')}
@@ -8,26 +10,35 @@ const numberValue=text=>{
  return digits[text]
 }
 const numberPattern='[0-9一二三四五六七八九十两]+'
-const labelKey=text=>text.replace(/[\s“”"「」『』《》：:，,。；;、（）()]/g,'').replace(/^(检查|核查|核对|排查)/,'').replace(/(排查任务|维修任务|任务|步骤|排查)$/,'')
+const labelKey=text=>text.replace(/实验/g,'试验').replace(/[\s“”"「」『』《》：:，,。；;、（）()]/g,'').replace(/^(检查|核查|核对|排查)/,'').replace(/(排查任务|维修任务|任务|步骤|排查)$/,'')
 
-function references(clause,steps){
+function references(clause,steps,action,checkTitle=false){
  const indices=[]
- const pattern=new RegExp(`第?(${numberPattern}(?:[、和及与]第?${numberPattern})*)[项条步个](?:排查|维修|复查|维保)?(?:任务|步骤)?`,'g')
- for(const match of clause.matchAll(pattern))for(const part of match[1].split(/[、和及与]/))indices.push(numberValue(part.replace(/^第/,''))-1)
+ const sequence=`${numberPattern}(?:\\s*[、和及与]\\s*第?\\s*${numberPattern})*`
+ const patterns=[new RegExp(`第?\\s*(${sequence})\\s*[项条步个](?:排查|维修|复查|维保)?(?:任务|步骤)?`,'g'),new RegExp(`(?:步骤|任务)\\s*第?\\s*(${sequence})(?![\\d一二三四五六七八九十两])`,'g')]
+ let titleClause=clause
+ for(const pattern of patterns)titleClause=titleClause.replace(pattern,(_match,numbers)=>{for(const part of numbers.split(/[、和及与]/))indices.push(numberValue(part.replace(/[第\s]/g,''))-1);return ''})
  const first=clause.match(new RegExp(`前(${numberPattern})[项条步个]`))
  if(first){indices.length=0;const n=numberValue(first[1]);if(n>steps.length)fail(`当前只有 ${steps.length} 项，无法保留前 ${n} 项。`);for(let i=0;i<n;i++)indices.push(i)}
  if(/最后(?:一)?[项条步个]/.test(clause))indices.push(steps.length-1)
- if(!indices.length){
-  const query=labelKey(clause.replace(/^(?:请|帮我|把|将|仅|只|保留|留下|删除|删掉|去掉|移除|取消|去除|修改|调整|更新|完善|细化|补充)+/, '').replace(/(?:即可|就好|就行|不变|原样|保持原样|其他不变|其余不变)$/,''))
-  steps.forEach((step,i)=>{const label=labelKey(step.label);if(query.length>=4&&(query.includes(label)||label.includes(query)))indices.push(i)})
-  if(indices.length>1)fail('这个标题对应多项任务，请用编号明确指定。')
+ const query=labelKey(titleClause.trim().replace(/^(?:请|帮我|把|将|仅|只|保留|留下|删除|删掉|去掉|移除|取消|去除|修改|调整|更新|完善|细化|补充)+/, '').replace(/(?:即可|就好|就行|不变|原样|保持原样|其他不变|其余不变)$/,''))
+ const labels=steps.map((step,i)=>[labelKey(step.label),labelKey(taskStepLabel(step,action,i))].filter(Boolean))
+ // Match the same names users see in the step tabs. An exact title takes
+ // precedence over partial matches; never guess between shared short names.
+ let named=labels.flatMap((names,i)=>names.includes(query)?[i]:[])
+ if(!named.length)named=labels.flatMap((names,i)=>names.some(label=>query.length>=4&&(query.includes(label)||label.includes(query)))?[i]:[])
+ if(indices.length){
+  if(checkTitle&&named.length&&!named.some(i=>indices.includes(i)))fail('步骤编号与标题不一致，请确认要修改哪一步。')
+ }else{
+  if(named.length>1)fail('这个标题对应多项任务，请用编号明确指定。')
+  indices.push(...named)
  }
  const unique=[...new Set(indices)]
  if(unique.some(i=>!Number.isInteger(i)||i<0||i>=steps.length))fail(`任务编号超出范围，当前只有 ${steps.length} 项。`)
  return unique
 }
 
-export function taskEditContract(plan,text){
+export function taskEditContract(plan,text,action=plan?.action||plan?.kind){
  if(!Array.isArray(plan?.steps)||!plan.steps.length)fail('尚无可修改的任务步骤。')
  const clauses=text.trim().replace(/[！？!?]/g,'。').split(/[，,。；;\n]|并且|然后|同时|并(?=删除|保留|只保留|仅保留|增加|修改|补充|去掉)|(?=仅保留|只保留)/).map(s=>s.trim()).filter(Boolean)
  const remove=[],keep=[],only=[],update=[]
@@ -41,7 +52,7 @@ export function taskEditContract(plan,text){
   if(deleting||retaining){
    if(/子步骤|子项|检查点|检查要求|里面|中的/.test(clause))fail('请明确要修改的任务及子项，不能将子项的增删解释为删除整项任务。')
    if(/如果|若|假如|是否|不要|不删|不需要删|别删|先不|暂不/.test(clause))fail('这条增删要求包含条件或否定，请明确当前要保留或删除的任务编号。')
-   const refs=references(clause,plan.steps)
+   const refs=references(clause,plan.steps,action,true)
    if(!refs.length)fail('未能唯一确定要保留或删除的任务，请使用当前任务编号或完整标题。')
    if(deleting){remove.push(...refs);structural=true}
    if(retaining){keep.push(...refs);if(/仅|只/.test(clause)){only.push(...refs);structural=true}}
@@ -50,7 +61,7 @@ export function taskEditContract(plan,text){
    // Preservation clauses constrain edits; they are not extra work instructions.
   }else{
    otherEdit=true
-   if(!insertionClauses.includes(clause)&&!new RegExp(`^(?:共|总共|总计|缩减为|合并为|控制在|改成|改为)\\s*${numberPattern}\\s*[项条步个]`).test(clause))update.push(...references(clause,plan.steps))
+   if(!insertionClauses.includes(clause)&&!new RegExp(`^(?:共|总共|总计|缩减为|合并为|控制在|改成|改为)\\s*${numberPattern}\\s*[项条步个]`).test(clause))update.push(...references(clause,plan.steps,action))
   }
  }
  if(remove.some(i=>keep.includes(i)))fail('同一项同时被要求删除和保留，请明确要保留的任务。')
@@ -138,7 +149,7 @@ export function applyTaskEditOperations(before,contract,operations,action){
 }
 
 export function verifyTaskEdit(before,text,result,action){
- const contract=taskEditContract(before,text),expected=applyTaskEditOperations(before,contract,result.editOperations,action)
+ const contract=taskEditContract(before,text,action),expected=applyTaskEditOperations(before,contract,result.editOperations,action)
  if(!same(result.plan,expected.plan))fail('生成结果未满足逐项修改约束，已拦截任务覆盖。')
  return expected
 }

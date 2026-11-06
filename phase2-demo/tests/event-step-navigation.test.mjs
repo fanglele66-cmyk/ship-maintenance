@@ -87,7 +87,7 @@ test('event task previews and records render one readable step with role-safe fe
    assert.equal(JSON.stringify(plan),snapshot)
   })
 
-  for(const kind of ['investigation','repair'])await t.test(`${kind} assigned previews hide private drafts from captain and preserve the executor entry`,async()=>{
+  for(const kind of ['investigation','repair'])await t.test(`${kind} assigned previews remain captain-only and executors use the task entry before submitting`,async()=>{
    const data=assigned(kind),prefix=kind==='investigation'?'排查':'维修'
    data.task.draft.records[0]={label:data.task.steps[0].label,result:'无法确认',note:'只属于执行人的尚未提交草稿'}
    const before=JSON.stringify(data.task)
@@ -95,21 +95,37 @@ test('event task previews and records render one readable step with role-safe fe
    assertSingleStep(captain,prefix)
    assert.doesNotMatch(captain,/只属于执行人的尚未提交草稿|record-feedback|>无法确认<\/dd>/)
    const executor=await render(data,'engineer',prefix+'步骤')
-   assertSingleStep(executor,prefix)
    assert.match(executor,new RegExp(`进入${prefix}任务 →`))
-   assert.doesNotMatch(executor,/record-feedback/)
+   assert.doesNotMatch(executor,/role="tabpanel"|aria-label="任务步骤"|record-feedback|只属于执行人的尚未提交草稿/)
+   assert.doesNotMatch(executor,new RegExp(`${prefix}第1项专用说明|${prefix}第1项独立操作|${prefix}第1项回交要求`))
    assert.equal(JSON.stringify(data.task),before)
   })
 
-  await t.test('submitted, generating, failed, waiting and terminated stages expose only submitted step feedback',async()=>{
-   const data=assigned('repair');submit(data.state,data.task,'正式维修结果')
+  for(const kind of ['investigation','repair'])await t.test(`${kind} unsubmitted waiting and terminated tasks do not expose steps to executors`,async()=>{
+   const data=assigned(kind),prefix=kind==='investigation'?'排查':'维修'
+   for(const status of ['waiting','terminated']){
+    data.task.status=status
+    if(status==='waiting')data.task.waiting={reason:'等待执行条件'}
+    const html=await render(data,'engineer',prefix+'步骤')
+    assert.doesNotMatch(html,/role="tabpanel"|aria-label="任务步骤"|record-feedback/)
+    assert.doesNotMatch(html,new RegExp(`${prefix}第1项专用说明`))
+   }
+  })
+
+  for(const kind of ['investigation','repair'])await t.test(`${kind} submitted, generating, failed, waiting and terminated stages expose only submitted step feedback to both roles`,async()=>{
+   const data=assigned(kind),prefix=kind==='investigation'?'排查':'维修';submit(data.state,data.task,`正式${prefix}结果`)
    data.task.draft.records[0].note='后来尚未提交的私有修改'
    for(const status of ['submitted','reporting','report-error','waiting','terminated']){
     data.task.status=status
     if(status==='waiting')data.task.waiting={reason:'等待补齐执行条件'}
-    const html=await render(data,'captain','维修方案'),body=assertSingleStep(html,'维修')
-    assert.match(body,/作业反馈/);assert.match(body,/已完成/);assert.match(body,/正式维修结果第1项/)
-    assert.doesNotMatch(body,/正式维修结果第2项|后来尚未提交的私有修改/)
+    for(const role of ['captain','engineer']){
+     const tab=kind==='repair'&&role==='captain'?'维修方案':prefix+'步骤'
+     const html=await render(data,role,tab),body=assertSingleStep(html,prefix)
+     assert.ok(body.includes(kind==='repair'?'作业反馈':'检查结果'))
+     assert.ok(body.includes(kind==='repair'?'已完成':'发现异常'))
+     assert.ok(body.includes(`正式${prefix}结果第1项`))
+     assert.doesNotMatch(body,new RegExp(`正式${prefix}结果第2项|后来尚未提交的私有修改`))
+    }
    }
   })
 
@@ -118,8 +134,10 @@ test('event task previews and records render one readable step with role-safe fe
    data.task.steps[0].guide='后来变更的任务说明';data.task.records[0].note='后来变更的现场记录'
    assign(data.state,'repair')
    const frozen=JSON.stringify(oldReport.submissionSnapshot),live=JSON.stringify(data.task)
-   const html=await render(data,'captain','排查步骤',{report:oldReport.id}),body=assertSingleStep(html,'排查')
-   assert.match(body,/历史排查正式结果第1项/);assert.doesNotMatch(body,/后来变更的/)
+   for(const role of ['captain','engineer']){
+    const html=await render(data,role,'排查步骤',{report:oldReport.id}),body=assertSingleStep(html,'排查')
+    assert.match(body,/历史排查正式结果第1项/);assert.doesNotMatch(body,/后来变更的/)
+   }
    assert.equal(JSON.stringify(oldReport.submissionSnapshot),frozen);assert.equal(JSON.stringify(data.task),live)
   })
 

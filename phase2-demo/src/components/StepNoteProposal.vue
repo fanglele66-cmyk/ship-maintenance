@@ -4,10 +4,7 @@
   <section v-if="response.kind==='draft'" class="step-note-proposal" :aria-label="`第 ${message.stepIndex+1} 步备注草稿`">
    <strong>本步骤备注草稿</strong>
    <p class="step-note-content">{{operationalText(response.note)}}</p>
-   <div class="step-note-actions">
-    <button type="button" :disabled="disabled||!!message.appliedAt||!!message.supersededAt" @click="$emit('apply',message.id)">{{message.appliedAt?'已采用到本步骤':message.supersededAt?'已有更新草稿':'采用到本步骤'}}</button>
-    <button type="button" :disabled="disabled" @click="$emit('revise',message)">继续修改</button>
-   </div>
+   <small v-if="message.appliedAt||message.supersededAt" class="step-note-adoption">{{message.appliedAt?'已采用到本步骤':'已有更新草稿'}}</small>
   </section>
   <section v-if="message.status==='streaming'" class="step-note-progress" role="status" aria-live="polite" aria-busy="true"><p class="step-progress-running"><span class="step-progress-spinner" aria-hidden="true"/>正在处理本步骤…</p><ol><li v-for="(item,index) in progressItems" :key="index" :class="{current:index===progressItems.length-1}">{{item.label}}</li></ol></section>
   <details v-else-if="progressItems.length" class="step-note-progress-history"><summary>处理进度</summary><ol><li v-for="(item,index) in progressItems" :key="index">{{item.label}}</li></ol></details>
