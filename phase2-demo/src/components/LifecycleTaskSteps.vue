@@ -2,9 +2,9 @@
  <section class="lc-task-wizard" :class="{'lc-repair-wizard':repair}" aria-label="横向分步填写">
   <details v-if="task.procedureHistory?.length" class="lc-procedure-history"><summary>步骤调整前的记录</summary><section v-for="(history,i) in task.procedureHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
   <details v-if="task.feedbackHistory?.length" class="lc-procedure-history"><summary>前次提交记录</summary><section v-for="(history,i) in task.feedbackHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
-  <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :disabled="submitting" :class="{active:index===i,complete:isTaskStepComplete(step,task.draft.records[i])}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{step.short||step.label}}</button></nav>
+  <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :title="step.label" :disabled="submitting" :class="{active:index===i,complete:isTaskStepComplete(step,task.draft.records[i])}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{taskStepLabel(step,task.kind,i)}}</button></nav>
   <form v-if="step" class="lc-step-editor" @submit.prevent="next">
-   <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :event="event" :task="task" :number="index+1" :step="step" :compact="repair" :paginate="repair"/><RecordGuidance v-if="!repair&&!step.substeps?.length" :text="step.recordHint"/></div>
+   <div class="lc-step-instructions"><LifecycleStepInstructions :event="event" :task="task" :number="index+1" :step="step" :compact="repair" :paginate="repair"/><RecordGuidance v-if="!repair&&!step.substeps?.length" :text="step.recordHint"/></div>
    <div class="lc-task-feedback"><fieldset><legend>{{task.kind==='investigation'?'检查结果':'作业反馈'}}<small v-if="displayStep.substeps?.length">（本步骤共 {{displayStep.substeps.length}} 个子项）</small></legend><label v-for="option in step.options" :key="option" :class="{selected:record.result===option}"><input type="radio" :name="task.id+'-'+index" v-model="record.result" :value="option" required/>{{option}}</label></fieldset>
    <label v-if="/无法确认|受限/.test(record.result||'')" class="execution-confirmation">本步骤实际执行情况<select v-model="record.executionStatus" required><option value="">请选择</option><option>已完成</option><option>未完成</option></select><small>已完成检查但原因未明，与检查尚未实施分别记录。</small></label><LifecycleNoteEditor :key="task.id+'-'+index" v-model="record.note" :rows="repair?2:3" :context="step.label" :assist-mode="stepAssistance" @assist="emit('assist',index)" :placeholder="'记录本步骤的部位、读数、实际措施或未完成原因。'"/></div>
    <p v-if="lastStep&&task.draft.attachments.length" class="lc-muted">已关联：{{task.draft.attachments.map(a=>a.name).join('、')}}</p>
@@ -23,6 +23,7 @@ import {taskName} from '../workflow/lifecycleDecisions'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {repairStepForDisplay} from '../workflow/repairPreparation.js'
 import {isTaskStepComplete} from '../workflow/taskStepCompletion.js'
+import {taskStepLabel} from '../workflow/taskStepPresentation.js'
 const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}}),emit=defineEmits(['submitting','submitted','assist']),store=useEventLifecycleStore(),error=ref(''),submitting=ref(false)
 const index=computed({get:()=>Math.max(0,Math.min(props.task.draft.stepIndex||0,props.task.steps.length-1)),set:value=>props.task.draft.stepIndex=value})
 const step=computed(()=>props.task.steps[index.value]),record=computed(()=>props.task.draft.records[index.value])
