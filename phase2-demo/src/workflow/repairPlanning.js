@@ -2,8 +2,9 @@ import {observationTasks} from './observationEvents.js'
 import {isAbnormalResult} from './lifecycleDecisions.js'
 import {groupRepairSteps} from './repairStepGroups.js'
 import {isVerificationReview,observationTaskFor} from './observationContext.js'
+import {compactC2RepairPreparation} from './repairPreparation.js'
 
-export const repairProcedureVersion=3
+export const repairProcedureVersion=4
 const workOptions=['已完成','未完成','不适用']
 const step=(label,guide,checks,recordHint)=>({label,guide,checks,recordHint,options:[...workOptions]})
 const clone=value=>JSON.parse(JSON.stringify(value))
@@ -73,7 +74,7 @@ export function detailedRepairSteps(event,methods=[]){
   ],'登记实际措施、用料、复测结论、剩余事项、交接对象及观察要求。')]
  const restorationIndex=operations.findIndex(t=>t.label==='复装连接并复核密封与防护')
  operations[restorationIndex]=merge(operations[restorationIndex],restorationMethods)
- return groupRepairSteps(operations)
+ return groupRepairSteps(operations).map(step=>compactC2RepairPreparation(event,step))
 }
 
 export function presetRecheckSteps(event){

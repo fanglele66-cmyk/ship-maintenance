@@ -2,6 +2,24 @@
 const normalizeText=value=>typeof value==='string'?value.normalize('NFKC').replace(/[【]/g,'[').replace(/[】]/g,']').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[，、]/g,',').replace(/[。]/g,'.').replace(/[—–−]/g,'-').replace(/\s+/gu,'').replace(/[.!?]+$/u,'').trim():''
 
 const prompts={
+ investigationStart:"二缸这边插头和能检查的反馈线束看了，没看到松脱或明显破损。对照报警片段，指令和反馈有一段没对应上。光看这些，还不好判断液压执行有没有问题。",
+ investigationAnswer:"做过。15:10—15:18，按许可停机，确认燃油、伺服油都隔离卸压后，照本机作业单检查了液压活塞动作，三次都发涩、回位不畅，没再往里面拆。插头和线束只看了能接近的部分，其他线束段没查。认可车间的内部检验记录还没有，污染、划痕还是磨损，现在都没确定。",
+ investigationRevise:"原因这块还没定，只能确认动作回位不畅，积碳还是磨损现在都说不准。其他记录保留。",
+ supply:"15:25—15:35，供给泵、阀位、滤器状态和能接近的接口都看了，这些位置没发现异常。供给和燃油轨压力记录也跟启停、六缸响应按同一时间轴对过，暂时没看到共同供给异常的对应片段。没有拆检全部滤器和管路，高负荷也没查到，供给部件没换。具体压力数值还没提供。",
+ supplyClarify:"具体数值暂时没有，材料还没补上。",
+ preparationStart:"这次按工单 WO-C2-001，只拆换二缸 ICU 总成并复测，不动供给通路。备用总成和接口密封件的机型、接口、标识、检验资料都按清单核对了，工具校验资料也看过，图号、序列号和力矩值还没提供。16:00—16:15，停机、防意外起动、燃油和伺服油分别隔离卸压都做了，现场核实方法也记了。范围和隔离没确认就先停，还没开始拆换。",
+ preparationAnswer:"李建国执行，陈志远监护复核，工单上都签了。签认文件还没上传。",
+ repairStart:"16:20—17:05，按获批工单把二缸 ICU 的插头、管路和方向标好了，拆开的接口也及时封堵了。二缸总成已经处理过了。船上没做液压活塞内部精修，没用砂纸，也没处理燃油供给通路。这次的作业照片还没上传。",
+ repairAnswer:"这次按获批工单换了 ICU 总成，备用总成和配套接口密封件都在清单里核对过适配。旧件编号封存，暂放旧件区，陈志远保管，标签 OLD-C2-01，准备送厂家认可车间，还没送出去，也没有检验结论。备用件标签是 SPARE-C2-01，不是图号或序列号。清单上实际领了总成 1 套、接口密封件 1 套，没再换其他件。",
+ repairRevise:"先别写更换后正常，这一步只记拆换措施。复装复核和试验在下一步，卡滞原因还要等认可车间检验。其他记录保留。",
+ trial:"17:10—17:35，照作业单复核了接口、接线、方向和防护，陈志远复核，工具和拆下件也清点了。按批准程序恢复介质后，检查范围内没看到外漏。17:40—17:50，只在获准的有限工况下核对了动作，这段时间原流量活塞报警没再出现。燃油轨压力、二缸指令反馈、六缸排温、转速和负荷的完整对照记录还没齐，高负荷没覆盖，力矩和厂家判据也没提供，还不能全面验收。再有泄漏、动作异常或原报警，就停下后续试验并回报。",
+ trialClarify:"后续试验还没做，等轮机长安排许可窗口。这一步还是未完成。",
+ handover:"18:00，批准范围、总成和密封件领用、旧件暂存和未送检的情况都交给轮机长了。还差同刻对照记录、另行许可工况下的试验和认可车间检验结论，李建国跟进，时限等轮机长确认。接下来打算关注二缸指令反馈、各缸排温、燃油轨压力、转速负荷和原报警，但新的效果观察还没开始，长期效果也没验证，作业附件还没齐。",
+ handoverClarify:"时间还没定，等轮机长安排。",
+}
+
+// Previously published lines keep their original identifiers, people and facts.
+const publishedPrompts={
  investigationStart:"二缸这边插头和能检查的反馈线束看了，没看到松脱或明显破损。对照报警片段，指令和反馈有一段没对应上。现在还不能从这两项判断液压执行到底有没有异常，我还没把液压动作检查情况说清楚。",
  investigationAnswer:"做过动作检查。检查时段是 15:10—15:18，按许可停机并确认燃油、伺服油隔离卸压后，按本机作业单核对液压活塞动作，三次均发涩、回位不畅，没有继续内部拆修。插接件和线束只看了可接近部位，未覆盖的线束段没有检查。没有取得厂家认可车间的内部检验记录，污染、划痕和磨损原因都还没确认。",
  investigationRevise:"再强调一下：只是液压动作回位不畅，具体卡滞原因还没确认，不能写成积碳或磨损导致。其余内容保留。",
@@ -30,56 +48,96 @@ const notes={
 }
 
 const question=text=>({kind:'question',text})
-const draft=(note,text='已整理为本步骤备注草稿，请核对后采用。')=>({kind:'draft',text,note})
+const draft=(note,text='整理好了，核对后可以采用。')=>({kind:'draft',text,note})
 const stepLabels={investigation:['核查 C2 ICU 液压机构与反馈','核查燃油供给与瞬态工况'],repair:['作业准备与安全隔离','实施维修与过程记录','复装与分阶段试验','交接与效果观察']}
 const rules=[
- {kind:'investigation',step:0,prompt:'investigationStart',reply:question('液压活塞实际动作检查做过了吗，检查结果是什么？')},
+ {kind:'investigation',step:0,prompt:'investigationStart',reply:question('液压活塞动作检查做了吗，结果怎么样？')},
  {kind:'investigation',step:0,prompt:'investigationAnswer',requires:['investigationStart'],results:['发现异常','无法确认'],reply:draft(notes.investigation)},
- {kind:'investigation',step:0,prompt:'investigationRevise',requires:['investigationStart','investigationAnswer'],results:['发现异常','无法确认'],reply:draft(notes.investigationRevised,'已保留回位不畅的描述，具体原因仍待确认。')},
+ {kind:'investigation',step:0,prompt:'investigationRevise',requires:['investigationStart','investigationAnswer'],results:['发现异常','无法确认'],reply:draft(notes.investigationRevised,'已保留回位不畅，原因仍待确认。')},
  {kind:'investigation',step:1,prompt:'supply',results:['未见异常'],reply:draft(notes.supply)},
- {kind:'investigation',step:1,prompt:'supplyClarify',requires:['supply'],results:['未见异常'],reply:draft(notes.supply,'已保留资料缺口，未补造压力数值。')},
- {kind:'repair',step:0,prompt:'preparationStart',reply:question('隔离由谁执行和复核，是否已有签认记录？')},
+ {kind:'investigation',step:1,prompt:'supplyClarify',requires:['supply'],results:['未见异常'],reply:draft(notes.supply,'数值和材料缺口已保留。')},
+ {kind:'repair',step:0,prompt:'preparationStart',reply:question('谁执行隔离、谁复核，工单签认了吗？')},
  {kind:'repair',step:0,prompt:'preparationAnswer',requires:['preparationStart'],results:['已完成'],reply:draft(notes.preparation)},
- {kind:'repair',step:1,prompt:'repairStart',reply:question('这次总成处置具体是拆换总成、连接修复，还是检查后封存？')},
+ {kind:'repair',step:1,prompt:'repairStart',reply:question('总成这次具体怎么处理的，拆换了还是做了连接修复？')},
  {kind:'repair',step:1,prompt:'repairAnswer',requires:['repairStart'],results:['已完成'],reply:draft(notes.repair)},
- {kind:'repair',step:1,prompt:'repairRevise',requires:['repairStart','repairAnswer'],results:['已完成'],reply:draft(notes.repair,'已仅保留拆换措施，复装试验及具体原因仍待后续核实。')},
+ {kind:'repair',step:1,prompt:'repairRevise',requires:['repairStart','repairAnswer'],results:['已完成'],reply:draft(notes.repair,'已只记拆换措施，复装试验和原因仍待核实。')},
  {kind:'repair',step:2,prompt:'trial',results:['未完成'],reply:draft(notes.trial)},
- {kind:'repair',step:2,prompt:'trialClarify',requires:['trial'],results:['未完成'],reply:draft(notes.trialClarified,'已明确后续试验尚未实施，保留未完成状态和许可条件。')},
+ {kind:'repair',step:2,prompt:'trialClarify',requires:['trial'],results:['未完成'],reply:draft(notes.trialClarified,'已记下后续试验未做，等待许可窗口。')},
  {kind:'repair',step:3,prompt:'handover',results:['已完成'],reply:draft(notes.handover)},
- {kind:'repair',step:3,prompt:'handoverClarify',requires:['handover'],results:['已完成'],reply:draft(notes.handover,'已保留时限待轮机长确认，不补写截止时间。')},
-].map(rule=>({...rule,label:stepLabels[rule.kind][rule.step],normalized:normalizeText(prompts[rule.prompt]),requiredTexts:(rule.requires||[]).map(key=>normalizeText(prompts[key]))}))
+ {kind:'repair',step:3,prompt:'handoverClarify',requires:['handover'],results:['已完成'],reply:draft(notes.handover,'时限仍记为待轮机长确认。')},
+].map(rule=>({...rule,label:stepLabels[rule.kind][rule.step]}))
 
-// Only known presentation-only wrappers around a complete current script line
-// may be omitted. Older identifiers, names or any new facts still use the model.
+const missingQuestions={
+ investigationStart:'插头、线束检查和报警时的指令反馈核对，结果分别怎么样？',
+ investigationAnswer:'液压活塞动作检查做了吗，什么时段、结果怎样？',
+ supply:'供给通路实际查了哪些位置和工况，结果怎么样？',
+ preparationStart:'这次工单范围是什么，备件核对和停机隔离完成了吗？',
+ repairStart:'这次连接标识、接口封堵和船上检查，实际做了哪些？',
+ repairAnswer:'总成具体怎么处理的，用了哪些件，旧件现在在哪里？',
+ trial:'复装和试验实际做到了哪一步，还有哪些没完成？',
+ handover:'已经交接了哪些情况，还有哪些事项要跟进？',
+}
+const inputRules=new Map()
+for(const rule of rules){
+ inputRules.set(normalizeText(prompts[rule.prompt]),rule)
+ inputRules.set(normalizeText(publishedPrompts[rule.prompt]),rule)
+}
+// Only these known presentation-only wrappers may surround a complete line.
+// Different identifiers, people, numbers or added facts are never normalized away.
 const legacyPrefix=normalizeText('【虚构演示】')
 const legacyImageSuffix=normalizeText('这张是 AI 生成的演示图，只练习上传，不是现场照片，不能拿它认定卡滞或损伤。')
-const scriptInputs=new Set(rules.map(rule=>rule.normalized))
-const normalizeInput=text=>{
+function ruleForText(text){
  const original=normalizeText(text)
+ if(inputRules.has(original))return inputRules.get(original)
  let candidate=original.startsWith(legacyPrefix)?original.slice(legacyPrefix.length):original
  if(candidate.endsWith(legacyImageSuffix))candidate=candidate.slice(0,-legacyImageSuffix.length).replace(/[.!?]+$/u,'')
- return scriptInputs.has(candidate)?candidate:original
+ return inputRules.get(candidate)
+}
+function scopedRule({event,task,stepIndex,text,step}={}){
+ if((event?.sourceEventId||event?.id)!=='real-alarm-0430'||!Number.isInteger(stepIndex))return null
+ const rule=ruleForText(text)
+ if(!rule||rule.kind!==task?.kind||rule.step!==stepIndex)return null
+ return normalizeText((step||task?.steps?.[stepIndex])?.label)===normalizeText(rule.label)?rule:null
+}
+
+// UI recognition only. Execution permission, current-step checks and validation
+// remain the responsibility of the UI/store and server request contract.
+export function isStepAssistScriptInput({event,task,stepIndex,text}={}){
+ return !!scopedRule({event,task,stepIndex,text})
 }
 
 // For acceptance scripts and documentation only; not a UI quick-send menu.
-// `requires` contains preceding case IDs, in chronological order.
-export const STEP_ASSIST_DEMO_CASES=Object.freeze(rules.map(rule=>Object.freeze({id:rule.prompt,kind:rule.kind,stepIndex:rule.step,stepLabel:rule.label,input:prompts[rule.prompt],response:Object.freeze({...rule.reply}),requires:Object.freeze([...(rule.requires||[])])})))
+export const STEP_ASSIST_DEMO_CASES=Object.freeze(rules.map(rule=>Object.freeze({id:rule.prompt,kind:rule.kind,stepIndex:rule.step,stepLabel:rule.label,input:prompts[rule.prompt],aliases:Object.freeze([publishedPrompts[rule.prompt]]),response:Object.freeze({...rule.reply}),requires:Object.freeze([...(rule.requires||[])])})))
+const acknowledgments=new Set(['谢谢','谢谢你','多谢','好的','好','收到','明白','明白了','了解','了解了','知道了','辛苦了','嗯','好，继续','请继续','继续','好的，谢谢','好的，收到','谢谢，先这样','谢谢，辛苦了','谢谢你，辛苦了'].map(normalizeText))
 
 export function matchStepAssistDemo({context,images=[]}={}){
- if(!context||(context.event?.sourceEventId||context.event?.id)!=='real-alarm-0430'||!Number.isInteger(context.stepIndex))return null
- const rule=rules.find(item=>item.kind===context.task?.kind&&item.step===context.stepIndex&&item.normalized===normalizeInput(context.message?.text))
+ if(!context)return null
+ let rule=scopedRule({...context,text:context.message?.text})
  if(!rule)return null
- if(normalizeText(context.step?.label)!==normalizeText(rule.label))return null
- // A differing human result must be handled by the real model as a conflict.
- if(context.record?.result&&rule.results&&!rule.results.includes(context.record.result))return null
- const users=(Array.isArray(context.history)?context.history:[]).filter(message=>message?.role==='user'&&message.stepIndex===context.stepIndex&&(!message.scope||message.scope==='current-step')&&(!message.eventId||message.eventId===context.event.id)&&(!message.taskId||message.taskId===context.task.id)).map(message=>normalizeInput(message.text))
- if(rule.requiredTexts.length){
-  // Retrying the same script line does not leave the scripted route. Preserve any
-  // intervening non-script statement so a changed fact still goes to the model.
-  while(users.at(-1)===rule.normalized)users.pop()
-  const recent=users.filter((text,index)=>index===0||text!==users[index-1]).slice(-rule.requiredTexts.length)
-  if(recent.length!==rule.requiredTexts.length||recent.some((text,i)=>text!==rule.requiredTexts[i]))return null
+ const currentPrompt=rule.prompt
+ const users=(Array.isArray(context.history)?context.history:[]).filter(message=>message?.role==='user'&&message.stepIndex===context.stepIndex&&(!message.scope||message.scope==='current-step')&&(!message.eventId||message.eventId===context.event.id)&&(!message.taskId||message.taskId===context.task.id))
+ const prior=new Set()
+ for(const message of users){
+  if(acknowledgments.has(normalizeText(message.text)))continue
+  const previous=scopedRule({...context,text:message.text})
+  // Never overwrite an intervening correction with an old fixed draft. A fresh
+  // free-form clarification can be handled by the model with the full history.
+  if(!previous)return question('前面还有新的补充，和这段记录是否一致？请确认本步实际情况。')
+  prior.add(previous.prompt)
  }
+ // Complete facts can arrive in either order. Preserve later optional
+ // clarifications when a user repeats an earlier line from the same step.
+ prior.add(currentPrompt)
+ const complete=rules.filter(candidate=>candidate.kind===rule.kind&&candidate.step===rule.step&&candidate.reply.kind==='draft'&&prior.has(candidate.prompt)&&(candidate.requires||[]).every(id=>prior.has(id)))
+ if(complete.length)rule=complete.at(-1)
+ // A known line never falls through to a model just because its result or
+ // prerequisites are missing. Ask without modifying the selected result.
+ if(context.record?.result&&rule.results&&!rule.results.includes(context.record.result)){
+  return question('当前选择“'+context.record.result+'”与这段记录不一致，哪项需要调整？')
+ }
+ const missing=(rule.requires||[]).find(id=>!prior.has(id))
+ if(missing)return question(missingQuestions[missing])
+ // Known optional lines and retries are harmless; another main step is ignored.
  // Pictures never establish scripted facts or imply a current work photo exists.
  void images
  return {...rule.reply}

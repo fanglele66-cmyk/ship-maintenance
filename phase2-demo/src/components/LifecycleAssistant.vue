@@ -47,6 +47,7 @@ import {taskConversation} from '../workflow/lifecycleWorkItems'
 import {taskAssistantIntro} from '../workflow/taskAssistantIntro.js'
 import {createSpeechDraftInput} from '../workflow/speechDraftInput.js'
 import {canUseStepAssist,STEP_ASSIST_LIMITS} from '../workflow/stepAssistContract.js'
+import {isStepAssistScriptInput} from '../workflow/stepAssistDemo.js'
 import {prepareStepPhoto,stepPhotoBytes,isStepPhotoCopy} from '../workflow/stepPhotoUpload.js'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},activeStepIndex:{type:Number,default:0},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
@@ -109,8 +110,13 @@ watch(pending,value=>{if(value)voice.cancel()})
 onBeforeUnmount(()=>{contextVersion++;voice.dispose();clearTimeout(highlightTimer)})
 function follow(){if(following.value&&stream.value)stream.value.scrollTo({top:stream.value.scrollHeight,behavior:'smooth'})}
 async function ask(text){
+ if(pending.value||readingFiles.value||(!text.trim()&&!(mode.value==='step'&&(images.value.length||attachments.value.length))))return
+ if(mode.value==='chat'&&stepAvailable.value&&Number.isInteger(props.activeStepIndex)&&task.value?.steps?.[props.activeStepIndex]&&isStepAssistScriptInput({event:props.event,task:task.value,stepIndex:props.activeStepIndex,text})){
+  // Route the visible draft, without restoring another cached step draft or
+  // borrowing any text or photographs from a previously visited step.
+  mode.value='step';stepIndex.value=props.activeStepIndex;nonStepDraft=''
+ }
  const selectedMode=mode.value,selectedIndex=stepIndex.value,version=contextVersion
- if(pending.value||readingFiles.value||(!text.trim()&&!(selectedMode==='step'&&(images.value.length||attachments.value.length))))return
  if(selectedMode==='step'&&(!stepAvailable.value||selectedIndex!==props.activeStepIndex)){submitError.value='当前步骤已切换，请从当前步骤重新开启协助。';return}
  voice.cancel();submitError.value='';fileNotice.value='';following.value=true
  const sent={...snapshot(),text};loadDraft()
@@ -132,7 +138,7 @@ function askFollowup(text){if(mode.value==='step'&&hasMessage.value){input.value
 function apply(messageId){submitError.value='';try{const report=store.applySupplement(props.event.id,messageId,props.taskId);emit('report',report.id)}catch(e){submitError.value=e.message}}
 watch(()=>[props.taskId,task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
 watch(()=>messages.value.length,(count,previous)=>{if(count>previous){following.value=true;nextTick(follow)}})
-watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.response?.text,m?.response?.note,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.status]},()=>nextTick(follow))
+watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.response?.text,m?.response?.note,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.progressLog?.length,m?.progressLog?.at(-1)?.label,m?.status]},()=>nextTick(follow))
 watch(()=>props.activeStepIndex,index=>{if(mode.value==='step'&&stepIndex.value!==index){voice.cancel();setMode('chat');submitError.value=''}})
 watch(stepAvailable,available=>{if(!available&&mode.value==='step'){voice.cancel();setMode('chat')}})
 watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{contextVersion++;voice.cancel();following.value=false;loadDraft();stepDrafts.clear();nonStepDraft='';fileNotice.value='';mode.value='chat';submitError.value='';imageDialog.value?.close();nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})

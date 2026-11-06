@@ -18,7 +18,7 @@ function mount(component,pinia,props){
  const vm=app.mount(node());return {app,state:vm.$.setupState,props:vm.$.props}
 }
 
-test('C2 step collaboration keeps drafts scoped and requires explicit send and adoption',async t=>{
+test('C2 step collaboration scopes drafts, routes complete current-step scripts and requires explicit send and adoption',async t=>{
  const oldWindow=globalThis.window,oldReader=globalThis.FileReader
  globalThis.window={addEventListener(){}}
  globalThis.FileReader=class{readAsDataURL(file){this.result=file.dataUrl;queueMicrotask(()=>this.onload())}}
@@ -30,6 +30,7 @@ test('C2 step collaboration keeps drafts scoped and requires explicit send and a
   const {useSensorStore}=await server.ssrLoadModule('/src/stores/sensorStore.js')
   const {default:Assistant}=await server.ssrLoadModule('/src/components/LifecycleAssistant.vue')
   const {default:Proposal}=await server.ssrLoadModule('/src/components/StepNoteProposal.vue')
+  const {STEP_ASSIST_DEMO_CASES}=await server.ssrLoadModule('/src/workflow/stepAssistDemo.js')
   useSensorStore().configureSimulation({enabled:false})
   const store=useEventLifecycleStore(),fixtureState=fixture();store.state.events=fixtureState.events;store.state.role='engineer'
   const event=store.state.events[id],task=currentTask(event),props={event,taskId:task.id,activeStepIndex:0}
@@ -124,6 +125,69 @@ test('C2 step collaboration keeps drafts scoped and requires explicit send and a
    const conversation=await renderToString(createSSRApp({render:()=>h(Assistant,props)}).use(pinia))
    const userHtml=conversation.match(/<article[^>]*data-message-id="legacy-user"[^>]*>([\s\S]*?)<\/article>/)?.[1]
    assert.match(userHtml,/【虚构演示】/);assert.match(userHtml,/AI 生成示意样例/)
+  })
+
+  await t.test('sending a complete current-step script enters step mode without restoring stale cached material',async()=>{
+   const script=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===1),sentStep=[],sentChat=[]
+   assert.ok(script)
+   store.assistStep=async(...args)=>{sentStep.push(args)};store.ask=async(...args)=>{sentChat.push(args)}
+   mounted.props.activeStepIndex=1;task.draft.stepIndex=1;await nextTick()
+   state.assistStep(1);state.input='本步骤上次未发送的草稿';state.images=[{...photo,name:'旧照片.png'}];state.setMode('chat')
+   const newPhoto={...photo,name:'当前照片.png'},file={name:'本次记录.txt',text:'仅属于本次输入的现场信息'}
+   state.input=script.input;state.images=[newPhoto];state.attachments=[file]
+   await state.ask(state.input)
+   assert.equal(state.mode,'step');assert.equal(state.stepIndex,1);assert.equal(sentChat.length,0);assert.equal(sentStep.length,1)
+   assert.deepEqual(sentStep[0].slice(0,4),[id,task.id,1,script.input])
+   assert.deepEqual(sentStep[0][4],{images:[newPhoto],attachments:[file]})
+   assert.equal(state.input,'');assert.deepEqual(state.images,[]);assert.deepEqual(state.attachments,[])
+   assert.equal(task.draft.records[1].result,'');assert.equal(task.draft.records[1].note,'')
+  })
+
+  await t.test('failed automatic routing restores the visible input and materials for the current step',async()=>{
+   const script=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===1)
+   state.setMode('chat');state.input=script.input;state.images=[photo]
+   store.assistStep=async()=>{throw Error('暂时无法处理，请重试。')}
+   await state.ask(state.input)
+   assert.equal(state.mode,'step');assert.equal(state.stepIndex,1)
+   assert.equal(state.input,script.input);assert.deepEqual(state.images,[photo]);assert.match(state.submitError,/暂时无法处理/)
+  })
+
+  await t.test('automatic script routing never intercepts ordinary chat, another step, or report and plan modes',async()=>{
+   const current=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===1),other=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===0),sentStep=[],sentChat=[]
+   store.assistStep=async(...args)=>{sentStep.push(args)};store.ask=async(...args)=>{sentChat.push(args)}
+   for(const [mode,text] of [['chat','请解释燃油供给的工作原理'],['chat',other.input],['chat',current.input+' 另外现场还有一个新异常。'],['report',current.input],['plan',current.input]]){
+    state.setMode(mode);state.input=text;await state.ask(state.input)
+    assert.equal(sentChat.at(-1)[1],text);assert.equal(sentChat.at(-1)[2].mode,mode)
+   }
+   assert.equal(sentStep.length,0);assert.equal(sentChat.length,5)
+  })
+
+  await t.test('automatic routing is disabled for another owner and submitted tasks',async()=>{
+   const script=STEP_ASSIST_DEMO_CASES.find(item=>item.kind==='investigation'&&item.stepIndex===1),sentStep=[],sentChat=[]
+   store.assistStep=async(...args)=>{sentStep.push(args)};store.ask=async(...args)=>{sentChat.push(args)}
+   store.state.role='captain';await nextTick()
+   state.input=script.input;await state.ask(state.input)
+   assert.equal(state.stepAvailable,false);assert.equal(sentChat.at(-1)[2].mode,'chat');assert.equal(sentStep.length,0)
+   store.state.role='engineer';await nextTick();task.status='submitted';await nextTick()
+   state.input=script.input;await state.ask(state.input)
+   assert.equal(state.stepAvailable,false);assert.equal(sentChat.at(-1)[2].mode,'chat');assert.equal(sentStep.length,0)
+   task.status='assigned';await nextTick()
+  })
+
+  await t.test('questions and drafts show live progress and retain an expandable, safely rendered completed log',async()=>{
+   const render=message=>renderToString(createSSRApp(Proposal,{message})),progressLog=[{stage:'context',label:'正在核对当前步骤…'},{stage:'organize',label:'正在整理已提供的现场信息…'},{stage:'compose',label:'正在整理 <现场记录>…'}]
+   for(const kind of ['question','draft']){
+    const message={stepIndex:1,status:'streaming',response:{kind,text:'',...(kind==='draft'?{note:''}:{})},progressLog}
+    const html=await render(message)
+    assert.match(html,/role="status"[^>]*aria-live="polite"[^>]*aria-busy="true"/);assert.match(html,/step-progress-spinner/)
+    assert.match(html,/正在核对当前步骤/);assert.match(html,/正在整理已提供的现场信息/);assert.match(html,/&lt;现场记录&gt;/);assert.doesNotMatch(html,/<现场记录>/)
+    const complete=await render({...message,status:'complete',response:{kind,text:kind==='question'?'现场独立读数是多少？':'请核对备注草稿。',note:'现场读数仍待核对。'},progressLog:[...progressLog,{stage:'complete',label:kind==='question'?'已整理待确认的问题':'备注草稿已生成，待您核对'}]})
+    assert.match(complete,/<details[^>]*class="step-note-progress-history"/);assert.match(complete,/<summary[^>]*>处理进度<\/summary>/)
+    assert.match(complete,/正在核对当前步骤/);assert.doesNotMatch(complete,/step-progress-spinner|aria-busy="true"/)
+   }
+   assert.match(await render({status:'complete',progress:'旧版本处理记录',response:{kind:'question',text:'请补充读数。'}}),/旧版本处理记录/)
+   assert.match(await render({status:'streaming'}),/正在结合本步骤记录整理/)
+   assert.doesNotMatch(await render({status:'complete',response:{kind:'receipt',text:'本步骤已记录。'}}),/处理进度|step-progress-spinner/)
   })
  }finally{mounted?.app.unmount();disposePinia(pinia);await server.close();if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;if(oldReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=oldReader}
 })

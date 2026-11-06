@@ -52,7 +52,15 @@ test('the selected record and whole current task conversation are sent with step
   {id:'streaming',kind:'step-assist',stepIndex:0,status:'streaming',response:null}
  ]}
  const before=records(f);let payload
- const message=await ask(f,async(body,progress)=>{payload=body;progress('progress',{label:'正在核对本步资料'});return question})
+ const message=await ask(f,async(body,progress)=>{
+  payload=body
+  progress('progress',{stage:'context',label:'正在核对本步资料'})
+  progress('progress',{stage:'context',label:'正在核对本步资料'})
+  const pending=f.task.conversations.engineer.at(-1)
+  assert.equal(pending.status,'streaming');assert.equal(pending.response,null)
+  assert.equal(pending.progressLog.length,1,'repeated progress signals do not grow the history')
+  return question
+ })
  const prepared=prepareStepAssistInput(payload)
  assert.equal(prepared.context.record.note,'本步骤人工原文');assert.equal(prepared.context.stepIndex,0)
  assert.equal(prepared.context.history.length,4)
@@ -60,6 +68,8 @@ test('the selected record and whole current task conversation are sent with step
  assert.deepEqual(prepared.context.history.map(m=>m.scope),['current-step','current-step','other-step','task'])
  assert.doesNotMatch(JSON.stringify(payload),/第二步私人记录|不应发送/)
  assert.equal(records(f),before);assert.equal(message.response.kind,'question')
+ assert.deepEqual(message.progressLog,[{stage:'context',label:'正在核对本步资料'},{stage:'complete',label:'已整理待确认的问题'}])
+ assert.deepEqual(JSON.parse(JSON.stringify(message)).progressLog,message.progressLog,'processing history survives persisted reloads')
  assert.throws(()=>apply(f,message),/可采用/)
  assert.deepEqual(f.pending,{})
 })

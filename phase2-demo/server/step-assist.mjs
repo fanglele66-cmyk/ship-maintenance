@@ -3,6 +3,24 @@ import {resolveProvider} from './ai-config.mjs'
 import {invokeModel} from './model.mjs'
 import {prepareStepAssistInput,normalizeStepAssistResult} from '../src/workflow/stepAssistContract.js'
 import {matchStepAssistDemo} from '../src/workflow/stepAssistDemo.js'
+import {setTimeout as delay} from 'node:timers/promises'
+
+const waitForReply=(milliseconds,signal)=>delay(milliseconds,undefined,{signal})
+async function presentScriptedReply(reply,{emit,signal,wait}){
+ // Give the fixed conversation the same visible processing states as a model
+ // response. These are UI stages, never purported internal model reasoning.
+ const stages=[
+  {stage:'context',label:'正在核对当前步骤',duration:450},
+  {stage:'organize',label:'正在整理已提供的现场信息',duration:550},
+  {stage:'compose',label:reply.kind==='question'?'正在整理需要确认的问题':'正在整理本步骤备注草稿',duration:reply.kind==='question'?600:800},
+ ]
+ for(const {duration,...progress} of stages){
+  signal?.throwIfAborted()
+  emit('progress',progress)
+  await wait(duration,signal)
+ }
+ signal?.throwIfAborted()
+}
 
 export const maxStepAssistRequestBytes=9*1024*1024
 export function assertStepAssistVisionProvider(provider,images){
@@ -33,12 +51,12 @@ export function stepAssistUserContent(protocol,context,images){
  return content
 }
 
-export async function assistTaskStep(input,{configuration,knowledge,fetcher,emit=()=>{},signal}){
+export async function assistTaskStep(input,{configuration,knowledge,fetcher,emit=()=>{},signal,wait=waitForReply}){
  const {context,images}=prepareStepAssistInput(input)
  const demo=matchStepAssistDemo({context,images})
  if(demo){
   const stepAssist=normalizeStepAssistResult(demo)
-  emit('progress',{stage:'demo',label:'正在整理本步骤记录'})
+  await presentScriptedReply(stepAssist,{emit,signal,wait})
   return {stepAssist,answer:stepAssist.text,source:'scripted-demo',sources:[],model:'c2-step-demo',usage:{inputTokens:0,outputTokens:0},provider:'scripted-demo'}
  }
  emit('progress',{stage:'received',label:'正在核对本步骤现场记录'})

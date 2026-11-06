@@ -1,13 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {Readable} from 'node:stream'
-import {readFileSync} from 'node:fs'
 import {createAiHandler} from '../server/ai-api.mjs'
 import {assistTaskStep,stepAssistInstruction,stepAssistUserContent,assertStepAssistVisionProvider} from '../server/step-assist.mjs'
 import {buildStepAssistRequest} from '../src/workflow/stepAssistContract.js'
 import {createLifecycleState,decide,currentTask,people} from '../src/workflow/eventLifecycle.js'
 import {aiStreamRequest} from '../src/services/aiClient.js'
 import {readEventStream} from '../src/services/eventStream.js'
+import {STEP_ASSIST_DEMO_CASES} from '../src/workflow/stepAssistDemo.js'
 
 const png={name:'C2现场.png',mimeType:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lT8AAAAASUVORK5CYII='}
 const config={source:'manual',enabled:true,apiKey:'test-private-key',model:'test-vision',baseUrl:'https://example.test/v1',protocol:'openai',maxTokens:4096,timeoutMs:5000,knowledgeEnabled:false}
@@ -72,25 +72,41 @@ test('step-assist sends actual image parts to OpenAI and Anthropic and returns o
 })
 
 test('an exact scripted prompt returns a labelled demo before reading config, retrieving knowledge or calling the provider',async()=>{
- const script=readFileSync(new URL('../docs/二缸步骤协作演示/排查演示脚本.md',import.meta.url),'utf8')
- const start=script.split('### 2. 发送原话和图片，留下一个关键缺口')[1].match(/^> (.+)$/m)[1]
- const answer=script.split('### 3. 回答后生成备注卡')[1].match(/^> (.+)$/m)[1]
+ const start=STEP_ASSIST_DEMO_CASES.find(item=>item.id==='investigationStart').input
+ const answer=STEP_ASSIST_DEMO_CASES.find(item=>item.id==='investigationAnswer').input
  const input=fixture();input.text=start;input.attachments=[]
- const options={configuration:{read:()=>assert.fail('scripted demo must not read model configuration')},knowledge:{search:()=>assert.fail('scripted demo must not retrieve knowledge')},fetcher:()=>assert.fail('scripted demo must not call a provider')}
+ const durations=[],options={configuration:{read:()=>assert.fail('scripted demo must not read model configuration')},knowledge:{search:()=>assert.fail('scripted demo must not retrieve knowledge')},fetcher:()=>assert.fail('scripted demo must not call a provider'),wait:async ms=>durations.push(ms)}
  const events=[];const first=await assistTaskStep(input,{...options,emit:(type,data)=>events.push({type,data})})
- assert.equal(events[0].data.label,'正在整理本步骤记录')
+ assert.deepEqual(events.map(event=>event.data.stage),['context','organize','compose'])
+ assert.equal(events[0].data.label,'正在核对当前步骤')
+ assert.equal(events.at(-1).data.label,'正在整理需要确认的问题')
+ assert.deepEqual(durations,[450,550,600])
  assert.equal(first.stepAssist.kind,'question');assert.equal(first.source,'scripted-demo')
  assert.equal(first.provider,'scripted-demo');assert.equal(first.model,'c2-step-demo')
  assert.deepEqual(first.usage,{inputTokens:0,outputTokens:0})
- const http=await request(input,options.fetcher,'openai',options.configuration)
+ const began=performance.now(),http=await request(input,options.fetcher,'openai',options.configuration)
+ assert.ok(performance.now()-began>=1500,'the production reply must leave visible processing time')
  assert.equal(http.code,200);assert.equal(JSON.parse(http.output).source,'scripted-demo')
  input.history=[{eventId:input.event.id,taskId:input.taskId,stepIndex:0,role:'user',text:start}];input.text=answer
  const next=await assistTaskStep(input,options)
+ assert.deepEqual(durations.slice(-3),[450,550,800])
  assert.equal(next.stepAssist.kind,'draft');assert.doesNotMatch(next.stepAssist.note,/演示|练习|虚构|AI 生成|图片来源/)
  assert.match(next.stepAssist.note,/原因未确认|原因.*未确认/)
  const different={...input,text:answer.replace('三次','四次')};let called=false
  const real=await assistTaskStep(different,{configuration:{read:async()=>config},knowledge:{search:async()=>[]},fetcher:async()=>{called=true;return modelResponse(reply)}})
  assert.equal(called,true);assert.equal(real.source,'model','an altered fact cannot reuse a fixed script response')
+})
+
+test('cancelling scripted processing cannot return a late reply or call the model',async()=>{
+ const input=fixture();input.text=STEP_ASSIST_DEMO_CASES.find(item=>item.id==='investigationStart').input
+ const controller=new AbortController(),events=[]
+ await assert.rejects(assistTaskStep(input,{
+  configuration:{read:()=>assert.fail('no config access')},fetcher:()=>assert.fail('no model access'),
+  emit:(type,data)=>events.push({type,data}),signal:controller.signal,
+  wait:async()=>controller.abort(),
+ }),{name:'AbortError'})
+ assert.equal(events.length,1)
+ assert.equal(events[0].data.stage,'context')
 })
 
 test('real fallback sees the whole current task conversation with step scope but no cross-task data',async()=>{

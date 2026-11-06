@@ -31,16 +31,24 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
  if(estimated>4*1024*1024)throw Error('记录中的图片较大，请压缩图片后重试；现有备注和对话未修改。')
  const at=now(),replyId=crypto.randomUUID(),baseNote=record.note||'',baseResult=record.result||'',baseExecutionStatus=record.executionStatus||'',baseStep=signature(task.steps[stepIndex])
  conversation.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at,stepAssistance:true,stepIndex,images:copy(body.images||[]),attachments:copy(body.attachments||[])})
- conversation.push({id:replyId,kind:'step-assist',stepIndex,baseNote,baseResult,baseExecutionStatus,baseStep,at,status:'streaming',response:null,progress:'正在整理本步骤的现场信息…'})
+ conversation.push({id:replyId,kind:'step-assist',stepIndex,baseNote,baseResult,baseExecutionStatus,baseStep,at,status:'streaming',response:null,progress:'正在整理本步骤的现场信息…',progressLog:[]})
  const locate=()=>state.events[eventId]?.tasks.find(t=>t.id===taskId)?.conversations?.[role]?.find(m=>m.id===replyId)
  pendingRequests[key]=true
  try{
-  const result=await request(body,(kind,data)=>{const m=locate();if(m&&kind==='progress')m.progress=data.label||'正在整理本步骤的现场信息…'})
+  const result=await request(body,(kind,data)=>{
+   const m=locate();if(!m||kind!=='progress')return
+   m.progress=data.label||'正在整理本步骤的现场信息…'
+   const entry={stage:data.stage||'processing',label:m.progress}
+   m.progressLog||=[]
+   if(!m.progressLog.some(item=>item.stage===entry.stage&&item.label===entry.label))m.progressLog=[...m.progressLog.slice(-11),entry]
+  })
   const response=normalizeStepAssistResult(result.stepAssist),message=locate()
   if(!message)return null
   const latest=state.events[eventId]?.tasks.find(t=>t.id===taskId)
   if(!canUseStepAssist(state.events[eventId],latest,role)||signature(latest.steps[stepIndex])!==baseStep)throw Error('任务范围或状态已变化，请回到当前步骤重新协助。')
   Object.assign(message,{response,status:'complete',source:result.source||'model',model:result.model,usage:result.usage,sources:result.sources||[],at:now()})
+  message.progressLog||=[]
+  message.progressLog.push({stage:'complete',label:response.kind==='question'?'已整理待确认的问题':'备注草稿已生成，待您核对'})
   for(const old of latest.conversations[role])if(old.id!==replyId&&old.kind==='step-assist'&&old.stepIndex===stepIndex&&old.response?.kind==='draft'&&!old.appliedAt)old.supersededAt=message.at
   return message
  }catch(error){const message=locate();if(message)Object.assign(message,{status:'interrupted',modelError:error.message});throw error}

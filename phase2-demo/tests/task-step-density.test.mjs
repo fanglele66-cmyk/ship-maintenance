@@ -16,7 +16,8 @@ test('new repair plans merge duplicated preparation/restoration while retaining 
   const methods=compactRepair({realType:type,packages:taskPackages(type)},keys).tasks
   const plan=detailedRepairSteps(event,methods),operations=plan.flatMap(s=>s.substeps||[s])
   assert.equal(plan.length,4)
-  assert.equal(operations.length,9,'eleven original operations merge to nine')
+  assert.equal(operations.length,id==='real-alarm-0430'?8:9,'C2 additionally combines scope and material preparation')
+  assert.equal(plan[0].substeps.length,id==='real-alarm-0430'?2:3)
   assert.ok(!operations.some(s=>/^(确认供气配置与隔离范围|确认作业范围与隔离标识|恢复供气并复测压力响应|恢复系统并复测喷射响应)$/.test(s.label)))
   const text=JSON.stringify(plan)
   for(const method of methods)for(const check of method.checks)assert.ok(text.includes(check),check)
