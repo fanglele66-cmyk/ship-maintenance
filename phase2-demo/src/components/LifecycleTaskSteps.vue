@@ -2,7 +2,7 @@
  <section class="lc-task-wizard" :class="{'lc-repair-wizard':repair}" aria-label="横向分步填写">
   <details v-if="task.procedureHistory?.length" class="lc-procedure-history"><summary>步骤调整前的记录</summary><section v-for="(history,i) in task.procedureHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
   <details v-if="task.feedbackHistory?.length" class="lc-procedure-history"><summary>前次提交记录</summary><section v-for="(history,i) in task.feedbackHistory" :key="i"><p v-for="record in history.draft.records.filter(r=>r.result||r.note)" :key="record.label"><strong>{{record.label}} · {{record.result||'未选结果'}}</strong><br/>{{record.note}}</p></section></details>
-  <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :disabled="submitting" :class="{active:index===i,complete:task.draft.records[i].result}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{step.short||step.label}}</button></nav>
+  <nav class="lc-stepper" aria-label="执行步骤"><button v-for="(step,i) in task.steps" :key="i" :disabled="submitting" :class="{active:index===i,complete:isTaskStepComplete(step,task.draft.records[i])}" :aria-current="index===i?'step':undefined" @click="go(i)"><span>{{i+1}}</span>{{step.short||step.label}}</button></nav>
   <form v-if="step" class="lc-step-editor" @submit.prevent="next">
    <div class="lc-step-instructions"><h3>{{step.label}}</h3><LifecycleStepInstructions :event="event" :task="task" :number="index+1" :step="step" :compact="repair" :paginate="repair"/><RecordGuidance v-if="!repair&&!step.substeps?.length" :text="step.recordHint"/></div>
    <div class="lc-task-feedback"><fieldset><legend>{{task.kind==='investigation'?'检查结果':'作业反馈'}}<small v-if="displayStep.substeps?.length">（本步骤共 {{displayStep.substeps.length}} 个子项）</small></legend><label v-for="option in step.options" :key="option" :class="{selected:record.result===option}"><input type="radio" :name="task.id+'-'+index" v-model="record.result" :value="option" required/>{{option}}</label></fieldset>
@@ -22,6 +22,7 @@ import {canUseStepAssist} from '../workflow/stepAssistContract.js'
 import {taskName} from '../workflow/lifecycleDecisions'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {repairStepForDisplay} from '../workflow/repairPreparation.js'
+import {isTaskStepComplete} from '../workflow/taskStepCompletion.js'
 const props=defineProps({event:{type:Object,required:true},task:{type:Object,required:true}}),emit=defineEmits(['submitting','submitted','assist']),store=useEventLifecycleStore(),error=ref(''),submitting=ref(false)
 const index=computed({get:()=>Math.max(0,Math.min(props.task.draft.stepIndex||0,props.task.steps.length-1)),set:value=>props.task.draft.stepIndex=value})
 const step=computed(()=>props.task.steps[index.value]),record=computed(()=>props.task.draft.records[index.value])
@@ -33,9 +34,9 @@ const repair=computed(()=>['repair','maintenance'].includes(props.task.kind))
 function go(i){error.value='';index.value=i}
 async function next(){
  if(submitting.value)return
- if(!record.value.result){error.value='请选择本步骤的实际结果。';return}
+ if(!isTaskStepComplete(step.value,record.value)){error.value=step.value?.options?.includes(record.value?.result)?'请补齐本步骤的实际执行情况。':'请选择本步骤的实际结果。';return}
  if(!lastStep.value){go(index.value+1);return}
- const missing=props.task.draft.records.findIndex((r,i)=>!props.task.steps[i].options.includes(r.result)||(/无法确认|受限/.test(r.result)&&!['已完成','未完成'].includes(r.executionStatus)))
+ const missing=props.task.steps.findIndex((step,i)=>!isTaskStepComplete(step,props.task.draft.records[i]))
  if(missing>=0){go(missing);error.value='请补齐本步骤的实际结果和执行情况。';return}
  submitting.value=true;error.value='';emit('submitting')
  try{await store.submit(props.event.id,props.task.id);emit('submitted')}catch(e){error.value=e.message}finally{submitting.value=false}

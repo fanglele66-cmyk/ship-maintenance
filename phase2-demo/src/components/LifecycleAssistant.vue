@@ -17,7 +17,7 @@
    <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
   <form class="lc-composer" :class="{'step-focus':composerHighlight}" @submit.prevent="ask(input)">
-   <div v-if="editableReports.length||editablePlan" class="lc-chat-mode"><button v-if="editableReports.length" type="button" :aria-pressed="mode==='report'" @click="setMode(mode==='report'?'chat':'report')">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="setMode(mode==='plan'?'chat':'plan')">修改AI建议</button><select v-if="mode==='report'" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div>
+   <div v-if="(!taskId&&editableReports.length)||editablePlan||(mode==='report'&&editableReports.length>1)" class="lc-chat-mode"><button v-if="!taskId&&editableReports.length" type="button" :aria-pressed="mode==='report'" @click="setMode(mode==='report'?'chat':'report')">补充报告</button><button v-if="editablePlan" type="button" :aria-pressed="mode==='plan'" :disabled="editablePlan.status!=='ready'" @click="setMode(mode==='plan'?'chat':'plan')">修改AI建议</button><select v-if="mode==='report'&&editableReports.length>1" v-model="targetReport" aria-label="要补充的报告"><option v-for="r in editableReports" :key="r.id" :value="r.id">{{r.title}} · {{r.number||r.submissionNumber}}</option></select></div>
    <textarea ref="inputEl" v-model="input" aria-label="询问助手" :placeholder="composerPlaceholder" @keydown.enter.exact.prevent="ask(input)"/>
    <div v-if="mode==='step'&&images.length" class="composer-images" aria-label="待发送照片"><div v-for="(photo,i) in images" :key="i"><button type="button" class="image-thumbnail" :aria-label="`预览图片：${photo.name}`" :title="photo.name" @click="previewImage(photo)"><img :src="photo.dataUrl" :alt="photo.name"/></button><button type="button" class="remove-material" :aria-label="`移除图片：${photo.name}`" @click="images.splice(i,1)">×</button><small v-if="isStepPhotoCopy(photo)">上传压缩副本</small></div></div>
    <ul v-if="mode==='step'&&attachments.length" class="composer-files"><li v-for="(file,i) in attachments" :key="i"><span>{{file.name}}</span><button type="button" :aria-label="`移除附件：${file.name}`" @click="attachments.splice(i,1)">×</button></li></ul>
@@ -59,7 +59,7 @@ function editTask(){if(editablePlan.value?.status!=='ready')return;setMode('plan
 function supplementReport(reportId){
  if(!editableReports.value.some(report=>report.id===reportId))return
  targetReport.value=reportId;setMode('report')
- nextTick(()=>{inputEl.value?.scrollIntoView({block:'nearest'});inputEl.value?.focus({preventScroll:true})})
+ void focusComposer()
 }
 async function revealReport(){
  following.value=false

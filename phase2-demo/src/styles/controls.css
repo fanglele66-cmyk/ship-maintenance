@@ -101,7 +101,13 @@
 .app-container.app-container .lc-stepper button.active { background: #f7f1e5; border-color: #e6d8b9; color: #896b37; }
 .app-container.app-container .lc-stepper button>span { background: #e8ebe1; color: #89917d; }
 .app-container.app-container .lc-stepper button.active>span { background: #ac8c50; color: #fff; }
-.app-container.app-container .lc-stepper button.complete:not(.active)>span { background: #e5efe6; color: #5e8970; }
+/* Completed required fields color the whole card, including the active step. */
+.app-container.app-container .lc-stepper button.complete,
+.app-container.app-container .lc-stepper button.complete.active { background: #eaf5ed; border-color: #a5cbb1; color: #356b47; }
+.app-container.app-container .lc-stepper button.complete:hover { background: #e1f0e5; }
+.app-container.app-container .lc-stepper button.complete.active { border-color: #6a9c7a; box-shadow: inset 0 0 0 1px #6a9c7a33; }
+.app-container.app-container .lc-stepper button.complete>span,
+.app-container.app-container .lc-stepper button.complete.active>span { background: #d1e8d8; color: #356b47; }
 .app-container.app-container .lc-step-editor fieldset label { border-color: var(--ui-border); border-radius: 7px; background: #fff; }
 .app-container.app-container .lc-step-editor fieldset label:hover { border-color: var(--ui-border-hover); }
 .app-container.app-container .lc-step-editor fieldset label.selected { border-color: var(--ui-accent-line); color: #836735; background: #faf5e9; box-shadow: 0 0 0 1px #c7ae7714; }
