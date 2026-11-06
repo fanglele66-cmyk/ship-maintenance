@@ -55,7 +55,10 @@ test('task submissions open the assistant through generation, completion and ret
    await router.push('/tasks/'+task.id)
    const mounted=mount(View,pinia,router)
    try{
-    assert.equal(mounted.state.assistantOpen,false)
+    assert.equal(mounted.state.assistantOpen,true,'the task assistant starts expanded')
+    mounted.state.assistantOpen=false
+    await nextTick()
+    assert.equal(mounted.state.assistantOpen,false,'the user may still collapse it')
     await mounted.state.showSubmission()
     assert.equal(mounted.state.assistantOpen,true,'opens before the model request')
     mounted.state.assistantOpen=false
@@ -69,11 +72,16 @@ test('task submissions open the assistant through generation, completion and ret
     finish(model);await pending;await nextTick();mounted.state.submitted();await nextTick()
     assert.equal(mounted.state.assistantOpen,true)
     assert.equal(mounted.state.tab,'提交记录')
-    const html=await renderToString(createSSRApp({render:()=>h(View)}).use(pinia).use(router))
+    const renderTab=tab=>renderToString(createSSRApp({...View,setup(props,context){const state=View.setup(props,context);state.tab.value=tab;return state}}).use(pinia).use(router))
+    const html=await renderTab('任务步骤')
     const toolbar=html.match(/<nav[^>]*aria-label="本轮报告操作"[^>]*>([\s\S]*?)<\/nav>/)?.[1]
     assert.ok(toolbar)
-    const positions=['返回本轮执行记录','查看'+({investigation:'排查',repair:'维修',maintenance:'维保'}[kind])+'报告','下载 Markdown','通过对话补充报告'].map(label=>toolbar.indexOf(label))
+    const positions=['本轮执行记录','查看'+({investigation:'排查',repair:'维修',maintenance:'维保'}[kind])+'报告','下载 Markdown','通过对话补充报告'].map(label=>toolbar.indexOf(label))
     assert.ok(positions.every((position,i)=>position>=0&&(i===0||position>positions[i-1])))
+    assert.doesNotMatch(toolbar,/返回本轮执行记录/)
+    const reportHtml=await renderTab('提交记录')
+    const reportToolbar=reportHtml.match(/<nav[^>]*aria-label="本轮报告操作"[^>]*>([\s\S]*?)<\/nav>/)?.[1]
+    assert.match(reportToolbar,/← 返回本轮执行记录/)
     assert.equal((html.match(/下载 Markdown/g)||[]).length,1)
     const currentReport=store.state.events[id].reports.at(-1)
     const noDownload=await renderToString(createSSRApp({render:()=>h(Report,{report:currentReport,showDownload:false})}))

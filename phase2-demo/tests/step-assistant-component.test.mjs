@@ -103,5 +103,27 @@ test('C2 step collaboration keeps drafts scoped and requires explicit send and a
    assert.ok(html.indexOf('aria-label="添加文件"')<html.indexOf('aria-label="添加现场照片"'));assert.ok(html.indexOf('aria-label="添加现场照片"')<html.indexOf('class="composer-voice"'));assert.ok(html.indexOf('class="composer-voice"')<html.indexOf('class="composer-send"'))
    assert.doesNotMatch(await render({taskId:''}),/aria-label="添加现场照片"/)
   })
+
+  await t.test('receipt emphasis preserves plain text and cannot inject HTML',async()=>{
+   const render=message=>renderToString(createSSRApp(Proposal,{message}))
+   const html=await render({response:{kind:'receipt',text:'本步骤已记录。可以点击“下一步”继续；下一步核对接口 <img src=x onerror=alert(1)>。'}})
+   assert.equal((html.match(/<strong class="step-note-next"[^>]*>下一步<\/strong>/g)||[]).length,2)
+   assert.match(html,/本步骤已记录/);assert.match(html,/核对接口/);assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img|<script/)
+   assert.doesNotMatch(await render({response:{kind:'receipt',text:'已到最后一步，请核对记录后提交。'}}),/step-note-next/)
+   assert.doesNotMatch(await render({response:{kind:'question',text:'下一步需要哪些信息？'}}),/step-note-next/)
+  })
+
+  await t.test('note presentation removes legacy framing while retaining raw messages and material limits',async()=>{
+   const note='【虚构演示】液压活塞三次回位不畅；未继续内部拆修，具体原因未确认。所述图片为 AI 生成示意样例，不作本轮现场证据。'
+   const message={id:'legacy-draft',kind:'step-assist',source:'scripted-demo',stepIndex:0,response:{kind:'draft',text:'请核对草稿。',note}}
+   const html=await renderToString(createSSRApp(Proposal,{message}))
+   assert.match(html,/液压活塞三次回位不畅/);assert.match(html,/未继续内部拆修，具体原因未确认/)
+   assert.doesNotMatch(html,/【虚构演示】|AI 生成示意样例/)
+   assert.equal(message.response.note,note);assert.equal(message.source,'scripted-demo')
+   task.conversations.engineer.push({id:'legacy-user',kind:'user',text:note,at:new Date().toISOString()})
+   const conversation=await renderToString(createSSRApp({render:()=>h(Assistant,props)}).use(pinia))
+   const userHtml=conversation.match(/<article[^>]*data-message-id="legacy-user"[^>]*>([\s\S]*?)<\/article>/)?.[1]
+   assert.match(userHtml,/【虚构演示】/);assert.match(userHtml,/AI 生成示意样例/)
+  })
  }finally{mounted?.app.unmount();disposePinia(pinia);await server.close();if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;if(oldReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=oldReader}
 })

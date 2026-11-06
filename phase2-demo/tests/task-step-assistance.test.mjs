@@ -88,12 +88,42 @@ test('adopting a draft changes only its note, without choosing a result, advanci
  assert.match(last.task.conversations.engineer.at(-1).response.text,/确认后点击左侧/)
 })
 
-test('old-step cards, manual note or result edits, and changed step requirements cannot overwrite current work',async()=>{
+test('result and feedback selections made after a draft do not prevent note-only adoption',async()=>{
+ for(const kind of ['investigation','repair']){
+  const f=fixture(kind),message=await ask(f,async()=>draft('已查范围的记录；未覆盖部分待核实。'))
+  const record=f.task.draft.records[0]
+  record.result=kind==='investigation'?'未见异常':'已完成'
+  record.executionStatus='未完成'
+  const expected=structuredClone(f.task.draft.records)
+  expected[0].note=message.response.note
+  apply(f,message)
+  assert.deepEqual(f.task.draft.records,expected)
+  assert.equal(f.task.draft.stepIndex,0)
+  assert.equal(f.task.status,'assigned')
+  assert.ok(message.appliedAt)
+ }
+})
+
+test('adopting an older draft uses the displayed note while preserving the original conversation',async()=>{
+ const f=fixture(),original='练习记录：已查接口未见异常。高负荷未覆盖。'
+ const message=await ask(f,async()=>draft(original))
+ f.task.draft.records[0].result='未见异常'
+ apply(f,message)
+ assert.equal(f.task.draft.records[0].note,'已查接口未见异常。高负荷未覆盖。')
+ assert.equal(message.response.note,original)
+ const empty=fixture(),framingOnly=await ask(empty,async()=>draft('练习记录：'))
+ const before=records(empty)
+ assert.throws(()=>apply(empty,framingOnly),/尚无本步骤/)
+ assert.equal(records(empty),before)
+ assert.equal(framingOnly.appliedAt,undefined)
+})
+
+test('old-step cards, manual note edits, and changed step requirements cannot overwrite current work',async()=>{
  const across=fixture(),message=await ask(across,async()=>draft('第一步草稿'))
  across.task.draft.stepIndex=1
  assert.throws(()=>apply(across,message),/回到左侧第 1 步/);assert.equal(across.task.draft.records[1].note,'')
  across.task.draft.stepIndex=0;apply(across,message)
- for(const change of [f=>f.task.draft.records[0].note='人工修改后的新备注',f=>f.task.draft.records[0].result=f.task.steps[0].options[0],f=>f.task.draft.records[0].executionStatus='未完成',f=>f.task.steps[0].guide+=' 新增作业范围']){
+ for(const change of [f=>f.task.draft.records[0].note='人工修改后的新备注',f=>f.task.steps[0].guide+=' 新增作业范围']){
   const f=fixture(),old=await ask(f,async()=>draft('旧上下文生成的草稿'));change(f)
   const before=records(f);assert.throws(()=>apply(f,old),/已被修改/);assert.equal(records(f),before);assert.equal(old.appliedAt,undefined)
  }

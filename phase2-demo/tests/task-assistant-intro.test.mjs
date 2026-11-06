@@ -35,7 +35,7 @@ test('submitted, waiting and interrupted tasks do not present completed work as 
  assert.match(taskAssistantIntro(event,{kind:'investigation',purpose:'recheck',status:'assigned',steps:[]})[0],/这项复查/)
 })
 
-test('the empty task conversation shows ordinary introductory text immediately before follow-up suggestions',async()=>{
+test('the introductory AI bubble stays before the conversation as messages arrive',async()=>{
  const priorWindow=globalThis.window;globalThis.window={addEventListener(){}}
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  const pinia=createPinia();setActivePinia(pinia)
@@ -48,11 +48,19 @@ test('the empty task conversation shows ordinary introductory text immediately b
   decide(state,id,{action:'investigate',owner:people.engineer,deadline:new Date(Date.now()+86400000).toISOString()})
   const task=currentTask(state.events[id]);task.conversations={engineer:[],captain:[]}
   const store=useEventLifecycleStore();store.state.events=state.events;store.state.role='engineer'
-  const html=await renderToString(createSSRApp({render:()=>h(Assistant,{event:store.state.events[id],taskId:task.id})}).use(pinia))
-  const intro=html.match(/<div class="task-assistant-intro"[^>]*>([\s\S]*?)<\/div>/)?.[1]
+  const render=()=>renderToString(createSSRApp({render:()=>h(Assistant,{event:store.state.events[id],taskId:task.id})}).use(pinia))
+  const html=await render()
+  const intro=html.match(/<article class="lc-message task-assistant-intro"[^>]*>([\s\S]*?)<\/article>/)?.[1]
   assert.ok(intro);assert.match(intro,/二缸报警与喷射控制核实/)
   assert.doesNotMatch(intro,/<h\d|<strong|report-proposal/)
   assert.ok(html.indexOf('task-assistant-intro')<html.indexOf('aria-label="继续追问"'))
   assert.equal((intro.match(/<p/g)||[]).length,2)
+  task.conversations.engineer.push({id:'later-user',kind:'user',text:'这里是用户刚补充的情况。',at:new Date().toISOString()},{id:'later-assistant',kind:'step-assist',source:'scripted-demo',stepIndex:0,status:'complete',response:{kind:'question',text:'请确认实际检查范围。'},at:new Date().toISOString()})
+  const populated=await render()
+  assert.ok(populated.indexOf('task-assistant-intro')<populated.indexOf('data-message-id="later-user"'))
+  assert.ok(populated.indexOf('data-message-id="later-user"')<populated.indexOf('data-message-id="later-assistant"'))
+  assert.equal((populated.match(/task-assistant-intro/g)||[]).length,1)
+  assert.doesNotMatch(populated,/演示 ·|step-assist-label/)
+  assert.equal(task.conversations.engineer.at(-1).source,'scripted-demo','presentation does not remove internal provenance')
  }finally{disposePinia(pinia);await server.close();if(priorWindow===undefined)delete globalThis.window;else globalThis.window=priorWindow}
 })

@@ -1,0 +1,36 @@
+{
+  "checks": [
+    {
+      "defaultOpen": true,
+      "introFirst": true,
+      "resultBeforeAdoption": true,
+      "receiptEmphasis": true,
+      "toolbarLabels": true,
+      "case": "investigation",
+      "scriptCalls": 5,
+      "steps": 2,
+      "adoptOnlyNote": true,
+      "submitKeepsAssistant": true
+    },
+    {
+      "case": "unscripted route",
+      "providerAdapterCalls": 1,
+      "taskContextMessages": 22,
+      "scoped": true
+    },
+    {
+      "defaultOpen": true,
+      "introFirst": true,
+      "resultBeforeAdoption": true,
+      "receiptEmphasis": true,
+      "toolbarLabels": true,
+      "case": "repair",
+      "scriptCalls": 9,
+      "steps": 4,
+      "adoptOnlyNote": true,
+      "submitKeepsAssistant": true
+    }
+  ],
+  "errors": [],
+  "externalCalls": 0
+}

@@ -1,6 +1,7 @@
 <template>
- <aside class="lc-assistant"><header><div class="assistant-heading"><strong>{{taskId?'任务助手':'事件助手'}}</strong><span v-if="mode==='step'" class="step-assist-label">第{{stepIndex+1}}步协助</span></div><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button></header>
+ <aside class="lc-assistant"><header><div class="assistant-heading"><strong>{{taskId?'任务助手':'事件助手'}}</strong></div><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button></header>
   <div ref="stream" class="lc-conversation" @wheel.passive="following=false" @pointerdown="following=false">
+   <article v-if="introduction.length" class="lc-message task-assistant-intro"><p v-for="(sentence,i) in introduction" :key="i">{{sentence}}</p></article>
    <article v-for="(message,i) in messages" :key="message.id" :class="['lc-message',message.kind,{'step-assist-user':message.kind==='user'&&message.stepAssistance}]" :data-message-id="message.id">
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>
@@ -9,11 +10,10 @@
     <template v-else><strong v-if="message.title">{{message.title}}</strong><p v-if="message.text">{{message.text}}</p></template>
     <div v-if="message.images?.length" class="message-images"><div v-for="(photo,j) in message.images" :key="j"><button type="button" :aria-label="`查看图片：${photo.name}`" :title="photo.name" @click="previewImage(photo)"><img :src="photo.dataUrl" :alt="photo.name" loading="lazy"/></button><small v-if="isStepPhotoCopy(photo)">上传压缩副本</small></div></div>
     <ul v-if="message.attachments?.length" class="message-files"><li v-for="(file,j) in message.attachments" :key="j">附件 · {{file.name}}</li></ul>
-    <time><span v-if="message.source==='scripted-demo'">演示 · </span>{{timeText(message.at)}}</time>
+    <time>{{timeText(message.at)}}</time>
    </article>
    <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>本轮报告待审阅。</p><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
-   <div v-if="introduction.length" class="task-assistant-intro"><p v-for="(sentence,i) in introduction" :key="i">{{sentence}}</p></div>
    <div class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
   <form class="lc-composer" :class="{'step-focus':composerHighlight}" @submit.prevent="ask(input)">
@@ -185,12 +185,12 @@ function closeImageBackdrop(ev){if(ev.target===imageDialog.value)imageDialog.val
 
 <style scoped>
 .lc-composer footer{justify-content:flex-start;gap:7px}.lc-composer footer .composer-send{margin-left:auto}.lc-composer footer .composer-voice[aria-pressed=true]{background:#f9e9e5;color:#b55f51}.composer-voice-status,.composer-voice-error,.composer-file-notice{display:block;margin-top:6px;font-size:11px;line-height:1.5;color:#7d8b9d;overflow-wrap:anywhere}.composer-voice-error,.composer-file-notice{color:#b47546}
-.task-assistant-intro{margin:14px 0 10px;color:#687c8c;font-size:12px;line-height:1.75}.task-assistant-intro p{margin:0 0 5px}
+.task-assistant-intro p{margin:0 0 8px}.task-assistant-intro p:last-child{margin-bottom:0}
 .lc-message>time{text-align:left!important}.lc-conversation .lc-message :deep(.assistant-basis-content){background:transparent}
 
 .lc-assistant>header{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}.lc-assistant>header small{grid-column:1/-1}.lc-assistant>header .assistant-collapse{justify-self:end;width:auto;padding:4px 8px;border:0;background:transparent;font-size:12px}
-.assistant-heading{display:flex;align-items:center;gap:10px;min-width:0}.step-assist-label{flex:none;font-size:11px;color:#53715c;padding:3px 7px;border-radius:5px;background:#edf5ee;border:1px solid #deeadf;line-height:1.5}
-.lc-assistant .lc-conversation .lc-message.step-assist-user{background:#edf5ff;border:1px solid #dce9f5;color:#3e576e;border-radius:11px 11px 3px 11px}.lc-assistant .lc-conversation .lc-message.step-assist{padding:13px 14px;margin:12px 12px 16px 0;background:#f0f7f1;border:1px solid #deeadf;border-radius:11px 11px 11px 3px;color:#435d4a}
+.assistant-heading{display:flex;align-items:center;gap:10px;min-width:0}
+.lc-assistant .lc-conversation .lc-message.step-assist-user{background:#edf5ff;border:1px solid #dce9f5;color:#3e576e;border-radius:11px 11px 3px 11px}.lc-assistant .lc-conversation .lc-message.step-assist,.lc-assistant .lc-conversation .lc-message.task-assistant-intro{padding:13px 14px;margin:12px 12px 16px 0;background:#f0f7f1;border:1px solid #deeadf;border-radius:11px 11px 11px 3px;color:#435d4a}.lc-assistant .lc-conversation .lc-message.task-assistant-intro{margin-top:0}
 .message-images,.composer-images{display:flex;gap:7px;overflow-x:auto;padding:4px 0}.message-images button,.composer-images .image-thumbnail{display:block;width:70px;height:70px;padding:0;overflow:hidden;border:1px solid #dbe3dc;border-radius:7px;background:#fff;flex:none}.message-images img,.composer-images img{width:100%;height:100%;object-fit:cover;display:block}.message-images>div,.composer-images>div{position:relative;flex:none;width:70px}.message-images small,.composer-images small{display:block;font-size:10px;line-height:1.5;color:#778577;text-align:center;margin-top:3px}.composer-images .remove-material{position:absolute;right:3px;top:3px;width:20px;height:20px;padding:0;background:#ffffffed;border:1px solid #dbe1db;border-radius:50%;font-size:14px;line-height:1;color:#5a665c}.composer-files,.message-files{list-style:none;padding:0;margin:7px 0;font-size:11px;color:#6c7c71}.composer-files li{display:flex;align-items:center;gap:8px;padding:3px 0}.composer-files span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.composer-files button{margin-left:auto;flex:none;padding:0 5px;border:0;background:transparent;color:#6d7f71}.message-files li{overflow-wrap:anywhere}
 .step-image-preview{max-width:min(92vw,1100px);max-height:90vh;padding:14px;border:1px solid #d8dfd8;border-radius:10px;background:#fff}.step-image-preview::backdrop{background:#15231ec2}.step-image-preview header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:12px}.step-image-preview strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}.step-image-preview img{display:block;max-width:100%;max-height:76vh;object-fit:contain;margin:auto}.step-image-preview button{flex:none;font-size:12px}
 .lc-composer.step-focus{animation:step-composer-focus 1.2s ease-out}@keyframes step-composer-focus{0%,25%{border-color:#b39a68;box-shadow:0 0 0 4px #b3945a2e,0 3px 12px #29332108}100%{border-color:#c3ac7d;box-shadow:0 0 0 3px #b3945a17,0 3px 12px #29332108}}@media(prefers-reduced-motion:reduce){.lc-composer.step-focus{animation:none}}

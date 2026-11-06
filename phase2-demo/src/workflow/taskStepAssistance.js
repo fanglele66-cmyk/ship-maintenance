@@ -1,6 +1,7 @@
 import {buildStepAssistRequest,canUseStepAssist,normalizeStepAssistResult,STEP_ASSIST_LIMITS} from './stepAssistContract.js'
 import {taskConversation} from './lifecycleWorkItems.js'
 import {lifecycleSnapshot} from './demoTimeline.js'
+import {operationalText} from './operationalText.js'
 
 const copy=value=>JSON.parse(JSON.stringify(value))
 const signature=step=>JSON.stringify(step)
@@ -27,7 +28,7 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
  const body=buildStepAssistRequest({event,task,stepIndex,role,text,history,images:uploads?.images||[],attachments:uploads?.attachments||[]})
  // Leave room for subsequent text edits in the existing local demo storage.
  const estimated=2*(lifecycleSnapshot(state)+JSON.stringify({images:body.images,attachments:body.attachments})).length
- if(estimated>4*1024*1024)throw Error('演示记录中的图片较大，请压缩图片后重试；现有备注和对话未修改。')
+ if(estimated>4*1024*1024)throw Error('记录中的图片较大，请压缩图片后重试；现有备注和对话未修改。')
  const at=now(),replyId=crypto.randomUUID(),baseNote=record.note||'',baseResult=record.result||'',baseExecutionStatus=record.executionStatus||'',baseStep=signature(task.steps[stepIndex])
  conversation.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at,stepAssistance:true,stepIndex,images:copy(body.images||[]),attachments:copy(body.attachments||[])})
  conversation.push({id:replyId,kind:'step-assist',stepIndex,baseNote,baseResult,baseExecutionStatus,baseStep,at,status:'streaming',response:null,progress:'正在整理本步骤的现场信息…'})
@@ -54,10 +55,11 @@ export function applyTaskStepNote(state,eventId,taskId,messageId,pendingRequests
  if((task.draft.stepIndex||0)!==message.stepIndex)throw Error(`请先回到左侧第 ${message.stepIndex+1} 步，再采用该草稿。`)
  if(message.appliedAt)throw Error('本草稿已经采用，请勿重复写入。')
  if(message.supersededAt)throw Error('已有更新的协助内容，请核对最新草稿。')
- const resultChanged=Object.hasOwn(message,'baseResult')&&(record.result||'')!==message.baseResult
- const executionChanged=Object.hasOwn(message,'baseExecutionStatus')&&(record.executionStatus||'')!==message.baseExecutionStatus
- if(signature(task.steps[message.stepIndex])!==message.baseStep||(record.note||'')!==message.baseNote||resultChanged||executionChanged)throw Error('步骤或现场记录已被修改，请点击“继续修改”重新整理，避免覆盖新记录。')
- const note=normalizeStepAssistResult(message.response).note
+ // Adoption only writes the note. Independent result/feedback selections must
+ // remain the operator's choice and must not invalidate an unchanged note.
+ if(signature(task.steps[message.stepIndex])!==message.baseStep||(record.note||'')!==message.baseNote)throw Error('步骤要求或备注已被修改，请点击“继续修改”重新整理，避免覆盖新记录。')
+ const note=operationalText(normalizeStepAssistResult(message.response).note)
+ if(!note)throw Error('草稿尚无本步骤的作业记录，请继续补充现场情况。')
  record.note=note;task.draft.updatedAt=now();message.appliedAt=task.draft.updatedAt
  const next=task.steps[message.stepIndex+1],nextStep=next?{index:message.stepIndex+1,title:next.label,summary:(next.substeps?.length?next.substeps.map(part=>part.label).join('、'):next.guide||next.checks?.[0]||'按步骤要求记录实际发现。').slice(0,140)}:null
  const text=nextStep?`本步骤备注已记录，请核对左侧${task.kind==='investigation'?'检查结果':'作业反馈'}。您可以点击“下一步”继续；下一步主要是${nextStep.title}：${nextStep.summary}`:'本步骤备注已记录。请核对各步骤结果和备注，确认后点击左侧“提交报告”，生成本轮报告。'

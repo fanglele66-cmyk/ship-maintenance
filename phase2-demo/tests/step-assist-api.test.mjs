@@ -59,7 +59,9 @@ test('step-assist sends actual image parts to OpenAI and Anthropic and returns o
  assert.match(stepAssistInstruction,/未说明不等于未执行/)
  assert.match(stepAssistInstruction,/核心动作是否实施或实际结果仍不清楚，必须优先返回 kind=question/)
  assert.match(stepAssistInstruction,/紧凑连续正文/)
- assert.match(stepAssistInstruction,/备注开头原样保留该标签/)
+ assert.match(stepAssistInstruction,/不把演示、练习、虚构等包装标签、图片来源或 AI 生成说明写入业务正文/)
+ assert.match(stepAssistInstruction,/必须保留真正的证据缺口/)
+ assert.doesNotMatch(stepAssistInstruction,/备注开头原样保留该标签/)
  assert.match(stepAssistInstruction,/每个.*完成态陈述，都必须能够直接对应 record 或 role=user 的原话/)
  assert.match(stepAssistInstruction,/历史 role=assistant 草稿不构成独立事实来源/)
  assert.match(stepAssistInstruction,/通常80—180字/)
@@ -75,7 +77,8 @@ test('an exact scripted prompt returns a labelled demo before reading config, re
  const answer=script.split('### 3. 回答后生成备注卡')[1].match(/^> (.+)$/m)[1]
  const input=fixture();input.text=start;input.attachments=[]
  const options={configuration:{read:()=>assert.fail('scripted demo must not read model configuration')},knowledge:{search:()=>assert.fail('scripted demo must not retrieve knowledge')},fetcher:()=>assert.fail('scripted demo must not call a provider')}
- const first=await assistTaskStep(input,options)
+ const events=[];const first=await assistTaskStep(input,{...options,emit:(type,data)=>events.push({type,data})})
+ assert.equal(events[0].data.label,'正在整理本步骤记录')
  assert.equal(first.stepAssist.kind,'question');assert.equal(first.source,'scripted-demo')
  assert.equal(first.provider,'scripted-demo');assert.equal(first.model,'c2-step-demo')
  assert.deepEqual(first.usage,{inputTokens:0,outputTokens:0})
@@ -83,7 +86,7 @@ test('an exact scripted prompt returns a labelled demo before reading config, re
  assert.equal(http.code,200);assert.equal(JSON.parse(http.output).source,'scripted-demo')
  input.history=[{eventId:input.event.id,taskId:input.taskId,stepIndex:0,role:'user',text:start}];input.text=answer
  const next=await assistTaskStep(input,options)
- assert.equal(next.stepAssist.kind,'draft');assert.match(next.stepAssist.note,/【虚构演示】/)
+ assert.equal(next.stepAssist.kind,'draft');assert.doesNotMatch(next.stepAssist.note,/演示|练习|虚构|AI 生成|图片来源/)
  assert.match(next.stepAssist.note,/原因未确认|原因.*未确认/)
  const different={...input,text:answer.replace('三次','四次')};let called=false
  const real=await assistTaskStep(different,{configuration:{read:async()=>config},knowledge:{search:async()=>[]},fetcher:async()=>{called=true;return modelResponse(reply)}})

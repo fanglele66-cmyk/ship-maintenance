@@ -2,6 +2,7 @@ import {taskRecommendation,eventSubject,shortSentence} from './contentRecommenda
 import {reportSections} from './generatedReport.js'
 import {shiftTimelineContent} from './demoTimeline.js'
 import {taskExecution} from './taskExecution.js'
+import {operationalText} from './operationalText.js'
 // User-facing evidence summaries. These describe source records and submitted
 // findings; they do not claim access to hidden model reasoning or new readings.
 import {hasAbnormalFindings,confirmedTracking,trackingNotSupported} from './lifecycleDecisions.js'
@@ -94,9 +95,9 @@ const briefChecks={
 export function decisionAnalysisItems(event,task,report){
  if(trackingNotSupported(event,task)){const assessment=trackingAssessment(event,task);return [{label:'本轮趋势判断',text:assessment.scope},{label:'本轮提交结论',text:task.summary},{label:'AI建议',text:assessment.next}]}
  if(confirmedTracking(event,task))return [{label:'本轮趋势判断',text:trackingAssessment(event,task).scope},{label:'AI建议',text:taskRecommendation(event,task).next}]
- if(!report?.analysisMarkdown)return [{label:'本轮判断',text:report?.analysis||event.brief.conclusion}]
+ if(!report?.analysisMarkdown)return [{label:'本轮判断',text:operationalText(report?.analysis||event.brief.conclusion)}]
  return report.analysisMarkdown.split(/(?:^|\n)### /).filter(Boolean).map(section=>{
-  const [label,...lines]=section.split('\n');return {label:label.replace(/AI后续建议|建议处置|后续建议/,'AI建议').replace(/^(?:AI分析[（(]原因与措施判断[）)]|原因解释与措施判断)$/,'原因与措施判断'),text:lines.filter(Boolean).join(' ')}
+  const [label,...lines]=section.split('\n');return {label:label.replace(/AI后续建议|建议处置|后续建议/,'AI建议').replace(/^(?:AI分析[（(]原因与措施判断[）)]|原因解释与措施判断)$/,'原因与措施判断'),text:operationalText(lines.filter(Boolean).join(' '))}
  })
 }
 export function decisionBasis(event,action){
