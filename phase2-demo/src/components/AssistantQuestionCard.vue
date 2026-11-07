@@ -1,6 +1,6 @@
 <template>
  <section class="assistant-question" :aria-label="title">
-  <header><span>待你确认</span><small>{{context}}</small></header>
+  <header><span>待你确认</span><small v-if="context">{{context}}</small></header>
   <fieldset :disabled="disabled"><legend>{{title}}</legend>
    <label v-for="(choice,index) in choices" :key="choice.id" :class="{selected:selected===choice.id}">
     <input v-model="selected" type="radio" :name="group" :value="choice.id"/>

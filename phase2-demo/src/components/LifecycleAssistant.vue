@@ -89,7 +89,7 @@ const currentProposal=computed(()=>{
 const decisionQuestion=computed(()=>{
  if(!stepAvailable.value||pending.value)return null
  if(currentProposal.value)return {key:currentProposal.value.id,title:'这份备注草稿怎么处理？',context:`第 ${props.activeStepIndex+1} 步`,choices:[{id:'apply',label:'采用到本步骤'},{id:'revise',label:'继续修改'}]}
- if(opening.value&&!dismissedOpening.value&&!messages.value.some(message=>message.kind==='user'))return {key:`opening-${props.taskId}`,context:'先回答一个简单问题',...opening.value}
+ if(opening.value&&!dismissedOpening.value&&!messages.value.some(message=>message.kind==='user'))return {key:`opening-${props.taskId}`,...opening.value}
  return null
 })
 let nonStepDraft='',highlightTimer,contextVersion=0
