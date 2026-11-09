@@ -2,6 +2,7 @@ import {carryForwardSteps} from './taskExecution.js'
 import {dispatchAction} from './lifecycleDecisions.js'
 import {groupRepairSteps} from './repairStepGroups.js'
 import {verifyTaskEdit} from './taskEdits.js'
+import {c4FollowupSteps} from './stepAssistScenarios.js'
 
 export function taskPlanKey(event){
  const report=event.reports.at(-1),text=JSON.stringify([event.phase,event.phases.at(-1)?.id,event.currentTask,report?.id,report?.markdown])
@@ -12,10 +13,15 @@ export function ensurePlanDraft(event,seed){
  const action=dispatchAction(event)
  if(!action)return null
  const key=taskPlanKey(event)
- if(event.pendingPlan?.key===key&&event.pendingPlan.action===action)return event.pendingPlan
- const needsModel=(action==='investigate'&&event.phase!=='reminder')||action==='recheck'||(!!event.manualReport&&action==='repair')
+ const prior=event.tasks?.find(task=>task.id===event.currentTask)
+ const c4Followup=(event.sourceEventId||event.id)==='real-health-c4-baseline'&&event.phase==='decision'&&action==='investigate'&&event.tasks.length===1&&prior?.kind==='investigation'&&prior.status==='submitted'
+ const cached=event.pendingPlan?.key===key&&event.pendingPlan.action===action
+ // Upgrade only the untouched initial placeholder; preserve generated/edited plans.
+ if(cached&&!(c4Followup&&event.pendingPlan.status==='pending'&&!event.pendingPlan.steps.length&&!event.pendingPlan.version&&!event.pendingPlan.source))return event.pendingPlan
+ if(c4Followup)seed={...seed,steps:JSON.parse(JSON.stringify(c4FollowupSteps)),scope:'承接首轮四缸相对基线下移待核实事项，核对测温连接及独立校验，补查历史调整与燃烧资料。',rationale:'首轮月度相对变化已记录，独立测温校验及部分调整资料仍缺失，先确认测量链路与已查范围。'}
+ const needsModel=!c4Followup&&((action==='investigate'&&event.phase!=='reminder')||action==='recheck'||(!!event.manualReport&&action==='repair'))
  const savedScope=event.decisionDraft?.action===action?event.decisionDraft.reason?.trim():''
- const preset=action==='recheck'
+ const preset=action==='recheck'||c4Followup
  event.pendingPlan={key,action,version:0,status:needsModel?'pending':'ready',source:preset?'preset':needsModel?'':'existing',scope:needsModel&&!preset?'':savedScope||seed.scope,rationale:seed.rationale,steps:needsModel&&!preset?[]:seed.steps,procedureVersion:seed.procedureVersion,sourceReportId:event.reports.at(-1)?.id||null,usage:null,sources:[],error:''}
  // A saved choice from an earlier gate must not survive a changed decision branch.
  if(event.decisionDraft&&event.decisionDraft.action!==action&&['investigate','repair','maintenance','recheck'].includes(event.decisionDraft.action)){event.decisionDraft.action='';event.decisionDraft.reason=''}

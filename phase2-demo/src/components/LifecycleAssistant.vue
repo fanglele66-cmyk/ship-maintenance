@@ -24,7 +24,7 @@
    <ul v-if="mode==='step'&&attachments.length" class="composer-files"><li v-for="(file,i) in attachments" :key="i"><span>{{file.name}}</span><button type="button" :aria-label="`移除附件：${file.name}`" @click="attachments.splice(i,1)">×</button></li></ul>
    <footer>
     <button type="button" aria-label="添加文件" title="添加文字附件" :disabled="!!pending||readingFiles" @click="upload?.click()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9M7 14l8-8"/></svg></button>
-    <button v-if="isC2Task" type="button" class="composer-photo" aria-label="添加现场照片" title="添加现场照片或拍照" :disabled="!!pending||readingFiles" @click="choosePhoto"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="8" cy="10" r="1.5"/><path d="m4 17 5-4 4 3 4-5 4 5M9 5l1-2h4l1 2"/></svg></button>
+    <button v-if="isSupportedTask" type="button" class="composer-photo" aria-label="添加现场照片" title="添加现场照片或拍照" :disabled="!!pending||readingFiles" @click="choosePhoto"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="8" cy="10" r="1.5"/><path d="m4 17 5-4 4 3 4-5 4 5M9 5l1-2h4l1 2"/></svg></button>
     <button type="button" class="composer-voice" :aria-label="speech.listening?'停止语音输入':'开始语音输入'" :title="speech.listening?'停止语音输入':'开始语音输入'" :aria-pressed="speech.listening" :disabled="!!pending" @click="voice.toggle()"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></button>
     <button type="submit" class="composer-send" aria-label="发送" :disabled="pending||readingFiles||!hasMessage" :aria-busy="!!pending"><svg v-if="!pending" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
    </footer>
@@ -48,12 +48,12 @@ import {supplementaryReports} from '../workflow/reportRevisions'
 import {taskConversation} from '../workflow/lifecycleWorkItems'
 import {taskAssistantIntro} from '../workflow/taskAssistantIntro.js'
 import {createSpeechDraftInput} from '../workflow/speechDraftInput.js'
-import {canUseStepAssist,STEP_ASSIST_LIMITS} from '../workflow/stepAssistContract.js'
+import {canUseStepAssist,isStepAssistEvent,STEP_ASSIST_LIMITS} from '../workflow/stepAssistContract.js'
 import {taskAssistantOpening} from '../workflow/taskAssistantOpening.js'
 import {prepareStepPhoto,stepPhotoBytes,isStepPhotoCopy} from '../workflow/stepPhotoUpload.js'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},activeStepIndex:{type:Number,default:0},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
-const isC2Task=computed(()=>!!props.taskId&&(props.event.sourceEventId||props.event.id)==='real-alarm-0430'&&['investigation','repair'].includes(task.value?.kind)),stepAvailable=computed(()=>!!props.taskId&&canUseStepAssist(props.event,task.value,store.state.role))
+const isSupportedTask=computed(()=>!!props.taskId&&isStepAssistEvent(props.event)&&['investigation','repair','maintenance'].includes(task.value?.kind)),stepAvailable=computed(()=>!!props.taskId&&canUseStepAssist(props.event,task.value,store.state.role))
 const introduction=computed(()=>props.taskId?taskAssistantIntro(props.event,task.value):[])
 const opening=computed(()=>taskAssistantOpening(task.value))
 const questions=computed(()=>mode.value==='step'?['本步骤还需要核对哪些现场信息？','帮我根据已提供的情况整理本步骤备注。']:props.taskId?['本次任务需要注意哪些事项？','这次记录还需要补充什么？']:props.event.phase==='closed'?['回顾本次处理过程']:captain.value?['这次决定的依据是什么？','下一步应如何安排？']:['还需要补充哪些排查依据？','维修范围如何确定？'])

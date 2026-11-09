@@ -31,7 +31,7 @@ test('only the current owned C2 investigation or repair task can start step coll
  }
  const mapped=fixture();delete mapped.state.events[id];mapped.event.sourceEventId=id;mapped.event.id='c2-observation-mapped';mapped.state.events[mapped.event.id]=mapped.event
  assert.equal((await ask(mapped)).status,'complete')
- for(const change of [f=>f.state.role='captain',f=>f.state.role='secondEngineer',f=>f.event.sourceEventId='real-warning-0523',f=>f.task.kind='maintenance',f=>f.task.status='submitted',f=>f.task.status='waiting',f=>f.event.currentTask='another-task',f=>f.event.phase='closed']){
+ for(const change of [f=>f.state.role='captain',f=>f.state.role='secondEngineer',f=>f.event.sourceEventId='unconfigured-event',f=>f.task.kind='observation',f=>f.task.status='submitted',f=>f.task.status='waiting',f=>f.event.currentTask='another-task',f=>f.event.phase='closed']){
   const f=fixture();change(f);const before=records(f);let called=false
   await assert.rejects(ask(f,async()=>{called=true;return question}),/当前任务或身份/)
   assert.equal(called,false);assert.equal(records(f),before)

@@ -57,7 +57,7 @@ export async function assistTaskStep(input,{configuration,knowledge,fetcher,emit
  if(demo){
   const stepAssist=normalizeStepAssistResult(demo)
   await presentScriptedReply(stepAssist,{emit,signal,wait})
-  return {stepAssist,answer:stepAssist.text,source:'scripted-demo',sources:[],model:'c2-step-demo',usage:{inputTokens:0,outputTokens:0},provider:'scripted-demo'}
+  return {stepAssist,answer:stepAssist.text,source:'scripted-demo',sources:[],model:(context.event.sourceEventId||context.event.id)==='real-alarm-0430'?'c2-step-demo':'event-step-script',usage:{inputTokens:0,outputTokens:0},provider:'scripted-demo'}
  }
  emit('progress',{stage:'received',label:'正在核对本步骤现场记录'})
  const config=await configuration.read()

@@ -128,7 +128,7 @@ test('real fallback sees the whole current task conversation with step scope but
 })
 
 test('wrong scene, identity, step and invalid pictures are rejected before any model request',async()=>{
- for(const change of [body=>body.event.id='real-warning-0523',body=>body.role='captain',body=>body.actor='伪造执行人',body=>body.stepIndex=40,body=>body.event.tasks[0].status='submitted',body=>body.images[0].mimeType='image/svg+xml',body=>body.images[0].dataUrl='https://example.test/hidden']){
+ for(const change of [body=>body.event.id='unconfigured-event',body=>body.role='captain',body=>body.actor='伪造执行人',body=>body.stepIndex=40,body=>body.event.tasks[0].status='submitted',body=>body.images[0].mimeType='image/svg+xml',body=>body.images[0].dataUrl='https://example.test/hidden']){
   const body=fixture();change(body);let called=false
   const result=await request(body,async()=>{called=true;return modelResponse(reply)})
   assert.equal(result.code,400);assert.equal(called,false);assert.ok(JSON.parse(result.output).error)

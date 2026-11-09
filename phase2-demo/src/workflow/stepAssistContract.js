@@ -14,9 +14,10 @@ const list=(value,label,max)=>{
  return value
 }
 
+export const isStepAssistEvent=event=>['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline'].includes(event?.sourceEventId||event?.id)
 export function canUseStepAssist(event,task,role){
  const current=Array.isArray(event?.tasks)?event.tasks.find(item=>item?.id===task?.id):null
- return Boolean((event?.sourceEventId||event?.id)==='real-alarm-0430'&&event.phase!=='closed'&&current&&event.currentTask===current.id&&current.status==='assigned'&&['investigation','repair'].includes(current.kind)&&ownsTask(role,current))
+ return Boolean(isStepAssistEvent(event)&&event.phase!=='closed'&&current&&event.currentTask===current.id&&current.status==='assigned'&&['investigation','repair','maintenance'].includes(current.kind)&&ownsTask(role,current))
 }
 
 function operation(value){
@@ -45,7 +46,7 @@ const attachment=value=>{
 // then send the selected writable step and this task's labelled conversation.
 export function prepareStepAssistInput(input){
  const event=input?.event,task=Array.isArray(event?.tasks)?event.tasks.find(item=>item?.id===input.taskId):null
- if(input?.mode!=='step-assist'||!canUseStepAssist(event,task,input.role)||input.actor!==people[input.role]||event.tasks.filter(item=>item.id===task.id).length!==1)throw Error('步骤协作仅用于本人当前执行的二缸排查或维修任务。')
+ if(input?.mode!=='step-assist'||!canUseStepAssist(event,task,input.role)||input.actor!==people[input.role]||event.tasks.filter(item=>item.id===task.id).length!==1)throw Error('步骤协作仅用于本人当前执行的排查、维修或维保任务。')
  const index=input.stepIndex
  if(!Array.isArray(task.steps)||!Number.isInteger(index)||index<0||index>=task.steps.length)throw Error('请选择当前任务内的有效步骤。')
  if((task.draft?.stepIndex||0)!==index)throw Error('请先返回对应步骤，再开启步骤协作。')

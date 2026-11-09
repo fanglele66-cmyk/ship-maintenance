@@ -1,4 +1,6 @@
 import {taskAssistantOpeningReply} from './taskAssistantOpening.js'
+import {isStepAssistEvent} from './stepAssistContract.js'
+import {OTHER_STEP_ASSIST_CASES} from './stepAssistScenarios.js'
 // Exact opt-in script lines. Image content never supplies scripted facts.
 const normalizeText=value=>typeof value==='string'?value.normalize('NFKC').replace(/[【]/g,'[').replace(/[】]/g,']').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[，、]/g,',').replace(/[。]/g,'.').replace(/[—–−]/g,'-').replace(/\s+/gu,'').replace(/[.!?]+$/u,'').trim():''
 
@@ -78,11 +80,13 @@ const missingQuestions={
  trial:'复装和试验实际做到了哪一步，还有哪些没完成？',
  handover:'已经交接了哪些情况，还有哪些事项要跟进？',
 }
+const allRules=[...rules.map(rule=>({...rule,eventId:'real-alarm-0430'})),...OTHER_STEP_ASSIST_CASES.map(item=>({eventId:item.eventId,kind:item.kind,step:item.stepIndex,label:item.stepLabel,prompt:item.id,requires:item.requires,results:item.results,reply:item.response}))]
 const inputRules=new Map()
-for(const rule of rules){
+for(const rule of allRules.filter(item=>item.eventId==='real-alarm-0430')){
  inputRules.set(normalizeText(prompts[rule.prompt]),rule)
  inputRules.set(normalizeText(publishedPrompts[rule.prompt]),rule)
 }
+for(const item of OTHER_STEP_ASSIST_CASES)inputRules.set(normalizeText(item.input),allRules.find(rule=>rule.prompt===item.id))
 // Only these known presentation-only wrappers may surround a complete line.
 // Different identifiers, people, numbers or added facts are never normalized away.
 const legacyPrefix=normalizeText('【虚构演示】')
@@ -95,9 +99,9 @@ function ruleForText(text){
  return inputRules.get(candidate)
 }
 function scopedRule({event,task,stepIndex,text,step}={}){
- if((event?.sourceEventId||event?.id)!=='real-alarm-0430'||!Number.isInteger(stepIndex))return null
+ if(!isStepAssistEvent(event)||!Number.isInteger(stepIndex))return null
  const rule=ruleForText(text)
- if(!rule||rule.kind!==task?.kind||rule.step!==stepIndex)return null
+ if(!rule||rule.eventId!==(event.sourceEventId||event.id)||rule.kind!==task?.kind||rule.step!==stepIndex)return null
  return normalizeText((step||task?.steps?.[stepIndex])?.label)===normalizeText(rule.label)?rule:null
 }
 
@@ -113,7 +117,7 @@ const acknowledgments=new Set(['谢谢','谢谢你','多谢','好的','好','收
 
 export function matchStepAssistDemo({context,images=[]}={}){
  if(!context)return null
- const opening=(context.event?.sourceEventId||context.event?.id)==='real-alarm-0430'&&taskAssistantOpeningReply(context.task,context.message?.text)
+ const opening=isStepAssistEvent(context.event)&&taskAssistantOpeningReply(context.task,context.message?.text)
  if(opening)return opening
  let rule=scopedRule({...context,text:context.message?.text})
  if(!rule)return null
@@ -132,7 +136,7 @@ export function matchStepAssistDemo({context,images=[]}={}){
  // Complete facts can arrive in either order. Preserve later optional
  // clarifications when a user repeats an earlier line from the same step.
  prior.add(currentPrompt)
- const complete=rules.filter(candidate=>candidate.kind===rule.kind&&candidate.step===rule.step&&candidate.reply.kind==='draft'&&prior.has(candidate.prompt)&&(candidate.requires||[]).every(id=>prior.has(id)))
+ const complete=allRules.filter(candidate=>candidate.eventId===rule.eventId&&candidate.kind===rule.kind&&candidate.step===rule.step&&candidate.reply.kind==='draft'&&prior.has(candidate.prompt)&&(candidate.requires||[]).every(id=>prior.has(id)))
  if(complete.length)rule=complete.at(-1)
  // A known line never falls through to a model just because its result or
  // prerequisites are missing. Ask without modifying the selected result.
@@ -140,7 +144,7 @@ export function matchStepAssistDemo({context,images=[]}={}){
   return question('当前选择“'+context.record.result+'”与这段记录不一致，哪项需要调整？')
  }
  const missing=(rule.requires||[]).find(id=>!prior.has(id))
- if(missing)return question(missingQuestions[missing])
+ if(missing)return question(missingQuestions[missing]||OTHER_STEP_ASSIST_CASES.find(item=>item.id===missing)?.missingQuestion||'请先补充本步实际检查范围和结果。')
  // Known optional lines and retries are harmless; another main step is ignored.
  // Pictures never establish scripted facts or imply a current work photo exists.
  void images

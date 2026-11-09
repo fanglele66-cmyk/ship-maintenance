@@ -24,7 +24,7 @@ test('step assist selects the current C2 task and current draft without changing
  assert.equal(canUseStepAssist(options.event,options.task,'engineer'),true)
  const mapped=structuredClone(options);mapped.event.sourceEventId=mapped.event.id;mapped.event.id='mapped-observation'
  assert.equal(canUseStepAssist(mapped.event,mapped.task,mapped.role),true)
- for(const change of [o=>o.event.id='real-warning-0523',o=>o.event.phase='closed',o=>o.task.status='submitted',o=>o.task.kind='maintenance',o=>o.event.currentTask='other',o=>o.role='captain',o=>o.role='secondEngineer']){
+ for(const change of [o=>o.event.id='unconfigured-event',o=>o.event.phase='closed',o=>o.task.status='submitted',o=>o.task.kind='observation',o=>o.event.currentTask='other',o=>o.role='captain',o=>o.role='secondEngineer']){
   const o=fixture();change(o);assert.equal(canUseStepAssist(o.event,o.task,o.role),false);assert.throws(()=>buildStepAssistRequest(o))
  }
  for(const stepIndex of [-1,1.5,500])assert.throws(()=>buildStepAssistRequest({...fixture(),stepIndex}),/有效步骤/)

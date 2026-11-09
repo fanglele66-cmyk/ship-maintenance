@@ -19,12 +19,12 @@ test('task introductions explain note assistance in short conversational languag
  assert.deepEqual(taskAssistantIntro(event,null),[])
 })
 
-test('submitted, waiting and interrupted tasks do not present completed work as still to be executed',()=>{
- const task={kind:'repair',steps:[{label:'实施已批准部位的修复'}]}
- for(const [status,phrase] of [['submitted','反馈已提交'],['reporting','报告正在生成'],['report-error','尚未生成完成'],['waiting','等待执行条件'],['terminated','未执行部分已终止']]){
-  const intro=taskAssistantIntro(event,{...task,status})
-  assert.equal(intro.length,3);assert.ok(intro[2].includes(phrase))
-  assert.doesNotMatch(intro.join(''),/本轮已全部完成|仍待执行|原因已确认/)
+test('the introduction stays unchanged across submission, report generation and other task states',()=>{
+ for(const kind of ['investigation','repair','maintenance']){
+  const task={kind,steps:[]},initial=taskAssistantIntro(event,{...task,status:'assigned'})
+  for(const status of ['submitted','reporting','report-error','waiting','terminated']){
+   assert.deepEqual(taskAssistantIntro(event,{...task,status}),initial)
+  }
  }
  assert.match(taskAssistantIntro(event,{kind:'investigation',purpose:'recheck',status:'assigned',steps:[]})[0],/复查备注/)
 })
