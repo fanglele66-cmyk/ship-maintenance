@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "event_id", "prepared_at", "report", "evidence", "analysis_request", "candidate_ref", "source_signatures", "content_guidance_ref"],
+  "properties": {
+    "kind": {"const": "manual_analysis_preparation"},
+    "event_id": {"type": "string", "pattern": "^ai-"},
+    "prepared_at": {"type": "string", "minLength": 19},
+    "report": {"type": "object"},
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["detector_event", "raw_refs", "fetch_attempts", "raw_fallback", "data_error", "trends", "algorithm_candidate_used", "detections", "related_trends", "sensor_samples"],
+      "properties": {
+        "detector_event": {"type": "object"},
+        "raw_refs": {"type": "array", "items": {"type": "string"}},
+        "fetch_attempts": {"type": "array", "items": {"type": "object"}},
+        "raw_fallback": {"type": "object"},
+        "data_error": {"type": ["string", "null"]},
+        "data_coverage": {"type": "object"},
+        "trends": {"type": "object"},
+        "algorithm_candidate_used": {"type": "boolean"},
+        "detections": {"type": "array"},
+        "related_trends": {"type": "object"},
+        "sensor_samples": {"type": "array"}
+      }
+    },
+    "analysis_request": {"type": "object"},
+    "candidate_ref": {"type": "string", "pattern": "^tmp/[^/]+__manual-candidate-[a-f0-9]+\\.json$"},
+    "source_signatures": {"type": "object", "additionalProperties": {"type": "string"}},
+    "content_guidance_ref": {"type": "string"},
+    "fallback_reason": {"type": "string", "minLength": 1}
+  }
+}

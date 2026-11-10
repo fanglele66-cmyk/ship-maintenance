@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/analysis-preparation.schema.json",
+  "title": "AI Anomaly Agent Analysis Preparation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "prepared_at",
+    "ser_no",
+    "ship_id",
+    "ship_name",
+    "analysis_window",
+    "input_refs",
+    "selection",
+    "analysis_requests",
+    "candidate_bundle_ref",
+    "candidate_schema_ref"
+  ],
+  "properties": {
+    "run_id": {"type": "string", "pattern": "^ai-run-[A-Za-z0-9_-]+-[0-9]{8}_[0-9]{6}$"},
+    "prepared_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"},
+    "ser_no": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+    "ship_id": {"type": "string", "minLength": 1},
+    "ship_name": {"type": "string", "minLength": 1},
+    "analysis_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_time", "end_time"],
+      "properties": {
+        "start_time": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"},
+        "end_time": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"}
+      }
+    },
+    "input_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "selection": {"type": "object"},
+    "analysis_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "event_action",
+          "ser_no",
+          "event_title",
+          "anomaly_type",
+          "severity",
+          "evidence",
+          "knowledge_search",
+          "agent_content_contract"
+        ],
+        "properties": {
+          "event_id": {"type": "string", "minLength": 1},
+          "event_action": {"enum": ["created", "updated"]},
+          "ser_no": {"type": "string", "minLength": 1},
+          "event_title": {"type": "string", "minLength": 1},
+          "anomaly_type": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["low", "medium", "high", "critical"]},
+          "evidence": {"type": "object"},
+          "knowledge_search": {"type": "object"},
+          "agent_content_contract": {"type": "object"}
+        }
+      }
+    },
+    "candidate_bundle_ref": {"type": "string", "pattern": "^tmp/.+\\.json$"},
+    "candidate_schema_ref": {"type": "string", "minLength": 1}
+  }
+}

@@ -1,0 +1,891 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/event-analysis-result.schema.json",
+  "title": "Ship AI Anomaly Event Analysis Result",
+  "allOf": [{
+    "if": {"properties": {"event_type": {"const": "ai-anomaly"}}, "required": ["event_type"]},
+    "then": {"properties": {"data_query_requests": {"items": {"properties": {
+      "points": {"maxItems": 6},
+      "api": {"properties": {"body": {"properties": {"pointDataIdList": {"maxItems": 6}}}}}
+    }}}}}
+  }],
+  "description": "单个 AI 异常事件的前端业务结果，供后端递送前端并供维修 skill 读取；必须覆盖分析结论、可能原因、工程推断过程和分析依据。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ser_no",
+    "event_id",
+    "event_type",
+    "created_at",
+    "ship_id",
+    "deviceDataId",
+    "systemType",
+    "image_ids",
+    "equipment_id",
+    "equipment_name",
+    "event_title",
+    "anomaly_type",
+    "severity",
+    "analysis_conclusion",
+    "fault_causes",
+    "engineering_inference",
+    "analysis_basis",
+    "diagnostic_plans",
+    "workflow_state",
+    "data_query_requests"
+  ],
+  "properties": {
+    "ser_no": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^ai-[A-Za-z0-9_-]+-[A-Za-z0-9_-]+-[0-9]{8}_[0-9]{6}$"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["ai-anomaly", "ship-manual", "shore-manual"]
+    },
+    "image_ids": {
+      "type": "array",
+      "description": "人工上报携带的图片 ID；周期 AI 事件固定为空数组。",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+    },
+    "manual_follow_up_feedback": {
+      "description": "事件级人工反馈的只读投影，来源于累计 feedback；新分析固定为 null，人工反馈成功后同步 note/submitted_at。兼容旧分析缺省此字段。",
+      "default": null,
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "note",
+            "submitted_at"
+          ],
+          "properties": {
+            "note": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "submitted_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+            }
+          }
+        }
+      ]
+    },
+    "workflow_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "task_index",
+        "status",
+        "updated_at",
+        "closure_status",
+        "summary_ref"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "event_overview",
+            "inspection",
+            "maintenance",
+            "manual_follow_up",
+            "closed"
+          ]
+        },
+        "task_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 5
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "waiting_feedback",
+            "summary_ready",
+            "closed"
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+        },
+        "closure_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            null,
+            "closed_false_alarm",
+            "closed_no_maintenance",
+            "closed_after_maintenance",
+            "closed_manual_follow_up"
+          ]
+        },
+        "summary_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"stage": {"const": "event_overview"}}},
+          "then": {
+            "properties": {
+              "task_index": {"const": null},
+              "status": {"const": "ready"},
+              "closure_status": {"const": null},
+              "summary_ref": {"const": null}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "stage": {"enum": ["inspection", "maintenance"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "task_index": {"type": "integer"},
+              "status": {"const": "waiting_feedback"},
+              "closure_status": {"const": null},
+              "summary_ref": {"const": null}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"stage": {"const": "manual_follow_up"}}},
+          "then": {
+            "properties": {
+              "task_index": {"type": "integer", "minimum": 1, "maximum": 5},
+              "status": {"const": "summary_ready"},
+              "closure_status": {"const": null},
+              "summary_ref": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"stage": {"const": "closed"}}},
+          "then": {
+            "properties": {
+              "status": {"const": "closed"},
+              "closure_status": {
+                "enum": [
+                  "closed_false_alarm",
+                  "closed_no_maintenance",
+                  "closed_after_maintenance",
+                  "closed_manual_follow_up"
+                ]
+              },
+              "summary_ref": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "ship_id": {
+      "type": "string"
+    },
+    "ship_name": {
+      "type": "string"
+    },
+    "deviceDataId": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "本事件所有关联点位共同对应的映射表设备主键。"
+    },
+    "systemTypes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}, "description": "人工上报完整系统 ID 集合，按表单顺序去重。"},
+    "systemNames": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}, "description": "与 systemTypes 顺序一致的系统中文名称。"},
+    "reportedPointIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}, "description": "人工上报原始关联点 ID 集合，用于区分用户选择与辅助查询点。"},
+    "systemType": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "AI/OEM 事件取关联点位系统众数；人工事件保留首个上报系统供旧消费者使用，完整多系统集合读取 systemTypes/systemNames。"
+    },
+    "equipment_id": {
+      "type": "string"
+    },
+    "equipment_name": {
+      "type": "string"
+    },
+    "event_title": {
+      "type": "string"
+    },
+    "anomaly_type": {
+      "type": "string",
+      "description": "供前端直接展示的中文完整短句，不得使用内部通道编码。",
+      "minLength": 4,
+      "pattern": "^[^_]*[\\u4e00-\\u9fff][^_]*$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "content_source": {
+      "type": "string",
+      "const": "agent_knowledge",
+      "description": "正文由 Agent 结合当前事件证据与知识库生成；生成失败时保持待分析状态，不生成固定脚本正文。"
+    },
+    "priority_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "由 ship-event-priority 按确定性百分制公式写回的事件处置优先级。"
+    },
+    "analysis_conclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "judgement",
+        "confidence",
+        "summary"
+      ],
+      "properties": {
+        "judgement": {
+          "type": "string",
+          "enum": [
+            "confirmed_anomaly",
+            "suspected_anomaly",
+            "insufficient_data",
+            "false_positive"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "fault_causes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "可能原因列表，与 OEM 分析和维修 skill 使用相同语义。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cause_id",
+          "cause_name",
+          "related_system",
+          "probability",
+          "probability_score",
+          "basis",
+          "direct_consequences"
+        ],
+        "properties": {
+          "cause_id": {
+            "type": "string"
+          },
+          "cause_name": {
+            "type": "string"
+          },
+          "related_system": {
+            "type": "string"
+          },
+          "probability": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "probability_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "basis": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "direct_consequences": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "engineering_inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "steps"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "order",
+              "observation",
+              "inference",
+              "basis_ids"
+            ],
+            "properties": {
+              "order": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "observation": {
+                "type": "string"
+              },
+              "inference": {
+                "type": "string"
+              },
+              "basis_ids": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "analysis_basis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "basis_id",
+          "basis_type",
+          "title",
+          "description"
+        ],
+        "properties": {
+          "basis_id": {
+            "type": "string"
+          },
+          "basis_type": {
+            "type": "string",
+            "enum": [
+              "sensor_trend",
+              "baseline_comparison",
+              "cross_signal",
+              "rule",
+              "operating_condition",
+              "knowledge"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "point_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "time_window": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_time",
+              "end_time"
+            ],
+            "properties": {
+              "start_time": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+              },
+              "end_time": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostic_plans": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "plan_id",
+          "cause_id",
+          "schemeTitle",
+          "steps"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "cause_id": {
+            "type": "string"
+          },
+          "schemeTitle": {
+            "type": "string",
+            "description": "一级任务的简短中文名词短语，聚焦 cause_id 对应的候选原因或对象，例如“控制空气泄漏”“1缸温度测量链路”；不含排查、检查、核实等动作词。"
+          },
+          "related_system": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "step_id",
+                "order",
+                "action",
+                "reference_images",
+                "feedback_text",
+                "feedback_image_ids",
+                "inspection_items"
+              ],
+              "properties": {
+                "step_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "order": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "action": {
+                  "type": "string",
+                  "description": "二级排查方向，例如“检查控制空气管路法兰垫片破损”或“检查管路松动或破损”；具体执行方法写入本步骤的 inspection_items.content。"
+                },
+                "reference_images": {
+                  "type": "array",
+                  "description": "与当前排查步骤强相关的知识库参考图；没有强相关图片时必须为空数组。",
+                  "maxItems": 3,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "title",
+                      "path"
+                    ],
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "path": {
+                        "type": "string",
+                        "pattern": "^wiki/wiki_rt-flex50/images/[^/]+\\.(png|jpg|jpeg|webp)$"
+                      }
+                    }
+                  }
+                },
+                "feedback_text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "该步骤已提交的用户反馈原文；不添加检查项标题或其他前缀，多条按输入顺序用中文分号连接，未提交或无文字时为 null。"
+                },
+                "feedback_image_ids": {
+                  "type": "array",
+                  "description": "该步骤已提交的图片 ID，按提交顺序去重。",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "inspection_items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "description": "由模型按本排查方向需要选择 2 至 4 个具体事项，可混合操作类和检查结果类；所有事项仅服务于当前 step.action。",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "inspection_item_id",
+                      "title",
+                      "content",
+                      "item_type"
+                    ],
+                    "properties": {
+                      "inspection_item_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "供船端检查项卡片直接显示的短标题。"
+                      },
+                      "content": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "排查事项正文，可为操作指令或检查事项；写清检查对象、执行方法和需要观察或记录的现象，不限于问句。"
+                      },
+                      "item_type": {
+                        "type": "string",
+                        "enum": [
+                          "operation",
+                          "inspection"
+                        ],
+                        "description": "operation 为执行类事项，不带结果选项；inspection 为需提交检查结果的事项，必须带 options。"
+                      },
+                      "options": {
+                        "type": "array",
+                        "description": "仅检查结果类事项具有选项，固定正常/异常两个代码；label 由模型结合该事项生成清晰的正常与异常结果描述。",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "prefixItems": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "code",
+                              "label",
+                              "abnormal"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "normal"
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "abnormal": {
+                                "const": false
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "code",
+                              "label",
+                              "abnormal"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "abnormal"
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "abnormal": {
+                                "const": true
+                              }
+                            }
+                          }
+                        ],
+                        "items": false
+                      },
+                      "answer_type": {
+                        "type": "string",
+                        "const": "single_choice"
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "answer": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "用户已提交的检查结果选项标签，未提交为 null；仅检查结果类事项存在此字段。"
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "item_type": {
+                              "const": "inspection"
+                            }
+                          },
+                          "required": [
+                            "item_type"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "options",
+                            "answer_type",
+                            "required",
+                            "answer"
+                          ]
+                        },
+                        "else": {
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "options"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "answer_type"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "required"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "answer"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "description": "同一候选原因下的不同排查方向；避免仅按准备、检查、复测等通用阶段拆分。",
+            "contains": {
+              "type": "object",
+              "required": [
+                "inspection_items"
+              ],
+              "properties": {
+                "inspection_items": {
+                  "type": "array",
+                  "contains": {
+                    "type": "object",
+                    "required": [
+                      "item_type"
+                    ],
+                    "properties": {
+                      "item_type": {
+                        "const": "inspection"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "minContains": 1
+          },
+          "safety_notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completion_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "description": "由模型结合当前异常事件证据和知识库生成：一级 plan 针对一个候选原因，二级 steps 分解该原因的不同排查方向，三级 inspection_items 描述执行该方向的具体操作或检查事项。不得使用固定脚本填充排查内容。"
+    },
+    "data_query_requests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "data_type",
+          "api",
+          "points",
+          "time_window"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "numeric",
+              "alarm"
+            ]
+          },
+          "api": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "configRef",
+              "endpointKey",
+              "baseUrl",
+              "path",
+              "body"
+            ],
+            "properties": {
+              "method": {
+                "type": "string",
+                "const": "POST"
+              },
+              "configRef": {
+                "const": "data/sensor-api.json"
+              },
+              "endpointKey": {
+                "const": "pointDataList"
+              },
+              "baseUrl": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "shipId",
+                  "deviceDataIdList",
+                  "pointDataIdList",
+                  "collectTimeStart",
+                  "collectTimeEnd",
+                  "pageNo",
+                  "pageSize"
+                ],
+                "properties": {
+                  "shipId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "deviceDataIdList": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {"type": "string", "minLength": 1}
+                  },
+              "pointDataIdList": {
+                "type": "array",
+                "minItems": 2,
+                    "uniqueItems": true,
+                    "items": {"type": "string", "minLength": 1}
+                  },
+                  "collectTimeStart": {"type": "string"},
+                  "collectTimeEnd": {"type": "string"},
+                  "pageNo": {"type": "integer", "minimum": 0},
+                  "pageSize": {"type": "integer", "minimum": 1}
+                }
+              }
+            }
+          },
+      "points": {
+        "type": "array",
+        "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "deviceDataId",
+                "pointDataId",
+                "pointName",
+                "dataType",
+                "unit"
+              ],
+              "properties": {
+                "deviceDataId": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "pointDataId": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "pointName": {"type": "string", "description": "数据概览第一行的英文传感器名称；兼容旧结果的拼接名称。"},
+                "pointName_ch": {"type": "string", "minLength": 1, "description": "数据概览第二行的中文传感器名称；新结果由显示名称映射生成，旧结果允许缺省。"},
+                "dataType": {"const": 1},
+                "unit": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "time_window": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_time",
+              "end_time"
+            ],
+            "properties": {
+              "start_time": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+              },
+              "end_time": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

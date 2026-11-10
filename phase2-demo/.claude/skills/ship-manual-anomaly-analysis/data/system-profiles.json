@@ -1,0 +1,30 @@
+{
+  "system_aliases": [
+    {"system_id": "main_engine", "names": ["主机系统"], "point_codes": ["DC0001"]},
+    {"system_id": "turbocharger", "names": ["增压系统"], "point_codes": ["DC0002", "DC0059"]},
+    {"system_id": "shafting", "names": ["轴系系统"], "point_codes": ["DC0003", "DC0004"]},
+    {"system_id": "starting", "names": ["启动系统"], "point_codes": ["DC0005"]},
+    {"system_id": "control_air", "names": ["控制系统"], "point_codes": ["DC0006", "DC0007"]},
+    {"system_id": "exhaust", "names": ["排气系统"], "point_codes": ["DC0008", "DC0009", "DC0010", "DC0011", "DC0012", "DC0013", "DC0014", "DC0015", "DC0016", "DC0017", "DC0018", "DC0019", "DC0020", "DC0021"]},
+    {"system_id": "scavenge_air", "names": ["扫气系统"], "point_codes": ["DC0022", "DC0023", "DC0024", "DC0025", "DC0026", "DC0027"]},
+    {"system_id": "lube_oil", "names": ["润滑系统"], "point_codes": ["DC0028", "DC0029", "DC0030", "DC0037", "DC0038", "DC0039", "DC0040"]},
+    {"system_id": "cooling", "names": ["冷却系统"], "point_codes": ["DC0031", "DC0032", "DC0033", "DC0034", "DC0035", "DC0036", "DC0044", "DC0045", "DC0046", "DC0047", "DC0048", "DC0049", "DC0050", "DC0051", "DC0052", "DC0053"]},
+    {"system_id": "fuel_oil", "names": ["燃油系统"], "point_codes": ["DC0041", "DC0042", "DC0056", "DC0057", "DC0058"]},
+    {"system_id": "servo_oil", "names": ["伺服系统"], "point_codes": ["DC0043", "DC0054", "DC0055"]}
+  ],
+  "mechanism_profiles": {
+    "fuel_oil": {"related_system": "主机燃油系统", "cause_name": "燃油供给或喷射过程偏离正常状态", "mechanism": "燃油压力、温度、燃油指令或ICU执行偏差会改变喷射量与雾化条件，并可进一步造成缸间燃烧和排温不一致。", "consequence": "偏离持续时可能导致功率波动、燃烧恶化、排温异常或相关部件热负荷增加。", "inspection_focus": "核对燃油压力温度、滤器压差、燃油指令、ICU反馈以及泄漏和供油稳定性。"},
+    "main_engine": {"related_system": "主机系统", "cause_name": "主机转速或运行工况偏离预期", "mechanism": "转速变化需结合操纵指令、负荷及实际运行状态核实，并保留转速测量链路异常这一解释。", "consequence": "偏离持续时可能影响推进功率或运行稳定性。", "inspection_focus": "核对主机转速、机旁独立读数、操纵指令、负荷和轮机日志。"},
+    "turbocharger": {"related_system": "增压系统", "cause_name": "增压器转速或增压空气供给偏离正常状态", "mechanism": "增压器转速和扫气空气进总管压力需结合负荷、排气能量与气路状态分析。", "consequence": "偏离持续时可能影响燃烧空气供给、排温和主机功率。", "inspection_focus": "核对增压器转速、扫气空气进总管压力、主机负荷和气路状态。"},
+    "shafting": {"related_system": "轴系系统", "cause_name": "轴系轴承热状态偏离正常状态", "mechanism": "尾轴后轴承和中间轴承温升需结合润滑、负荷、现场声振及测量链路核实。", "consequence": "偏离持续时可能增加轴承磨损或热损伤风险。", "inspection_focus": "核对尾轴后轴承温度、中间轴承温度、润滑状态和现场声振记录。"},
+    "starting": {"related_system": "启动系统", "cause_name": "起动空气供给偏离正常状态", "mechanism": "起动空气压力偏低或波动需结合空气瓶压力、供气阀状态和泄漏情况核实。", "consequence": "偏离持续时可能影响主机起动可靠性。", "inspection_focus": "核对起动空气压力、空气瓶压力、供气阀、泄漏和压力测量链路。"},
+    "control_air": {"related_system": "控制系统", "cause_name": "控制空气供给偏离正常状态", "mechanism": "控制空气压力和安全控制空气压力异常需结合供气、调压、泄漏和测量链路核实。", "consequence": "偏离持续时可能影响控制执行或安全联锁可靠性。", "inspection_focus": "分别核对控制空气压力、控制空气压力(safety)、调压阀、泄漏和机旁压力。"},
+    "exhaust": {"related_system": "排气系统", "cause_name": "燃烧一致性或排气能量分配偏离正常状态", "mechanism": "单缸排温及缸间偏差可由喷射、压缩、配气、负荷分配或测量链路异常引起。", "consequence": "偏离持续时可能造成热负荷不均、功率下降或部件热损伤。", "inspection_focus": "核对六缸排气温度及偏差、喷油与压缩状态、排气阀和增压器前后排烟温度。"},
+    "scavenge_air": {"related_system": "扫气系统", "cause_name": "各缸扫气热状态偏离正常状态", "mechanism": "各缸扫气温度变化需结合负荷、气路状态、冷却效果和测量偏差进行对比。", "consequence": "偏离持续时可能影响燃烧空气条件和相关部件热状态。", "inspection_focus": "对比六缸扫气温度，核对负荷、扫气通道和关联冷却状态。"},
+    "lube_oil": {"related_system": "润滑系统", "cause_name": "润滑供油或轴承热状态偏离正常状态", "mechanism": "润滑压力、温度或压差异常会改变油膜承载和散热条件，轴承温升可作为关联响应。", "consequence": "偏离持续时可能增加摩擦、磨损、轴承热损伤或停机风险。", "inspection_focus": "核对主轴承供油温压、推力轴承出口温度、增压器滑油温压及前后端阻尼器滑油压力。"},
+    "cooling": {"related_system": "冷却系统", "cause_name": "冷却介质循环或换热过程偏离正常状态", "mechanism": "本系统包括活塞冷却油、缸套冷却水和空冷器冷却水，应按具体测点区分介质与回路，结合温度、压力、负荷及测量链路判断。", "consequence": "偏离持续时可能影响活塞、缸套或增压空气的冷却效果。", "inspection_focus": "按所报测点核对对应冷却油或冷却水回路的温压、进出口温差、泵阀和泄漏记录。"},
+    "piston_cooling": {"related_system": "冷却系统", "cause_name": "活塞冷却油散热或局部热负荷偏离正常状态", "mechanism": "活塞冷却油出口温度偏高需结合六缸对比、主机负荷、冷却油循环和测量偏差核实，不能直接套用冷却水回路的检查方向。", "consequence": "偏离持续时可能影响活塞散热和相关部件热状态。", "inspection_focus": "核对六缸活塞冷却油出口温度、主机负荷及对应供油回路，结合机旁记录排除测量偏差。"},
+    "servo_oil": {"related_system": "伺服系统", "cause_name": "伺服油压力或泄漏状态偏离正常状态", "mechanism": "伺服油压力与泄漏信号异常需结合供油、控制执行、阀件状态和测量链路核实。", "consequence": "偏离持续时可能影响伺服执行稳定性和相关控制功能。", "inspection_focus": "核对伺服油压力1、伺服油压力2、伺服油泄漏及相关机旁记录。"},
+    "default": {"related_system": "主机相关系统", "cause_name": "相关部件或介质过程偏离正常状态", "mechanism": "人工上报测点在指定时间窗内表现异常，需要结合工况、关联信号和机旁检查区分真实状态偏离与测量问题。", "consequence": "偏离持续时可能影响主机可靠性、热状态或运行稳定性。", "inspection_focus": "复核测点、工况、关联部件和采集链路，并记录机旁交叉测量。"}
+  }
+}

@@ -1,3 +1,5 @@
+import {createBackendWorkflowSync} from '../workflow/backendWorkflowSync.js'
+import {workflowStatus} from '../services/workflowStatus.js'
 import {auth,accountRequest,pruneDeletedEvents} from '../services/auth'
 import {assistTaskStep,applyTaskStepNote} from '../workflow/taskStepAssistance.js'
 import {validateAnomalyReport,reportEvidence,createManualAnomaly} from '../workflow/manualAnomaly.js'
@@ -12,7 +14,7 @@ import {reactive,computed,watch} from 'vue'
 import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,askAssistant,people,refreshLifecyclePresentation,ensureTaskPlan} from '../workflow/eventLifecycle.js'
 import {useSensorStore} from './sensorStore'
 import {syncLifecycleObservations} from '../workflow/lifecycleObservation.js'
-import {aiStreamRequest} from '../services/aiClient'
+import {aiStreamRequest as rawAiRequest} from '../services/aiClient'
 import {supplementaryReports,applyReportSupplement} from '../workflow/reportRevisions'
 import {acceptTaskPlan} from '../workflow/taskPlanning.js'
 import {updateObservationAdvice} from '../workflow/observationAdvice.js'
@@ -37,6 +39,14 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  initial.notices||=[];initial.role||='captain'
  for(const event of Object.values(initial.events))if(['generating','updating'].includes(event.pendingPlan?.status))event.pendingPlan.status=event.pendingPlan.source==='preset'?'pending':event.pendingPlan.steps?.length?'ready':'pending'
  const state=reactive(initial)
+ const backend=createBackendWorkflowSync(state,accountRequest,{onError:error=>workflowStatus.error=error})
+ const aiStreamRequest=async(body,progress)=>{if(body.event&&state.events[body.event.id]?.backendManaged)await backend.flush();return rawAiRequest(body,progress)}
+ watch(()=>state.events,()=>backend.schedule(),{deep:true})
+ if(!import.meta.env?.SSR&&auth.user){
+  void backend.pull().catch(error=>workflowStatus.error=error.message)
+  const backendTimer=setInterval(()=>void backend.refresh(),5000);backendTimer.unref?.()
+  window.addEventListener('pagehide',()=>{void backend.flush().catch(()=>{})})
+ }
  const sensors=useSensorStore(),syncObservations=()=>{syncLifecycleObservations(state,sensors,Date.now(),{demo:true});pruneDeletedEvents(state)}
  watch(()=>sensors.sampledAt,syncObservations,{immediate:true})
  const snapshot=()=>lifecycleSnapshot(state)
@@ -61,7 +71,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   const report=validateAnomalyReport(form,state.role)
   report.submittedAt=new Date().toISOString()
   report.evidence=reportEvidence(report,sensors.recordedSensorChannels(report.sensorIds,Date.parse(report.start),Date.parse(report.end)))
-  const run=(async()=>{try{const result=await aiStreamRequest({mode:'manual-anomaly',text:report.description,role:report.submitter.role,report},onProgress||(()=>{}));return createManualAnomaly(state,report,result,requestId)}finally{anomalyRequests.delete(requestId)}})()
+  const run=(async()=>{try{const result=await aiStreamRequest({mode:'manual-anomaly',requestId,text:report.description,role:report.submitter.role,report},onProgress||(()=>{}));if(result.event){backend.accept(result.event);return state.events[result.event.id]}return createManualAnomaly(state,report,result,requestId)}finally{anomalyRequests.delete(requestId)}})()
   anomalyRequests.set(requestId,run);return run
  }
  const shoreReports=computed(()=>shoreReportEntries(state))
@@ -82,6 +92,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  const planRequests=new Map()
  const modelEvent=event=>lifecycleModelContext(event,state.role)
  function prepareTaskPlan(id,{retry=false,editText='',onProgress}={}){
+  if(state.role!=='captain')return Promise.resolve(null)
   const event=state.events[id],draft=event&&suggestionAction(event)&&ensureTaskPlan(event)
   if(!draft)return Promise.resolve(null)
   const requestKey=draft.key
@@ -178,5 +189,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.[state.role]:event?.conversations[state.role])?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
  async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
- return {deleteEvent,assistStep:(id,taskId,stepIndex,text,uploads)=>assistTaskStep(state,id,taskId,stepIndex,text,uploads,aiStreamRequest,pendingRequests),applyStepNote:(id,taskId,messageId)=>applyTaskStepNote(state,id,taskId,messageId,pendingRequests),reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
+ return {flush:()=>backend.flush(),deleteEvent,assistStep:(id,taskId,stepIndex,text,uploads)=>assistTaskStep(state,id,taskId,stepIndex,text,uploads,aiStreamRequest,pendingRequests),applyStepNote:(id,taskId,messageId)=>applyTaskStepNote(state,id,taskId,messageId,pendingRequests),reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

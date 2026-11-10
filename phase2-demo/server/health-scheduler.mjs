@@ -3,7 +3,8 @@ import {mkdir,readFile,writeFile,rename,cp} from 'node:fs/promises'
 import {join,resolve} from 'node:path'
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
-import {createHash} from 'node:crypto'
+import {createHash,randomBytes} from 'node:crypto'
+import {pruneHealthOutputs} from './health-retention.mjs'
 import {configStore,resolveProvider} from './ai-config.mjs'
 import {invokeModel} from './model.mjs'
 import {HOUR,sqlTime} from './local-data.mjs'
@@ -25,20 +26,30 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
  await mkdir(directory,{recursive:true})
  const jobs=new DatabaseSync(join(directory,'jobs.sqlite'))
  jobs.exec('PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS health_jobs (id TEXT PRIMARY KEY,status TEXT,attempts INTEGER,lease_until INTEGER,updated_at INTEGER,error TEXT)')
+ if(!jobs.prepare('PRAGMA table_info(health_jobs)').all().some(c=>c.name==='owner_pid'))jobs.exec('ALTER TABLE health_jobs ADD COLUMN owner_pid INTEGER')
  const reportPath=join(directory,'health-latest.json')
  const inputs=['data/sensor-point-mapping.json','data/ship-profile.json','.claude/skills/ship-engine-health/scripts/run_local_health.py','.claude/skills/ship-engine-health/scripts/run_engine_health.py','.claude/skills/ship-engine-health/references/local-report.md']
  const content=await Promise.all(inputs.map(async name=>{try{return await readFile(join(root,name),'utf8')}catch(e){if(e.code==='ENOENT'&&analyze)return '';throw e}}))
  const dataset=await jsonRead(join(directory,'manifest.json'))
  const revision=createHash('sha256').update(content.join('\n')+JSON.stringify(dataset)).digest('hex').slice(0,12)
+ const startedAt=clock(),session=`run-${startedAt}-${randomBytes(4).toString('hex')}`
+ await pruneHealthOutputs(directory)
+ const abandonedIds=[]
  let busy=false,timer=null,pending=null,closed=false
  const claim=now=>{
-  const id=`${Math.floor(now/HOUR)}:${revision}`
+  const slot=Math.max(0,Math.floor((now-startedAt)/HOUR)),id=`${session}-${slot}`
   jobs.exec('BEGIN IMMEDIATE')
   try{
-   if(jobs.prepare("SELECT id FROM health_jobs WHERE status='running' AND lease_until>? LIMIT 1").get(now)){jobs.exec('COMMIT');return null}
+   for(const running of jobs.prepare("SELECT id,owner_pid,lease_until FROM health_jobs WHERE status='running'").all()){
+    let alive=running.lease_until>now
+    if(alive&&running.owner_pid)try{process.kill(running.owner_pid,0)}catch(e){if(e.code==='ESRCH')alive=false}
+    if(alive){jobs.exec('COMMIT');return null}
+    jobs.prepare("UPDATE health_jobs SET status='interrupted',lease_until=0,error='Previous process exited' WHERE id=?").run(running.id)
+    abandonedIds.push(running.id)
+   }
    const old=jobs.prepare('SELECT * FROM health_jobs WHERE id=?').get(id)
    if(old&&(old.status==='complete'||old.lease_until>now||old.attempts>=3)){jobs.exec('COMMIT');return null}
-   jobs.prepare('INSERT INTO health_jobs VALUES (?, ?, 1, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET status=excluded.status,attempts=health_jobs.attempts+1,lease_until=excluded.lease_until,updated_at=excluded.updated_at,error=NULL').run(id,'running',now+10*60000,now)
+   jobs.prepare('INSERT INTO health_jobs (id,status,attempts,lease_until,updated_at,error,owner_pid) VALUES (?, ?, 1, ?, ?, NULL, ?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,attempts=health_jobs.attempts+1,lease_until=excluded.lease_until,updated_at=excluded.updated_at,error=NULL,owner_pid=excluded.owner_pid').run(id,'running',now+10*60000,now,process.pid)
    jobs.exec('COMMIT');return id
   }catch(e){jobs.exec('ROLLBACK');throw e}
  }
@@ -52,7 +63,7 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
   if(!config.enabled)return null
   const provider=await resolveProvider(config)
   const instruction=await readFile(join(root,'.claude/skills/ship-engine-health/references/local-report.md'),'utf8')
-  const response=await invokeModel(provider,{...config,maxTokens:8192},instruction,JSON.stringify(facts))
+  const response=await invokeModel(provider,{...config,timeoutMs:Math.min(config.timeoutMs||180000,180000),maxTokens:8192},instruction,JSON.stringify(facts))
   const parsed=JSON.parse(response.text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''))
   for(const key of ['conclusion','next','detail'])if(typeof parsed[key]!=='string'||!parsed[key].trim())throw Error('健康研判正文不完整')
   validateHealthLanguage(parsed)
@@ -70,9 +81,10 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
    const now=clock(),manifest=await jsonRead(join(directory,'manifest.json'))
    if(!manifest)return
    id=claim(now);if(!id)return
+   if(abandonedIds.length)await pruneHealthOutputs(directory,6,{abandonedIds:abandonedIds.splice(0)})
    const facts=await runSkill(now),device=Object.values(facts.result.devices)[0]
    const quality=facts.coverage.status
-   const report={jobId:id,revision,completedAt:sqlTime(clock()),window:facts.result.analysis_window,coverage:facts.coverage,
+   const report={jobId:id,revision,schedulerStartedAt:sqlTime(startedAt),scheduledAt:sqlTime(startedAt+Math.max(0,Math.floor((now-startedAt)/HOUR))*HOUR),completedAt:sqlTime(clock()),window:facts.result.analysis_window,coverage:facts.coverage,
     dataCutoff:`${facts.coverage.start} ～ ${facts.coverage.end}`,
     conclusion:device?.analysis_conclusion||'可用数据不足，暂不能研判主机健康状态。',
     next:device?.recommendations?.join('；')||'检查数据覆盖后重新分析。',detail:device?.context||facts.result.context,
@@ -87,11 +99,13 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
    const archive=join(directory,'health-history',id.replace(':','-'))
    report.archivePath=archive
    await mkdir(archive,{recursive:true})
-   await atomicWrite(join(archive,'report.json'),JSON.stringify(report,null,2))
    await atomicWrite(join(archive,'report.md'),`# 主机设备健康研判\n\n更新时间：${report.completedAt}\n\n数据窗口：${report.dataCutoff}\n\n${report.detail}\n`)
    await atomicWrite(join(archive,'skill-result.json'),JSON.stringify(facts,null,2))
    if(!analyze)await cp(join(directory,'workspace/input/sensor-raw-data'),join(archive,'sensor-raw-data'),{recursive:true})
+   // report.json is written last: retention only counts fully assembled archives.
+   await atomicWrite(join(archive,'report.json'),JSON.stringify(report,null,2))
    await publish(report)
+   await pruneHealthOutputs(directory)
    jobs.prepare('UPDATE health_jobs SET status=?,lease_until=0,updated_at=? WHERE id=?').run('complete',clock(),id)
   }catch(e){
    if(id)jobs.prepare('UPDATE health_jobs SET status=?,lease_until=?,updated_at=?,error=? WHERE id=?').run('failed',clock()+5*60000,clock(),String(e.message).slice(0,500),id)
@@ -101,7 +115,7 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
  return {
   tick(){return pending||(pending=work().finally(()=>{pending=null}))},
   start(){if(!timer){void this.tick();timer=setInterval(()=>void this.tick(),30000);timer.unref?.()}},
-  async status(){const latest=await jsonRead(reportPath),job=jobs.prepare('SELECT id,status,attempts,updated_at FROM health_jobs ORDER BY updated_at DESC LIMIT 1').get();return {latest,job:job||null,stale:!latest||latest.revision!==revision||clock()-Date.parse(latest.completedAt.replace(' ','T')+'+08:00')>75*60000,nextRunAt:(Math.floor(clock()/HOUR)+1)*HOUR}},
+  async status(){const latest=await jsonRead(reportPath),job=jobs.prepare('SELECT id,status,attempts,updated_at FROM health_jobs ORDER BY updated_at DESC,rowid DESC LIMIT 1').get();return {latest,job:job||null,stale:!latest||latest.revision!==revision||clock()-Date.parse(latest.completedAt.replace(' ','T')+'+08:00')>75*60000,startedAt,nextRunAt:startedAt+(Math.max(0,Math.floor((clock()-startedAt)/HOUR))+1)*HOUR}},
   async close(){closed=true;if(timer)clearInterval(timer);await pending;jobs.close()},
  }
 }

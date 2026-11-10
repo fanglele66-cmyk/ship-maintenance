@@ -15,7 +15,7 @@
      <dl>
       <div><dt>航速</dt><dd>{{formatReading('ship-speed')}} <small>kn</small></dd></div>
       <div><dt>主机转速</dt><dd>{{formatReading('s-012')}} <small>rpm</small></dd></div>
-      <div><dt>主机负荷</dt><dd>{{formatReading('main-load')}} <small>%</small></dd></div>
+      <div><dt>燃油指令</dt><dd>{{formatReading('local-DC0058')}} <small>%</small></dd></div>
      </dl>
      <div class="twin-running-meta"><time :datetime="sampleTimeIso">数据更新于 {{sampleTimeLabel}}</time></div>
     </section>
@@ -30,7 +30,7 @@
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
  </div>
-  <Transition name="situation-assistant"><HomeSituationAssistant v-show="assistantOpen" id="home-situation-assistant" :open="assistantOpen" :chronology="chronology" :readings="{speed:formatReading('ship-speed'),rpm:formatReading('s-012'),load:formatReading('main-load'),sampledAt:sampleTimeIso}" @close="assistantOpen=false"/></Transition>
+  <Transition name="situation-assistant"><HomeSituationAssistant v-show="assistantOpen" id="home-situation-assistant" :open="assistantOpen" :chronology="chronology" :readings="{speed:formatReading('ship-speed'),rpm:formatReading('s-012'),fuelCommand:formatReading('local-DC0058'),sampledAt:sampleTimeIso}" @close="assistantOpen=false"/></Transition>
  </div>
 </template>
 <script setup>

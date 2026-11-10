@@ -8,8 +8,8 @@
      <div class="stage-content">
       <header class="stage-heading"><h3>{{stage.status}}</h3><span v-if="index===stages.length-1" class="latest-label">最近阶段</span></header>
       <p class="stage-description">{{stage.detail}}</p>
-      <div v-if="index<stages.length-1" class="stage-average"><span>平均航速</span><strong>{{Number.isFinite(stage.averageSpeed)?stage.averageSpeed.toFixed(1):'—'}} <small>kn</small></strong></div>
-      <dl class="stage-operations"><div><dt>{{index===stages.length-1?'推进方式':'航行变化'}}</dt><dd>{{stage.operation}}</dd></div><div><dt>负荷变化</dt><dd>{{stage.loadTrend}}</dd></div></dl>
+      <div v-if="stage.primaryMetric||index<stages.length-1" class="stage-average"><span>{{stage.primaryMetric?.label||'平均航速'}}</span><strong>{{metricValue(stage)}} <small>{{stage.primaryMetric?.unit||'kn'}}</small></strong></div>
+      <dl class="stage-operations"><div><dt>{{stage.operationLabel||(index===stages.length-1?'推进方式':'航行变化')}}</dt><dd>{{stage.operation}}</dd></div><div><dt>{{stage.loadTrendLabel||'负荷变化'}}</dt><dd>{{stage.loadTrend}}</dd></div></dl>
       <section v-if="captain&&stage.concerns.length" class="stage-concerns" aria-label="本阶段提醒处置概况"><p class="concern-label">本阶段关联提醒</p>
        <div v-for="concern in stage.concerns" :key="concern.device" :class="concern.severity">
         <strong><i aria-hidden="true"/>{{concern.device}}<span class="concern-types">{{concern.types.map(t=>t.label.replace('事件','')+' '+t.count).join(' · ')}}</span></strong>
@@ -27,6 +27,7 @@
 import {computed,ref,watch,nextTick} from 'vue'
 import {navigationStages} from '../workflow/navigationStages.js'
 const props=defineProps({periods:{type:Array,required:true},events:{type:Array,default:()=>[]},captain:{type:Boolean,default:false},compact:{type:Boolean,default:false}})
+function metricValue(stage){const value=stage.primaryMetric?stage.primaryMetric.value:stage.averageSpeed;return Number.isFinite(value)?value.toFixed(1):'—'}
 const scroll=ref(null)
 watch(()=>props.compact,async compact=>{await nextTick();if(scroll.value)scroll.value.scrollLeft=compact?scroll.value.scrollWidth:0})
 const stages=computed(()=>navigationStages(props.periods,props.events,{captain:props.captain}).slice(-4))

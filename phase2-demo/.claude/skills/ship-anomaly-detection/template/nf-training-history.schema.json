@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/nf-training-history.schema.json",
+  "title": "Haixun 06 NF Training History",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["epoch", "train_loss", "validation_loss"],
+    "properties": {
+      "epoch": {"type": "integer", "minimum": 1},
+      "train_loss": {"type": "number"},
+      "validation_loss": {"type": "number"}
+    }
+  }
+}

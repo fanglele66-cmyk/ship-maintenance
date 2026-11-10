@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/agent-analysis-content.schema.json",
+  "title": "Agent-authored AI Anomaly Business Content",
+  "description": "Only reasoning and field-work content. Identity, state, query, ordering and frontend answer fields are system-managed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "summary",
+    "fault_causes",
+    "engineering_inference",
+    "analysis_basis",
+    "diagnostic_plans"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "summary": {"type": "string", "minLength": 20},
+    "fault_causes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cause_id", "cause_name", "related_system", "probability", "basis", "direct_consequences"],
+        "properties": {
+          "cause_id": {"type": "string", "minLength": 3},
+          "cause_name": {"type": "string", "minLength": 6},
+          "related_system": {"type": "string", "minLength": 3},
+          "probability": {"enum": ["low", "medium", "high"]},
+          "basis": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "string", "minLength": 30}},
+          "direct_consequences": {"type": "string", "minLength": 20}
+        }
+      }
+    },
+    "engineering_inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "steps"],
+      "properties": {
+        "summary": {"type": "string", "minLength": 60},
+        "steps": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["observation", "inference", "basis_ids"],
+            "properties": {
+              "observation": {"type": "string", "minLength": 20},
+              "inference": {"type": "string", "minLength": 25},
+              "basis_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3}}
+            }
+          }
+        }
+      }
+    },
+    "analysis_basis": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["basis_id", "basis_type", "title", "description"],
+        "properties": {
+          "basis_id": {"type": "string", "minLength": 3},
+          "basis_type": {"enum": ["sensor_trend", "baseline_comparison", "cross_signal", "rule", "operating_condition", "knowledge"]},
+          "title": {"type": "string", "minLength": 4},
+          "description": {"type": "string", "minLength": 30}
+        }
+      }
+    },
+    "diagnostic_plans": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "plan_id",
+          "cause_id",
+          "schemeTitle",
+          "related_system",
+          "steps",
+          "safety_notes",
+          "completion_criteria"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "minLength": 3
+          },
+          "cause_id": {
+            "type": "string",
+            "minLength": 3
+          },
+          "schemeTitle": {
+            "type": "string",
+            "minLength": 2,
+            "description": "一级任务的简短中文名词短语，聚焦 cause_id 对应的候选原因或对象，例如“控制空气泄漏”“1缸温度测量链路”；不含排查、检查、核实等动作词。",
+            "pattern": "^(?![\\s\\S]*(?:排查|检查|核实|核对|复核|验证|确认|检测|检验|校验))(?!\\s*(?:调取|查看|记录|对比|比对|复测))"
+          },
+          "related_system": {
+            "type": "string",
+            "minLength": 3
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "step_id",
+                "action",
+                "reference_images",
+                "inspection_items"
+              ],
+              "properties": {
+                "step_id": {
+                  "type": "string",
+                  "minLength": 3
+                },
+                "action": {
+                  "type": "string",
+                  "minLength": 6,
+                  "description": "二级排查方向，例如“检查控制空气管路法兰垫片破损”或“检查管路松动或破损”；具体执行方法写入本步骤的 inspection_items.content。"
+                },
+                "reference_images": {
+                  "type": "array",
+                  "maxItems": 3,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "title",
+                      "path"
+                    ],
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 2
+                      },
+                      "path": {
+                        "type": "string",
+                        "pattern": "^wiki/wiki_rt-flex50/images/[^/]+\\.(png|jpg|jpeg|webp)$"
+                      }
+                    }
+                  }
+                },
+                "inspection_items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "inspection_item_id",
+                      "title",
+                      "content",
+                      "item_type"
+                    ],
+                    "properties": {
+                      "inspection_item_id": {
+                        "type": "string",
+                        "minLength": 3
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 3
+                      },
+                      "content": {
+                        "type": "string",
+                        "minLength": 12,
+                        "description": "排查事项正文，可为操作指令或检查事项；写清检查对象、执行方法和需要观察或记录的现象，不限于问句。"
+                      },
+                      "item_type": {
+                        "type": "string",
+                        "enum": [
+                          "operation",
+                          "inspection"
+                        ],
+                        "description": "operation 为执行类事项，不带结果选项；inspection 为需提交检查结果的事项，必须带 options。"
+                      },
+                      "options": {
+                        "type": "array",
+                        "description": "仅检查结果类事项具有选项，固定正常/异常两个代码；label 由模型结合该事项生成清晰的正常与异常结果描述。",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "prefixItems": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "code",
+                              "label",
+                              "abnormal"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "normal"
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "abnormal": {
+                                "const": false
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "code",
+                              "label",
+                              "abnormal"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "abnormal"
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "abnormal": {
+                                "const": true
+                              }
+                            }
+                          }
+                        ],
+                        "items": false
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "item_type": {
+                              "const": "inspection"
+                            }
+                          },
+                          "required": [
+                            "item_type"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "options"
+                          ]
+                        },
+                        "else": {
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "options"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "description": "由模型按本排查方向需要选择 2 至 4 个具体事项，可混合操作类和检查结果类；所有事项仅服务于当前 step.action。"
+                }
+              }
+            },
+            "description": "同一候选原因下的不同排查方向；避免仅按准备、检查、复测等通用阶段拆分。",
+            "contains": {
+              "type": "object",
+              "required": [
+                "inspection_items"
+              ],
+              "properties": {
+                "inspection_items": {
+                  "type": "array",
+                  "contains": {
+                    "type": "object",
+                    "required": [
+                      "item_type"
+                    ],
+                    "properties": {
+                      "item_type": {
+                        "const": "inspection"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "minContains": 1
+          },
+          "safety_notes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          "completion_criteria": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "minLength": 12
+            }
+          }
+        }
+      },
+      "description": "由模型结合当前异常事件证据和知识库生成：一级 plan 针对一个候选原因，二级 steps 分解该原因的不同排查方向，三级 inspection_items 描述执行该方向的具体操作或检查事项。不得使用固定脚本填充排查内容。"
+    }
+  }
+}

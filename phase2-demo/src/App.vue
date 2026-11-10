@@ -6,6 +6,7 @@
     <AppNav />
     <div class="app-main">
       <AppHeader />
+      <div v-if="workflowStatus.error" class="workflow-sync-error" role="alert">{{workflowStatus.error}} <button @click="reloadWorkflow">重新载入服务器记录</button></div>
       <div class="app-content">
         <router-view v-slot="{ Component, route }">
           <transition name="fade-slide" mode="out-in">
@@ -21,6 +22,8 @@
 </template>
 
 <script setup>
+import {workflowStatus} from './services/workflowStatus.js'
+const reloadWorkflow=()=>location.reload()
 import AccountLogin from './components/AccountLogin.vue'
 import {auth,loadAccount} from './services/auth'
 import { ref, onBeforeUnmount } from 'vue'
@@ -40,6 +43,7 @@ if(import.meta.hot){
 </script>
 
 <style scoped>
+.workflow-sync-error{background:#fff3db;color:#855719;padding:8px 16px;font-size:13px}.workflow-sync-error button{margin-left:12px;border:1px solid #d8c29b;border-radius:4px;padding:4px 8px;background:white;cursor:pointer}
 .app-container {
   width: 100%;
   height: 100%;

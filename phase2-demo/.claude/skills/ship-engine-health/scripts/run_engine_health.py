@@ -39,7 +39,7 @@ BEIJING_TZ = timezone(timedelta(hours=8))
 RAW_FILE_GLOB = "*__raw-data.json"
 RESULT_FILE_RE = re.compile(r"^engine-health-(\d{8}_\d{6})__result\.json$")
 OUTPUT_RETENTION_HOURS = 12
-OUTPUT_PROTECTED_FILE_COUNT = 10
+OUTPUT_PROTECTED_FILE_COUNT = 6
 ACTIVE_EVENT_INDEXES = (
     Path("result/ai-anomaly/active-events.json"),
     Path("result/oem-alarm/active-events.json"),

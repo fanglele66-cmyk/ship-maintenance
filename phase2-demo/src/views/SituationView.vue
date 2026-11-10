@@ -126,7 +126,7 @@ import { useAbnormalReport } from '@/composables/useAbnormalReport'
 const sensorStore = useSensorStore()
 const localReadings=computed(()=>{
  const value=id=>{const v=sensorStore.allSensors.find(s=>s.id===id)?.value;return Number.isFinite(v)?v.toFixed(1):'—'}
- return {speed:value('ship-speed'),rpm:value('s-012'),load:'—',sampledAt:new Date(sensorStore.sampledAt).toISOString()}
+ return {speed:value('ship-speed'),rpm:value('s-012'),fuelCommand:value('local-DC0058'),sampledAt:new Date(sensorStore.sampledAt).toISOString()}
 })
 const situationStore = useSituationStore()
 const deviceStore = useDeviceStore()

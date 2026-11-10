@@ -53,7 +53,7 @@ test('confirmed observation preserves the editable purpose and manual report sen
 })
 
 test('system selection restricts user-chosen sensors and retains ownership validation',()=>{
- const form={deviceId:'main-engine-1',selectionMode:'selected',systems:['冷却系统'],sensorIds:['s-007','main-cyl-1-coolant'],start:new Date(Date.now()-3600000).toISOString(),end:new Date(Date.now()-60000).toISOString(),description:'主机冷却水温度波动，需核对现场读数。'}
+ const form={deviceId:'main-engine-1',selectionMode:'selected',systems:['冷却系统'],sensorIds:['local-DC0044','main-cyl-1-coolant'],start:new Date(Date.now()-3600000).toISOString(),end:new Date(Date.now()-60000).toISOString(),description:'主机冷却水温度波动，需核对现场读数。'}
  const report=validateAnomalyReport(form,'engineer')
  assert.deepEqual(report.sensorIds,form.sensorIds)
  assert.ok(report.sensors.every(s=>s.subsystem==='冷却系统'))
@@ -83,10 +83,10 @@ test('workbench states the actual available next decision and keeps submitted co
 
 
 test('only normalized legacy automatic reports remain readable without expanding their ids',()=>{
- const form={deviceId:'main-engine-1',selectionMode:'selected',systems:['冷却系统'],sensorIds:['s-007'],start:new Date(Date.now()-3600000).toISOString(),end:new Date(Date.now()-60000).toISOString(),description:'测试：核对所选系统内明确选中的测点。'}
+ const form={deviceId:'main-engine-1',selectionMode:'selected',systems:['冷却系统'],sensorIds:['local-DC0044'],start:new Date(Date.now()-3600000).toISOString(),end:new Date(Date.now()-60000).toISOString(),description:'测试：核对所选系统内明确选中的测点。'}
  const report=validateAnomalyReport(form,'engineer')
  const saved={...report,selectionMode:'system'}
- assert.deepEqual(validateAnomalyReport(saved,'engineer').sensorIds,['s-007'],'reading an existing automatic report must not add newly registered sensors')
+ assert.deepEqual(validateAnomalyReport(saved,'engineer').sensorIds,['local-DC0044'],'reading an existing automatic report must not add newly registered sensors')
  assert.throws(()=>validateAnomalyReport({...form,selectionMode:'system',systems:[],sensorIds:[]},'engineer'),/明确选择/)
  assert.throws(()=>validateAnomalyReport({...form,selectionMode:'system'},'engineer'),/明确选择/)
  assert.throws(()=>validateAnomalyReport({...saved,sensors:[]},'engineer'),/明确选择/)

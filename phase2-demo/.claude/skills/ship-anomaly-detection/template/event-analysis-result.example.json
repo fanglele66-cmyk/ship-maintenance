@@ -1,0 +1,439 @@
+{
+  "ser_no": "873247549912068096",
+  "event_id": "ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200",
+  "event_type": "ai-anomaly",
+  "image_ids": [],
+  "created_at": "2026-07-07T10:31:25",
+  "manual_follow_up_feedback": null,
+  "workflow_state": {
+    "stage": "event_overview",
+    "task_index": null,
+    "status": "ready",
+    "updated_at": "2026-07-07T10:31:25",
+    "closure_status": null,
+    "summary_ref": null
+  },
+  "ship_id": "CHBY-PROVISIONAL",
+  "ship_name": "长航碧玉",
+  "deviceDataId": "980000000000000001",
+  "systemType": "fuel_oil",
+  "equipment_id": "left_main_engine",
+  "equipment_name": "主机",
+  "event_title": "主机燃油进口压力持续偏高",
+  "anomaly_type": "主机燃油进口压力持续偏离工况健康基线",
+  "severity": "medium",
+  "analysis_conclusion": {
+    "judgement": "confirmed_anomaly",
+    "confidence": 0.86,
+    "summary": "主机在转速和负荷稳定的条件下，燃油进口压力持续高于同工况基线，已排除单次采样尖峰，建议优先检查燃油调压阀和过滤器回油通路。"
+  },
+  "fault_causes": [
+    {
+      "cause_id": "fuel_pressure_regulator_fault",
+      "cause_name": "燃油调压阀调节异常",
+      "related_system": "fuel_oil",
+      "probability": "high",
+      "probability_score": 0.78,
+      "basis": [
+        "燃油进口压力持续高于同工况基线，且异常期间主机转速和负荷保持稳定。"
+      ],
+      "direct_consequences": "可能导致燃油供给压力不稳定、喷射状态异常或同类事件反复出现。"
+    },
+    {
+      "cause_id": "fuel_filter_return_restriction",
+      "cause_name": "燃油滤器或回油通路阻力偏大",
+      "related_system": "fuel_oil",
+      "probability": "medium",
+      "probability_score": 0.58,
+      "basis": [
+        "进口压力持续升高可能与下游流通阻力增加有关。"
+      ],
+      "direct_consequences": "可能造成燃油压力继续升高并影响供油稳定性。"
+    }
+  ],
+  "engineering_inference": {
+    "summary": "先确认异常是否独立于工况变化，再结合压力持续性和关联测点缩小到调压与流通阻力两类原因。",
+    "steps": [
+      {
+        "order": 1,
+        "observation": "10:12 至 10:30 燃油进口压力保持在 6.3 至 6.8bar。",
+        "inference": "异常具有持续性，不属于单点采样尖峰。",
+        "basis_ids": [
+          "basis_pressure_trend"
+        ]
+      },
+      {
+        "order": 2,
+        "observation": "同期主机转速约 720rpm、负荷约 68%，波动较小。",
+        "inference": "压力升高不能仅由负荷突然变化解释，应检查调压阀和燃油流通阻力。",
+        "basis_ids": [
+          "basis_operating_condition",
+          "basis_baseline_comparison"
+        ]
+      }
+    ]
+  },
+  "analysis_basis": [
+    {
+      "basis_id": "basis_pressure_trend",
+      "basis_type": "sensor_trend",
+      "title": "燃油进口压力持续偏高",
+      "description": "事件窗口内压力连续高于 6.3bar，最高达到 6.8bar。",
+      "point_refs": [
+        "44301"
+      ],
+      "time_window": {
+        "start_time": "2026-07-07T10:12:00",
+        "end_time": "2026-07-07T10:30:00"
+      }
+    },
+    {
+      "basis_id": "basis_baseline_comparison",
+      "basis_type": "baseline_comparison",
+      "title": "同工况基线对比",
+      "description": "当前压力 6.3 至 6.8bar，高于同工况基线 4.0 至 4.5bar。",
+      "point_refs": [
+        "44301"
+      ]
+    },
+    {
+      "basis_id": "basis_operating_condition",
+      "basis_type": "operating_condition",
+      "title": "主机工况稳定",
+      "description": "异常期间转速和负荷变化较小，可排除快速升负荷造成的短时压力变化。",
+      "point_refs": [
+        "44302",
+        "44303"
+      ]
+    }
+  ],
+  "diagnostic_plans": [
+    {
+      "plan_id": "diag_fuel_pressure_regulator",
+      "cause_id": "fuel_pressure_regulator_fault",
+      "schemeTitle": "燃油调压阀",
+      "related_system": "fuel_oil",
+      "steps": [
+        {
+          "step_id": "step_regulator_pressure_check",
+          "order": 1,
+          "action": "检查调压阀设定偏离",
+          "reference_images": [
+            {
+              "title": "燃油系统示例",
+              "path": "wiki/wiki_rt-flex50/images/fig_17-1_燃油系统示例.png"
+            }
+          ],
+          "feedback_text": null,
+          "feedback_image_ids": [],
+          "inspection_items": [
+            {
+              "inspection_item_id": "fuel_regulator_reference_record",
+              "title": "读取设定与压力",
+              "content": "在主机工况稳定且允许观察时，读取调压阀现有设定、机旁压力和监控压力，记录对应时间及读数，暂不调整设定。",
+              "item_type": "operation"
+            },
+            {
+              "inspection_item_id": "fuel_pressure_gauge_check",
+              "title": "压力测量一致性",
+              "content": "对比同一时刻机旁压力表与监控压力读数，观察偏差是否超过仪表允许误差，并记录两者差值。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "两处压力读数一致",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "两处压力读数存在明显偏差",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            },
+            {
+              "inspection_item_id": "fuel_regulator_setting_check",
+              "title": "调压阀设定偏离",
+              "content": "查阅本机经批准的调压阀设定记录，与当前设定逐项核对，确认是否存在偏离并记录实际值和依据。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "设定符合批准记录",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "设定偏离批准记录",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            }
+          ]
+        },
+        {
+          "step_id": "step_regulator_response_check",
+          "order": 2,
+          "action": "检查调压阀动作迟滞或卡滞",
+          "reference_images": [],
+          "feedback_text": null,
+          "feedback_image_ids": [],
+          "inspection_items": [
+            {
+              "inspection_item_id": "fuel_regulator_response_check",
+              "title": "调压动作响应",
+              "content": "在经许可的运行观察窗口，对照压力趋势观察调压阀可见动作或位置反馈，判断是否出现迟滞、卡滞或反复振荡并记录发生时间。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "调压动作平稳且及时",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "调压动作迟滞卡滞或振荡",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            },
+            {
+              "inspection_item_id": "fuel_regulator_pressure_recovery_check",
+              "title": "动作后压力恢复",
+              "content": "对照调压阀动作前后同工况压力趋势，观察进口压力能否回到本机规定工作范围并保持稳定，记录压力范围和观察时段。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "压力恢复并保持稳定",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "压力未恢复或仍持续波动",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            }
+          ]
+        }
+      ],
+      "safety_notes": [
+        "拆检燃油阀件前必须隔离、泄压并做好防火防污染措施。"
+      ],
+      "completion_criteria": [
+        "已确认压力异常是否真实存在。",
+        "已确认调压阀设定和动作状态。"
+      ]
+    },
+    {
+      "plan_id": "diag_fuel_filter_return_restriction",
+      "cause_id": "fuel_filter_return_restriction",
+      "schemeTitle": "燃油滤器与回油通路",
+      "related_system": "fuel_oil",
+      "steps": [
+        {
+          "step_id": "step_fuel_filter_differential_check",
+          "order": 1,
+          "action": "检查燃油滤器堵塞或污染",
+          "reference_images": [
+            {
+              "title": "燃油系统示例",
+              "path": "wiki/wiki_rt-flex50/images/fig_17-1_燃油系统示例.png"
+            }
+          ],
+          "feedback_text": null,
+          "feedback_image_ids": [],
+          "inspection_items": [
+            {
+              "inspection_item_id": "fuel_filter_pressure_record",
+              "title": "记录滤器前后压力",
+              "content": "在稳定工况下读取燃油滤器前后压力和压差指示，记录滤器编号、采集时间与对应主机负荷。",
+              "item_type": "operation"
+            },
+            {
+              "inspection_item_id": "fuel_filter_pressure_drop_check",
+              "title": "滤器压差判断",
+              "content": "将滤器前后压差与本机维护资料规定的允许压差比较，检查是否超过限值并记录比较依据。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "滤器压差处于允许范围",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "滤器压差超过允许范围",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            },
+            {
+              "inspection_item_id": "fuel_filter_isolation_prepare",
+              "title": "安排滤器安全隔离",
+              "content": "若需要开盖检查，先按本机维护规程安排停机或切换备用滤器，并完成隔离、泄压和防火准备，确认条件满足后再开盖。",
+              "item_type": "operation"
+            },
+            {
+              "inspection_item_id": "fuel_filter_contamination_check",
+              "title": "滤芯污染判断",
+              "content": "在安全隔离且允许开盖的条件下目视滤芯表面，检查是否存在油泥、异物堆积或明显堵塞，并拍照记录污染位置。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "滤芯清洁且无明显堵塞",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "滤芯污染或明显堵塞",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            }
+          ]
+        },
+        {
+          "step_id": "step_fuel_return_path_check",
+          "order": 2,
+          "action": "检查回油阀位错误或管路受阻",
+          "reference_images": [],
+          "feedback_text": null,
+          "feedback_image_ids": [],
+          "inspection_items": [
+            {
+              "inspection_item_id": "fuel_return_path_identify",
+              "title": "核对回油路径",
+              "content": "对照本机燃油系统图从调压阀回油出口沿实际管路核对阀门和接头位置，记录待核查阀门编号与管段。",
+              "item_type": "operation"
+            },
+            {
+              "inspection_item_id": "fuel_return_valve_position_check",
+              "title": "回油阀位核查",
+              "content": "逐一对照运行规程核对回油路径上的阀门开度和挂牌状态，检查是否存在误关、未全开或错误隔离。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "回油阀位符合运行要求",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "回油阀位错误或存在误隔离",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            },
+            {
+              "inspection_item_id": "fuel_return_pressure_check",
+              "title": "回油管路受阻核查",
+              "content": "沿回油路径目视检查压扁、折弯和外部挤压部位，并结合可用回油压力读数判断是否存在异常阻力，记录位置和读数。",
+              "item_type": "inspection",
+              "options": [
+                {
+                  "code": "normal",
+                  "label": "管路外观及回油压力正常",
+                  "abnormal": false
+                },
+                {
+                  "code": "abnormal",
+                  "label": "管路受损或回油压力异常",
+                  "abnormal": true
+                }
+              ],
+              "answer_type": "single_choice",
+              "required": true,
+              "answer": null
+            }
+          ]
+        }
+      ],
+      "safety_notes": [
+        "拆检燃油滤器和回油管路前必须隔离、泄压并做好防火防污染措施。"
+      ],
+      "completion_criteria": [
+        "已确认滤器压差和污染状态。",
+        "已确认回油阀位、压力和管路通畅性。"
+      ]
+    }
+  ],
+  "data_query_requests": [
+    {
+      "request_id": "main_engine_anomaly_trend_001",
+      "data_type": "numeric",
+      "api": {
+        "method": "POST",
+        "configRef": "data/sensor-api.json",
+        "endpointKey": "pointDataList",
+        "baseUrl": "https://test.zhongshu.tech/ship-maintenance-shore",
+        "path": "/api/server/sensor-data/point-data-list",
+        "body": {
+          "shipId": "CHBY",
+          "deviceDataIdList": [
+            "980000000000000001"
+          ],
+          "pointDataIdList": [
+            "990000000000000041",
+            "990000000000000001",
+            "990000000000000058"
+          ],
+          "collectTimeStart": "2026-07-07 02:00:00",
+          "collectTimeEnd": "2026-07-07 02:30:00",
+          "pageNo": 0,
+          "pageSize": 2000
+        }
+      },
+      "points": [
+        {
+          "deviceDataId": "980000000000000001",
+          "pointDataId": "990000000000000041",
+          "pointName": "燃油进机压力",
+          "dataType": 1,
+          "unit": "bar"
+        },
+        {
+          "deviceDataId": "980000000000000001",
+          "pointDataId": "990000000000000001",
+          "pointName": "主机转速",
+          "dataType": 1,
+          "unit": "RPM"
+        },
+        {
+          "deviceDataId": "980000000000000001",
+          "pointDataId": "990000000000000058",
+          "pointName": "燃油指令",
+          "dataType": 1,
+          "unit": "%"
+        }
+      ],
+      "time_window": {
+        "start_time": "2026-07-07T10:00:00",
+        "end_time": "2026-07-07T10:30:00"
+      }
+    }
+  ]
+}

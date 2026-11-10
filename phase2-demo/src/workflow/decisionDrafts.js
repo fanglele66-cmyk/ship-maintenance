@@ -1,6 +1,7 @@
 const clone=value=>JSON.parse(JSON.stringify(value))
 export function observationPlanDraft(event,now=Date.now()){
  const previous=event.observationPlan,interval=event.tracking?7*86400000:2*3600000
+ if(event.backendManaged&&!previous)return {...observationPlanDraft({...event,backendManaged:false},now),signals:(event.sensorScope?.systems?.join('、')||'关联系统')+'全部相关测点，并结合主机转速与燃油指令核对工况',conditions:'按实际转速和燃油指令核对运行状态；停机与运行时段分别研判'}
  return {triggerOperator:previous?.triggerOperator||'above',triggerSignal:previous?.triggerSignal||'',triggerValue:previous?.triggerValue??'',purpose:previous?.purpose||`核对「${event.title}」相关变化是否持续、恢复或复发`,signals:previous?.signals||event.manualReport?.sensors?.map(s=>s.name).join('、')||event.brief?.facts?.map(f=>f.label).join('、')||'原事件相关测点',conditions:previous?.conditions||'使用可比负荷和运行状态；工况不一致单独说明',limits:previous?.limits||'只解释实际覆盖窗口；缺测不能认定恢复或正常',dueAt:new Date(now+interval).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16).replace(' ','T'),trigger:previous?.trigger||'出现与原事件相关的新报警或经人工确认的持续恶化',version:(previous?.version||0)+1}
 }
 export function validateObservationPlan(plan,now=Date.now()){

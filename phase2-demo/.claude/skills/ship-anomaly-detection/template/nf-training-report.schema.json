@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/nf-training-report.schema.json",
+  "title": "Haixun 06 NF Training Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["created_at", "scope", "devices", "limitations"],
+  "properties": {
+    "created_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"},
+    "scope": {"type": "string"},
+    "devices": {
+      "type": "object",
+      "required": ["left_main_engine", "right_main_engine"],
+      "additionalProperties": {"type": "object", "additionalProperties": true}
+    },
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "total": 3,
+  "pageCount": 1,
+  "pointDataList": [
+    {
+      "shipId": "CHBY",
+      "dataId": "970000000000000001",
+      "deviceDataId": "980000000000000001",
+      "pointDataId": "990000000000000041",
+      "collectTime": "2026-07-07 16:23:00",
+      "value": "4.2500"
+    },
+    {
+      "shipId": "CHBY",
+      "dataId": "970000000000000001",
+      "deviceDataId": "980000000000000001",
+      "pointDataId": "990000000000000001",
+      "collectTime": "2026-07-07 16:23:00",
+      "value": "745.0000"
+    },
+    {
+      "shipId": "CHBY",
+      "dataId": "970000000000000001",
+      "deviceDataId": "980000000000000001",
+      "pointDataId": "990000000000000058",
+      "collectTime": "2026-07-07 16:23:00",
+      "value": "65.0000"
+    }
+  ],
+  "_fetchMetadata": {
+    "source": "point-data-list",
+    "shipId": "CHBY",
+    "collectTimeStart": "2026-07-07 16:23:00",
+    "collectTimeEnd": "2026-07-07 16:23:00",
+    "collectTimeTimezone": "Asia/Shanghai",
+    "requestCollectTimeStart": "2026-07-07 16:23:00",
+    "requestCollectTimeEnd": "2026-07-07 16:23:00",
+    "requestTimeTimezone": "Asia/Shanghai",
+    "recordCount": 3,
+    "recordsPath": "pointDataList",
+    "fetchedAt": "2026-07-08T00:23:01"
+  }
+}

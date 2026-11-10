@@ -1,3 +1,4 @@
+import {localSensors} from './localSensorData.js'
 import {mockSensors} from '../mock/sensors.js'
 import {mockDevices} from '../mock/devices.js'
 import {buildSimulationSensors} from '../mock/sensorSimulation.js'
@@ -7,7 +8,7 @@ import {normalizeTaskPlan} from './taskPlanning.js'
 // Use the same definitions as sensorStore.allSensors / the situation device page.
 // This includes numbered-cylinder, common-rail, control-air and auxiliary points.
 export const reportDevices=mockDevices.filter(d=>buildSimulationSensors(mockSensors).some(s=>s.deviceId===d.id)).map(({id,name})=>({id,name}))
-export const reportSensors=deviceId=>buildSimulationSensors(mockSensors).filter(s=>s.deviceId===deviceId)
+export const reportSensors=deviceId=>deviceId==='main-engine-1'?localSensors():buildSimulationSensors(mockSensors).filter(s=>s.deviceId===deviceId)
 export const reportSensorsForSystems=(deviceId,systems=[])=>reportSensors(deviceId).filter(s=>!systems.length||systems.includes(s.subsystem))
 const copy=value=>JSON.parse(JSON.stringify(value))
 const instant=value=>Date.parse(/T\d{2}:\d{2}$/.test(String(value))?value+':00+08:00':value)
@@ -40,7 +41,7 @@ export function normalizeAnomalyAnalysis(value){
  return result
 }
 export function reportEvidence(report,channels=[]){
- return report.sensors.map(s=>({channelId:s.id,name:s.name,unit:s.unit,sourceKind:'prototype',trendData:(channels.find(c=>c.channelId===s.id)?.trendData||[]).filter(p=>Number.isFinite(p.timestamp)&&p.timestamp>=Date.parse(report.start)&&p.timestamp<=Date.parse(report.end)&&Number.isFinite(p.value)).slice(-64)}))
+ return report.sensors.map(s=>({channelId:s.id,name:s.name,unit:s.unit,sourceKind:channels.find(c=>c.channelId===s.id)?.sourceKind||'unavailable',trendData:(channels.find(c=>c.channelId===s.id)?.trendData||[]).filter(p=>Number.isFinite(p.timestamp)&&p.timestamp>=Date.parse(report.start)&&p.timestamp<=Date.parse(report.end)&&Number.isFinite(p.value)).slice(-64)}))
 }
 export function createManualAnomaly(state,report,result,requestId,{at=new Date().toISOString()}={}){
  if(!/^[a-zA-Z0-9-]{8,80}$/.test(requestId))throw Error('上报编号无效，请重新打开表单。')
@@ -50,7 +51,7 @@ export function createManualAnomaly(state,report,result,requestId,{at=new Date()
  const manualReport={...validated,submittedAt:report.submittedAt||at,generatedAt:at,evidence,analysis,model:result.model,sources:result.sources||[],usage:result.usage}
  const number='CBY-EVT-'+new Date(at).toLocaleDateString('sv-SE',{timeZone:'Asia/Shanghai'}).replaceAll('-','')+'-MR-'+requestId.slice(0,8).toUpperCase()
  const brief={id,discovery:{kind:'manual-report',label:'人工异常上报',at:manualReport.submittedAt,text:validated.description},conclusion:analysis.summary,boundary:analysis.interpretation,dispatchReason:analysis.recommendation,captainDecision:analysis.recommendation,facts:[],sources:[],tasks:analysis.steps.map(s=>({title:s.label,detail:s.guide}))}
- const event={id,number,title:analysis.title,type:'报警事件',device:validated.device,deviceId:validated.deviceId,createdAt:at,occurredAt:validated.start,tracking:false,manualReport,submitter:validated.submitter,brief,status:'待决策',phase:'reminder',currentTask:null,participants:[validated.submitter.name],tasks:[],reports:[],decisions:[],shore:[],maintenance:null,phases:[{id:'reminder',kind:'reminder',label:'初始信息',at}],conversations:Object.fromEntries(Object.keys(people).map(role=>[role,[]])),unread:{captain:true}}
+ const event={id,number,title:analysis.title,type:'报警事件',device:validated.device,deviceId:validated.deviceId,createdAt:at,occurredAt:validated.start,tracking:false,manualReport,submitter:validated.submitter,brief,status:'待决策',phase:'reminder',currentTask:null,responsible:people.captain,participants:[...new Set([people.captain,validated.submitter.name])],tasks:[],reports:[],decisions:[],shore:[],maintenance:null,phases:[{id:'reminder',kind:'reminder',label:'初始信息',at}],conversations:Object.fromEntries(Object.keys(people).map(role=>[role,[]])),unread:{captain:true}}
  event.conversations.captain.push({id:id+'-analysis',kind:'model',status:'complete',text:analysis.summary+'\n\n'+analysis.recommendation,at,model:result.model,sources:result.sources||[]})
  state.events[id]=copy(event)
  state.notices||=[];state.notices.push({id:id+'-notice',eventId:id,recipient:'captain',title:'收到异常上报',text:validated.submitter.name+'提交：'+analysis.title,at,read:false})

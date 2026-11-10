@@ -20,7 +20,7 @@ def analyze(directory: Path, cutoff: datetime):
     catalog_dir.mkdir(parents=True, exist_ok=True)
     for name in ['ship-profile.json', 'sensor-point-mapping.json', 'local-replay.json']:
         shutil.copyfile(WORKSPACE_ROOT / 'data' / name, catalog_dir / name)
-    (workspace / 'wiki').mkdir(exist_ok=True)
+    (workspace / 'wiki_rt-flex50').mkdir(exist_ok=True)
     asset_dir = Path('.claude/skills/ship-engine-health/data')
     (workspace / asset_dir).mkdir(parents=True, exist_ok=True)
     for name in ['main_engine_registry.json', 'changhangbiyu_mapping.json', 'system-profiles.json']:

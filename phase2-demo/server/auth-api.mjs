@@ -61,7 +61,7 @@ export async function createAuthService(root,{directory=process.env.SHIP_DATA_DI
   if(path==='/api/events/delete'&&req.method==='POST'){
    if(user.role!=='admin')return send(res,403,{error:'只有超级管理员可以删除事件。'})
    let input;try{input=await body(req)}catch{return send(res,400,{error:'删除请求格式错误。'})}
-   if(!Array.isArray(input.ids)||!input.ids.length||input.ids.length>100||input.ids.some(id=>typeof id!=='string'||!/^[\w-]{1,160}$/.test(id)))return send(res,400,{error:'事件编号无效。'})
+   if(!Array.isArray(input.ids)||!input.ids.length||input.ids.length>100||input.ids.some(id=>typeof id!=='string'||!/^[\w-]{1,240}$/.test(id)))return send(res,400,{error:'事件编号无效。'})
    db.exec('BEGIN IMMEDIATE')
    try{for(const id of input.ids)db.prepare('INSERT OR IGNORE INTO deleted_events VALUES(?,?,?)').run(id,user.username,new Date(clock()).toISOString());db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}
    return send(res,200,{deletedIds:deleted()})

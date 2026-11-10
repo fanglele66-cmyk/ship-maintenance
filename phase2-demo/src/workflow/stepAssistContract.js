@@ -14,7 +14,7 @@ const list=(value,label,max)=>{
  return value
 }
 
-export const isStepAssistEvent=event=>['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline'].includes(event?.sourceEventId||event?.id)
+export const isStepAssistEvent=event=>Boolean(event?.manualReport||event?.backendManaged||/^(manual-|detected-)/.test(event?.id||''))||['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline'].includes(event?.sourceEventId||event?.id)
 export function canUseStepAssist(event,task,role){
  const current=Array.isArray(event?.tasks)?event.tasks.find(item=>item?.id===task?.id):null
  return Boolean(isStepAssistEvent(event)&&event.phase!=='closed'&&current&&event.currentTask===current.id&&current.status==='assigned'&&['investigation','repair','maintenance'].includes(current.kind)&&ownsTask(role,current))

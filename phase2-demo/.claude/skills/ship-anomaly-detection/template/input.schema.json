@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/input.schema.json",
+  "title": "Haixun 06 Point Data List Raw Package",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["total", "pageCount", "pointDataList", "_fetchMetadata"],
+  "properties": {
+    "total": {"type": "integer", "minimum": 0},
+    "pageCount": {"type": "integer", "minimum": 0},
+    "pointDataList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "shipId",
+          "dataId",
+          "deviceDataId",
+          "pointDataId",
+          "collectTime",
+          "value"
+        ],
+        "properties": {
+          "shipId": {"type": ["integer", "string"]},
+          "dataId": {"type": ["integer", "string"]},
+          "deviceDataId": {"type": ["integer", "string"]},
+          "pointDataId": {"type": ["integer", "string"]},
+          "collectTime": {"type": "string"},
+          "value": {"type": ["number", "string", "null"]}
+        }
+      }
+    },
+    "_fetchMetadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "source",
+        "shipId",
+        "collectTimeStart",
+        "collectTimeEnd",
+        "collectTimeTimezone",
+        "requestCollectTimeStart",
+        "requestCollectTimeEnd",
+        "requestTimeTimezone",
+        "recordCount",
+        "recordsPath"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "point-data-list",
+            "point-data-list-composed-real-api-raw"
+          ]
+        },
+        "shipId": {"type": "string", "minLength": 1},
+        "collectTimeStart": {"type": "string"},
+        "collectTimeEnd": {"type": "string"},
+        "collectTimeTimezone": {"const": "Asia/Shanghai"},
+        "requestCollectTimeStart": {"type": "string"},
+        "requestCollectTimeEnd": {"type": "string"},
+        "requestTimeTimezone": {"const": "Asia/Shanghai"},
+        "cursorSource": {
+          "enum": [
+            "explicit_start",
+            "explicit_end",
+            "latest_raw_data",
+            "current_time",
+            "composed_real_api_raw"
+          ]
+        },
+        "recordCount": {"type": "integer", "minimum": 0},
+        "receivedRecordCount": {"type": "integer", "minimum": 0},
+        "blankPlaceholderRecordsRemoved": {"type": "integer", "minimum": 0},
+        "duplicatesRemoved": {"type": "integer", "minimum": 0},
+        "recordsPath": {"const": "pointDataList"}
+      }
+    }
+  }
+}

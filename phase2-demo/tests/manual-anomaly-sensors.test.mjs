@@ -24,7 +24,7 @@ test('report sensor options match the situation device/system store, including e
    }
   }
   const main=reportSensors('main-engine-1')
-  for(const id of ['main-cyl-1-coolant','main-cyl-4-icu','main-cyl-6-vcu','main-control-air-pressure','main-fuel-rail-pressure'])assert.ok(main.some(s=>s.id===id),id)
+  for(const id of ['main-cyl-1-coolant','main-cyl-4-exhaust','main-cyl-6-piston','main-control-air-pressure','main-fuel-rail-pressure'])assert.ok(main.some(s=>s.id===id),id)
  }finally{disposePinia(pinia);await server.close()}
 })
 
@@ -33,7 +33,7 @@ test('only explicitly chosen points within the device and selected systems enter
  const report=validateAnomalyReport(form,'engineer')
  assert.deepEqual(report.sensorIds,['main-control-air-pressure'])
  assert.equal(report.sensors.length,1)
- assert.equal(report.sensors[0].name,'控制空气进口压力')
+ assert.equal(report.sensors[0].name,'控制空气压力')
  assert.equal(reportEvidence(report,[]).length,1)
  assert.equal(reportEvidence(report,[])[0].trendData.length,0,'catalog metadata is not sampled evidence')
  for(const sensorIds of [[],['main-servo-rail-pressure'],['aux-1-oil-press'],['invented']])assert.throws(()=>validateAnomalyReport({...form,sensorIds},'engineer'),/传感器/)

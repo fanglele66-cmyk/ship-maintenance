@@ -11,10 +11,10 @@ description: 可配置船舶设备健康分析与船端态势对话消息。消�
 
 本目录完整复制自 `ship-changhangbiyu/.claude/skills/ship-engine-health`，保留原分析器、Schema、回归和旧船端卡片分支。以下本地入口优先于后文旧船端消息展示约定。
 
-- 定时服务每小时执行 `scripts/run_local_health.py --data-dir <数据目录> --cutoff <北京时间>`。
+- 后端每次启动立即执行，之后以本次启动时间为基准每隔一小时执行 `scripts/run_local_health.py --data-dir <数据目录> --cutoff <北京时间>`。
 - 适配器只读本项目数据库副本，截取截止时刻之前 6 小时，生成 12 个半小时 `pointDataList` 文件，再调用原 `run_engine_health.run`。不会改动源数据库或读取未来样本。
 - 分析完整六小时连续窗口。源时间与拼接点只保留在内部追溯元数据中，不裁剪为最后一个源片段；面向人员的报告按当前工况表述。
-- 原始输入与结果存放 `<数据目录>/workspace/`，与演示事件、原船端工作空间隔离。旧输入每轮替换，Skill 原目录保留最新 10 份；每小时完整产物另存 `health-history/<小时-版本>/`，包含输入、Skill 结果和最终报告。
+- 原始输入与结果存放 `<数据目录>/workspace/`，与演示事件、原船端工作空间隔离。旧输入每轮替换，Skill 原目录保留最新 6 份；完整产物另存 `health-history/<启动标识-轮次>/`，同样只保留最新 6 份，包含输入、Skill 结果和最终报告。
 - 不导入前端预置报警/预警。空事件索引仅代表未导入，不能解释为原船无报警。
 - 原统计和物理关系由确定性脚本计算。模型只按 [本地研判约定](references/local-report.md) 整理摘要、关注建议和 Markdown；本地页面不使用旧 `card` 信封。
 - 同时以真实样本间最大间隔评估覆盖；不得把 12 个文件等同完整 6 小时。原始 result 的文件数量口径保留，前端使用适配器 coverage。
@@ -109,7 +109,7 @@ python .claude/skills/ship-engine-health/scripts/build_device_detail.py --worksp
 5. 只读 AI/OEM 活跃事件索引，按 `equipment_name` 匹配设备、按 `event_id` 去重并排除 `status=closed`，写入设备的 `event_count`。`abnormal_parts` 作为前端“关注点（事件）”字段，合并未闭环事件标题/异常描述和结构化传感器异常，去重后保留 0～3 条；只要 `event_count > 0` 就至少保留一条事件关注点。只要 `event_count > 0`，该设备就必须判为 `health_status=abnormal`，并在分数、结论、建议、设备正文及总览中体现未闭环事件；不得同时输出“正常”或“未检测到激活报警/故障”。
 6. 对能从 `data/sensor-point-mapping.json.systemTypeMapping` 解析到非零系统的未闭环事件或异常测点，生成 `analysis_highlights[]`。普通结论不强制高亮；每项固定包含系统、研判结论、候选可能原因和证据。前端按系统名称精确高亮，不使用特殊符号解析。
 7. 输出到 `result/engine-health/outputs/engine-health-<created_YYYYMMDD_HHMMSS>__result.json`。
-8. 运行结束后按产物时间从最旧开始清理 `result/engine-health/outputs/`，固定保护最新 10 份；不足 10 份时不删除，超过 10 份时即使产物仍在 12 小时内也清理到 10 份。
+8. 运行结束后按产物时间从最旧开始清理 `result/engine-health/outputs/`，固定保护最新 6 份；不足 6 份时不删除，超过 6 份时即使产物仍在 12 小时内也清理到 6 份。
 
 ## 不负责
 
@@ -297,4 +297,4 @@ sensor-raw-<collect_YYYYMMDD_HHMMSS>__raw-data.json
 result/engine-health/outputs/
 ```
 
-只处理文件名匹配 `engine-health-*__result.json` 的本 skill 产物。先按文件名时间排序，时间无法解析时使用文件修改时间；最新 10 份构成固定保护集，不因超过 12 小时而删除。目录不足 10 份时全部保留；超过 10 份时，从时间最早的文件开始删除，直到只剩最新 10 份，即使被删除文件仍在 12 小时内也一样执行。不删除 `input/`，不影响 AI 异常检测、OEM 报警或维修事件目录。
+只处理文件名匹配 `engine-health-*__result.json` 的本 skill 产物。先按文件名时间排序，时间无法解析时使用文件修改时间；最新 6 份构成固定保护集，不因超过 12 小时而删除。目录不足 6 份时全部保留；超过 6 份时，从时间最早的文件开始删除，直到只剩最新 6 份，即使被删除文件仍在 12 小时内也一样执行。不删除 `input/`，不影响 AI 异常检测、OEM 报警或维修事件目录。

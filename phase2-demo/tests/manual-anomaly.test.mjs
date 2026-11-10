@@ -52,7 +52,7 @@ test('backend invokes AI with submitted evidence, fixes submitter identity and r
   const req=Readable.from([Buffer.from(JSON.stringify({mode:'manual-anomaly',text:form().description,role:'engineer',stream:true,report:{...form(),submitter:{name:'伪造人'}}}))]);Object.assign(req,{url:'/api/ai/chat',method:'POST',socket:{remoteAddress:'127.0.0.1'},headers:{host:'localhost:5188','x-engine-room-client':'local-ui'}})
   const res={setHeader(){},flushHeaders(){},write(s){output+=s},end(s=''){output+=s;this.writableEnded=true}}
   await handler(req,res,()=>assert.fail('unexpected next'))
-  assert.equal(JSON.parse(request.messages[1].content).report.submitter.name,people.engineer)
+  assert.equal(JSON.parse(request.messages[1].content.replace(/^<yincang>|<\/yincang>$/g,'')).report.submitter.name,people.engineer)
   assert.match(request.messages[0].content,/不得编造历史采样/)
   assert.match(output,invalid?/event: error/:/event: done/)
   assert.doesNotMatch(output,/apiKey|伪造人/)

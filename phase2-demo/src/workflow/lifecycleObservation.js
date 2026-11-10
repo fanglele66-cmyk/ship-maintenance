@@ -11,6 +11,7 @@ export function observationCase(event){return event.tracking?(evidenceEventId(ev
 export function observationSettings(event){return workflowCases[observationCase(event)]?.observation}
 export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=false}={}){
  for(const event of Object.values(state.events))for(const task of observationTasks(event)){
+  if(event.backendManaged)continue
   if(!hasObservation(task)||task.status!=='submitted'||(!task.observationStartedAt&&!task.observation))continue
   const config=observationSettings(event),start=Date.parse(observationStart(task)),end=Math.min(now,task.observationEndedAt?Date.parse(task.observationEndedAt):now)
   if(!config||!Number.isFinite(start)||end<start)continue
@@ -43,6 +44,7 @@ export function syncLifecycleObservations(state,sensors,now=Date.now(),{demo=fal
   if(event.phase==='review'&&phase?.observationWaiting){const intervention=observationIntervention(phase.observationPlan||event.observationPlan,channels,now);if(intervention)finishObservation(event,phase,now,{intervention})}
  }
  for(const event of Object.values(state.events)){
+  if(event.backendManaged)continue
   const phase=event.phases.at(-1),interval=observationPolicy(event).intervalMs
   if(event.phase==='review'&&phase?.observationWaiting&&!phase.observationPlan&&phase.observationIntervalMs!==interval){
    const task=observationTasks(event).find(t=>t.id===(phase.observationTaskId||phase.taskId)),start=Date.parse(observationStart(task)),at=Date.parse(phase.at)

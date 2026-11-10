@@ -1,0 +1,36 @@
+{
+  "ser_no": "873247549912068096",
+  "event_id": "ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200",
+  "event_type": "ai-anomaly",
+  "ship_id": "CHBY-PROVISIONAL",
+  "deviceDataId": "980000000000000001",
+  "equipment_id": "left_main_engine",
+  "equipment_name": "主机",
+  "event_title": "主机燃油进口压力持续偏高",
+  "status": "active",
+  "status_suggestion": "inspection_required",
+  "analysis_refs": [
+    "result/ai-anomaly/events/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200__anomaly-analysis-result.json"
+  ],
+  "feedback_refs": [],
+  "maintenance_feedback_refs": [],
+  "maintenance_refs": [],
+  "history": [
+    {
+      "time": "2026-07-07T10:31:20",
+      "action": "ai_anomaly_event_created",
+      "type": "event_created",
+      "title": "AI异常事件已创建",
+      "detail": "主机燃油进口压力持续偏高已完成本轮AI异常分析。",
+      "ref": "result/ai-anomaly/outputs/ai-run-873247549912068096-20260707_103120__result.json"
+    },
+    {
+      "time": "2026-07-07T10:31:25",
+      "action": "ai_anomaly_analysis_generated",
+      "type": "analysis_generated",
+      "title": "AI异常分析已生成",
+      "detail": "已生成事件分析结果和排查建议。",
+      "ref": "result/ai-anomaly/events/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200__anomaly-analysis-result.json"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "人工异常分析"
+  short_description: "结合人工描述和本地采样，建立独立的船端 2.0 事件及排查建议"
+  default_prompt: "使用 $ship-manual-anomaly-analysis 的船端 2.0 契约，由本地后端按 requestId 隔离上报并提供实际取数与检测证据，按本次 JSON 契约生成分析。不同上报不得互相覆盖；缺测保留待核实；事件交轮机长决策。不调用原船端四产物发布器或周期检测批处理。"

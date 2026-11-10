@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/result.schema.json",
+  "title": "Ship Anomaly Detection Scheduled Run Result",
+  "description": "一次定时检测窗口的常规输出，固定写入 result/ai-anomaly/outputs/。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "source",
+    "created_at",
+    "ship_id",
+    "analysis_window",
+    "input_refs",
+    "summary",
+    "created_event_ids",
+    "updated_event_ids",
+    "events"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "pattern": "^ai-run-[A-Za-z0-9_-]+-[0-9]{8}_[0-9]{6}$",
+      "description": "格式为 ai-run-<ser_no>-<created_YYYYMMDD_HHMMSS>。"
+    },
+    "source": {
+      "type": "string",
+      "const": "ai_anomaly"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+    },
+    "ship_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ship_name": {
+      "type": "string"
+    },
+    "analysis_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_time",
+        "end_time"
+      ],
+      "properties": {
+        "start_time": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+        },
+        "end_time": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+        }
+      }
+    },
+    "input_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^input/sensor-raw-data/.+\\.json$"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_status",
+        "new_events",
+        "updated_events",
+        "suppressed_events",
+        "message"
+      ],
+      "properties": {
+        "result_status": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "candidate",
+            "anomalyDetected"
+          ]
+        },
+        "new_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suppressed_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "created_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "updated_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "本次实际创建或更新的事件摘要；普通正常运行时为空数组。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ser_no",
+          "event_id",
+          "event_action",
+          "status",
+          "severity",
+          "deviceDataId",
+          "equipment_id",
+          "equipment_name",
+          "anomaly_type",
+          "event_title",
+          "time_range",
+          "summary",
+          "event_ref",
+          "analysis_result_ref"
+        ],
+        "properties": {
+          "ser_no": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "event_id": {
+            "type": "string",
+            "pattern": "^ai-[A-Za-z0-9_-]+-[A-Za-z0-9_-]+-[0-9]{8}_[0-9]{6}$",
+            "description": "新事件格式为 ai-<ship_id>-<ser_no>-<event_start_YYYYMMDD_HHMMSS>；连续异常更新复用既有事件 ID。"
+          },
+          "event_action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "confirmed"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "deviceDataId": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "来自 data/sensor-point-mapping.json 的设备主键。"
+          },
+          "equipment_id": {
+            "type": "string"
+          },
+          "equipment_name": {
+            "type": "string"
+          },
+          "anomaly_type": {
+            "type": "string",
+            "description": "供前端直接展示的中文完整短句，不得使用内部通道编码。",
+            "minLength": 4,
+            "pattern": "^[^_]*[\\u4e00-\\u9fff][^_]*$"
+          },
+          "event_title": {
+            "type": "string"
+          },
+          "time_range": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_time",
+              "end_time"
+            ],
+            "properties": {
+              "start_time": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+              },
+              "end_time": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})?$"
+              }
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "event_ref": {
+            "type": "string",
+            "description": "工作空间内部事件生命周期主文件，供 skill 与后端管理事件，不直接递送给前端。",
+            "pattern": "^result/ai-anomaly/events/.+/[^/]+__event\\.json$"
+          },
+          "analysis_result_ref": {
+            "type": "string",
+            "description": "完整事件分析结果，供后端递送给前端并供维修 skill 读取。",
+            "pattern": "^result/ai-anomaly/events/.+/[^/]+__anomaly-analysis-result\\.json$"
+          }
+        }
+      }
+    }
+  }
+}

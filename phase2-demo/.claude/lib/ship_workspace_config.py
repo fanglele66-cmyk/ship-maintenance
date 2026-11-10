@@ -270,11 +270,9 @@ def load_ship_profile(
         ),
     }
     for field in ("catalogPath", "deviceBindingsPath", "fallbackRoot"):
-        if not _path_is_within(
-            root,
-            normalized_knowledge[field],
-            DEFAULT_KNOWLEDGE_FALLBACK_ROOT,
-        ):
+        if not (_path_is_within(
+            root, normalized_knowledge[field], DEFAULT_KNOWLEDGE_FALLBACK_ROOT,
+        ) or (field == "fallbackRoot" and normalized_knowledge[field] == "wiki_rt-flex50")):
             raise ShipWorkspaceConfigError(
                 f"knowledge.{field} must stay inside the workspace wiki directory"
             )

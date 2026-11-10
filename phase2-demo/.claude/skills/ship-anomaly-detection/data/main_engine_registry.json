@@ -1,0 +1,41 @@
+{
+  "version": "2026-08-28-changhangbiyu-rtflex50-v1",
+  "analyzer": "rtflex50_main_engine",
+  "mapping_file": "data/mappings/changhangbiyu_mapping.json",
+  "devices": {
+    "left_main_engine": {
+      "model": "MAN B&W 6S50ME-B9.3",
+      "cylinders": 6
+    }
+  },
+  "regime": {
+    "rpm_key": "rpm",
+    "load_key": "fo_command",
+    "stopped_max_rpm": 5,
+    "low_speed_max_rpm": 30,
+    "mid_speed_max_rpm": 90,
+    "cruise_min_rpm": 90,
+    "sample_interval_seconds": 12,
+    "sample_interval_sec": 12,
+    "gap_reset_sec": 36,
+    "stopped_rpm_max": 5,
+    "low_speed_rpm_max": 30,
+    "mid_rpm_max": 90,
+    "cruise_rpm_min": 90,
+    "stability_window_sec": 600,
+    "min_stability_samples": 30,
+    "rpm_std_max": 10.0,
+    "load_std_max": 5.0,
+    "warmup_sec": 1800,
+    "min_segment_sec": 180,
+    "min_cruise_samples": 30
+  },
+  "event_rules": {
+    "stat_min_duration_sec": 600,
+    "stat_confirmed_duration_sec": 1200,
+    "mid_min_duration_sec": 300,
+    "stopped_min_duration_sec": 60,
+    "merge_gap_sec": 300,
+    "event_match_gap_sec": 1800
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/agent-analysis-bundle.schema.json",
+  "title": "Agent-authored AI Anomaly Analysis Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "events"],
+  "properties": {
+    "run_id": {"type": "string", "pattern": "^ai-run-[A-Za-z0-9_-]+-[0-9]{8}_[0-9]{6}$"},
+    "events": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["event_id", "summary", "fault_causes", "engineering_inference", "analysis_basis", "diagnostic_plans"]
+      }
+    }
+  }
+}

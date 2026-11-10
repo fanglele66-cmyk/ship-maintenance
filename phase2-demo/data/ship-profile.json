@@ -12,7 +12,7 @@
     "catalogPath": "wiki/catalog.json",
     "deviceBindingsPath": "wiki/device-bindings.json",
     "defaultPackageId": "rt-flex50",
-    "fallbackRoot": "wiki"
+    "fallbackRoot": "wiki_rt-flex50"
   },
   "analyzerProfiles": {
     "rtflex50_main_engine": {

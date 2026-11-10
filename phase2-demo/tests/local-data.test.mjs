@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises'
+import {mkdtemp,mkdir,writeFile,rm,readFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {DatabaseSync} from 'node:sqlite'
@@ -37,26 +37,69 @@ test('operating chronology derives from measurements and never invents alarms, l
  assert.equal(coverage([],start,now).status,'insufficient')
 })
 
+test('stages show measured speed or rpm, actual transitions and fuel commands instead of unavailable load',()=>{
+ const start=toTime('2026-11-10 12:00:00'),frame=(offset,rpm,fuel)=>({at:start+offset*60000,values:Array.from({length:59},(_,i)=>i===0?rpm:i===57?fuel:0)})
+ const rows=[frame(0,70,20),frame(10,90,40),frame(20,110,60),frame(31,0,0),frame(50,0,0)]
+ const first=chronology(rows,[],start,start+HOUR).periods[0]
+ assert.equal(first.primaryMetric.label,'平均转速');assert.equal(first.primaryMetric.value,90)
+ assert.equal(first.averageSpeed,null);assert.equal(first.fuelCommandAverage,40)
+ assert.match(first.operation,/70.0 → 110.0 rpm/);assert.match(first.loadTrend,/20.0～60.0 %/)
+ assert.equal(first.loadTrendLabel,'燃油指令');assert(!/负荷|推断|未采集/.test(first.detail+first.operation+first.loadTrend))
+ const ais=[{at:start,sog:8},{at:start+15*60000,sog:12},{at:start+16*60000,sog:102.3}]
+ const stage=chronology(rows,ais,start,start+HOUR).periods[0]
+ assert.equal(stage.primaryMetric.label,'平均航速');assert.equal(stage.primaryMetric.value,10)
+ assert.match(stage.operation,/8.0 → 12.0 kn/)
+ const reverse=chronology([frame(0,-90,25),frame(10,90,25)],[],start,start+30*60000).periods[0]
+ assert.equal(reverse.state,'running');assert.equal(reverse.averageRpm,90)
+ assert.equal(reverse.primaryMetric.label,'平均转速幅值');assert.match(reverse.operation,/-90.0 → 90.0/)
+})
+
+test('restart recovers an interrupted owner and removes only its incomplete archive',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'ship-recovery-'));await writeFile(join(dir,'manifest.json'),'{}')
+ let calls=0;const now=toTime('2026-11-10 12:00:00')
+ const scheduler=await createHealthScheduler(dir,{directory:dir,clock:()=>now,analyze:async()=>{calls++;return facts},enhance:async()=>null})
+ const old='run-1-1234abcd-0',archive=join(dir,'health-history',old)
+ await mkdir(archive,{recursive:true});await writeFile(join(archive,'report.md'),'incomplete')
+ const db=new DatabaseSync(join(dir,'jobs.sqlite'))
+ db.prepare('INSERT INTO health_jobs VALUES(?,?,?,?,?,?,?)').run(old,'running',1,now+600000,now,null,2147483646)
+ try{await scheduler.tick();assert.equal(calls,1);assert.equal(db.prepare('SELECT status FROM health_jobs WHERE id=?').get(old).status,'interrupted');assert.equal((await scheduler.status()).job.status,'complete');await assert.rejects(readFile(join(archive,'report.md')),e=>e.code==='ENOENT')}
+ finally{db.close();await scheduler.close();await rm(dir,{recursive:true,force:true})}
+})
+
 const facts={result:{devices:{main:{analysis_conclusion:'实测统计结论',recommendations:['核对测点'],context:'## 结论\n实测统计',health_status:'normal'}},analysis_window:{}},coverage:{status:'sufficient',start:'2026-11-10 06:00:00',end:'2026-11-10 12:00:00'},resultPath:'result.json'}
-test('hourly jobs persist, deduplicate across processes, recover and retain last good report on failure',async()=>{
+test('each startup analyzes immediately and repeats hourly from its own start, with bounded retries',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'ship-job-test-'))
- let now=toTime('2026-11-10 12:00:00'),calls=0,fail=false
+ let now=toTime('2026-11-10 12:35:00'),calls=0,fail=false
  await writeFile(join(dir,'manifest.json'),'{}')
  const options={directory:dir,clock:()=>now,analyze:async()=>{calls++;if(fail)throw Error('test failure');return facts},enhance:async()=>null}
- const a=await createHealthScheduler(dir,options),b=await createHealthScheduler(dir,options)
+ const a=await createHealthScheduler(dir,options)
  try{
-  await Promise.all([a.tick(),b.tick()]);assert.equal(calls,1)
   await a.tick();assert.equal(calls,1)
-  assert.equal((await a.status()).latest.conclusion,'实测统计结论')
-  now+=HOUR;fail=true;await b.tick()
-  assert.equal((await b.status()).job.status,'failed')
-  assert.equal((await b.status()).latest.conclusion,'实测统计结论')
-  await a.tick();assert.equal(calls,2)
-  now+=5*60000;fail=false;await a.tick();assert.equal(calls,3)
-  assert.equal((await a.status()).job.status,'complete')
- }finally{await a.close();await b.close()}
- const c=await createHealthScheduler(dir,options)
- try{await c.tick();assert.equal(calls,3)}finally{await c.close();await rm(dir,{recursive:true,force:true})}
+  assert.equal((await a.status()).nextRunAt,toTime('2026-11-10 13:35:00'))
+  now=toTime('2026-11-10 13:00:00');await a.tick();assert.equal(calls,1,'wall-clock hour must not trigger')
+  now=toTime('2026-11-10 13:35:00');fail=true;await a.tick();assert.equal(calls,2)
+  assert.equal((await a.status()).job.status,'failed');assert.equal((await a.status()).latest.conclusion,'实测统计结论')
+  now+=60000;await a.tick();assert.equal(calls,2)
+  now+=4*60000;fail=false;await a.tick();assert.equal(calls,3)
+  assert.equal((await a.status()).nextRunAt,toTime('2026-11-10 14:35:00'),'retry must not move the regular cadence')
+ }finally{await a.close()}
+ const b=await createHealthScheduler(dir,options)
+ try{
+  await b.tick();assert.equal(calls,4,'restart in the same hour must run again')
+  assert.equal((await b.status()).nextRunAt,toTime('2026-11-10 14:40:00'))
+  now+=55*60000;await b.tick();assert.equal(calls,4)
+  now+=5*60000;await b.tick();assert.equal(calls,5)
+ }finally{await b.close();await rm(dir,{recursive:true,force:true})}
+})
+
+test('parallel service instances cannot analyze the shared workspace concurrently',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'ship-lease-test-'));await writeFile(join(dir,'manifest.json'),'{}')
+ let release,entered,calls=0
+ const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r)
+ const options={directory:dir,analyze:async()=>{calls++;entered();await gate;return facts},enhance:async()=>null}
+ const a=await createHealthScheduler(dir,options),b=await createHealthScheduler(dir,options)
+ try{const running=a.tick();await ready;await b.tick();assert.equal(calls,1);release();await running;await b.tick();assert.equal(calls,2)}
+ finally{release();await a.close();await b.close();await rm(dir,{recursive:true,force:true})}
 })
 
 test('model failure publishes computed Skill report explicitly instead of a demo result',async()=>{

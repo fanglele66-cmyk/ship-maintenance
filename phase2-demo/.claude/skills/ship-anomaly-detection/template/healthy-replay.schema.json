@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".claude/skills/ship-anomaly-detection/template/healthy-replay.schema.json",
+  "title": "Haixun 06 Main Engine Healthy Replay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "assumption", "window_hours", "devices", "totals", "acceptance"],
+  "properties": {
+    "source": {"type": "string"},
+    "assumption": {"const": "historical_data_is_healthy_baseline_not_fault_labels"},
+    "window_hours": {"type": "number", "exclusiveMinimum": 0},
+    "devices": {
+      "type": "object",
+      "required": ["left_main_engine", "right_main_engine"],
+      "additionalProperties": {"type": "object", "additionalProperties": true}
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["samples", "candidate_events", "confirmed_events", "iqr_total_points", "iqr_anomaly_points", "iqr_point_rate", "candidate_events_by_channel", "confirmed_events_by_channel", "active_samples_by_channel"],
+      "properties": {
+        "samples": {"type": "integer", "minimum": 0},
+        "candidate_events": {"type": "integer", "minimum": 0},
+        "confirmed_events": {"type": "integer", "minimum": 0},
+        "iqr_total_points": {"type": "integer", "minimum": 0},
+        "iqr_anomaly_points": {"type": "integer", "minimum": 0},
+        "iqr_point_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "candidate_events_by_channel": {"type": "object"},
+        "confirmed_events_by_channel": {"type": "object"},
+        "active_samples_by_channel": {"type": "object"}
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed_events_must_equal", "iqr_point_rate_must_be_below", "passed"],
+      "properties": {
+        "confirmed_events_must_equal": {"const": 0},
+        "iqr_point_rate_must_be_below": {"type": "number", "exclusiveMinimum": 0},
+        "passed": {"type": "boolean"}
+      }
+    }
+  }
+}

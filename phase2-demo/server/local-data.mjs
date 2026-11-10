@@ -19,23 +19,35 @@ export function coverage(rows,start,end){
 }
 
 // Classifications describe observed motion only; zero speed never proves anchoring.
+const validSpeed=v=>finite(v)!==null&&v>=0&&v<102.3
+const stats=values=>{const a=values.filter(Number.isFinite);return a.length?{mean:mean(a),min:Math.min(...a),max:Math.max(...a),first:a[0],last:a.at(-1),count:a.length}:null}
+const number=v=>v.toFixed(1)
+const range=(s,unit)=>Math.abs(s.max-s.min)<.05?`${number(s.mean)} ${unit}`:`${number(s.min)}～${number(s.max)} ${unit}`
+const transition=(s,unit)=>Math.abs(s.last-s.first)<.1?`${Math.abs(s.max-s.min)<.1?'维持':'起止'} ${number(s.last)} ${unit}`:`${number(s.first)} → ${number(s.last)} ${unit}`
 export function chronology(rows,ais,start,end){
  const intervals=[],bucket=30*60000
  for(let at=start;at<end;at+=bucket){
-  const until=Math.min(end,at+bucket),r=rows.filter(v=>v.at>=at&&v.at<until),a=ais.filter(v=>v.at>=at&&v.at<until)
-  const rpm=mean(r.map(v=>finite(v.values[0])).filter(v=>v!==null)),speed=mean(a.map(v=>finite(v.sog)).filter(v=>v!==null))
+  const until=Math.min(end,at+bucket),r=rows.filter(v=>v.at>=at&&v.at<until),a=ais.filter(v=>v.at>=at&&v.at<until&&validSpeed(v.sog))
+  const rpm=mean(r.map(v=>finite(v.values[0])===null?null:Math.abs(v.values[0])).filter(v=>v!==null))
   const state=rpm===null?'unknown':rpm<5?'stopped':rpm<60?'maneuver':'running'
   const last=intervals.at(-1)
-  if(last?.state===state){last.end=until;last.rpms.push(...r.map(v=>v.values[0]).filter(Number.isFinite));last.speeds.push(...a.map(v=>v.sog).filter(Number.isFinite))}
-  else intervals.push({start:at,end:until,state,rpms:r.map(v=>v.values[0]).filter(Number.isFinite),speeds:a.map(v=>v.sog).filter(Number.isFinite)})
+  if(last?.state===state){last.end=until;last.rows.push(...r);last.ais.push(...a)}
+  else intervals.push({start:at,end:until,state,rows:r,ais:a})
  }
  const periods=intervals.map((p,i)=>{
-  const rpm=mean(p.rpms),speed=mean(p.speeds),status={unknown:'数据缺失',stopped:'主机停转',maneuver:'低速运行',running:'主机运行'}[p.state]
-  return {id:`database-${i}`,start:p.start,end:p.end,state:p.state,tone:p.state==='stopped'?'anchored':'cruising',status,averageSpeed:speed,
-   detail:rpm===null?'此时段未采集到主机数据。':`主机平均转速 ${rpm.toFixed(1)} rpm；${speed===null?'此时段无可用 AIS 航速。':`平均航速 ${speed.toFixed(1)} kn。`}`,
-   operation:p.state==='stopped'?'转速接近零；停泊状态需结合航行记录确认':p.state==='unknown'?'等待采集数据':'依据实测转速归类，未推断操纵意图',loadTrend:'未采集功率负荷；燃油指令不等同负荷'}
+  const rpm=stats(p.rows.map(r=>r.values[0])),rpmMagnitude=stats(p.rows.map(r=>Number.isFinite(r.values[0])?Math.abs(r.values[0]):null)),speed=stats(p.ais.map(a=>a.sog)),fuel=stats(p.rows.map(r=>r.values[57]))
+  const status={unknown:'数据缺失',stopped:'主机停转',maneuver:'低速运行',running:'主机运行'}[p.state]
+  const minutes=Math.round((p.end-p.start)/60000),duration=minutes>=60?`${Math.floor(minutes/60)} 小时${minutes%60?` ${minutes%60} 分钟`:''}`:`${minutes} 分钟`
+  return {id:`database-${i}`,start:p.start,end:p.end,state:p.state,tone:p.state==='stopped'?'anchored':p.state==='maneuver'?'maneuver':'cruising',status,
+   averageSpeed:speed?.mean??null,averageRpm:rpmMagnitude?.mean??null,fuelCommandAverage:fuel?.mean??null,
+   primaryMetric:speed?{label:'平均航速',value:speed.mean,unit:'kn'}:{label:rpm?.min<0?'平均转速幅值':'平均转速',value:rpmMagnitude?.mean??null,unit:'rpm'},
+   detail:rpm?`时段 ${duration} · ${p.state==='stopped'&&rpmMagnitude.max>=5?'以停转为主，含短时转动；':''}转速 ${range(rpm,'rpm')}`:'等待当前时段的运行记录。',
+   operationLabel:speed?'航速变化':'转速变化',
+   operation:speed?`${transition(speed,'kn')}${speed.max-speed.min>=.1?`；范围 ${range(speed,'kn')}`:''}`:rpm?`${transition(rpm,'rpm')}`:'等待采集数据',
+   loadTrendLabel:'燃油指令',loadTrend:fuel?`${range(fuel,'%')}；平均 ${number(fuel.mean)}%`:'等待燃油指令测量',
+   measurements:{rpm,rpmMagnitude,speed,fuelCommand:fuel}}
  })
- return {periods,source:'主机运行测量与 AIS 航迹',start,end,markdown:periods.map(p=>`${sqlTime(p.start)}～${sqlTime(p.end)}：${p.status}。${p.detail}`).join('\n')}
+ return {periods,source:'主机转速、燃油指令与 AIS 航速',start,end,markdown:periods.map(p=>`${sqlTime(p.start)}～${sqlTime(p.end)}：${p.status}。${p.detail}。${p.operationLabel}：${p.operation}。燃油指令：${p.loadTrend}`).join('\n')}
 }
 
 export function openLocalData(root,directory=process.env.SHIP_DATA_DIR||join(root,'.local-data')){
@@ -56,7 +68,7 @@ export function openLocalData(root,directory=process.env.SHIP_DATA_DIR||join(roo
   return {now,source:manifest.mode,sampledAt:last?toTime(last.timestamp):null,sourceTime:last?.source_time||null,quality:coverage(all,start,now),fresh:Boolean(fresh),
    exhausted:now>toTime(manifest.tables.sensor_readings.end),availableUntil:manifest.tables.sensor_readings.end,
    points:mapping.map(p=>({...p,value:finite(values[Number(p.pointCode.slice(2))-1])})),
-   speed:aisFresh?finite(ais.sog):null,speedSampledAt:ais?.at||null,load:null,
+   speed:aisFresh&&validSpeed(ais.sog)?ais.sog:null,speedSampledAt:ais?.at||null,load:null,fuelCommand:finite(values[57]),
    trends:Object.fromEntries(mapping.map(p=>[p.pointCode,sample.map(r=>({timestamp:r.at,value:finite(r.values[Number(p.pointCode.slice(2))-1])}))])),
    clockPolicy:manifest.clockPolicy,cadenceSeconds:manifest.cadenceSeconds,
    sourceSeams:all.filter(r=>r.source_gap_seconds>60).map(r=>({at:r.at,sourceTime:r.source_time,gapSeconds:r.source_gap_seconds})),

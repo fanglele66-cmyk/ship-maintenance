@@ -2,7 +2,7 @@
  <aside class="lc-assistant home-situation-assistant" aria-label="态势助手" @keydown.esc="$emit('close')">
   <header><strong>{{title}}</strong><button v-if="collapsible" class="assistant-collapse" type="button" aria-label="收起态势助手" @click="$emit('close')">收起 →</button></header>
   <div ref="stream" class="lc-conversation situation-conversation">
-   <article class="lc-message situation-overview"><strong class="situation-overview-label"><span aria-hidden="true">✦</span> 工况概览</strong><p>当前{{chronology.periods.at(-1)?.status||'数据未就绪'}}，航速 {{readings.speed}} kn，主机转速 {{readings.rpm}} rpm，负荷 {{readings.load}}%。</p><time v-if="readings.sampledAt" :datetime="readings.sampledAt">{{timeText(readings.sampledAt)}}</time></article>
+   <article class="lc-message situation-overview"><strong class="situation-overview-label"><span aria-hidden="true">✦</span> 工况概览</strong><p>当前{{chronology.periods.at(-1)?.status||'数据未就绪'}}，航速 {{readings.speed}} kn，主机转速 {{readings.rpm}} rpm，燃油指令 {{readings.fuelCommand??'—'}}%。</p><time v-if="readings.sampledAt" :datetime="readings.sampledAt">{{timeText(readings.sampledAt)}}</time></article>
    <article v-if="health" class="lc-message situation-overview"><strong>设备健康研判</strong><p>{{health.conclusion}}</p><time>{{health.completedAt}}</time></article>
    <article v-for="(message,i) in messages" :key="i" :class="['lc-message',message.role]"><MarkdownContent v-if="message.text" :content="message.text"/><time v-if="message.text" :datetime="message.at">{{timeText(message.at)}}</time></article>
    <p v-if="pending" role="status" class="situation-status">正在分析工况资料…</p>
@@ -21,7 +21,7 @@ import {timeText} from '../workflow/eventLifecycle'
 const props=defineProps({open:Boolean,title:{type:String,default:'态势助手'},collapsible:{type:Boolean,default:true},health:{type:Object,default:null},chronology:{type:Object,required:true},readings:{type:Object,required:true}})
 defineEmits(['close'])
 const store=useEventLifecycleStore(),input=ref(''),inputEl=ref(null),messages=ref([]),pending=ref(false),error=ref(''),stream=ref(null),upload=ref(null),fileNotice=ref('')
-const questions=['近24小时工况如何变化？','当前主机转速与负荷是多少？']
+const questions=['近24小时工况如何变化？','当前主机转速与燃油指令是多少？']
 let controller
 function submitOnEnter(event){if(event.isComposing)return;event.preventDefault();ask(input.value)}
 async function ask(text){

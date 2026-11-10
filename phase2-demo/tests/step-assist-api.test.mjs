@@ -44,7 +44,7 @@ test('step-assist sends actual image parts to OpenAI and Anthropic and returns o
   assert.ok(image)
   if(protocol==='openai')assert.equal(image.image_url.url,png.dataUrl)
   else{assert.equal(image.source.type,'base64');assert.equal(image.source.media_type,'image/png');assert.equal(image.source.data,png.dataUrl.split(',')[1])}
-  const context=JSON.parse(user[0].text)
+  const context=JSON.parse(user[0].text.replace(/^<yincang>|<\/yincang>$/g,''))
   assert.equal(context.stepNumber,1);assert.equal(context.stepIndex,undefined,'the model never receives zero-based internal step numbering')
   assert.equal(context.message.attachments[0].text,'现场记录：插接件未见松动。')
   assert.doesNotMatch(JSON.stringify(context),/其他步骤隐藏标记/)
@@ -117,7 +117,7 @@ test('real fallback sees the whole current task conversation with step scope but
   {...stamp,taskId:'another-task',role:'user',stepIndex:0,text:'禁止传出的其它任务情况'},
   {...stamp,eventId:'another-event',role:'user',stepIndex:0,text:'禁止传出的其它事件情况'}]
  let context
- const result=await request(input,async(url,options)=>{const content=JSON.parse(options.body).messages.at(-1).content;context=JSON.parse(content[0].text);return modelResponse(reply)})
+ const result=await request(input,async(url,options)=>{const content=JSON.parse(options.body).messages.at(-1).content;context=JSON.parse(content[0].text.replace(/^<yincang>|<\/yincang>$/g,''));return modelResponse(reply)})
  assert.equal(result.code,200);assert.equal(context.history.length,3)
  assert.equal(context.history[0].stepNumber,2);assert.equal(context.history[0].scope,'other-step')
  assert.equal(context.history[0].stepIndex,undefined)

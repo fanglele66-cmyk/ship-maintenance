@@ -50,6 +50,10 @@ export function taskEditContract(plan,text,action=plan?.action||plan?.kind){
   const deleting=/删除|删掉|去掉|移除|取消|去除/.test(clause)
   const retaining=/保留|留下/.test(clause)
   if(deleting||retaining){
+   // “Only keep step 1, delete the others” is one unambiguous structural edit.
+   if(deleting&&/^(?:其他|其余|剩余)(?:步骤|任务|项目|项)?(?:都|全部)?(?:删除|删掉|去掉|移除)/.test(clause)&&only.length){remove.push(...plan.steps.map((_,i)=>i).filter(i=>!only.includes(i)));structural=true;continue}
+   // Preserving an existing field is not deleting a substep.
+   if(retaining&&!deleting&&/检查要求|回交要求|步骤说明/.test(clause)&&!canUpdate){const refs=references(clause,plan.steps,action);if(refs.length){keep.push(...refs);continue}}
    if(/子步骤|子项|检查点|检查要求|里面|中的/.test(clause))fail('请明确要修改的任务及子项，不能将子项的增删解释为删除整项任务。')
    if(/如果|若|假如|是否|不要|不删|不需要删|别删|先不|暂不/.test(clause))fail('这条增删要求包含条件或否定，请明确当前要保留或删除的任务编号。')
    const refs=references(clause,plan.steps,action,true)

@@ -1,0 +1,6 @@
+interface:
+  display_name: "船舶设备异常检测"
+  short_description: "检测最近六小时设备数据，生成交轮机长核实的船端 2.0 事件"
+  default_prompt: "使用 $ship-anomaly-detection 的船端 2.0 契约。由本地后端运行 run_local_detection.py 读取数据库并执行检测，按本次请求结构整理事件分析；保留既有身份、任务及反馈，不调用原船端发布器。"
+policy:
+  allow_implicit_invocation: true

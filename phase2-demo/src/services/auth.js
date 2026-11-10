@@ -8,7 +8,7 @@ export async function accountRequest(path,body){
 }
 export async function loadAccount(){try{const result=await accountRequest('auth/me');Object.assign(auth,result,{error:''})}catch(e){auth.user=null;auth.error=e.message}finally{auth.ready=true}}
 export async function login(username,password){await accountRequest('auth/login',{username,password});try{localStorage.setItem('engine-room-auth-change',String(Date.now()))}catch{}location.reload()}
-export async function logout(){await accountRequest('auth/logout',{});try{localStorage.setItem('engine-room-auth-change',String(Date.now()))}catch{}location.reload()}
+export async function logout(){const {useEventLifecycleStore}=await import('../stores/eventLifecycleStore');await useEventLifecycleStore().flush();await accountRequest('auth/logout',{});try{localStorage.setItem('engine-room-auth-change',String(Date.now()))}catch{}location.reload()}
 export function pruneDeletedEvents(state){
  const removed=new Set(auth.deletedIds)
  let changed=true

@@ -1,0 +1,46 @@
+{
+  "run_id": "ai-run-873247549912068096-20260707_103120",
+  "source": "ai_anomaly",
+  "created_at": "2026-07-07T10:31:20",
+  "ship_id": "CHBY-PROVISIONAL",
+  "ship_name": "长航碧玉",
+  "analysis_window": {
+    "start_time": "2026-07-07T04:30:00",
+    "end_time": "2026-07-07T10:30:00"
+  },
+  "input_refs": [
+    "input/sensor-raw-data/sensor-raw-20260707_103000__raw-data.json"
+  ],
+  "summary": {
+    "result_status": "anomalyDetected",
+    "new_events": 1,
+    "updated_events": 0,
+    "suppressed_events": 0,
+    "message": "本次分析窗口为 6 小时，确认 1 个事件，抑制 0 个低置信候选。"
+  },
+  "created_event_ids": [
+    "ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200"
+  ],
+  "updated_event_ids": [],
+  "events": [
+    {
+      "ser_no": "873247549912068096",
+      "event_id": "ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200",
+      "event_action": "created",
+      "status": "active",
+      "severity": "medium",
+      "deviceDataId": "980000000000000001",
+      "equipment_id": "left_main_engine",
+      "equipment_name": "主机",
+      "anomaly_type": "主机燃油进口压力持续偏离工况健康基线",
+      "event_title": "主机燃油进口压力持续偏高",
+      "time_range": {
+        "start_time": "2026-07-07T10:12:00",
+        "end_time": "2026-07-07T10:30:00"
+      },
+      "summary": "稳定负载下燃油进口压力持续高于同工况基线，达到事件门槛。",
+      "event_ref": "result/ai-anomaly/events/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200__event.json",
+      "analysis_result_ref": "result/ai-anomaly/events/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200/ai-CHBY-PROVISIONAL-873247549912068096-20260707_101200__anomaly-analysis-result.json"
+    }
+  ]
+}
