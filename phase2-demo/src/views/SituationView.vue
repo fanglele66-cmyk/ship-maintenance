@@ -77,7 +77,8 @@
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
         >
-          <Phase2Assistant :title="issueId ? '事件处置助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :plan-only="maintenanceId==='planned'" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
+          <HomeSituationAssistant v-if="currentLayer===2&&selectedDeviceId==='main-engine-1'&&!issueId&&!attentionId&&!maintenanceId" title="主机态势助手" :collapsible="false" :open="true" :chronology="sensorStore.localChronology" :health="sensorStore.health?.latest" :readings="localReadings"/>
+          <Phase2Assistant v-else :title="issueId ? '事件处置助手' : 'AI设备态势助手'" :issue-id="issueId" @issue-section="section => issueDetailRef?.showSection(section)" :key="issueId ? 'issue:'+issueId : maintenanceId ? 'maintenance:'+maintenanceId : attentionId ? 'attention:'+attentionId : 'device:'+selectedDeviceId" :device-id="currentLayer===2?selectedDeviceId:null" :device-name="selectedDeviceName" ref="assistantRef" :dossier="Boolean(attentionId)" :maintenance-detail="Boolean(maintenanceId)" :plan-only="maintenanceId==='planned'" :mode="attentionId || maintenanceId ? 'attention' : currentLayer === 1 ? 'ship' : currentLayer === 2 && selectedDeviceId === 'main-engine-1' ? 'attention' : 'sensor'" @open-device="openDemoDevice" @open-todo="openDemoTodo" @open-item="openDemoItem" />
         </div>
       </Transition></template>
     </div>
@@ -107,6 +108,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 const AbnormalReportDialog=lazyPane(()=>import('@/components/AbnormalReportDialog.vue'))
 import ShipOverview from './ShipOverview.vue'
+import HomeSituationAssistant from '@/components/HomeSituationAssistant.vue'
 import SensorSimulationControls from '@/components/SensorSimulationControls.vue'
 const SensorGrid=lazyPane(()=>import('./SensorGrid.vue'))
 const SensorTrend=lazyPane(()=>import('./SensorTrend.vue'))
@@ -122,6 +124,10 @@ import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { useAbnormalReport } from '@/composables/useAbnormalReport'
 
 const sensorStore = useSensorStore()
+const localReadings=computed(()=>{
+ const value=id=>{const v=sensorStore.allSensors.find(s=>s.id===id)?.value;return Number.isFinite(v)?v.toFixed(1):'—'}
+ return {speed:value('ship-speed'),rpm:value('s-012'),load:'—',sampledAt:new Date(sensorStore.sampledAt).toISOString()}
+})
 const situationStore = useSituationStore()
 const deviceStore = useDeviceStore()
 const demoStore = usePhase2DemoStore()

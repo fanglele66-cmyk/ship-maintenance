@@ -1,14 +1,14 @@
 <template>
  <section class="voyage" :class="{'voyage-compact':compact}" aria-label="航行阶段时间线，从早到晚">
   <div ref="scroll" class="voyage-scroll" tabindex="0" aria-label="横向滚动查看航行阶段">
-   <ol class="voyage-timeline">
+   <ol class="voyage-timeline" :style="stages.length<4?{gridTemplateColumns:`repeat(${Math.max(stages.length,1)}, minmax(190px, 1fr))`}:{}">
     <li v-for="(stage,index) in stages" :key="stage.id" class="voyage-stage" :class="[stage.tone,stage.severity,{'is-latest':index===stages.length-1}]" :style="{'--stage-delay':index*80+'ms','--flow-delay':index*.7+'s'}">
      <div class="stage-clock"><time :datetime="new Date(stage.start).toISOString()">{{shortTime(stage.start)}}</time><span aria-hidden="true">—</span><time :datetime="new Date(stage.end).toISOString()">{{shortTime(stage.end)}}</time></div>
      <div class="stage-track" aria-hidden="true"><i class="track-node"/><span class="track-line"/><svg v-if="index<stages.length-1" viewBox="0 0 8 12"><path d="m2 2 4 4-4 4"/></svg></div>
      <div class="stage-content">
       <header class="stage-heading"><h3>{{stage.status}}</h3><span v-if="index===stages.length-1" class="latest-label">最近阶段</span></header>
       <p class="stage-description">{{stage.detail}}</p>
-      <div v-if="index<stages.length-1" class="stage-average"><span>平均航速</span><strong>{{stage.averageSpeed.toFixed(1)}} <small>kn</small></strong></div>
+      <div v-if="index<stages.length-1" class="stage-average"><span>平均航速</span><strong>{{Number.isFinite(stage.averageSpeed)?stage.averageSpeed.toFixed(1):'—'}} <small>kn</small></strong></div>
       <dl class="stage-operations"><div><dt>{{index===stages.length-1?'推进方式':'航行变化'}}</dt><dd>{{stage.operation}}</dd></div><div><dt>负荷变化</dt><dd>{{stage.loadTrend}}</dd></div></dl>
       <section v-if="captain&&stage.concerns.length" class="stage-concerns" aria-label="本阶段提醒处置概况"><p class="concern-label">本阶段关联提醒</p>
        <div v-for="concern in stage.concerns" :key="concern.device" :class="concern.severity">

@@ -35,7 +35,8 @@ import 'element-plus/es/components/popover/style/css'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BackButton from './BackButton.vue'
 import LifecycleNotifications from './LifecycleNotifications.vue'
-import { shipInfo, statusLabels } from '@/mock/devices'
+import {useSensorStore} from '@/stores/sensorStore'
+import { shipInfo } from '@/mock/devices'
 import { knowledgeDocs } from '@/mock/knowledge'
 import { useEventStore } from '@/stores/eventStore'
 import { knowledgeViewCache, inspectionViewCache } from '@/stores/viewCache'
@@ -44,6 +45,7 @@ import { useRoute, useRouter } from 'vue-router'
 const eventStore = useEventStore()
 const route = useRoute()
 const router = useRouter()
+const sensorStore=useSensorStore()
 const displayShipName=computed(()=>shipInfo.name)
 const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
 const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')?(route.query.from==='tasks'?'我的任务':'事件中心'):route.meta.title || '船舶设备检修助手')
@@ -79,12 +81,9 @@ function closeDetail() {
 
 const currentTime = ref('')
 
-const statusLabel = computed(() => statusLabels[shipInfo.status] || '未知')
+const statusLabel = computed(() => sensorStore.localError?'数据未就绪':sensorStore.localChronology.periods.at(-1)?.status||'数据未就绪')
 const statusTone = computed(() => {
-  const status = shipInfo.status
-  if (status === 'offline') return 'offline'
-  if (status === 'danger') return 'danger'
-  if (status === 'warning' || status === 'anchoring' || status === 'docking') return 'warning'
+  if(sensorStore.localError||!sensorStore.localData?.fresh)return 'offline'
   return 'online'
 })
 

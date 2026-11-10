@@ -1,0 +1,62 @@
+{
+  "shipId": "900000000000000101",
+  "shipName": "长航碧玉",
+  "sensorApiShipId": "900000000000000101",
+  "dataSource": {
+    "provider": "local_sqlite_replay",
+    "configPath": "data/local-replay.json",
+    "pointMappingPath": "data/sensor-point-mapping.json",
+    "rawDataDir": "input/sensor-raw-data"
+  },
+  "knowledge": {
+    "catalogPath": "wiki/catalog.json",
+    "deviceBindingsPath": "wiki/device-bindings.json",
+    "defaultPackageId": "rt-flex50",
+    "fallbackRoot": "wiki"
+  },
+  "analyzerProfiles": {
+    "rtflex50_main_engine": {
+      "detectionEntrypoint": ".changhang_detector:detect_all",
+      "healthEntrypoint": "changhang.analyze_health:analyze_health",
+      "registryPath": ".claude/skills/ship-engine-health/data/main_engine_registry.json",
+      "mappingPath": ".claude/skills/ship-engine-health/data/changhangbiyu_mapping.json",
+      "detectorProfile": "rtflex50-v8.1",
+      "requiredPointCount": 59,
+      "signed16PointNameMarkers": [
+        "主机滑油滤器压差",
+        "排气温度偏差",
+        "主机曲轴箱压力",
+        "主机扭振监测"
+      ],
+      "canonicalInput": {
+        "shipIdentifier": "900000000000000101",
+        "serialNumber": "CHBY-CANONICAL-INPUT",
+        "deviceSerialNumber": "DEVICE1"
+      }
+    }
+  },
+  "devices": {
+    "left_main_engine": {
+      "deviceName": "主机",
+      "deviceDataId": "900000000000000202",
+      "equipmentModel": "MAN B&W 6S50ME-B9.3 / RT-flex50",
+      "collectEnabled": true,
+      "keyDevice": true,
+      "analyzers": [
+        "rtflex50_main_engine"
+      ],
+      "aliases": [
+        "1#主机",
+        "1号主机",
+        "一号主机",
+        "长航碧玉主机"
+      ]
+    }
+  },
+  "features": {
+    "oemAlarmEnabled": false
+  },
+  "presentation": {
+    "workspaceTitle": "长航碧玉智能体工作空间"
+  }
+}

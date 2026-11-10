@@ -1,0 +1,19 @@
+{
+  "type": "situationWelcome",
+  "data": {
+    "shipName": "<data/ship-profile.json.shipName>",
+    "title": "船舶运行概览",
+    "metrics": {
+      "keyDeviceCount": 4,
+      "totalDeviceCount": 10,
+      "abnormalCount": 2,
+      "warningCount": 2
+    },
+    "summary": "长航碧玉当前重点设备为主机；请选择设备查看最新健康详情。",
+    "suggestedQuestions": [
+      "当前哪些重点设备需要优先关注？",
+      "帮我查看主机的设备健康情况。",
+      "最近是否有未闭环的异常事件？"
+    ]
+  }
+}

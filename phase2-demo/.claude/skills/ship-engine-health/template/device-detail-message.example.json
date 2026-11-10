@@ -1,0 +1,51 @@
+{
+  "type": "deviceDetail",
+  "data": {
+    "shipId": "CHBY-PROVISIONAL",
+    "deviceId": "980000000000000001",
+    "deviceName": "主机",
+    "generatedAt": "2026-07-11T16:05:00",
+    "analysisWindow": {
+      "startTime": "2026-07-11T15:00:00",
+      "endTime": "2026-07-11T16:00:00"
+    },
+    "status": "stopped",
+    "dataQuality": "available",
+    "isKeyDevice": true,
+    "healthStatus": "abnormal",
+    "healthScore": 80,
+    "healthLabel": "存在异常",
+    "operatingCondition": "停机",
+    "eventCount": 1,
+    "abnormalParts": ["主机起动空气压力低限报警"],
+    "analysisHighlights": [
+      {
+        "systemType": 4,
+        "systemName": "起动空气系统",
+        "analysisConclusion": "起动空气系统存在需关注证据：主机起动空气压力低限报警。",
+        "possibleCauses": [
+          "起动空气供气压力不足",
+          "起动阀或管路存在泄漏、阻塞",
+          "压力传感器或报警回路需要复核"
+        ],
+        "evidence": [
+          {
+            "source": "active_event",
+            "id": "oem-CHBY-PROVISIONAL-202607060001-20260706_143000",
+            "label": "主机起动空气压力低限报警"
+          }
+        ]
+      }
+    ],
+    "analysisConclusion": "主机当前存在1个未闭环活跃事件，本次分析归纳的关注点为：主机起动空气压力低限报警。重点关注系统：起动空气系统。",
+    "recommendations": [
+      "优先完成主机起动空气压力低限报警的事件排查并记录现场反馈。"
+    ],
+    "context": "## 结论\n\n**主机处于停机状态。** 当前无需展开运行健康分析。",
+    "suggestedQuestions": [
+      "主机当前最需要优先检查什么？",
+      "主机最近有哪些未闭环事件？",
+      "主机下一次健康复查应关注哪些数据？"
+    ]
+  }
+}

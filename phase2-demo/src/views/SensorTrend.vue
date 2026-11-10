@@ -103,7 +103,7 @@
                   <label>结束时间</label>
                   <input type="datetime-local" v-model="customEnd" class="st-datetime-input" />
                 </div>
-                <div class="st-custom-actions">
+                <p v-if="customRangeError" role="alert">{{customRangeError}}</p><div class="st-custom-actions">
                   <button class="st-custom-apply" @click="applyCustomRange">应用</button>
                   <button class="st-custom-cancel" @click="showCustomPanel = false">取消</button>
                 </div>
@@ -188,7 +188,8 @@ const hoveredIndex = ref(null)
 const chartSize = reactive({ width: 0, height: 0 })
 let hoverPointerType = 'dashed'
 
-const timeRanges = [1, 6, 24, 168]
+const timeRanges = computed(()=>sensorStore.currentDeviceId==='main-engine-1'?[1,6,24]:[1,6,24,168])
+const customRangeError=ref('')
 
 const selectedCardStyle = computed(() => {
   const chartRect = chartRef.value?.getBoundingClientRect?.()
@@ -240,7 +241,7 @@ const customEnd = ref('')
 
 function generateTrendForSensor(sensor, hours) {
   const data = sensorStore.getSimulationTrend(sensor.id,hours)
-  if (!data.length) return data
+  if (!data.length || sensor.sourceKind==='historical-copy-replay') return data
   return data.map((item, index) => index === data.length - 1
     ? { ...item, value: Number(sensor.value) }
     : item
@@ -372,6 +373,12 @@ function applyPreset(hours) {
 }
 
 function applyCustomRange() {
+  customRangeError.value=''
+  if(sensorStore.currentDeviceId==='main-engine-1'){
+    const start=new Date(customStart.value).getTime(),end=new Date(customEnd.value).getTime()
+    const now=sensorStore.localData?.now||Date.now()
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||start<now-24*3600000||end>now){customRangeError.value='当前主机趋势支持最近 24 小时内的有效时间范围。';return}
+  }
   if (customStart.value && customEnd.value) {
     isCustomRange.value = true
     showCustomPanel.value = false

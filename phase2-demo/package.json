@@ -7,7 +7,11 @@
     "ai:test": "node scripts/test-ai-connection.mjs",
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "node scripts/build-information-map.mjs && vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 5173"
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "start": "node server/local-server.mjs",
+    "data:prepare": "python scripts/prepare-local-data.py",
+    "data:test": "node --test tests/local-data.test.mjs",
+    "health:run": "node scripts/run-local-health.mjs"
   },
   "dependencies": {
     "vue": "^3.5.13",

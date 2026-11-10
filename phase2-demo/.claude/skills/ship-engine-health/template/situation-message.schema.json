@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ship-engine-health/situation-message",
+  "title": "长航碧玉态势页欢迎消息",
+  "type": "object",
+  "required": ["type", "data"],
+  "properties": {
+    "type": {
+      "const": "situationWelcome"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "shipName",
+        "title",
+        "metrics",
+        "summary",
+        "suggestedQuestions"
+      ],
+      "properties": {
+        "shipName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "const": "船舶运行概览"
+        },
+        "metrics": {
+          "type": "object",
+          "required": [
+            "keyDeviceCount",
+            "totalDeviceCount",
+            "abnormalCount",
+            "warningCount"
+          ],
+          "properties": {
+            "keyDeviceCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "totalDeviceCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "abnormalCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "warningCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suggestedQuestions": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

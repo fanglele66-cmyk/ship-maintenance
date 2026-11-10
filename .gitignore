@@ -9,3 +9,9 @@ ship-dashboard-full-src.tar.gz
 public/ship-bg-t.png
 public/ship-bg-transparent.png
 public/ship-bg.jpg
+
+# Local ship data and health runtime (never publish raw database or secrets)
+phase2-demo/.local-data/
+phase2-demo/.local-ai/
+__pycache__/
+*.pyc

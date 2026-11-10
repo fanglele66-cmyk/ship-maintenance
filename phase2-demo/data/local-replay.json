@@ -1,0 +1,9 @@
+{
+  "provider": "local_sqlite_replay",
+  "cadenceSeconds": 12,
+  "input": "pointDataList",
+  "sensorValues": "unchanged",
+  "sourceClock": "preserved in source_time",
+  "gapPolicy": "remove empty intervals; flag source seams",
+  "unitSource": "ship-data-collector/config.yaml sensor_map; local historical pressure values use MPa, API mapping bar is not applicable"
+}

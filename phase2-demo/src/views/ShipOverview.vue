@@ -24,7 +24,8 @@
   <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
     <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span><button class="home-assistant-toggle" type="button" :aria-expanded="assistantOpen" aria-controls="home-situation-assistant" @click="assistantOpen=!assistantOpen">✦ 态势助手</button></ModuleHeader>
-    <NavigationVoyage :periods="chronology.periods" :events="lifecycle.events" :captain="lifecycle.state.role==='captain'" :compact="assistantOpen"/>
+    <p v-if="sensorStore.localError" class="local-data-note" role="status">{{sensorStore.localError}}</p><p v-else class="local-data-note">连续历史数据回放 · 每 15 秒刷新</p>
+    <NavigationVoyage :periods="chronology.periods" :events="[]" :captain="false" :compact="assistantOpen"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>
   </div>
@@ -52,15 +53,14 @@ import ModuleHeader from '@/components/ModuleHeader.vue'
 
 import LifecycleWorkbench from '@/components/LifecycleWorkbench.vue'
 import NavigationVoyage from '@/components/NavigationVoyage.vue'
-import {navigationChronology} from '../workflow/navigationChronology'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const lifecycle=useEventLifecycleStore(),workbench=ref(null)
 const emit=defineEmits(['selectDevice','selectItem']),store=usePhase2DemoStore(),deviceStore=useDeviceStore(),twinRef=ref(null)
 const sensorStore=useSensorStore()
-function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return point?Number(point.value).toFixed(1):'—'}
+function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return Number.isFinite(point?.value)?Number(point.value).toFixed(1):'—'}
 const sampleTimeIso=computed(()=>new Date(sensorStore.sampledAt).toISOString())
 const sampleTimeLabel=computed(()=>new Date(sensorStore.sampledAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Shanghai'}))
-const chronology=computed(()=>navigationChronology(sensorStore,sensorStore.sampledAt,{timeBase:lifecycle.state.timeBase}))
+const chronology=computed(()=>sensorStore.localChronology)
 const {width,height}=useElementSize(twinRef)
 const sceneStyle=computed(()=>{const scale=Math.max(width.value/941,height.value/1672);return {height:1672*scale+'px',width:941*scale+'px'}})
 const devices=computed(()=>{
@@ -68,10 +68,11 @@ const devices=computed(()=>{
  const auxiliary=deviceStore.devices.filter(d=>d.id.startsWith('aux-engine-'))
  const signals=auxiliary.map(d=>captainDeviceSignal(store,d.id))
  const signal=signals.includes('danger')?'danger':signals.includes('warning')?'warning':'normal'
- return [...(main?[{...main,signal:captainDeviceSignal(store,main.id)}]:[]),{id:'aux-system',name:'辅机',system:'辅机系统',signal}]
+ return [...(main?[{...main,signal:sensorStore.health?.latest?.healthStatus==='abnormal'?'danger':sensorStore.health?.latest?.healthStatus==='warning'?'warning':'normal'}]:[]),{id:'aux-system',name:'辅机',system:'辅机系统',signal}]
 })
 </script>
 <style scoped>
+.local-data-note{font-size:12px;color:#7c8797;padding:0 20px;margin:0 0 10px}
 .home-assistant-toggle{border:1px solid #dfd7c7;background:#faf8f2;color:#8b6b39;border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer}.home-assistant-toggle[aria-expanded=true]{background:#eee6d5}
 
 

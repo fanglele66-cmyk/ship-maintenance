@@ -1,0 +1,38 @@
+{
+  "source": "ship-changhangbiyu/.claude/skills/ship-engine-health",
+  "copiedOn": "2026-11-10",
+  "originalFilesSHA256": {
+    "SKILL.md": "090a76aa0c74c77ee44bccf28d3253c5414acfacf8f272dcf34475e772b09bb7",
+    "agents/openai.yaml": "fc45226c710ac4d7c5b697e47b34d79856188cb1eb9c12f1fe10d78dd5854506",
+    "changhang/analyze_health.py": "bf6271eb9af3ce0b48b868322c930b2fec25cd7dcff9c50c210c8d7951ab0b0f",
+    "changhang/__init__.py": "0a146d7a9fde10e3fc6ee3fc1875178512d83b2da825981bcadcf46691b999e5",
+    "references/data-contract.md": "5801215e9d6fb4860b112aad948bfbbb6f390f40cd8fae73a8fd0e6509bb9c7a",
+    "references/workflow.md": "815957c0c00af44f9d20c3a3ed2debfd49ea154a6109feb1bb14af479dd04755",
+    "scripts/build_device_detail.py": "151045b14076255321a778f4db71a163e787e29d44d4a41d3c2bd6ee63d7f4eb",
+    "scripts/build_situation_welcome.py": "fa7a630ce49c49537e2c2046277dfef208637e8b49ce156ef996120f21347884",
+    "scripts/run_engine_health.py": "acd8350629dce4008581406ab51a65e57d7ca3a1d9f83573edbd8d5eaa02554f",
+    "scripts/validate_result.py": "d020284e443c3d75362b294f9d04fd4e2c824b54ca03ab9aeb8f88e96cb6949a",
+    "template/device-detail-message.example.json": "f02bbb5ed4fe8cb935d100a24fae97b5b2f1915576cfe5c94439f94cd20118ac",
+    "template/device-detail-message.schema.json": "ebd13b1706478e3c37097996cd3c1f6a4b92a66018f80aebafc04810b5aefab4",
+    "template/input.example.json": "0b436c11971f2b1a5c786a705fa2a0055e20ea590651e40b45e9f9eec5640945",
+    "template/input.schema.json": "e13b1b6747374fe6c3b5be92965bbb037db5836170a80afffef1eef7184689ce",
+    "template/result.example.json": "16b6e7c3ae28481f755a703a3fe68e652eac457672072819982c855ff7d118a4",
+    "template/result.schema.json": "42cb05c9a6f79106348bb6fc98b08e89df4fb7c9198afb4ff6dd49727f204bf2",
+    "template/situation-message.example.json": "ef74519f7bbe5ad8390d0d028eaf4dd0563db1fc483ca27e291b31c44f273c32",
+    "template/situation-message.schema.json": "cb818aedcc05530b57be063ddc5526fd462a73be889fb161e3b1b90c718e7404",
+    "tests/test_manual_system_highlights.py": "867667123958e4e61ed28b68164e25aed59d7cda074c20e65d99a0415377cf33"
+  },
+  "adaptedFiles": [
+    "SKILL.md",
+    "scripts/run_engine_health.py",
+    "tests/test_manual_system_highlights.py"
+  ],
+  "dependencies": [
+    ".claude/lib/ship_workspace_config.py",
+    "data/ship-profile.json",
+    "data/sensor-point-mapping.json",
+    "data/main_engine_registry.json",
+    "data/changhangbiyu_mapping.json",
+    "data/system-profiles.json"
+  ]
+}

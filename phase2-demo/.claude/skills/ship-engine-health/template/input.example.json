@@ -1,0 +1,7 @@
+{
+  "workspace": ".",
+  "input_dir": "input/sensor-raw-data",
+  "output_dir": "result/engine-health/outputs",
+  "limit": 12,
+  "created_at": "2026-07-11T08:00:00"
+}
