@@ -30,8 +30,8 @@
       </router-link>
     </div>
     <el-popover trigger="click" placement="right-end" :width="210" v-model:visible="roleMenuOpen">
-      <template #reference><button class="nav-role-avatar" type="button" :aria-label="'切换角色，当前'+roleLabel" :title="roleLabel" :aria-expanded="roleMenuOpen">{{roleLabel.slice(0,1)}}</button></template>
-      <div class="nav-role-menu" aria-label="选择角色"><strong>切换角色</strong><button v-for="(name,key) in people" :key="key" type="button" :aria-pressed="lifecycle.state.role===key" @click="lifecycle.setRole(key);roleMenuOpen=false">{{name}}<span v-if="lifecycle.state.role===key"> ✓</span></button></div>
+      <template #reference><button class="nav-role-avatar" type="button" :aria-label="'当前账号，'+roleLabel" :title="roleLabel" :aria-expanded="roleMenuOpen">{{roleLabel.slice(0,1)}}</button></template>
+      <div class="nav-role-menu" aria-label="当前账号"><strong>{{auth.user?.name}} · {{roleLabel}}</strong><span>{{auth.user?.username}}</span><button type="button" @click="signOut">退出登录</button><span v-if="logoutError" role="alert">{{logoutError}}</span></div>
     </el-popover>
   </nav>
 </template>
@@ -39,7 +39,7 @@
 <script setup>
 import {ElPopover} from 'element-plus'
 import 'element-plus/es/components/popover/style/css'
-import {people} from '../workflow/lifecyclePermissions.js'
+import {auth,logout} from '../services/auth'
 import {Document} from '@element-plus/icons-vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -51,7 +51,8 @@ const route = useRoute()
 const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
 const lifecycle=useEventLifecycleStore(),roleMenuOpen=ref(false)
-const roleLabel=computed(()=>people[lifecycle.state.role]?.match(/（(.+)）/)?.[1]||'轮机长')
+const roleLabel=computed(()=>auth.user?.roleLabel||''),logoutError=ref('')
+async function signOut(){try{await logout()}catch(e){logoutError.value=e.message}}
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
 const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:lifecycle.workItems.pending.filter(item=>item.kind==='task').length)
 

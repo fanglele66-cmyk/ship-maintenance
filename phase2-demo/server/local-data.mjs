@@ -35,7 +35,7 @@ export function chronology(rows,ais,start,end){
    detail:rpm===null?'此时段未采集到主机数据。':`主机平均转速 ${rpm.toFixed(1)} rpm；${speed===null?'此时段无可用 AIS 航速。':`平均航速 ${speed.toFixed(1)} kn。`}`,
    operation:p.state==='stopped'?'转速接近零；停泊状态需结合航行记录确认':p.state==='unknown'?'等待采集数据':'依据实测转速归类，未推断操纵意图',loadTrend:'未采集功率负荷；燃油指令不等同负荷'}
  })
- return {periods,source:'历史数据库副本（时间平移回放）',start,end,markdown:periods.map(p=>`${sqlTime(p.start)}～${sqlTime(p.end)}：${p.status}。${p.detail}`).join('\n')}
+ return {periods,source:'主机运行测量与 AIS 航迹',start,end,markdown:periods.map(p=>`${sqlTime(p.start)}～${sqlTime(p.end)}：${p.status}。${p.detail}`).join('\n')}
 }
 
 export function openLocalData(root,directory=process.env.SHIP_DATA_DIR||join(root,'.local-data')){

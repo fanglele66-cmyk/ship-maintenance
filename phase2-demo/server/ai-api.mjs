@@ -34,6 +34,10 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    for await(const part of req){const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);size+=chunk.length;if(size>maxStepAssistRequestBytes)return send(413,{error:'请求内容过大，图片与附件请分批补充。'});chunks.push(chunk)}
    const raw=Buffer.concat(chunks).toString('utf8')
    let input;try{input=JSON.parse(raw)}catch{return send(400,{error:'请求格式不正确。'})}
+   if(req.user){
+    if(input.role&&input.role!==req.user.workflowRole)return send(403,{error:'请求身份与当前登录账号不一致。'})
+    input.role=req.user.workflowRole;input.actor=req.user.role==='admin'?'陈志远（轮机长）':req.user.name+'（'+req.user.roleLabel+'）'
+   }
    if(input?.mode!=='step-assist'&&size>300000)return send(413,{error:'内容过长，请分段补充。'})
    if(path!=='/api/ai/chat')return send(404,{error:'接口不存在。'})
    if(busy>=2)return send(429,{error:'模型正在处理其他请求，请稍后重试。'})

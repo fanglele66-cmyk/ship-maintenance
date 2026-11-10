@@ -25,4 +25,4 @@ export async function createDataService(root){
   async close(){await scheduler.close();data?.close()},
  }
 }
-export function localDataPlugin(){return {name:'engine-room-local-data',apply:'serve',async configureServer(server){const service=await createDataService(server.config.root);server.middlewares.use((req,res,next)=>void service.handler(req,res,next));server.httpServer?.once('close',()=>void service.close())}}}
+export function localDataPlugin(){return {name:'engine-room-local-data',apply:'serve',async configureServer(server){if(server.config.server.middlewareMode)return;const service=await createDataService(server.config.root);server.middlewares.use((req,res,next)=>void service.handler(req,res,next));server.httpServer?.once('close',()=>void service.close())}}}

@@ -1,8 +1,9 @@
+import {auth,accountRequest,pruneDeletedEvents} from '../services/auth'
 import {assistTaskStep,applyTaskStepNote} from '../workflow/taskStepAssistance.js'
 import {validateAnomalyReport,reportEvidence,createManualAnomaly} from '../workflow/manualAnomaly.js'
 import {shoreReportEntries} from '../workflow/shoreReports.js'
 import {lifecycleModelContext} from '../workflow/lifecycleModelContext.js'
-import {capabilities,actor,ownsTask} from '../workflow/lifecyclePermissions.js'
+import {actor,ownsTask} from '../workflow/lifecyclePermissions.js'
 import {resumeOwnTask} from '../workflow/eventLifecycle.js'
 import {refreshTaskReport} from '../workflow/reportRefresh.js'
 import {currentReportContext,reportTask,submissionContext,submissionSnapshot} from '../workflow/reportSubmissions.js'
@@ -20,13 +21,14 @@ import {generateTaskReport,recoverTaskReportGeneration} from '../workflow/taskRe
 import {observationTaskFor} from '../workflow/observationContext.js'
 import {suggestionAction} from '../workflow/lifecycleDecisions.js'
 import {loadLifecycleState,lifecycleSnapshot,lifecycleStorageKey as storageKey} from '../workflow/demoTimeline.js'
-const roleKey='engine-room-current-role'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let reportSession=crypto.randomUUID();try{reportSession=sessionStorage.getItem('engine-room-report-session')||reportSession;sessionStorage.setItem('engine-room-report-session',reportSession)}catch{}
  let storage;try{storage=localStorage}catch{}
  let initial=loadLifecycleState(storage,createLifecycleState)
- try{const role=sessionStorage.getItem(roleKey);if(Boolean(capabilities[role]))initial.role=role}catch{}
+ initial.role=auth.user?.workflowRole||'engineer'
+ pruneDeletedEvents(initial)
  refreshLifecyclePresentation(initial)
+ pruneDeletedEvents(initial)
  recoverTaskReportGeneration(initial,reportSession)
  for(const event of Object.values(initial.events))for(const messages of Object.values(event.conversations))for(const message of messages)if(message.status==='streaming'){
   message.status='interrupted';message.text='';message.modelError='上次生成已中断，请重新发送。原报告未修改。'
@@ -35,16 +37,19 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  initial.notices||=[];initial.role||='captain'
  for(const event of Object.values(initial.events))if(['generating','updating'].includes(event.pendingPlan?.status))event.pendingPlan.status=event.pendingPlan.source==='preset'?'pending':event.pendingPlan.steps?.length?'ready':'pending'
  const state=reactive(initial)
- const sensors=useSensorStore(),syncObservations=()=>syncLifecycleObservations(state,sensors,Date.now(),{demo:true})
+ const sensors=useSensorStore(),syncObservations=()=>{syncLifecycleObservations(state,sensors,Date.now(),{demo:true});pruneDeletedEvents(state)}
  watch(()=>sensors.sampledAt,syncObservations,{immediate:true})
  const snapshot=()=>lifecycleSnapshot(state)
  let lastStored=snapshot()
  watch(()=>[state.events,state.notices],()=>{const value=snapshot();if(value!==lastStored)try{lastStored=value;localStorage.setItem(storageKey,value)}catch{}},{deep:true})
- // Each browser tab keeps its role; only shared workflow data crosses tabs.
+ watch(()=>auth.deletedIds,()=>pruneDeletedEvents(state))
+ // All tabs share the authenticated account and persisted workflow.
  window.addEventListener('storage',event=>{
   if(event.key!==storageKey||!event.newValue)return
-  try{const incoming=JSON.parse(event.newValue);if(incoming.version!==1||!Object.keys(state.events).every(id=>incoming.events?.[id]))return
+  try{const incoming=JSON.parse(event.newValue);if(incoming.version!==1||!incoming.events)return
+   pruneDeletedEvents(incoming)
    refreshLifecyclePresentation(incoming)
+   pruneDeletedEvents(incoming)
    incoming.timeBase=Number.isFinite(incoming.timeBase)?incoming.timeBase:state.timeBase
    lastStored=lifecycleSnapshot(incoming);state.timeBase=incoming.timeBase;state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
@@ -64,7 +69,13 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  const workItems=computed(()=>lifecycleWorkItems(state)),notifications=computed(()=>lifecycleNotifications(state))
  const unread=computed(()=>workItems.value.pending.length)
  const notices=computed(()=>state.notices.filter(n=>n.recipient===state.role&&!n.read))
- function setRole(role){if(Boolean(capabilities[role])){state.role=role;try{sessionStorage.setItem(roleKey,role)}catch{}}}
+ function setRole(role){if(role===auth.user?.workflowRole)state.role=role}
+ async function deleteEvent(id){
+  if(auth.user?.role!=='admin')throw Error('只有超级管理员可以删除事件。')
+  const ids=new Set([id]);let changed=true
+  while(changed){changed=false;for(const event of Object.values(state.events))if(ids.has(event.parentEventId)&&!ids.has(event.id)){ids.add(event.id);changed=true}}
+  const result=await accountRequest('events/delete',{ids:[...ids]});auth.deletedIds=result.deletedIds;pruneDeletedEvents(state)
+ }
  function markRead(id){if(state.events[id])state.events[id].unread[state.role]=false}
  function acknowledge(id){markRead(id);state.notices.filter(n=>n.eventId===id&&n.recipient===state.role).forEach(n=>n.read=true)}
  const pendingRequests=reactive({})
@@ -167,5 +178,5 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.[state.role]:event?.conversations[state.role])?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
  async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
- return {assistStep:(id,taskId,stepIndex,text,uploads)=>assistTaskStep(state,id,taskId,stepIndex,text,uploads,aiStreamRequest,pendingRequests),applyStepNote:(id,taskId,messageId)=>applyTaskStepNote(state,id,taskId,messageId,pendingRequests),reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
+ return {deleteEvent,assistStep:(id,taskId,stepIndex,text,uploads)=>assistTaskStep(state,id,taskId,stepIndex,text,uploads,aiStreamRequest,pendingRequests),applyStepNote:(id,taskId,messageId)=>applyTaskStepNote(state,id,taskId,messageId,pendingRequests),reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

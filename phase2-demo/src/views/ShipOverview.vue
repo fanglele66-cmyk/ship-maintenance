@@ -24,7 +24,7 @@
   <div class="captain-right" aria-label="24小时运行与事件处置">
    <section class="captain-analysis">
     <ModuleHeader title="工况态势"><span class="analysis-window">近24小时</span><button class="home-assistant-toggle" type="button" :aria-expanded="assistantOpen" aria-controls="home-situation-assistant" @click="assistantOpen=!assistantOpen">✦ 态势助手</button></ModuleHeader>
-    <p v-if="sensorStore.localError" class="local-data-note" role="status">{{sensorStore.localError}}</p><p v-else class="local-data-note">连续历史数据回放 · 每 15 秒刷新</p>
+    <p v-if="sensorStore.localError" class="local-data-note" role="status">{{sensorStore.localError}}</p><p v-else class="local-data-note">设备运行数据 · 每 15 秒刷新</p>
     <NavigationVoyage :periods="chronology.periods" :events="[]" :captain="false" :compact="assistantOpen"/>
    </section>
    <LifecycleWorkbench ref="workbench" compact/>

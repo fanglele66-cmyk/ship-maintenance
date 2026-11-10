@@ -13,6 +13,7 @@
     <button class="report-anomaly-button" type="button" @click="reportDialog.open()">＋ 异常上报</button>
    </IssueFilterToolbar>
    <div  class="issues-scroll">
+    <p v-if="deleteError" role="alert" class="delete-error">{{deleteError}}</p>
     <p class="result-count">共 {{ filtered.length }} 项<span>已闭环事件及完整处置记录保留在这里。</span></p>
     <div class="event-cards">
      <article v-for="item in visible" :key="item.id" class="event-card" :data-event-id="item.id">
@@ -27,7 +28,7 @@
       <p v-if="item.continuation" class="continuation">{{item.continuation}}</p>
       <footer class="card-footer">
        <span class="event-time">{{item.firstObserved || '保留原事件记录'}}</span>
-       <div><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看任务</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'查看闭环结果':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
+       <div><button v-if="auth.user?.role==='admin'" class="delete-event" :disabled="deleting===item.id" @click="remove(item)">删除事件</button><button v-if="item.actionTaskId" class="task-link" @click="openTask(item)">查看任务</button><button class="detail-link" @click="open(item)">{{item.eventState==='已闭环'?'查看闭环结果':'查看事件'}}<span aria-hidden="true"> ›</span></button></div>
       </footer>
      </article>
     </div>
@@ -39,6 +40,7 @@
  </main>
 </template>
 <script setup>
+import {auth} from '../services/auth'
 import ManualAnomalyDialog from '../components/ManualAnomalyDialog.vue'
 import {eventState,eventStates,currentResponsibility} from '../workflow/lifecyclePresentation.js'
 import {computed,ref} from 'vue'
@@ -48,12 +50,13 @@ import {historicalDecisions} from '../mock/fourStoryWorkflow'
 import {activeTask,timeText,stageNames,people} from '../workflow/eventLifecycle'
 import FormSelect from '../components/forms/FormSelect.vue'
 import IssueFilterToolbar from '../components/IssueFilterToolbar.vue'
-const reportDialog=ref(null)
+const reportDialog=ref(null),deleting=ref(''),deleteError=ref('')
+async function remove(item){if(!window.confirm('删除事件“'+item.title+'”？其关联任务、报告和观察记录将从当前工作空间移除。'))return;deleting.value=item.id;deleteError.value='';try{await store.deleteEvent(item.id)}catch(e){deleteError.value=e.message}finally{deleting.value=''}}
 function submitted(event){clearFilters();open(event)}
 const store=useEventLifecycleStore(),router=useRouter(),device=ref(''),type=ref(''),status=ref('')
 const history=historicalDecisions.filter(e=>!e.parentIssueId).map(e=>({...e,rank:1,eventState:'已闭环',firstObserved:e.at,reference:true}))
 const responsibilityOwner=e=>currentResponsibility(e).owner==='轮机长'?people.captain:currentResponsibility(e).owner
-const rows=computed(()=>[...store.events.map(e=>({...e,rank:['报警事件','预警事件','异动跟踪','效果观察'].indexOf(e.type),eventState:eventState(e),stage:stageNames[e.phase],taskOwner:responsibilityOwner(e),progressNote:e.tasks.length?e.tasks.length+' 项关联任务 · '+e.tasks.filter(t=>t.status==='submitted').length+' 项已提交':'尚未建立人工执行任务',firstObserved:timeText(e.brief.discovery.at),actionTaskId:activeTask(e)?.id,continuation:e.phases.at(-1)?.observationWaiting?'观察中，按计划到期汇报。':['decision','review'].includes(e.phase)?'报告已回交，待审阅。':''})),...(store.state.role==='captain'?history:[])])
+const rows=computed(()=>[...store.events.map(e=>({...e,rank:['报警事件','预警事件','异动跟踪','效果观察'].indexOf(e.type),eventState:eventState(e),stage:stageNames[e.phase],taskOwner:responsibilityOwner(e),progressNote:e.tasks.length?e.tasks.length+' 项关联任务 · '+e.tasks.filter(t=>t.status==='submitted').length+' 项已提交':'尚未建立人工执行任务',firstObserved:timeText(e.brief.discovery.at),actionTaskId:activeTask(e)?.id,continuation:e.phases.at(-1)?.observationWaiting?'观察中，按计划到期汇报。':['decision','review'].includes(e.phase)?'报告已回交，待审阅。':''})),...(store.state.role==='captain'?history.filter(e=>!auth.deletedIds.includes(e.id)):[])])
 const deviceOptions=computed(()=>[{value:'',label:'全部设备'},...[...new Set(rows.value.map(e=>e.device))].map(value=>({value,label:value}))])
 const typeOptions=[{value:'',label:'全部类型'},...['报警事件','预警事件','异动跟踪','效果观察'].map(value=>({value,label:value}))]
 const eventStatusOptions=[{value:'',label:'全部事件状态'},...eventStates.map(value=>({value,label:value}))]
@@ -64,6 +67,7 @@ function open(e){router.push({path:'/situation/issue/'+e.id,query:{from:'issues'
 function openTask(e){router.push({path:'/tasks/'+e.actionTaskId})}
 </script>
 <style scoped>
+.delete-event,.delete-error{color:#ac4036}
 .report-anomaly-button{margin-left:auto;border:1px solid #34362e;border-radius:6px;padding:9px 16px;background:#30322a;color:white;font:inherit;font-size:13px;cursor:pointer}.report-anomaly-button:hover{background:#46483c}
 .issues-page{height:100%;width:100%;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;padding:22px 24px 16px;background:#f3f5f8;box-sizing:border-box;overflow:hidden}
 .issues-page-head{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:0 0 20px;flex-shrink:0}.issues-page-head h2{font-size:var(--wb-title);font-weight:600;margin:0 0 7px;color:#202020}.issues-page-head p{font-size:var(--wb-body);margin:0;color:#778397}.directory-count{display:flex;align-items:baseline;gap:7px;font-size:var(--wb-body);color:#718094;white-space:nowrap}.directory-count strong{color:#263951;font-size:calc(var(--wb-title) + 4px);font-weight:600}.directory-count i{height:14px;width:1px;background:#d4dce6;margin:0 7px}

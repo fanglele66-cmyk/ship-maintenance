@@ -1,5 +1,5 @@
 import {DatabaseSync} from 'node:sqlite'
-import {mkdir,readFile,writeFile,rename} from 'node:fs/promises'
+import {mkdir,readFile,writeFile,rename,cp} from 'node:fs/promises'
 import {join,resolve} from 'node:path'
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
@@ -11,6 +11,15 @@ const execute=promisify(execFile)
 const jsonRead=async file=>{try{return JSON.parse(await readFile(file,'utf8'))}catch(e){if(e.code==='ENOENT')return null;throw e}}
 export async function atomicWrite(file,value){await writeFile(file+'.tmp',value,'utf8');await rename(file+'.tmp',file)}
 
+export function healthModelFacts(facts){
+ const devices=Object.fromEntries(Object.entries(facts.result.devices).map(([id,d])=>[id,Object.fromEntries(['device_name','status','health_status','health_score','operating_condition','analysis_highlights','context'].filter(key=>d[key]!==undefined).map(key=>[key,d[key]]))]))
+ return {devices,window:{start:facts.coverage.start,end:facts.coverage.end,rows:facts.coverage.rows,maximumGapSeconds:facts.coverage.maximumGapSeconds},units:facts.units}
+}
+export function validateHealthLanguage(report){
+ const text=[report.conclusion,report.next,report.detail].join('\n')
+ if(/回放|复刻|源数据拼接|原始连续片段|数据局限|本地.{0,6}未导入|无(?:异常与)?告警|无报警|没有告警|无异常部件|具备.{0,6}起动条件|随时起动|保证.{0,4}安全/.test(text))throw Error('研判包含技术叙述或无证据的安全结论')
+}
+
 export async function createHealthScheduler(root,{directory=process.env.SHIP_DATA_DIR||join(root,'.local-data'),clock=Date.now,analyze,enhance}={}){
  directory=resolve(directory)
  await mkdir(directory,{recursive:true})
@@ -19,7 +28,8 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
  const reportPath=join(directory,'health-latest.json')
  const inputs=['data/sensor-point-mapping.json','data/ship-profile.json','.claude/skills/ship-engine-health/scripts/run_local_health.py','.claude/skills/ship-engine-health/scripts/run_engine_health.py','.claude/skills/ship-engine-health/references/local-report.md']
  const content=await Promise.all(inputs.map(async name=>{try{return await readFile(join(root,name),'utf8')}catch(e){if(e.code==='ENOENT'&&analyze)return '';throw e}}))
- const revision=createHash('sha256').update(content.join('\n')).digest('hex').slice(0,12)
+ const dataset=await jsonRead(join(directory,'manifest.json'))
+ const revision=createHash('sha256').update(content.join('\n')+JSON.stringify(dataset)).digest('hex').slice(0,12)
  let busy=false,timer=null,pending=null,closed=false
  const claim=now=>{
   const id=`${Math.floor(now/HOUR)}:${revision}`
@@ -45,6 +55,7 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
   const response=await invokeModel(provider,{...config,maxTokens:8192},instruction,JSON.stringify(facts))
   const parsed=JSON.parse(response.text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''))
   for(const key of ['conclusion','next','detail'])if(typeof parsed[key]!=='string'||!parsed[key].trim())throw Error('健康研判正文不完整')
+  validateHealthLanguage(parsed)
   return {...parsed,model:response.model,usage:response.usage}
  })
  async function publish(report){
@@ -62,18 +73,24 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
    const facts=await runSkill(now),device=Object.values(facts.result.devices)[0]
    const quality=facts.coverage.status
    const report={jobId:id,revision,completedAt:sqlTime(clock()),window:facts.result.analysis_window,coverage:facts.coverage,
-    dataCutoff:`${facts.coverage.start} ～ ${facts.coverage.end}（历史数据库副本）`,
+    dataCutoff:`${facts.coverage.start} ～ ${facts.coverage.end}`,
     conclusion:device?.analysis_conclusion||'可用数据不足，暂不能研判主机健康状态。',
     next:device?.recommendations?.join('；')||'检查数据覆盖后重新分析。',detail:device?.context||facts.result.context,
     healthStatus:quality==='sufficient'?device?.health_status:'unknown',modelStatus:'pending',resultPath:facts.resultPath}
-   if(quality!=='sufficient')report.conclusion=`${facts.coverage.sourceSeams?.length?'回放数据连续，本次仅研判最后一段原始连续数据。':'数据覆盖不足，研判仅供参考。'}${report.conclusion}`
    await publish(report)
    try{
-    const model=await enrich({result:facts.result,coverage:facts.coverage,units:facts.units,source:'历史采集数据去除空档后连续回放；没有接入实时船端；当前没有导入事件'})
+    const model=await enrich(healthModelFacts(facts))
     if(model){report.conclusion=model.conclusion;report.next=model.next;report.detail=model.detail;report.model=model.model;report.usage=model.usage;report.modelStatus='complete'}
     else report.modelStatus='disabled'
    }catch{report.modelStatus='failed';report.modelError='模型研判未完成，本次显示 Skill 计算结果；下个小时重试。'}
    report.completedAt=sqlTime(clock())
+   const archive=join(directory,'health-history',id.replace(':','-'))
+   report.archivePath=archive
+   await mkdir(archive,{recursive:true})
+   await atomicWrite(join(archive,'report.json'),JSON.stringify(report,null,2))
+   await atomicWrite(join(archive,'report.md'),`# 主机设备健康研判\n\n更新时间：${report.completedAt}\n\n数据窗口：${report.dataCutoff}\n\n${report.detail}\n`)
+   await atomicWrite(join(archive,'skill-result.json'),JSON.stringify(facts,null,2))
+   if(!analyze)await cp(join(directory,'workspace/input/sensor-raw-data'),join(archive,'sensor-raw-data'),{recursive:true})
    await publish(report)
    jobs.prepare('UPDATE health_jobs SET status=?,lease_until=0,updated_at=? WHERE id=?').run('complete',clock(),id)
   }catch(e){

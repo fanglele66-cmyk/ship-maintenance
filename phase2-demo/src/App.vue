@@ -1,6 +1,8 @@
 <template>
  <ElConfigProvider size="small">
-  <div class="app-container">
+  <AccountLogin v-if="auth.ready&&!auth.user"/>
+  <div v-else-if="!auth.ready" class="login-loading">正在连接工作空间…</div>
+  <div v-else class="app-container">
     <AppNav />
     <div class="app-main">
       <AppHeader />
@@ -19,12 +21,17 @@
 </template>
 
 <script setup>
+import AccountLogin from './components/AccountLogin.vue'
+import {auth,loadAccount} from './services/auth'
 import { ref, onBeforeUnmount } from 'vue'
 import {ElConfigProvider} from 'element-plus'
 import AppNav from '@/components/AppNav.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import { installDevViewRecovery } from '@/utils/devViewRecovery'
 
+void loadAccount()
+const authTimer=setInterval(async()=>{const before=auth.user?.username;await loadAccount();if(before!==auth.user?.username)location.reload()},15000)
+onBeforeUnmount(()=>clearInterval(authTimer))
 const viewRevision=ref(0)
 if(import.meta.hot){
   const stopRecovery=installDevViewRecovery(import.meta.hot,()=>{viewRevision.value++})

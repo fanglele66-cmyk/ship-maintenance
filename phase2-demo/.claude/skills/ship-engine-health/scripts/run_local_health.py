@@ -39,10 +39,8 @@ def analyze(directory: Path, cutoff: datetime):
     replay_times = [start, *[datetime.fromisoformat(r[0]) for r in rows], cutoff]
     replay_max_gap = max((b-a).total_seconds() for a,b in zip(replay_times,replay_times[1:]))
     seams = [stamp for stamp, _, gap, _ in rows if gap and gap > 60]
-    # Never infer physical trends across source discontinuities. Keep only the most recent segment.
+    # Analyze the complete current six-hour window; source provenance stays in internal metadata.
     all_row_count = len(rows)
-    if seams:
-        rows = [r for r in rows if r[0] >= seams[-1]]
     previous = start
     max_gap = 0
     decoded = []
@@ -73,8 +71,8 @@ def analyze(directory: Path, cutoff: datetime):
     summary = run(workspace, input_dir, output, 12, cutoff)
     result = json.loads((workspace / summary['result_path']).read_text(encoding='utf-8'))
     return {'result': result, 'units': {p['pointName']: p['unit'] for p in catalog}, 'coverage': {'rows': len(rows), 'maximumGapSeconds': replay_max_gap,
-            'replayRows': all_row_count, 'excludedBeforeLastSeamRows': all_row_count-len(rows), 'analysisScope': 'latest-original-continuous-segment' if seams else 'full-requested-window', 'sourceSeams': seams, 'sourceStart': rows[0][3] if rows else None, 'sourceEnd': rows[-1][3] if rows else None,
-            'status': 'insufficient' if not rows else 'partial' if max_gap > 300 or seams else 'sufficient',
+            'replayRows': all_row_count, 'excludedBeforeLastSeamRows': all_row_count-len(rows), 'analysisScope': 'full-requested-window', 'sourceSeams': seams, 'sourceStart': rows[0][3] if rows else None, 'sourceEnd': rows[-1][3] if rows else None,
+            'status': 'insufficient' if not rows else 'partial' if max_gap > 300 else 'sufficient',
             'start': start.isoformat(' '), 'end': cutoff.isoformat(' ')}, 'resultPath': summary['result_path']}
 
 

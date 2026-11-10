@@ -32,7 +32,7 @@ async function ask(text){
  nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))
  const requestController=new AbortController();controller=requestController
  try{
-  const result=await aiStreamRequest({mode:'situation',role:store.state.role,text,history,situation:{ship:'长航碧玉',readings:props.readings,periods:props.chronology.periods,source:props.chronology.source,health:props.health}},(kind,data)=>{
+  const result=await aiStreamRequest({mode:'situation',role:store.state.role,text,history,situation:{ship:'长航碧玉',readings:props.readings,periods:props.chronology.periods,source:props.chronology.source,health:props.health?{conclusion:props.health.conclusion,next:props.health.next,detail:props.health.detail,completedAt:props.health.completedAt}:undefined}},(kind,data)=>{
    if(kind==='text'&&controller===requestController){messages.value[index].text+=data.delta;nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))}
   },{signal:requestController.signal})
   if(controller===requestController){messages.value[index].text=result.answer;nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))}

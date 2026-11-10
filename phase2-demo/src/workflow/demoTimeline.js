@@ -50,8 +50,7 @@ export function loadLifecycleState(storage,createState,now=Date.now()){
  let saved
  try{saved=JSON.parse(storage.getItem(lifecycleStorageKey))}catch{}
  // Only new workspaces receive shifted cases. Existing submissions are immutable.
- const expected=['real-alarm-0430','real-warning-0523','real-tracking-exhaust-baseline','real-health-c4-baseline']
- const initial=saved?.version===1&&expected.every(id=>saved.events?.[id])?saved:createState({timeBase:Math.floor(now/60000)*60000})
+ const initial=saved?.version===1&&saved.events&&typeof saved.events==='object'&&!Array.isArray(saved.events)?saved:createState({timeBase:Math.floor(now/60000)*60000})
  initial.timeBase=Number.isFinite(initial.timeBase)?initial.timeBase:Math.floor(now/60000)*60000
  // Persist before the first action so reloads and other tabs share this clock.
  try{storage.setItem(lifecycleStorageKey,lifecycleSnapshot(initial))}catch{}
