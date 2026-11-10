@@ -4,7 +4,8 @@ import {mkdtemp,readFile,readdir,rm} from 'node:fs/promises'
 import {DatabaseSync} from 'node:sqlite'
 import {tmpdir} from 'node:os'
 import {join,resolve,dirname} from 'node:path'
-import {createWorkflowService} from '../server/workflow-service.mjs'
+import {createWorkflowService,readWorkflowJson} from '../server/workflow-service.mjs'
+import {Readable} from 'node:stream'
 import {renderMarkdown} from '../src/workflow/renderMarkdown.js'
 import {hiddenContext,visibleText} from '../server/skill-runtime.mjs'
 import {createBackendWorkflowSync} from '../src/workflow/backendWorkflowSync.js'
@@ -18,6 +19,12 @@ import {taskEditContract} from '../src/workflow/taskEdits.js'
 const copy=v=>JSON.parse(JSON.stringify(v)),chief={workflowRole:'captain'},engineer={workflowRole:'engineer'}
 const analysis={title:'燃油压力波动核实',summary:'现场上报压力波动，待核对。',interpretation:'依据现场描述与本窗口采样核对。',unverified:'独立表计读数待确认。',recommendation:'安排核对燃油压力变化与独立表计。',steps:[{label:'核对燃油压力',guide:'同步读取现场表计和系统读数。',checks:['记录时间与压力。'],recordHint:'回交两组读数与时间。'}]}
 const form=()=>({deviceId:'main-engine-1',sensorIds:['s-002'],start:new Date(Date.now()-3600000).toISOString(),end:new Date(Date.now()-60000).toISOString(),description:'燃油进机压力疑似波动，请核对现场表计。'})
+test('workflow JSON preserves Chinese and emoji when network chunks split UTF-8 characters',async()=>{
+ const value={revision:10,event:{pendingPlan:{editHistory:[{recordHint:'核对时间与结果。⚙️'}]},note:'压力0.89 MPa，未见异常。'}},bytes=Buffer.from(JSON.stringify(value))
+ const chunks=[...bytes].map(byte=>Buffer.from([byte]))
+ assert.deepEqual(await readWorkflowJson(Readable.from(chunks)),value)
+ await assert.rejects(readWorkflowJson(Readable.from([Buffer.alloc(12*1024*1024),Buffer.from('x')])),/记录过大/)
+})
 async function fixture(t,options={}){
  const directory=await mkdtemp(join(tmpdir(),'ship-workflow-')),root=process.cwd();let time=Date.now(),calls=0
  const service=await createWorkflowService(root,{directory,clock:()=>time,detect:async()=>{calls++;return {rows:1800,devices:[{events:[]}]}},analyze:async()=>({anomaly:analysis,model:'test-model'}),evidenceReader:(_root,scope)=>Array.from({length:scope.allRelated?8:1},(_,i)=>({channelId:'sensor-'+i,name:'测点'+i,pointCode:i?'DC0042':'DC0001',unit:i?'MPa':'RPM',sampleCount:300,min:0,max:100,mean:i?1:0,value:i?1:0,covered:true,trendData:[]})),observationModel:async()=>({summary:'停机窗口内压力读数平稳，运行效果待验证。',analysis:'八个关联测点均已取得记录。',next:'交轮机长核对后续运行验证安排。'}),...options})

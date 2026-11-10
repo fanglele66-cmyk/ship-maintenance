@@ -156,6 +156,13 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
  return {repository,manual,save,visible,authorize,tick,startedAt,async status(){return {startedAt,nextAt:startedAt+(Math.floor((clock()-startedAt)/HOUR)+1)*HOUR,runs:db.prepare('SELECT * FROM runs ORDER BY rowid DESC LIMIT 12').all().map(r=>({id:r.id,status:r.status,...JSON.parse(r.json)}))}},start(){if(!timer){void tick();timer=setInterval(()=>void tick(),15000);timer.unref?.()}},async close(){if(closing)return;closing=true;clearInterval(timer);await pending;await Promise.allSettled([...inFlight.values()]);await repository.close()}}
 }
 
+export async function readWorkflowJson(request){
+ const chunks=[];let size=0
+ for await(const part of request){const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);size+=chunk.length;if(size>12*1024*1024)throw Error('事件记录过大。');chunks.push(chunk)}
+ // Network chunks may split a Chinese UTF-8 character. Decode only once, after assembly.
+ return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+}
+
 export async function workflowHandler(root){
  const service=await getWorkflowService(root)
  return async(req,res,next)=>{
@@ -165,7 +172,7 @@ export async function workflowHandler(root){
   try{
    if(path==='/api/workflow/events'&&req.method==='GET')return send(200,{events:service.visible(req.user)})
    if(path==='/api/workflow/status'&&req.method==='GET')return send(200,await service.status())
-   if(path==='/api/workflow/save'&&req.method==='POST'){let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>12*1024*1024)throw Error('事件记录过大。')}const body=JSON.parse(raw);return send(200,{event:await service.save(body.event,body.revision,req.user)})}
+   if(path==='/api/workflow/save'&&req.method==='POST'){const body=await readWorkflowJson(req);return send(200,{event:await service.save(body.event,body.revision,req.user)})}
    return send(405,{error:'不支持的请求方法。'})
   }catch(error){return send(error.status||400,{error:error.message})}
  }
