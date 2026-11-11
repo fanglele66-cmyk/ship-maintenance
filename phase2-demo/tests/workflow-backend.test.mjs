@@ -46,6 +46,25 @@ test('manual requests use distinct folders, same-request retry is idempotent, co
  await assert.rejects(service.manual({...input,report:{...report,description:'另一组描述，不能覆盖原始上报。'}},{user:engineer}),/编号/)
  const other=await service.manual({...input,requestId:'report-test-0002'},{user:engineer});assert.notEqual(a.event.id,other.event.id)
 })
+
+test('simultaneous chief conversation and engineer task feedback retain server authorization and both artifacts',async t=>{
+ const {service,directory}=await fixture(t),result=await service.manual({requestId:'concurrent-report',report:form()},{user:engineer})
+ const setup={role:'captain',events:{[result.event.id]:result.event},notices:[]},id=result.event.id
+ ensureTaskPlan(setup.events[id]);decide(setup,id,{action:'investigate',owner:people.engineer,deadline:new Date(Date.now()+86400000).toISOString()})
+ await service.save(setup.events[id],setup.events[id].serverRevision,chief)
+ const make=user=>{const state={events:{}};const sync=createBackendWorkflowSync(state,async(path,body)=>path==='workflow/events'?{events:service.visible(user)}:{event:await service.save(body.event,body.revision,user)});return {state,sync}}
+ const a=make(chief),b=make(engineer);t.after(()=>{a.sync.close();b.sync.close()})
+ await Promise.all([a.sync.pull(),b.sync.pull()])
+ a.state.events[id].conversations.captain.push({id:'chief-concurrent-message',kind:'user',text:'继续核对现场表计。'})
+ b.state.events[id].tasks[0].draft.records[0].note='现场0.89 MPa，与系统一致。'
+ await Promise.all([a.sync.flush(),b.sync.flush()]);await a.sync.refresh()
+ assert.equal(service.repository.get(id).tasks[0].draft.records[0].note,'现场0.89 MPa，与系统一致。')
+ const messages=JSON.parse(await readFile(join(directory,'events',id,'conversations.json'),'utf8'))
+ assert.equal(messages.event.captain.at(-1).text,'继续核对现场表计。')
+ assert.equal(service.visible({workflowRole:'secondEngineer'}).length,0)
+ const invalid=copy(b.state.events[id]);invalid.conversations.captain.push({id:'forged',kind:'user',text:'冒充轮机长'})
+ await assert.rejects(service.save(invalid,invalid.serverRevision,engineer),/他人会话/)
+})
 test('hourly detection is startup relative and does not duplicate a completed slot',async t=>{
  const f=await fixture(t);await f.service.tick();assert.equal(f.calls(),1);f.advance(59*60000);await f.service.tick();assert.equal(f.calls(),1);f.advance(60000);await f.service.tick();assert.equal(f.calls(),2)
  const status=await f.service.status();assert.equal(status.runs.filter(r=>r.status==='complete').length,2)

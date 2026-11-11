@@ -25,7 +25,10 @@ export async function createAuthService(root,{directory=process.env.SHIP_DATA_DI
  }
  if(created.length)await writeFile(join(directory,'accounts-initial.json'),JSON.stringify(created,null,2),'utf8')
  const deleted=()=>db.prepare('SELECT id FROM deleted_events ORDER BY deleted_at').all().map(r=>r.id)
- const tokenFor=req=>{const match=(req.headers.cookie||'').match(/(?:^|;\s*)ship_session=([A-Za-z0-9_-]+)/);return match?digest(match[1]):''}
+ // Explicit tab credentials take precedence, including the unauthenticated sentinel.
+ // Cookies remain supported for existing clients; new UI sessions never share cookies.
+ const tabSession=req=>req.headers['x-ship-session']!==undefined
+ const tokenFor=req=>{if(tabSession(req)){const token=req.headers['x-ship-session'];return typeof token==='string'&&/^[A-Za-z0-9_-]{43}$/.test(token)?digest(token):''}const match=(req.headers.cookie||'').match(/(?:^|;\s*)ship_session=([A-Za-z0-9_-]+)/);return match?digest(match[1]):''}
  const cookie=(res,token,age)=>res.setHeader('Set-Cookie',`ship_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}`)
  async function handler(req,res,next){
   const path=(req.url||'').split('?')[0]
@@ -36,8 +39,6 @@ export async function createAuthService(root,{directory=process.env.SHIP_DATA_DI
   const user=db.prepare('SELECT accounts.* FROM sessions JOIN accounts USING(username) WHERE token=?').get(tokenFor(req))
   if(path==='/api/auth/me'&&req.method==='GET')return send(res,200,{user:user?safeUser(user):null,deletedIds:user?deleted():[]})
   if(path==='/api/auth/login'&&req.method==='POST'){
-   // One active identity in this local installation, including other tabs/browsers.
-   if(db.prepare('SELECT 1 FROM sessions').get())return send(res,409,{error:'已有账号登录，请先在当前会话退出后再切换账号。'})
    let input;try{input=await body(req)}catch{return send(res,400,{error:'登录信息格式错误。'})}
    const username=String(input.username||'').slice(0,100),password=String(input.password||'')
    const attempt=db.prepare('SELECT * FROM login_attempts WHERE username=?').get(username)
@@ -49,14 +50,16 @@ export async function createAuthService(root,{directory=process.env.SHIP_DATA_DI
    db.prepare('DELETE FROM login_attempts WHERE username=?').run(username)
    db.exec('BEGIN IMMEDIATE')
    try{
-    if(db.prepare('SELECT 1 FROM sessions').get()){db.exec('ROLLBACK');return send(res,409,{error:'已有账号登录，请先退出。'})}
+    // A login only replaces this client's old session, never another user's session.
+    db.prepare('DELETE FROM sessions WHERE token=?').run(tokenFor(req))
     db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(token),username,clock()+8*3600000);db.exec('COMMIT')
    }catch(e){db.exec('ROLLBACK');throw e}
-   cookie(res,token,28800);return send(res,200,{user:safeUser(account),deletedIds:deleted()})
+   if(!tabSession(req))cookie(res,token,28800)
+   return send(res,200,{user:safeUser(account),sessionToken:token,deletedIds:deleted()})
   }
   if(!user)return send(res,401,{error:'请先登录。'})
   req.user=safeUser(user)
-  if(path==='/api/auth/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(tokenFor(req));cookie(res,'',0);return send(res,200,{ok:true})}
+  if(path==='/api/auth/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(tokenFor(req));if(!tabSession(req))cookie(res,'',0);return send(res,200,{ok:true})}
   if(path==='/api/events/deleted'&&req.method==='GET')return send(res,200,{deletedIds:deleted()})
   if(path==='/api/events/delete'&&req.method==='POST'){
    if(user.role!=='admin')return send(res,403,{error:'只有超级管理员可以删除事件。'})

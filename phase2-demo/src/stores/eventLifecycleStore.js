@@ -23,10 +23,12 @@ import {generateTaskReport,recoverTaskReportGeneration} from '../workflow/taskRe
 import {observationTaskFor} from '../workflow/observationContext.js'
 import {suggestionAction} from '../workflow/lifecycleDecisions.js'
 import {loadLifecycleState,lifecycleSnapshot,lifecycleStorageKey as storageKey} from '../workflow/demoTimeline.js'
+import {demoWorkspace,mergeDemoWorkspace} from '../workflow/workspaceCache.js'
 export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let reportSession=crypto.randomUUID();try{reportSession=sessionStorage.getItem('engine-room-report-session')||reportSession;sessionStorage.setItem('engine-room-report-session',reportSession)}catch{}
  let storage;try{storage=localStorage}catch{}
- let initial=loadLifecycleState(storage,createLifecycleState)
+ let initial=demoWorkspace(loadLifecycleState(storage,createLifecycleState))
+ try{storage?.setItem(storageKey,lifecycleSnapshot(initial))}catch{}
  initial.role=auth.user?.workflowRole||'engineer'
  pruneDeletedEvents(initial)
  refreshLifecyclePresentation(initial)
@@ -49,19 +51,20 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  }
  const sensors=useSensorStore(),syncObservations=()=>{syncLifecycleObservations(state,sensors,Date.now(),{demo:true});pruneDeletedEvents(state)}
  watch(()=>sensors.sampledAt,syncObservations,{immediate:true})
- const snapshot=()=>lifecycleSnapshot(state)
+ const snapshot=()=>lifecycleSnapshot(demoWorkspace(state))
  let lastStored=snapshot()
  watch(()=>[state.events,state.notices],()=>{const value=snapshot();if(value!==lastStored)try{lastStored=value;localStorage.setItem(storageKey,value)}catch{}},{deep:true})
  watch(()=>auth.deletedIds,()=>pruneDeletedEvents(state))
- // All tabs share the authenticated account and persisted workflow.
+ // Real events synchronize via their server revisions, never another tab's cache.
  window.addEventListener('storage',event=>{
   if(event.key!==storageKey||!event.newValue)return
-  try{const incoming=JSON.parse(event.newValue);if(incoming.version!==1||!incoming.events)return
+  try{const saved=JSON.parse(event.newValue);if(saved.version!==1||!saved.events)return
+   const incoming=mergeDemoWorkspace(state,saved)
    pruneDeletedEvents(incoming)
    refreshLifecyclePresentation(incoming)
    pruneDeletedEvents(incoming)
    incoming.timeBase=Number.isFinite(incoming.timeBase)?incoming.timeBase:state.timeBase
-   lastStored=lifecycleSnapshot(incoming);state.timeBase=incoming.timeBase;state.events=incoming.events;state.notices=incoming.notices||[]
+   lastStored=lifecycleSnapshot(demoWorkspace(incoming));state.timeBase=incoming.timeBase;state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
  })
  const anomalyRequests=new Map()

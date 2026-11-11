@@ -38,6 +38,7 @@ const mod=name=>import(pathToFileURL(root+'/'+name));
  const errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));page.on('response',async r=>{if(r.url().endsWith('/api/ai/chat'))calls.push({status:r.status(),at:new Date().toISOString()});});
  const login=async(name,password)=>{await page.getByLabel('账号',{exact:true}).fill(name);await page.getByLabel('密码',{exact:true}).fill(password);await page.getByRole('button',{name:'登录',exact:true}).click();await page.locator('.app-nav').waitFor()};
  const logout=async()=>{await page.locator('.nav-role-avatar').click();await page.getByRole('button',{name:'退出登录',exact:true}).click();await page.getByLabel('账号',{exact:true}).waitFor()};
+ const waitForEvent=async(predicate,id,timeout=180000)=>{const until=Date.now()+timeout;while(Date.now()<until){const e=service.repository.get(id);if(e&&predicate(e))return;await new Promise(r=>setTimeout(r,250))}throw Error('Timed out waiting for persisted event '+id)};
  const snapshot=()=>JSON.parse(require('node:fs').readFileSync(path.join(directory,'events',eventId,'event.json'),'utf8'));
  let eventId;const receipt={directory,base,steps:[],errors,calls};const checkpoint=async(name)=>{receipt.steps.push(name);await fs.writeFile(path.join(out,'workflow-local-qa.json'),JSON.stringify(receipt,null,2));console.log(name)};
  try{
@@ -50,9 +51,9 @@ const mod=name=>import(pathToFileURL(root+'/'+name));
   await logout();await login('chief','qa-chief');await page.goto(base+'/#/situation/issue/'+eventId);await page.getByRole('button',{name:'AI排查建议',exact:true}).click();await page.getByRole('button',{name:'修改AI建议',exact:true}).waitFor();
   await page.getByRole('button',{name:'修改AI建议',exact:true}).click();await page.getByLabel('询问助手').fill('只保留第1项，其他步骤删除；第1项检查要求保留。');await page.getByLabel('询问助手').press('Enter');
 
-  await page.waitForFunction(id=>{const e=JSON.parse(localStorage.getItem('engine-room-captain-workflow-v1')).events[id];return e.pendingPlan?.status==='ready'&&e.pendingPlan.steps.length===1},eventId,{timeout:180000});await checkpoint('event assistant edited investigation plan');
+  await waitForEvent(e=>e.pendingPlan?.status==='ready'&&e.pendingPlan.steps.length===1,eventId);await checkpoint('event assistant edited investigation plan');
   await page.getByRole('button',{name:'填写决策',exact:true}).click();await page.getByRole('radio',{name:'派发排查',exact:true}).check();await page.getByRole('button',{name:'确认派发排查',exact:true}).click();
-  await page.waitForFunction(id=>JSON.parse(localStorage.getItem('engine-room-captain-workflow-v1')).events[id].tasks.length===1,eventId);await logout();await login('engineer1','qa-engineer');
+  await waitForEvent(e=>e.tasks.length===1,eventId);await logout();await login('engineer1','qa-engineer');
   const taskId=snapshot().currentTask;receipt.taskId=taskId;await page.goto(base+'/#/tasks/'+taskId);await page.getByLabel('询问助手').waitFor();await page.getByText('我是任务助手',{exact:false}).waitFor();await checkpoint('assigned task + engineer assistant welcome');
   for(const text of ['现场已核对独立表计，燃油进机压力0.89 MPa，和系统一致，未发现泄漏。','补充：记录时间为本次巡检时，主机停机，其他情况尚未核实。','以上就是目前掌握的全部情况，请整理备注。']){
    const before=await page.locator('.step-note-message').count();await page.getByLabel('询问助手').fill(text);await page.getByLabel('询问助手').press('Enter');
@@ -64,10 +65,10 @@ const mod=name=>import(pathToFileURL(root+'/'+name));
   const confirmation=page.getByRole('button',{name:'确认 →',exact:true});if(await confirmation.count())await confirmation.click();
   await page.waitForFunction(()=>[...document.querySelectorAll('.lc-task-feedback textarea')].some(t=>t.value.includes('0.89')));await checkpoint('task note adopted to left form');
   await page.getByRole('radio',{name:'未见异常',exact:true}).check();await page.getByRole('button',{name:'提交排查报告',exact:true}).click();
-  await page.waitForFunction(id=>JSON.parse(localStorage.getItem('engine-room-captain-workflow-v1')).events[id].tasks[0].status==='submitted',eventId,{timeout:180000});await checkpoint('formal feedback enriched into same report');
+  await waitForEvent(e=>e.tasks[0].status==='submitted',eventId);await checkpoint('formal feedback enriched into same report');
   await logout();await login('chief','qa-chief');await page.goto(base+'/#/situation/issue/'+eventId);await page.getByRole('button',{name:'填写决策',exact:true}).click();await page.getByRole('radio',{name:'效果观察',exact:true}).check();
   const due=new Date(Date.now()+90000).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16).replace(' ','T');await page.locator('dialog[open] input[type=datetime-local]').fill(due);await page.getByRole('button',{name:'确认转入效果观察',exact:true}).click();
-  await page.waitForFunction(id=>JSON.parse(localStorage.getItem('engine-room-captain-workflow-v1')).events[id].observationEventIds?.length,eventId);await logout();await checkpoint('observation scheduled then browser logged out');
+  await waitForEvent(e=>e.observationEventIds?.length,eventId);await logout();await checkpoint('observation scheduled then browser logged out');
   const observationId=snapshot().observationEventIds[0];receipt.observationId=observationId;
   await page.waitForTimeout(Math.max(0,Date.parse(due+':00+08:00')-Date.now()+1000));await service.tick();
   const observation=service.repository.get(observationId);assert.equal(observation.reports.filter(r=>r.kind==='观察报告').length,1);assert(observation.reports.at(-1).observationSnapshot.sensors.length>1);receipt.observedSensors=observation.reports.at(-1).observationSnapshot.sensors.length;await checkpoint('due report generated without browser login');

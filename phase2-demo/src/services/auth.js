@@ -1,14 +1,15 @@
 import {reactive} from 'vue'
+import {sessionHeaders,saveSession,clearSession} from './session.js'
 export const auth=reactive({ready:false,user:null,deletedIds:[],error:''})
 export async function accountRequest(path,body){
- const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'x-engine-room-client':'local-ui',...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})})
+ const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{...sessionHeaders(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})})
  const data=await response.json()
- if(!response.ok)throw Error(data.error||'请求失败')
+ if(!response.ok)throw Object.assign(Error(data.error||'请求失败'),{status:response.status})
  return data
 }
 export async function loadAccount(){try{const result=await accountRequest('auth/me');Object.assign(auth,result,{error:''})}catch(e){auth.user=null;auth.error=e.message}finally{auth.ready=true}}
-export async function login(username,password){await accountRequest('auth/login',{username,password});try{localStorage.setItem('engine-room-auth-change',String(Date.now()))}catch{}location.reload()}
-export async function logout(){const {useEventLifecycleStore}=await import('../stores/eventLifecycleStore');await useEventLifecycleStore().flush();await accountRequest('auth/logout',{});try{localStorage.setItem('engine-room-auth-change',String(Date.now()))}catch{}location.reload()}
+export async function login(username,password){const result=await accountRequest('auth/login',{username,password});saveSession(result.sessionToken);location.reload()}
+export async function logout(){const {useEventLifecycleStore}=await import('../stores/eventLifecycleStore');await useEventLifecycleStore().flush();await accountRequest('auth/logout',{});clearSession();location.reload()}
 export function pruneDeletedEvents(state){
  const removed=new Set(auth.deletedIds)
  let changed=true
@@ -19,4 +20,3 @@ export function pruneDeletedEvents(state){
  for(const event of Object.values(state.events||{}))for(const phase of event.phases||[])if(removed.has(phase.observationEventId))delete phase.observationEventId
  return [...removed]
 }
-if(typeof window!=='undefined')window.addEventListener('storage',event=>{if(event.key==='engine-room-auth-change')location.reload()})

@@ -1,5 +1,6 @@
+import {sessionHeaders} from './session.js'
 export async function aiRequest(path,body,method=body?'POST':'GET'){
- const response=await fetch('/api/ai/'+path,{method,headers:{'Content-Type':'application/json','X-Engine-Room-Client':'local-ui'},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(185000)})
+ const response=await fetch('/api/ai/'+path,{method,headers:{'Content-Type':'application/json',...sessionHeaders()},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(185000)})
  if(!response.headers.get('content-type')?.includes('application/json'))throw Error('当前站点未启用本地模型后台。')
  const result=await response.json()
  if(!response.ok)throw Error(result.error||'模型服务暂不可用。')
@@ -11,7 +12,7 @@ import {normalizeStepAssistResult} from '../workflow/stepAssistContract.js'
 
 export async function aiStreamRequest(body,onProgress,{signal}={}){
  const timeout=AbortSignal.timeout(185000)
- const response=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Engine-Room-Client':'local-ui'},body:JSON.stringify({...body,stream:true}),signal:signal?AbortSignal.any([signal,timeout]):timeout})
+ const response=await fetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json',...sessionHeaders()},body:JSON.stringify({...body,stream:true}),signal:signal?AbortSignal.any([signal,timeout]):timeout})
  if(response.headers.get('content-type')?.includes('application/json')){
   const result=await response.json();throw Error(result.error||'当前后台未启用流式输出。')
  }

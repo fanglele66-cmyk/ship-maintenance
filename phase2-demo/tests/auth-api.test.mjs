@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
 import {mkdtemp,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
-import {join} from 'node:path'
+import {join,dirname,resolve} from 'node:path'
 import {createAuthService} from '../server/auth-api.mjs'
 
-test('single account login, persisted admin deletion, role enforcement and logout revocation',async()=>{
+test('concurrent accounts, independent logout, persisted sessions and admin role enforcement',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'ship-auth-'))
  const passwords={chief:'chief-test',engineer1:'one-test',engineer2:'two-test',admin:'admin-test'}
  let auth=await createAuthService(directory,{directory,passwords}),cookie=''
@@ -20,11 +20,26 @@ test('single account login, persisted admin deletion, role enforcement and logou
   assert.equal((await call('data/health')).status,401)
   assert.equal((await call('auth/login',{username:'chief',password:'wrong'})).status,401)
   const attempts=await Promise.all([call('auth/login',{username:'chief',password:passwords.chief}),call('auth/login',{username:'engineer1',password:passwords.engineer1})])
-  assert.deepEqual(attempts.map(r=>r.status).sort(),[200,409]);cookie=attempts.find(r=>r.status===200).cookie
+  assert.deepEqual(attempts.map(r=>r.status),[200,200]);cookie=attempts[0].cookie
+  const engineerCookie=attempts[1].cookie
+  assert.equal((await call('auth/me',null,cookie)).data.user.username,'chief')
+  assert.equal((await call('auth/me',null,engineerCookie)).data.user.username,'engineer1')
   assert.equal((await call('events/delete',{ids:['manual-test']})).status,403)
   const old=cookie;await call('auth/logout',{});assert.equal((await call('data/health',null,old)).status,401)
+  assert.equal((await call('auth/me',null,engineerCookie)).data.user.username,'engineer1')
   for(const username of ['engineer1','engineer2']){const result=await call('auth/login',{username,password:passwords[username]});cookie=result.cookie;assert.equal(result.data.user.username,username);assert.equal((await call('events/delete',{ids:['manual-test']})).status,403);await call('auth/logout',{})}
   cookie=(await call('auth/login',{username:'admin',password:passwords.admin})).cookie
+  // New UI tabs ignore any cookie left by an old UI tab. Headers identify all APIs.
+  assert.equal((await call('auth/me',null,cookie,{'x-ship-session':'none'})).data.user,null)
+  const tab=await call('auth/login',{username:'engineer2',password:passwords.engineer2},cookie,{'x-ship-session':'none'})
+  assert.equal(tab.status,200);assert.equal(tab.cookie,undefined)
+  const header={'x-ship-session':tab.data.sessionToken}
+  assert.equal((await call('data/health',null,cookie,header)).data.user.username,'engineer2')
+  assert.equal((await call('events/delete',{ids:['manual-test']},cookie,header)).status,403)
+  assert.equal((await call('data/health',null,cookie,{'x-ship-session':'invalid'})).status,401)
+  await call('auth/logout',{},cookie,header)
+  assert.equal((await call('data/health',null,cookie,header)).status,401)
+  assert.equal((await call('auth/me',null,cookie)).data.user.username,'admin')
   assert.equal((await call('events/delete',{ids:['manual-test']},cookie,{origin:'https://untrusted.example'})).status,403)
   assert.equal((await call('events/delete',{ids:['../invalid']})).status,400)
   assert.deepEqual((await call('events/delete',{ids:['manual-test','observation-test']})).data.deletedIds,['manual-test','observation-test'])
@@ -33,5 +48,5 @@ test('single account login, persisted admin deletion, role enforcement and logou
   assert.deepEqual((await call('events/deleted')).data.deletedIds,['manual-test','observation-test'])
   await call('auth/logout',{})
   assert.equal((await call('events/delete',{ids:['manual-second']})).status,401)
- }finally{await new Promise(r=>server.close(r));auth.close();await rm(directory,{recursive:true,force:true})}
+ }finally{await new Promise(r=>server.close(r));auth.close();assert.equal(dirname(resolve(directory)),resolve(tmpdir()));await rm(directory,{recursive:true,force:true})}
 })
