@@ -112,7 +112,9 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
     const analyzed=await analyze({report,role:'captain',detection:{devices:[{events:[signal]}]},skillName:'ship-anomaly-detection'},{root,configuration,knowledge,fetcher,emit:()=>{}})
     const state={events:{},notices:[]},event=createManualAnomaly(state,report,analyzed,`${fingerprint}-${now}`,{at:new Date(now).toISOString()})
     event.id=`detected-${fingerprint}-${now}`;event.number=event.number.replace('-MR-','-AI-');event.brief.id=event.id
-    event.type=/iqr|trend|gradual/.test(signal.channel+' '+signal.event_type)?'异动跟踪':'预警事件';event.tracking=event.type==='异动跟踪'
+    // Hourly anomaly detection produces warnings. Long-history baseline tracking
+    // has its own explicitly invoked skill and is not scheduled here.
+    event.type='预警事件';event.tracking=false
     event.brief.discovery={kind:'periodic-detection',label:'周期异常检测',at:new Date(now).toISOString(),text:analyzed.anomaly.summary}
     event.sensorScope={deviceId:report.deviceId,systems:report.systems,sensorIds:ids};event.detectionReport={...report,kind:'periodic',submittedAt:new Date(now).toISOString(),generatedAt:new Date(clock()).toISOString(),fingerprint,latest:signal,checkedAt:new Date(now).toISOString(),analysis:analyzed.anomaly,evidence:report.evidence};delete event.manualReport;delete event.submitter
     event.skill='ship-anomaly-detection';await repository.save(event);eventIds.push(event.id)

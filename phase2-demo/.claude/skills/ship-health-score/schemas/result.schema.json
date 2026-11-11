@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ship-health-score.result.v1",
+  "title": "Ship health score result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source",
+    "method",
+    "latest",
+    "health",
+    "diagnostics",
+    "groups",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ship-health-score.result.v1"
+    },
+    "schema_path": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "required": ["mode", "windows", "time_start", "time_end", "baseline", "rpm_zone_counts"],
+      "properties": {
+        "mode": {"type": "string"},
+        "windows": {"type": "integer", "minimum": 1},
+        "time_start": {"type": "string"},
+        "time_end": {"type": "string"},
+        "baseline_sensor_count": {"type": "integer", "minimum": 0},
+        "baseline": {"type": "object"},
+        "rpm_zone_counts": {"type": "object"},
+        "rpm_zone_note": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "method": {
+      "type": "object",
+      "required": ["baseline", "standardized_residual", "ewma", "cusum_health", "rolling_baseline"],
+      "properties": {
+        "baseline": {"type": "string"},
+        "standardized_residual": {"type": "string"},
+        "ewma": {"type": "string"},
+        "cusum_health": {"type": "string"},
+        "rolling_baseline": {"type": "string"},
+        "scoring_standard": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {"type": "string"},
+          {"type": "object"}
+        ]
+      }
+    },
+    "latest": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "engine_health_score",
+        "state",
+        "state_cn",
+        "top_sensor_risks",
+        "top_local_group_risks",
+        "top_system_risks",
+        "top_cylinder_risks"
+      ],
+      "properties": {
+        "timestamp": {"type": "string"},
+        "engine_health_score": {"type": "number"},
+        "state": {"type": "string"},
+        "state_cn": {"type": "string"},
+        "top_sensor_risks": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}},
+        "top_local_group_risks": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}},
+        "top_system_risks": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}},
+        "top_cylinder_risks": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}}
+      },
+      "additionalProperties": true
+    },
+    "health": {
+      "type": "object",
+      "required": ["whole_engine", "systems", "local_groups", "cylinders", "sensors"],
+      "properties": {
+        "whole_engine": {"$ref": "#/$defs/ranked_health_item"},
+        "systems": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}},
+        "local_groups": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}},
+        "cylinders": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}},
+        "sensors": {"type": "array", "items": {"$ref": "#/$defs/ranked_health_item"}}
+      },
+      "additionalProperties": true
+    },
+    "four_levels": {
+      "type": "object"
+    },
+    "examples": {
+      "type": "object"
+    },
+    "diagnostics": {
+      "type": "object"
+    },
+    "groups": {
+      "type": "object",
+      "required": ["systems", "local_groups", "cylinders"],
+      "properties": {
+        "systems": {"type": "object"},
+        "local_groups": {"type": "object"},
+        "cylinders": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["timeseries_csv", "point_metrics_csv", "baseline_fixed_json", "plot_png", "detail_plot_png", "result_json"],
+      "additionalProperties": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "ranked_health_item": {
+      "type": "object",
+      "required": ["id", "name_cn", "risk", "health_score", "state", "state_cn"],
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "name_cn": {"type": "string"},
+        "risk": {"type": "number"},
+        "health_score": {"type": "number"},
+        "state": {"type": "string"},
+        "state_cn": {"type": "string"},
+        "metrics": {"type": "object"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -15,3 +15,6 @@ phase2-demo/.local-data/
 phase2-demo/.local-ai/
 __pycache__/
 *.pyc
+
+# Manual-only health tracking artifacts; retain source baseline and schemas.
+phase2-demo/.claude/skills/ship-health-score/output*/

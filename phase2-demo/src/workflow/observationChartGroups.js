@@ -15,7 +15,11 @@ export function observationChartGroups(points,readings=[]){
 export function observationChartOption(group,start,end){
  const units=[...new Set(group.channels.map(c=>c.unit||''))]
  const from=Date.parse(start),to=Date.parse(end)
- const time=value=>new Date(value).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false,hour:'2-digit',minute:'2-digit'})
+ const time=value=>{
+  if(to-from<86400000)return new Date(value).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false,hour:'2-digit',minute:'2-digit'})
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hourCycle:'h23',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date(value)).map(p=>[p.type,p.value]))
+  return `${parts.month}-${parts.day}\n${parts.hour}:${parts.minute}`
+ }
  return {animation:false,color:['#387db2','#d78b35','#369c8b','#986eb0','#ce677b','#84933d'],
   legend:{type:'scroll',top:4,left:12,right:12,textStyle:{color:'#60778a',fontSize:12}},
   tooltip:{trigger:'axis',confine:true,renderMode:'richText',formatter:items=>{

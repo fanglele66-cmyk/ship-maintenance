@@ -19,6 +19,10 @@ test('chart preserves zeros, reverse rotation, missing samples and the actual ob
  const option=observationChartOption(observationChartGroups([],[r])[0],start,end)
  assert.deepEqual(option.series[0].data,[[at,0],[at+12000,-42],[at+24000,null]])
  assert.equal(option.series[0].connectNulls,false);assert.equal(option.xAxis.min,at);assert.equal(option.xAxis.max,Date.parse(end))
+ assert.equal(option.xAxis.axisLabel.formatter(at),'11:00')
+ const long=observationChartOption(observationChartGroups([],[r])[0],start,'2026-11-25T04:00:00Z')
+ assert.equal(long.xAxis.axisLabel.formatter(Date.parse('2026-05-01T00:00:00+08:00')),'05-01\n00:00')
+ assert.notEqual(long.xAxis.axisLabel.formatter(at),long.xAxis.axisLabel.formatter(at+86400000))
 })
 test('uncompleted observations show the selected scope without manufacturing readings',()=>{
  const groups=observationChartGroups([{id:'temperature',pointCode:'DC0022',nameCn:'1缸扫气温度',unit:'°C'}])

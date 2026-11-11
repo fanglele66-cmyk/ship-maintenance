@@ -1,0 +1,41 @@
+{
+  "sourceRoot": "D:\\zstech\\ship_sop\\ship-health-score",
+  "copiedAt": "2026-11-11",
+  "files": [
+    {
+      "source": "health_score.py",
+      "target": "health_score.py",
+      "sha256": "7fa59cd2f3f92818caed7f0e9fc31238c0438038b5a6a0d8f5dd197f654222f8"
+    },
+    {
+      "source": "baselines/health_baseline_median_mad.json",
+      "target": "baselines/health_baseline_median_mad.json",
+      "sha256": "59b2d4fffaa4c73ecaba00b8377df0191470c569e0b31010909d92a6c82866fd"
+    },
+    {
+      "source": "schemas/result.schema.json",
+      "target": "schemas/result.schema.json",
+      "sha256": "968561a2ca12b049d160b0e21b44a4428d5038165a0c0c67ec180774d33e8bb9"
+    },
+    {
+      "source": "README.md",
+      "target": "references/original-method.md",
+      "sha256": "3ee0470e1a6b726d1171097e01919d580da108224dd95fb4e6c0ec1375754d72"
+    },
+    {
+      "source": "skills/ship-health-score-analysis/SKILL.md",
+      "target": "references/original-skill.md",
+      "sha256": "34ded1b219a60516aea8edbd8305eebce55b74817669a12fb6507d8e22bcf654"
+    },
+    {
+      "source": "skills/ship-health-score-analysis/references/result-contract.md",
+      "target": "references/original-result-contract.md",
+      "sha256": "90ec5ccb92be7be8b5538ece25e64a3772be0e393d32c803db5297cabbe75b5b"
+    }
+  ],
+  "excluded": [
+    "output*",
+    "__pycache__",
+    "experimental environment-correction runners"
+  ]
+}

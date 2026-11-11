@@ -19,6 +19,6 @@ export const docTypeColors = {
 
 
 export const knowledgeDocs=documents
-export const DEVICE_TYPES=[{key:'主机',count:documents.length,iconKey:'main-engine'},{key:'辅机',count:0,iconKey:'aux-engine'},{key:'锅炉',count:0,iconKey:'boiler'},{key:'舵机',count:0,iconKey:'steering-gear'},{key:'分油机',count:0,iconKey:'oil-separator'}]
+export const DEVICE_TYPES=[{key:'主机',count:documents.length,iconKey:'main-engine'}]
 export const DOC_TYPE_STATS=Object.fromEntries(['全部类型',...Object.values(DOC_TYPES)].map(type=>[type,type==='全部类型'?documents.length:documents.filter(d=>d.docType===type).length]))
 export const getDocCount=(device,docType)=>documents.filter(d=>(device==='全部'||d.device===device)&&(['全部','全部类型'].includes(docType)||d.docType===docType)).length

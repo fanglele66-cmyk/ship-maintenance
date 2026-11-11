@@ -1,6 +1,6 @@
 <template>
  <section class="manual-evidence" aria-label="上报测点资料">
-  <h3>{{report.kind==='periodic'?'检测关联测点':'上报测点'}}</h3><p>{{report.systems.join('、')}} · {{timeText(report.start)}} — {{timeText(report.end)}}</p>
+  <h3>{{report.kind==='health-tracking'?'跟踪关联测点':report.kind==='periodic'?'检测关联测点':'上报测点'}}</h3><p>{{report.systems.join('、')}} · {{timeText(report.start)}} — {{timeText(report.end)}}</p>
   <div class="evidence-scroll"><table><thead><tr><th>传感器</th><th>样本数</th><th>窗口内记录范围</th></tr></thead><tbody><tr v-for="sensor in report.sensors" :key="sensor.id"><td>{{sensor.name}}</td><td>{{evidence(sensor.id)?.sampleCount??values(sensor.id).length}}</td><td>{{range(sensor)}}</td></tr></tbody></table></div>
   <div v-if="detailed" class="evidence-trends">
    <h3>测点趋势</h3>

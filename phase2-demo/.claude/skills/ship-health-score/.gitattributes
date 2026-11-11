@@ -1,0 +1,4 @@
+# Keep fixed-baseline fingerprints and copied source receipts stable across OSes.
+baselines/*.json -text whitespace=cr-at-eol
+schemas/*.json -text whitespace=cr-at-eol
+references/original-*.md -text whitespace=cr-at-eol

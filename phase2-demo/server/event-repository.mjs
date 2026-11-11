@@ -7,7 +7,7 @@ const copy=value=>JSON.parse(JSON.stringify(value))
 export const canSeeEvent=(event,user)=>user?.workflowRole==='captain'||event.participants?.includes(people[user?.workflowRole])
 export function validateEventUpdate(old,event,user){
  if(!old||!canSeeEvent(old,user))throw Error('没有该事件的访问权限。')
- for(const key of ['id','number','createdAt','manualReport','detectionReport','sensorScope','responsible','parentEventId','sourceEventId'])if(!same(old[key],event[key]))throw Error('不能修改事件身份与原始证据。')
+ for(const key of ['id','number','createdAt','manualReport','detectionReport','trackingReport','sensorScope','responsible','parentEventId','sourceEventId'])if(!same(old[key],event[key]))throw Error('不能修改事件身份与原始证据。')
  if(user.workflowRole==='captain')return
  const role=user.workflowRole,owner=people[role]
  const priorCurrent=old.tasks.find(t=>t.id===old.currentTask),current=event.tasks.find(t=>t.id===old.currentTask)

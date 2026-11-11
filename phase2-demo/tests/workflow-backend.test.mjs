@@ -135,11 +135,11 @@ test('observation failure retries after five minutes; cancellation during genera
 
 test('periodic confirmed signals deduplicate, retain six runs and respect administrator deletion',async t=>{
  const mapping=JSON.parse(await readFile('data/sensor-point-mapping.json','utf8')).pointList
- const point=mapping.find(p=>p.pointCode==='DC0008'),signal={confirmed:true,equipment_id:'CHBY-001',channel:'statistical',event_type:'压力波动',sensors:['燃油进机压力'],time_end:'2026-11-10 10:00:00',details:{sourcePoints:[{pointDataId:point.pointDataId}]}}
+ const point=mapping.find(p=>p.pointCode==='DC0008'),signal={confirmed:true,equipment_id:'CHBY-001',channel:'trend',event_type:'趋势偏离',sensors:['1缸排气温度'],time_end:'2026-11-10 10:00:00',details:{sourcePoints:[{pointDataId:point.pointDataId}]}}
  const f=await fixture(t,{detect:async()=>({rows:1800,devices:[{events:[signal]}]})})
  for(let i=0;i<8;i++){await f.service.tick();f.advance(3600000)}
  assert.equal(f.service.repository.list().length,1);assert.equal((await readdir(join(f.directory,'detection-history'))).length,6)
- const event=f.service.repository.list()[0];assert.equal(event.responsible,people.captain);assert.equal(event.manualReport,undefined)
+ const event=f.service.repository.list()[0];assert.equal(event.responsible,people.captain);assert.equal(event.manualReport,undefined);assert.equal(event.type,'预警事件');assert.equal(event.tracking,false)
  const accounts=new DatabaseSync(join(f.directory,'accounts.sqlite'));accounts.exec('CREATE TABLE deleted_events(id TEXT PRIMARY KEY)');accounts.prepare('INSERT INTO deleted_events VALUES(?)').run(event.id);accounts.close()
  await f.service.tick();assert.equal(f.service.visible(chief).length,0);assert.equal(f.service.repository.list().length,1)
 })
