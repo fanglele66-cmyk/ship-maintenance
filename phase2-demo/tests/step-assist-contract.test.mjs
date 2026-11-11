@@ -71,8 +71,9 @@ test('image and text limits enforce MIME, data URLs, signatures and combined his
  assert.throws(()=>buildStepAssistRequest({...o,history,attachments:[{name:'c',text:'c'},{name:'d',text:'d'}]}),/3 份/)
 })
 
-test('structured replies are only questions or note drafts, never result selection or automatic operations',()=>{
+test('structured replies support answers, questions or note drafts, never automatic operations',()=>{
+ assert.deepEqual(normalizeStepAssistResult({kind:'answer',text:'当前任务列出的备件是适配本机的 ICU 总成和密封件。'}),{kind:'answer',text:'当前任务列出的备件是适配本机的 ICU 总成和密封件。'})
  assert.deepEqual(normalizeStepAssistResult({kind:'question',text:'具体检查了哪个接口？'}),{kind:'question',text:'具体检查了哪个接口？'})
  assert.deepEqual(normalizeStepAssistResult({kind:'draft',text:'请核对草稿。',note:'接口未见松动，动作尚未检查。'}),{kind:'draft',text:'请核对草稿。',note:'接口未见松动，动作尚未检查。'})
- for(const value of [{kind:'draft',text:'完成',note:'测试',result:'未见异常'},{kind:'question',text:'测试',submit:true},{kind:'draft',text:'测试',note:''},{kind:'complete',text:'测试'}])assert.throws(()=>normalizeStepAssistResult(value))
+ for(const value of [{kind:'draft',text:'完成',note:'测试',result:'未见异常'},{kind:'question',text:'测试',submit:true},{kind:'answer',text:'测试',note:'咨询不能附草稿'},{kind:'draft',text:'测试',note:''},{kind:'complete',text:'测试'}])assert.throws(()=>normalizeStepAssistResult(value))
 })

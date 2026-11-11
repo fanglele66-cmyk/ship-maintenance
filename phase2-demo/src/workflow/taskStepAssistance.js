@@ -48,7 +48,7 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
   if(!canUseStepAssist(state.events[eventId],latest,role)||signature(latest.steps[stepIndex])!==baseStep)throw Error('任务范围或状态已变化，请回到当前步骤重新协助。')
   Object.assign(message,{response,status:'complete',source:result.source||'model',model:result.model,usage:result.usage,sources:result.sources||[],at:now()})
   message.progressLog||=[]
-  message.progressLog.push({stage:'complete',label:response.kind==='question'?'已整理待确认的问题':'备注草稿已生成，待您核对'})
+  message.progressLog.push({stage:'complete',label:response.kind==='answer'?'已回答您的问题':response.kind==='question'?'已整理待确认的问题':'备注草稿已生成，待您核对'})
   for(const old of latest.conversations[role])if(old.id!==replyId&&old.kind==='step-assist'&&old.stepIndex===stepIndex&&old.response?.kind==='draft'&&!old.appliedAt)old.supersededAt=message.at
   return message
  }catch(error){const message=locate();if(message)Object.assign(message,{status:'interrupted',modelError:error.message});throw error}

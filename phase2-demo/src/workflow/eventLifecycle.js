@@ -18,6 +18,7 @@ import {shoreReportSnapshot} from './shoreReports.js'
 import {applyInitialTimeline,shiftTimelineContent} from './demoTimeline.js'
 import {taskRecommendation,eventSubject} from './contentRecommendations.js'
 import {initialBriefText} from './initialBriefText.js'
+import {eventTitle} from './eventTitle.js'
 export {hasAbnormalFindings,taskName} from './lifecycleDecisions.js'
 
 import {people,capabilities,actor,ownsTask,executors} from './lifecyclePermissions.js'
@@ -37,7 +38,7 @@ export function checkSteps(id){
 }
 export function newEvent(item,{createdAt=new Date().toISOString()}={}){
  const brief=eventBriefingFor(item.id)
- return {id:item.id,title:item.title,type:item.id==='real-warning-0523'?'预警事件':item.type,device:item.device,createdAt,tracking:item.type==='异动跟踪',brief:copy(brief),status:'待决策',phase:'reminder',currentTask:null,participants:[],tasks:[],reports:[],decisions:[],shore:[],maintenance:null,
+ return {id:item.id,title:eventTitle(item.title,item.type),type:item.id==='real-warning-0523'?'预警事件':item.type,device:item.device,createdAt,tracking:item.type==='异动跟踪',brief:copy(brief),status:'待决策',phase:'reminder',currentTask:null,participants:[],tasks:[],reports:[],decisions:[],shore:[],maintenance:null,
   number:eventNumbers[item.id],phases:[{id:'reminder',kind:'reminder',label:'初始信息',at:brief?.discovery.at}],conversations:{captain:[],engineer:[]},unread:{captain:true,engineer:false}}
 }
 function say(event,role,kind,text,extra={}){const message={id:uid('message'),kind,text,at:new Date().toISOString(),...extra};(event.conversations[role]||=[]).push(message);return message}
@@ -119,6 +120,7 @@ export function makeReport(event,task,reportId){
 }
 export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
+  event.title=eventTitle(event.title,event.type)
   // Retire only unissued authorizations from the previous prototype; preserve history and actual tasks.
   if(event.dispatchAuthorization?.status==='pending'){
    const authorization=event.dispatchAuthorization

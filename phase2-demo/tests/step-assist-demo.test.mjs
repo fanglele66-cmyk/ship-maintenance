@@ -87,7 +87,7 @@ test('supplying missing prerequisites after an answer completes the draft withou
   assert.deepEqual(matchStepAssistDemo({context}),answer.response,startId)
   const result=start.kind==='investigation'?'未见异常':'未完成'
   assert.equal(matchStepAssistDemo({context:{...context,record:{result,note:''}}}).kind,'question','a completed fact set cannot override conflicting human result')
-  assert.equal(matchStepAssistDemo({context:{...context,history:[...context.history,user('更正，实际执行情况还有变化。',start.stepIndex)]}}).kind,'question')
+  assert.equal(matchStepAssistDemo({context:{...context,history:[...context.history,user('更正，实际执行情况还有变化。',start.stepIndex)]}}),null)
  }
 })
 
@@ -107,14 +107,13 @@ test('known optional exchanges, repeated inputs and short acknowledgments do not
  assert.deepEqual(matchStepAssistDemo({context}),clarification.response,'repeating the earlier complete input retains the later unperformed-trial clarification')
 })
 
-test('later non-script corrections stay protected and trigger a short check instead of an old draft',()=>{
+test('mixed free-form conversations return to the model instead of reusing a scripted draft',()=>{
  for(const item of cases){
   const context=contextFor(item)
   for(const correction of ['更正：实际尚未检查。','旧件后来已经送出了。','谢谢，另外发现接口损伤。']){
    const history=[...context.history,user(correction,item.stepIndex),user(item.input,item.stepIndex)]
    const reply=matchStepAssistDemo({context:{...context,history}})
-   assert.equal(reply.kind,'question',item.id);assert.equal(reply.note,undefined)
-   assert.match(reply.text,/新的补充/);assert.equal(recognition(context),true)
+   assert.equal(reply,null,item.id);assert.equal(recognition(context),true)
   }
  }
 })

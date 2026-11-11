@@ -130,7 +130,7 @@ export function matchStepAssistDemo({context,images=[]}={}){
   const previous=scopedRule({...context,text:message.text})
   // Never overwrite an intervening correction with an old fixed draft. A fresh
   // free-form clarification can be handled by the model with the full history.
-  if(!previous)return question('前面还有新的补充，和这段记录是否一致？请确认本步实际情况。')
+  if(!previous)return null
   prior.add(previous.prompt)
  }
  // Complete facts can arrive in either order. Preserve later optional

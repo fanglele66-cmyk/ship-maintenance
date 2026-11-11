@@ -1,4 +1,5 @@
 import {localSensors} from './localSensorData.js'
+import {eventTitle} from './eventTitle.js'
 import {mockSensors} from '../mock/sensors.js'
 import {mockDevices} from '../mock/devices.js'
 import {buildSimulationSensors} from '../mock/sensorSimulation.js'
@@ -36,7 +37,7 @@ export function validateAnomalyReport(form,role,now=Date.now()){
 }
 export function normalizeAnomalyAnalysis(value){
  const text=(key,max)=>{if(typeof value?.[key]!=='string'||!value[key].trim()||value[key].length>max)throw Error('AI 分析结果不完整，请重试。');return value[key].trim()}
- const result={title:text('title',80),summary:text('summary',200),interpretation:text('interpretation',1200),unverified:text('unverified',800),recommendation:text('recommendation',300)}
+ const result={title:eventTitle(text('title',80)),summary:text('summary',200),interpretation:text('interpretation',1200),unverified:text('unverified',800),recommendation:text('recommendation',300)}
  result.steps=normalizeTaskPlan({scope:result.recommendation,rationale:result.interpretation,steps:value.steps},'investigate').steps
  return result
 }

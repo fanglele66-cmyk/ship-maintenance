@@ -24,6 +24,17 @@ const ask=(f,request=async()=>question,text='本步骤现场检查尚未完成�
 const apply=(f,message)=>applyTaskStepNote(f.state,f.event.id,f.task.id,message.id,f.pending)
 const records=f=>JSON.stringify({records:f.task.draft.records,submittedRecords:f.task.records,status:f.task.status,summary:f.task.summary,phase:f.event.phase,currentTask:f.event.currentTask,reports:f.event.reports,decisions:f.event.decisions})
 
+test('free-form answers remain conversation messages without note adoption or changing records',async()=>{
+ const f=fixture('repair'),before=records(f)
+ for(const text of ['需要哪些备件？','主机已经停机了，我想先知道需要哪些备件。','密封件该怎么核对？']){
+  const message=await ask(f,async()=>response({kind:'answer',text:'先根据批准的 ICU 处理范围核对备用总成和密封件的型号、接口。'}),text)
+  assert.equal(message.response.kind,'answer');assert.equal(message.response.note,undefined)
+  assert.equal(message.progressLog.at(-1).label,'已回答您的问题')
+  assert.throws(()=>apply(f,message),/可采用/)
+ }
+ assert.equal(records(f),before)
+})
+
 test('only the current owned C2 investigation or repair task can start step collaboration',async()=>{
  for(const kind of ['investigation','repair']){
   const f=fixture(kind),message=await ask(f)

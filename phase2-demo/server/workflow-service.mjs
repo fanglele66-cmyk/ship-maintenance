@@ -85,7 +85,6 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
   if(input.mode==='step-assist'){
    const requested=input.task?.id||input.taskId,task=event.tasks.find(t=>t.id===requested)
    if(!task||task.status!=='assigned'||event.currentTask!==task.id||task.owner!==people[user.workflowRole])throw Error('只能协助本人当前正在执行的任务。')
-   input.clarificationRounds=(task.conversations?.[user.workflowRole]||[]).filter(m=>m.kind==='step-assist'&&m.stepIndex===input.stepIndex&&m.response?.kind==='question'&&m.status==='complete').length
    input.event={...event,tasks:[task]};input.task=task
   }
  }

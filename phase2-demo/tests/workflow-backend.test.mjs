@@ -92,13 +92,13 @@ test('manual task dispatch, engineer feedback and due observation persist; obser
  for(const linked of Object.values(state.events)){const current=service.repository.get(linked.id);await service.save(linked,current.serverRevision,chief)}
  assert.equal(service.repository.get(child.id).phase,'closed');assert.equal(service.repository.get(event.id).phase,'closed')
 })
-test('two clarification rounds force an adoptable draft without fabricating completed actions',async t=>{
+test('clarification count never turns an unanswered question into an adoptable draft',async t=>{
  const {service}=await fixture(t),result=await service.manual({requestId:'report-clarify-1',report:form()},{user:chief}),event=result.event,state={role:'captain',events:{[event.id]:event},notices:[]}
  ensureTaskPlan(event);decide(state,event.id,{action:'investigate',owner:people.engineer,deadline:new Date(Date.now()+86400000).toISOString()})
  const input=buildStepAssistRequest({event,task:currentTask(event),stepIndex:0,role:'engineer',text:'只有这个现场记录，其他读数还没取得。'});input.clarificationRounds=2
  const config={source:'manual',enabled:true,apiKey:'test',model:'test',baseUrl:'https://example.test/v1',protocol:'openai',maxTokens:4096,timeoutMs:5000,knowledgeEnabled:false}
  const reply=await assistTaskStep(input,{root:process.cwd(),configuration:{read:async()=>config},knowledge:{search:async()=>[]},fetcher:async()=>new Response('data: '+JSON.stringify({choices:[{delta:{content:JSON.stringify({kind:'question',text:'再补充一个读数？'})},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}})})
- assert.equal(reply.stepAssist.kind,'draft');assert.match(reply.stepAssist.note,/其他读数还没取得/);assert.ok(!reply.stepAssist.note.includes('已完成检查'))
+ assert.equal(reply.stepAssist.kind,'question');assert.equal(reply.stepAssist.note,undefined);assert.equal(reply.stepAssist.text,'再补充一个读数？')
 })
 test('backend sync saves before reload and detects stale versions without silently overwriting',async()=>{
  const event={id:'manual-sync-test',backendManaged:true,serverRevision:1,tasks:[],title:'original'},state={events:{}},stored=copy(event);let saves=0

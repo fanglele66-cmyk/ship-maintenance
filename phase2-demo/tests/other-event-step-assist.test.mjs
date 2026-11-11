@@ -76,7 +76,7 @@ test('new scripts are exact, short, event-scoped, support jumping steps and prot
   assert.equal(matchStepAssistDemo({context:{...context,message:{text:c.input+'另有新发现。'},history}}),null)
   if(c.requires.length)assert.equal(matchStepAssistDemo({context}).kind,'question')
   else assert.deepEqual(matchStepAssistDemo({context}),c.response,'each new step starts without previous step dialogue')
-  assert.equal(matchStepAssistDemo({context:{...context,history:[...history,{role:'user',stepIndex:c.stepIndex,text:'更正，这步的处理和刚才说的不一样。'}]}}).kind,'question')
+  assert.equal(matchStepAssistDemo({context:{...context,history:[...history,{role:'user',stepIndex:c.stepIndex,text:'更正，这步的处理和刚才说的不一样。'}]}}),null)
   assert.equal(matchStepAssistDemo({context:{...context,history,record:{result:'与脚本冲突'}}}).kind,'question')
   assert.ok(c.response.text.length<80)
   assert.doesNotMatch(c.input,/演示|练习|虚构|请只整理|我还没把/)

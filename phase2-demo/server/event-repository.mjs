@@ -2,6 +2,7 @@ import {DatabaseSync} from 'node:sqlite'
 import {mkdir,writeFile,rename} from 'node:fs/promises'
 import {join,resolve} from 'node:path'
 import {people} from '../src/workflow/lifecyclePermissions.js'
+import {eventTitle} from '../src/workflow/eventTitle.js'
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
 const copy=value=>JSON.parse(JSON.stringify(value))
 export const canSeeEvent=(event,user)=>user?.workflowRole==='captain'||event.participants?.includes(people[user?.workflowRole])
@@ -54,10 +55,13 @@ export async function createEventRepository(directory){
    folder(event.id);const old=get(event.id)
    if(expected!==undefined&&old?.serverRevision!==expected){const e=Error('事件已更新，请刷新后重试。');e.status=409;throw e}
    if(user)validateEventUpdate(old,event,user)
-   const revision=(old?.serverRevision||0)+1,value=copy({...event,backendManaged:true});delete value.serverRevision
+   const revision=(old?.serverRevision||0)+1,value=copy({...event,title:eventTitle(event.title,event.type),backendManaged:true});delete value.serverRevision
    db.prepare('INSERT INTO events VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,json=excluded.json,updated=excluded.updated').run(value.id,revision,JSON.stringify(value),Date.now())
    const result={...value,serverRevision:revision};await exportEvent(result);return result
   });pending.set(event.id,operation);return operation.finally(()=>{if(pending.get(event.id)===operation)pending.delete(event.id)})
  }
+ // One-time title-only upgrade for existing events. Keep evidence, notes and
+ // conversations intact, and export the same revision to the event folder.
+ for(const event of list())if(eventTitle(event.title,event.type)!==event.title)await save({...event,title:eventTitle(event.title,event.type)},{expected:event.serverRevision})
  return {db,get,list,save,folder,async close(){await Promise.allSettled([...pending.values()]);db.close()}}
 }

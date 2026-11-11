@@ -64,7 +64,7 @@ test('step-assist sends actual image parts to OpenAI and Anthropic and returns o
  assert.doesNotMatch(stepAssistInstruction,/备注开头原样保留该标签/)
  assert.match(stepAssistInstruction,/每个.*完成态陈述，都必须能够直接对应 record 或 role=user 的原话/)
  assert.match(stepAssistInstruction,/历史 role=assistant 草稿不构成独立事实来源/)
- assert.match(stepAssistInstruction,/通常80—180字/)
+ assert.match(stepAssistInstruction,/不设最低字数/)
  assert.match(stepAssistInstruction,/scope=other-step.*不能当作当前步骤已执行证据/)
  assert.throws(()=>stepAssistUserContent('unknown',{},[png]),/协议不支持图片/)
  assert.throws(()=>assertStepAssistVisionProvider({protocol:'anthropic',model:'deepseek-v4-pro',baseUrl:'https://api.deepseek.com/anthropic'},[png]),/不处理图片/)
@@ -107,6 +107,26 @@ test('cancelling scripted processing cannot return a late reply or call the mode
  }),{name:'AbortError'})
  assert.equal(events.length,1)
  assert.equal(events[0].data.stage,'context')
+})
+
+test('free-form questions remain answers or clarifications after any number of turns',async()=>{
+ const input=fixture();input.images=[];input.attachments=[];input.event.tasks[0].draft.records[0].note='';input.clarificationRounds=99
+ input.history=Array.from({length:6},(_,i)=>({eventId:input.event.id,taskId:input.taskId,stepIndex:0,role:i%2?'assistant':'user',text:i%2?'这是相关说明。':'我想先了解一下。'}))
+ for(const value of [{kind:'answer',text:'本步先按已批准范围核对适配 ICU 备用总成及密封件；具体型号以作业卡为准。'},{kind:'question',text:'独立表计与系统示值分别是多少？'}]){
+  input.text='停机已经停机了，我需要先知道需要哪些备件才能领用啊'
+  const result=await assistTaskStep(input,{configuration:{read:async()=>config},knowledge:{search:async()=>[]},fetcher:async(_url,options)=>{
+   const content=JSON.parse(JSON.parse(options.body).messages.at(-1).content)
+   assert.equal(content.clarificationRounds,undefined);assert.doesNotMatch(content._context,/clarificationRounds/)
+   return modelResponse(value)
+  }})
+  assert.deepEqual(result.stepAssist,value);assert.equal(result.stepAssist.note,undefined)
+ }
+ assert.match(stepAssistInstruction,/对话轮数不是生成草稿的条件/)
+ assert.match(stepAssistInstruction,/kind=answer/)
+ assert.match(stepAssistInstruction,/用户明确说/)
+ const plain='本步已列出适配 ICU 备用总成和密封件；型号请对照作业卡确认。'
+ const result=await assistTaskStep(input,{configuration:{read:async()=>config},knowledge:{search:async()=>[]},fetcher:async()=>modelResponse(plain)})
+ assert.deepEqual(result.stepAssist,{kind:'answer',text:plain})
 })
 
 test('real fallback sees the whole current task conversation with step scope but no cross-task data',async()=>{

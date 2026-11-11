@@ -90,9 +90,9 @@ export function buildStepAssistRequest({event,task,stepIndex,role,text='',histor
 }
 
 export function normalizeStepAssistResult(value){
- if(!object(value)||!['question','draft'].includes(value.kind))throw Error('步骤协作返回格式不完整，请重试。')
+ if(!object(value)||!['answer','question','draft'].includes(value.kind))throw Error('步骤协作返回格式不完整，请重试。')
  const allowed=value.kind==='draft'?['kind','text','note']:['kind','text']
  if(Object.keys(value).some(key=>!allowed.includes(key)))throw Error('步骤协作返回了未允许的操作，未改动执行记录。')
- const text=bounded(value.text,value.kind==='question'?600:500,'步骤协作回复')
- return value.kind==='question'?{kind:'question',text}:{kind:'draft',text,note:bounded(value.note,4000,'备注草稿')}
+ const text=bounded(value.text,value.kind==='answer'?2000:value.kind==='question'?600:500,'步骤协作回复')
+ return value.kind!=='draft'?{kind:value.kind,text}:{kind:'draft',text,note:bounded(value.note,4000,'备注草稿')}
 }
