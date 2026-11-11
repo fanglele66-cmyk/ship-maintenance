@@ -53,9 +53,9 @@ async function moveReportTab(event){
 }
 function openReport(id){selectedReportId.value=id;tab.value='提交记录'}
 const canSupplement=computed(()=>report.value&&supplementaryReports(event.value,store.state.role).some(r=>r.id===report.value.id))
-watch(()=>[task.value?.id,store.state.role],()=>{assistantOpen.value=true;tab.value='任务步骤';selectedReportId.value=null;if(event.value&&allowed.value&&route.name==='LifecycleTask')store.acknowledge(event.value.id)},{immediate:true})
+watch([()=>task.value?.id,()=>store.state.role],()=>{assistantOpen.value=true;tab.value='任务步骤';selectedReportId.value=null;if(event.value&&allowed.value&&route.name==='LifecycleTask')store.acknowledge(event.value.id)},{immediate:true})
 async function showSubmission(){assistantOpen.value=true;await nextTick();assistant.value?.revealReport()}
-watch(()=>[task.value?.status,task.value?.reportGeneration?.requestId],()=>{if(['reporting','report-error'].includes(task.value?.status))void showSubmission()},{immediate:true})
+watch([()=>task.value?.status,()=>task.value?.reportGeneration?.requestId],()=>{if(['reporting','report-error'].includes(task.value?.status))void showSubmission()},{immediate:true})
 function submitted(){assistantOpen.value=true;openReport(latestReport.value?.id)}
 function back(){router.push({path:'/event',query:route.query.returnView&&route.query.returnView!=='pending'?{view:route.query.returnView}:{}})}
 </script>

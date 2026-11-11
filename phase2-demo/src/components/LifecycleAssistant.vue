@@ -161,12 +161,14 @@ async function ask(text){
 function restoreSentDraft(sent,current){return {text:[sent.text,current.text].filter(Boolean).join('\n'),images:[...sent.images,...(current.images||[])].filter((photo,i,list)=>list.findIndex(item=>item.dataUrl===photo.dataUrl)===i),attachments:[...sent.attachments,...(current.attachments||[])].filter((file,i,list)=>list.findIndex(item=>item.name===file.name&&item.text===file.text)===i),editingMessageId:current.editingMessageId||sent.editingMessageId}}
 function askFollowup(text){if(mode.value==='step'&&hasMessage.value){input.value=[input.value,text].filter(Boolean).join('\n');void focusComposer();return}if(mode.value!=='step')setMode('chat');return ask(text)}
 function apply(messageId){submitError.value='';try{const report=store.applySupplement(props.event.id,messageId,props.taskId);emit('report',report.id)}catch(e){submitError.value=e.message}}
-watch(()=>[props.taskId,task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
+watch([()=>props.taskId,()=>task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
 watch(()=>messages.value.length,(count,previous)=>{if(count>previous){following.value=true;nextTick(follow)}})
 watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.response?.text,m?.response?.note,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.progressLog?.length,m?.progressLog?.at(-1)?.label,m?.status]},()=>nextTick(follow))
 watch(()=>props.activeStepIndex,index=>{if(stepAvailable.value&&stepIndex.value!==index){voice.cancel();assistStep(index,false)}})
 watch(stepAvailable,available=>{if(available)assistStep(props.activeStepIndex,false);else if(mode.value==='step'){voice.cancel();setMode('chat')}},{immediate:true})
-watch(()=>[props.event.id,props.taskId,store.state.role,closed.value],()=>{contextVersion++;voice.cancel();following.value=false;loadDraft();stepDrafts.clear();nonStepDraft='';fileNotice.value='';mode.value='chat';submitError.value='';dismissedOpening.value=false;imageDialog.value?.close();if(stepAvailable.value)assistStep(props.activeStepIndex,false);nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
+// Server snapshots replace the event object without changing the conversation.
+// Compare each identity value, not the identity of a newly allocated array.
+watch([()=>props.event.id,()=>props.taskId,()=>store.state.role,()=>closed.value],()=>{contextVersion++;voice.cancel();following.value=false;loadDraft();stepDrafts.clear();nonStepDraft='';fileNotice.value='';mode.value='chat';submitError.value='';dismissedOpening.value=false;imageDialog.value?.close();if(stepAvailable.value)assistStep(props.activeStepIndex,false);nextTick(()=>{if(stream.value)stream.value.scrollTop=0})})
 function choosePhoto(){if(!stepAvailable.value){fileNotice.value='当前任务已不可填写，可在报告中补充现场资料。';return}if(mode.value!=='step')assistStep(props.activeStepIndex,false);photoUpload.value?.click()}
 function draftDestination(){return {version:contextVersion,index:stepIndex.value,mode:mode.value}}
 function matchingDestination(destination){return destination.version===contextVersion&&destination.mode===mode.value&&(destination.mode!=='step'||destination.index===stepIndex.value)}

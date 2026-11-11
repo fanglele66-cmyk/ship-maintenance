@@ -95,7 +95,7 @@ function openPlan(action){if(typeof action==='string'&&['investigate','repair','
 watch(()=>[pendingTab.value,event.value?taskPlanKey(event.value):''],()=>{if(pendingTab.value)void store.prepareTaskPlan(event.value.id).catch(()=>{})},{immediate:true})
 watch(tabs,list=>{if(!list.includes(tab.value))tab.value=list[0]||''})
 function restorePhase(){afterSubmit();if(route.query.phase&&event.value)choosePhase(route.query.phase);if(route.query.report&&event.value)openReport(route.query.report);if(route.query.shore&&event.value)openShoreReport(route.query.shore)}
-watch(()=>[event.value?.id,store.state.role,route.query.phase,route.query.report,route.query.shore],restorePhase,{immediate:true})
+watch([()=>event.value?.id,()=>store.state.role,()=>route.query.phase,()=>route.query.report,()=>route.query.shore],restorePhase,{immediate:true})
 watch(()=>event.value?.phases.at(-1)?.id,(id,previous)=>{if(id&&(!selected.value||selected.value===previous))choosePhase(id)})
 onActivated(restorePhase)
 </script>

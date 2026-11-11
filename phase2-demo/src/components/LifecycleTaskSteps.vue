@@ -29,7 +29,9 @@ const index=computed({get:()=>Math.max(0,Math.min(props.task.draft.stepIndex||0,
 const step=computed(()=>props.task.steps[index.value]),record=computed(()=>props.task.draft.records[index.value])
 const displayStep=computed(()=>repairStepForDisplay({event:props.event,task:props.task,step:step.value}))
 const lastStep=computed(()=>index.value===props.task.steps.length-1)
-watch(()=>[props.task.draft.records,props.task.draft.summary,props.task.draft.attachments],()=>{props.task.draft.updatedAt=new Date().toISOString()},{deep:true})
+// A save acknowledgement can replace these objects with identical records.
+// Only changed content is a new edit, otherwise autosave feeds back into itself.
+watch(()=>JSON.stringify([props.task.draft.records,props.task.draft.summary,props.task.draft.attachments]),()=>{props.task.draft.updatedAt=new Date().toISOString()})
 const stepAssistance=computed(()=>canUseStepAssist(props.event,props.task,store.state.role))
 const repair=computed(()=>['repair','maintenance'].includes(props.task.kind))
 function go(i){error.value='';index.value=i}
