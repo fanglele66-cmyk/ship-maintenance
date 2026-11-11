@@ -5,13 +5,14 @@
   <p v-if="busy" class="lc-plan-progress" role="status">{{plan.source==='preset'?'预设复查步骤已列出，AI 正结合实际作业与观察记录整理新版，完成后更新。':plan.status==='updating'?'正在按对话要求修改任务，完成后更新步骤。':'正在依据已有结果生成后续步骤…'}}</p>
   <div v-if="plan.error" class="lc-plan-error" role="alert"><p>{{plan.error}}{{plan.source==='preset'?' 预设任务已保留，可核对后派发或重新生成。':''}}</p><button type="button" @click="retry">重新生成任务</button></div>
   <LifecycleTaskRecords v-if="plan.steps.length" :key="plan.key+':'+plan.version" :event="event" :task="plan" :show-feedback="false"/>
-  <details v-if="plan.sources?.length"><summary>参考资料 · {{plan.sources.length}} 处</summary><p v-for="s in plan.sources" :key="s.id">[{{s.id}}] {{s.title}} · {{s.file}} L{{s.startLine}}—{{s.endLine}}</p></details>
+  <KnowledgeReferences :sources="plan.sources"/>
   <details v-if="plan.editHistory?.length" class="lc-edit-history"><summary>任务修改记录 · {{plan.editHistory.length}} 次</summary><section v-for="(edit,i) in plan.editHistory" :key="i"><strong>第 {{i+1}} 次修改</strong><p>{{edit.text}}</p><p>{{edit.summary}}</p><details><summary>查看修改前任务</summary><LifecycleTaskRecords :event="event" :task="{...plan,steps:edit.before.steps}" :show-feedback="false"/></details></section></details>
  </section>
 </template>
 <script setup>
 import {computed} from 'vue'
 import LifecycleTaskRecords from './LifecycleTaskRecords.vue'
+import KnowledgeReferences from './KnowledgeReferences.vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const props=defineProps({event:{type:Object,required:true}})
 defineEmits(['edit'])

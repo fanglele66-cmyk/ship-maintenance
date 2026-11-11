@@ -11,11 +11,14 @@ export function createKnowledge(root){
     if(entry.isSymbolicLink())continue
     const path=join(dir,entry.name)
     if(entry.isDirectory()){if(entry.name!=='images')await walk(path);continue}
-    if(!/\.md$/i.test(entry.name)||(await stat(path)).size>2_000_000)continue
+    // Catalogs and ingestion logs are navigation/audit metadata, not engine evidence.
+    if(!/\.md$/i.test(entry.name)||/^(?:index|log|data_structure|readme)\.md$/i.test(entry.name)||(await stat(path)).size>2_000_000)continue
     const lines=(await readFile(path,'utf8')).split(/\r?\n/),file=relative(root,path).replaceAll('\\','/'),title=entry.name.replace(/\.md$/i,'')
+    const frontEnd=lines[0]==='---'?lines.indexOf('---',1):-1
+    if(frontEnd>0&&lines.slice(1,frontEnd).some(line=>/^retrieval:\s*false\s*$/.test(line)))continue
     count++;let start=0,buffer=[]
-    function flush(){if(buffer.length){chunks.push({file,title,startLine:start+1,endLine:start+buffer.length,text:buffer.join('\n')});buffer=[]}}
-    for(let i=0;i<lines.length;i++){
+    function flush(){if(buffer.length){if(buffer.some(line=>line.trim()&&!/^\s*#/.test(line)))chunks.push({file,title,startLine:start+1,endLine:start+buffer.length,text:buffer.join('\n')});buffer=[]}}
+    for(let i=frontEnd>0?frontEnd+1:0;i<lines.length;i++){
      if(buffer.join('\n').length>1400||(/^#{1,3} /.test(lines[i])&&buffer.length>6))flush()
      if(!buffer.length)start=i
      buffer.push(lines[i])
@@ -27,9 +30,11 @@ export function createKnowledge(root){
   cache=chunks;documentCount=count;loaded=Date.now();return cache
  }
  function terms(text){
-  const normalized=text.toLowerCase(),words=normalized.match(/[a-z][a-z0-9-]{1,}|\d+(?:\.\d+)?/g)||[]
-  for(const phrase of normalized.match(/[\u4e00-\u9fff]+/g)||[])for(let i=0;i<phrase.length-1;i++)words.push(phrase.slice(i,i+2))
-  return [...new Set(words)].filter(w=>!['什么','怎么','如何','请问','一下','补充','报告','我们','这个','可以','进行','以及','是否'].includes(w))
+  const normalized=text.toLowerCase().replace(/正常范围|一般|是多少|多少|请问/g,' '),words=normalized.match(/[a-z][a-z0-9-]{1,}|\d+(?:\.\d+)?/g)||[]
+  // Preserve equipment phrases such as 控制空气, instead of letting generic
+  // two-character terms (正常/范围) outrank the actual subject of the question.
+  for(const phrase of normalized.match(/[\u4e00-\u9fff]+/g)||[])for(let n=2;n<=4;n++)for(let i=0;i<=phrase.length-n;i++)words.push(phrase.slice(i,i+n))
+  return [...new Set(words)].filter(w=>!['什么','怎么','如何','请问','一下','补充','报告','我们','这个','可以','进行','以及','是否','正常','范围','一般','多少','是多少'].includes(w))
  }
  return {
   async status(){await load();return {documents:documentCount,chunks:cache.length,directory:'wiki_rt-flex50',imagesIndexed:false}},

@@ -118,7 +118,7 @@ for path in paths:
         target.parent.mkdir(parents=True, exist_ok=True)
         if path.resolve() != target.resolve(): shutil.copyfile(path, target)
     source_path = 'wiki_rt-flex50/' + rel.as_posix()
-    doc_html = render(body) + f'<p>来源条目：<a href="/{quote(source_path)}">{html.escape(rel.as_posix())}</a></p>'
+    doc_html = render(body) + f'<p><a href="/{quote(source_path)}">查看知识原文</a></p>'
     docs.append(dict(id=ids[name],title=name,device='主机',docType=doc_type,category='RT-flex50',subcategory=description[1] if description else name,chapterHTML=doc_html,version='未注明',updatedAt=updated[1] if updated else '未注明',sourcePath=source_path,sourceKind='wiki-source',sha256=hashlib.sha256(raw).hexdigest()))
 for filename in images:
     for target in (root / 'wiki_rt-flex50/images' / filename, assets / 'images' / filename):

@@ -11,7 +11,7 @@
    <ol v-if="message.taskChange"><li v-for="step in message.taskChange.steps" :key="step.label">{{step.label}}</li></ol>
 
   </section>
-  <details v-if="message.sources?.length" class="model-sources"><summary>参考资料 · {{message.sources.length}} 处</summary><article v-for="source in message.sources" :key="source.id"><b>[{{source.id}}] {{source.title}}</b><small>{{source.file}} · L{{source.startLine}}—{{source.endLine}}</small><p>{{source.text}}</p></article></details>
+  <KnowledgeReferences :sources="message.sources"/>
   <section v-if="reportContent" class="report-proposal" :aria-busy="message.status==='streaming'">
    <strong>报告补充 · {{message.proposal?(message.proposal.applied?'已写入':'待核对'):message.status==='streaming'?'生成中':'生成中断'}}</strong><p>{{reportContent.reportTitle}}</p>
    <details><summary>原报告</summary><MarkdownContent :content="reportContent.baseMarkdown"/></details>
@@ -30,6 +30,7 @@
 <script setup>
 import {reportMarkdown} from '../workflow/reportPresentation.js'
 import MarkdownContent from './MarkdownContent.vue'
+import KnowledgeReferences from './KnowledgeReferences.vue'
 import {computed} from 'vue'
 import {revisionAnalysis} from '../workflow/reportRevisions'
 import {generatedPreview} from '../workflow/generatedReport'

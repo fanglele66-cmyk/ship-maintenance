@@ -1,7 +1,7 @@
 {
-  "sourceRoot": "D:\\zstech\\ship_sop\\wiki_rt-flex50",
-  "documents": 61,
-  "images": 190,
+  "sourceRoot": "D:\\zstech\\fang-intelligent-engine-room\\ship-maintenance\\phase2-demo\\wiki_rt-flex50",
+  "documents": 67,
+  "images": 195,
   "missingImages": [
     "2a63bb36a5934cd8443b46027a4b536d3ebb38f3325593e9c9822898236c1db3.jpg",
     "50fd5921722c86d726a95ea01401d5d1014c8049b3df2ef553c707d3fe0ddeb2.jpg",
@@ -52,7 +52,7 @@
       "title": "第6章-技术参数与报警设定",
       "docType": "设备手册",
       "sourcePath": "wiki_rt-flex50/chapters/第6章-技术参数与报警设定.md",
-      "sha256": "5f1e77c7423e1631cc2c3a7ea97a3fa227ac24fe36c39e343fd66ce1e2236096"
+      "sha256": "53fea599ce73bc555ff71d4be8e85d3981a0a6577c7daf3875dde59559333302"
     },
     {
       "id": "RTF-07BAEF4EB5",
@@ -167,6 +167,13 @@
       "sha256": "9b271ce29cf842c4509828033f58e2c56cd189de4b5bdc5c997981d691845ab7"
     },
     {
+      "id": "RTF-C9E781EBCF",
+      "title": "主机报警与保护设定速查",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/主机报警与保护设定速查.md",
+      "sha256": "35947582e66c989e5f3ad669474466b8603beeedc2e05a445078f1dd81526617"
+    },
+    {
       "id": "RTF-E3763CC05A",
       "title": "传感器测点清单",
       "docType": "设备手册",
@@ -200,6 +207,13 @@
       "docType": "操作规程",
       "sourcePath": "wiki_rt-flex50/concepts/共轨柴油机运行管理要点.md",
       "sha256": "cecd044f31b280fff74daa1a1eb6a3009634c6857530272ab0ec2d14c4896a31"
+    },
+    {
+      "id": "RTF-2FFC5C14F3",
+      "title": "厂家图纸辅助排查与测点核对",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/厂家图纸辅助排查与测点核对.md",
+      "sha256": "6d6b2256804a7334072edda5acdb33a35ba8106c1ec2ba58310ab5e84ed6cc55"
     },
     {
       "id": "RTF-AFE9AE98F5",
@@ -244,11 +258,25 @@
       "sha256": "f8f1855345a66dddd3cf7f5e343f2de0765bd0b4a93fa40cd6ffdca623a4c07b"
     },
     {
+      "id": "RTF-D5AA4CC61F",
+      "title": "扫气温度正常范围与测点辨识",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/扫气温度正常范围与测点辨识.md",
+      "sha256": "6556503d5ddef64ba289c3d14499b32a6a5a330a888d0b40dab61cbdb68de104"
+    },
+    {
       "id": "RTF-DAD6D3AF6D",
       "title": "报警监控系统",
       "docType": "设备手册",
       "sourcePath": "wiki_rt-flex50/concepts/报警监控系统.md",
       "sha256": "f9be1e7017caca6c49e9309dc3d7499febcf58a88ac7ae561f4883abc008e589"
+    },
+    {
+      "id": "RTF-5EC24B0EB3",
+      "title": "持续运行参数与版本对照",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/concepts/持续运行参数与版本对照.md",
+      "sha256": "1ddd3d196f6184786c43fc43f10e9bb1cd47c9729ae0716995de5cf05a35de72"
     },
     {
       "id": "RTF-1D22679A77",
@@ -262,7 +290,7 @@
       "title": "控制空气系统",
       "docType": "设备手册",
       "sourcePath": "wiki_rt-flex50/concepts/控制空气系统.md",
-      "sha256": "0a6e002d23a0aaa50d19cd08f3d918d1cd6874f7266cfba26f5badad7b3868e1"
+      "sha256": "b8a2819fdcf7f43125d5b76e2451927d3b4b2c8630099d1674a693d23fc6e211"
     },
     {
       "id": "RTF-1B1DBAD4C5",
@@ -426,6 +454,13 @@
       "sha256": "42d8a0e4b861e1d9e911cc9ca5704f1922e2143de9f9e62210173bbb139b6948"
     },
     {
+      "id": "RTF-354FFACA7D",
+      "title": "本地厂家说明书与图纸目录",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/本地厂家说明书与图纸目录.md",
+      "sha256": "4816999b3f6ca2ae341e34f8152704bf7ed62aa26c31b09be7b8e45f4396dea3"
+    },
+    {
       "id": "RTF-25E75F3443",
       "title": "长航碧玉30KG到8KG减压阀损坏故障报告0523",
       "docType": "故障案例",
@@ -438,6 +473,13 @@
       "docType": "故障案例",
       "sourcePath": "wiki_rt-flex50/sources/长航碧玉主机2缸ICU伺服油液压活塞故障报告0430.md",
       "sha256": "fec554de0a079509e02b9c8164c7af9c37ade7346e6af696e58f612642512c75"
+    },
+    {
+      "id": "RTF-401E946C42",
+      "title": "长航碧玉主机运行参数纸质说明书",
+      "docType": "设备手册",
+      "sourcePath": "wiki_rt-flex50/sources/长航碧玉主机运行参数纸质说明书.md",
+      "sha256": "982c4e46a2558f15806d0b6520f5532cc0985434681418d96d2fde57eb586a48"
     }
   ]
 }
