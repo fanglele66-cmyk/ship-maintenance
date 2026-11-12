@@ -54,7 +54,7 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
    report.evidence=evidenceReader(root,report,directory)
    const folder=repository.folder(key);await mkdir(folder,{recursive:true});await writeFile(join(folder,'request.json'),JSON.stringify(report,null,2),'utf8')
    let detection={devices:[],rows:0}
-   if(report.deviceId==='main-engine-1'){emit('progress',{label:'正在运行异常检测 Skill'});detection=await detect(root,directory,Date.parse(report.start),Date.parse(report.end),join(folder,'detection'))}
+   if(report.deviceId==='main-engine-1'){emit('progress',{label:'AI正在异常检测分析'});detection=await detect(root,directory,Date.parse(report.start),Date.parse(report.end),join(folder,'detection'))}
    const result=await analyze({...input,role:user.workflowRole,report,detection},{root,configuration,knowledge,fetcher,emit,signal})
    const state={events:{},notices:[]},event=createManualAnomaly(state,report,result,requestId,{at:new Date(clock()).toISOString()})
    event.sensorScope={deviceId:report.deviceId,systems:report.systems,sensorIds:report.sensorIds};event.manualReport.evidence=report.evidence
