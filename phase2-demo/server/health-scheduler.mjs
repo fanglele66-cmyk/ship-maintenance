@@ -8,6 +8,7 @@ import {pruneHealthOutputs} from './health-retention.mjs'
 import {configStore,resolveProvider} from './ai-config.mjs'
 import {invokeModel} from './model.mjs'
 import {HOUR,sqlTime} from './local-data.mjs'
+import {telemetryDirectory} from './data-paths.mjs'
 const execute=promisify(execFile)
 const jsonRead=async file=>{try{return JSON.parse(await readFile(file,'utf8'))}catch(e){if(e.code==='ENOENT')return null;throw e}}
 export async function atomicWrite(file,value){await writeFile(file+'.tmp',value,'utf8');await rename(file+'.tmp',file)}
@@ -30,7 +31,7 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
  const reportPath=join(directory,'health-latest.json')
  const inputs=['data/sensor-point-mapping.json','data/ship-profile.json','.claude/skills/ship-engine-health/scripts/run_local_health.py','.claude/skills/ship-engine-health/scripts/run_engine_health.py','.claude/skills/ship-engine-health/references/local-report.md']
  const content=await Promise.all(inputs.map(async name=>{try{return await readFile(join(root,name),'utf8')}catch(e){if(e.code==='ENOENT'&&analyze)return '';throw e}}))
- const dataset=await jsonRead(join(directory,'manifest.json'))
+ const dataset=await jsonRead(join(telemetryDirectory(root,directory),'manifest.json'))
  const revision=createHash('sha256').update(content.join('\n')+JSON.stringify(dataset)).digest('hex').slice(0,12)
  const startedAt=clock(),session=`run-${startedAt}-${randomBytes(4).toString('hex')}`
  await pruneHealthOutputs(directory)
@@ -54,7 +55,7 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
   }catch(e){jobs.exec('ROLLBACK');throw e}
  }
  const runSkill=analyze||(async(now)=>{
-  const {stdout}=await execute(process.env.SHIP_PYTHON||'python',[join(root,'.claude/skills/ship-engine-health/scripts/run_local_health.py'),'--data-dir',directory,'--cutoff',sqlTime(now)],
+  const {stdout}=await execute(process.env.SHIP_PYTHON||'python',[join(root,'.claude/skills/ship-engine-health/scripts/run_local_health.py'),'--data-dir',directory,'--telemetry-dir',telemetryDirectory(root,directory),'--cutoff',sqlTime(now)],
    {cwd:root,windowsHide:true,timeout:180000,maxBuffer:8*1024*1024,env:{...process.env,PYTHONIOENCODING:'utf-8'}})
   return JSON.parse(stdout)
  })
@@ -78,7 +79,7 @@ export async function createHealthScheduler(root,{directory=process.env.SHIP_DAT
   busy=true
   let id
   try{
-   const now=clock(),manifest=await jsonRead(join(directory,'manifest.json'))
+   const now=clock(),manifest=await jsonRead(join(telemetryDirectory(root,directory),'manifest.json'))
    if(!manifest)return
    id=claim(now);if(!id)return
    if(abandonedIds.length)await pruneHealthOutputs(directory,6,{abandonedIds:abandonedIds.splice(0)})

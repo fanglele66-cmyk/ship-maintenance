@@ -317,8 +317,11 @@ def load_sensor_raw_data(
     paths: Iterable[str | Path] | None = None,
     lookback_hours: float = 6.0,
     max_files: int | None = 12,
+    input_root: str | Path | None = None,
 ) -> tuple[dict[str, list[Sample]], list[str], dict[str, Any]]:
     workspace_path = Path(workspace).resolve()
+    # Separate persistent runtime input from the algorithm/profile workspace.
+    input_root_path = Path(input_root).resolve() if input_root is not None else workspace_path
     input_paths = _resolve_input_paths(workspace_path, paths)
     if not input_paths:
         profile, _ = load_ship_profile(workspace_path)
@@ -360,9 +363,9 @@ def load_sensor_raw_data(
     seen_refs: set[str] = set()
     for _, path, payload, records in selected:
         try:
-            relative = path.relative_to(workspace_path).as_posix()
+            relative = path.relative_to(input_root_path).as_posix()
         except ValueError as exc:
-            raise SensorDataError(f"input path escapes workspace: {path}") from exc
+            raise SensorDataError(f"input path escapes input root: {path}") from exc
         if relative not in seen_refs:
             input_refs.append(relative)
             seen_refs.add(relative)

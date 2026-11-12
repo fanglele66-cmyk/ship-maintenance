@@ -9,19 +9,18 @@ from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
 ROOT = SKILL.parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
+from dataset_paths import dataset_database
 sys.path.insert(0, str(SKILL))
 from engine.loader import load_sensor_raw_data
 from engine.detector import detect_all
 
 
-def run(directory, start, end, output):
+def run(directory, start, end, output, telemetry=None):
     directory, output = Path(directory).resolve(), Path(output).resolve()
     output.relative_to(directory)
     output.mkdir(parents=True, exist_ok=True)
-    manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf-8'))
-    database = (directory / manifest['database']).resolve()
-    if database.parent != directory:
-        raise ValueError('Database outside dataset directory')
+    database = dataset_database(directory, telemetry)
     catalog = json.loads((ROOT / 'data/sensor-point-mapping.json').read_text(encoding='utf-8'))['pointList']
     with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as db:
         rows = db.execute('SELECT timestamp,data FROM sensor_readings WHERE timestamp>=? AND timestamp<=? ORDER BY timestamp', (start, end)).fetchall()
@@ -36,11 +35,11 @@ def run(directory, start, end, output):
     raw.write_text(json.dumps({'pointDataList': points, '_fetchMetadata': {'recordsPath': 'pointDataList', 'collectTimeStart': start, 'collectTimeEnd': end}}, ensure_ascii=False), encoding='utf-8')
     # loader needs the registry/profile relative to the application; outputs stay isolated per invocation.
     if rows:
-        samples, refs, metadata = load_sensor_raw_data(ROOT, paths=[raw], lookback_hours=max(6, (datetime.fromisoformat(end)-datetime.fromisoformat(start)).total_seconds()/3600), max_files=None)
+        samples, refs, metadata = load_sensor_raw_data(ROOT, paths=[raw], lookback_hours=max(6, (datetime.fromisoformat(end)-datetime.fromisoformat(start)).total_seconds()/3600), max_files=None, input_root=directory)
         devices = [result.to_dict() for result in detect_all(samples, workspace=str(ROOT))]
     else:
         devices = []
-    result = {'start': start, 'end': end, 'rows': len(rows), 'devices': devices, 'source': 'ship-anomaly-detection', 'raw': str(raw.relative_to(ROOT))}
+    result = {'start': start, 'end': end, 'rows': len(rows), 'devices': devices, 'source': 'ship-anomaly-detection', 'raw': str(raw.relative_to(directory))}
     (output / 'detection.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
     return result
 
@@ -49,5 +48,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ['data-dir', 'start', 'end', 'output']:
         parser.add_argument('--'+key, required=True)
+    parser.add_argument('--telemetry-dir', help='Read-only telemetry directory')
     args = parser.parse_args()
-    print(json.dumps(run(args.data_dir, args.start, args.end, args.output), ensure_ascii=False))
+    print(json.dumps(run(args.data_dir, args.start, args.end, args.output, args.telemetry_dir), ensure_ascii=False))

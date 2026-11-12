@@ -16,12 +16,13 @@ import {createKnowledge} from './knowledge.mjs'
 import {invokeModel} from './model.mjs'
 import {skillInstruction,hiddenContext} from './skill-runtime.mjs'
 import {sqlTime,HOUR} from './local-data.mjs'
+import {telemetryDirectory} from './data-paths.mjs'
 const execute=promisify(execFile),hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value))
 const services=new Map()
 export function getWorkflowService(root,options){const key=resolve(root);if(!services.has(key))services.set(key,createWorkflowService(key,options));return services.get(key)}
 export async function runDetection(root,directory,start,end,output){
  await mkdir(output,{recursive:true})
- const {stdout}=await execute(process.env.SHIP_PYTHON||'python',[join(root,'.claude/skills/ship-anomaly-detection/scripts/run_local_detection.py'),'--data-dir',directory,'--start',sqlTime(start),'--end',sqlTime(end),'--output',output],{cwd:root,timeout:180000,maxBuffer:24*1024*1024,windowsHide:true,env:{...process.env,PYTHONUTF8:'1',PYTHONIOENCODING:'utf-8',TEMP:directory,TMP:directory}})
+ const {stdout}=await execute(process.env.SHIP_PYTHON||'python',[join(root,'.claude/skills/ship-anomaly-detection/scripts/run_local_detection.py'),'--data-dir',directory,'--telemetry-dir',telemetryDirectory(root,directory),'--start',sqlTime(start),'--end',sqlTime(end),'--output',output],{cwd:root,timeout:180000,maxBuffer:24*1024*1024,windowsHide:true,env:{...process.env,PYTHONUTF8:'1',PYTHONIOENCODING:'utf-8',TEMP:directory,TMP:directory}})
  return JSON.parse(stdout)
 }
 export async function createWorkflowService(root,{directory=process.env.SHIP_DATA_DIR||join(root,'.local-data'),clock=Date.now,detect=runDetection,analyze=analyzeManualAnomaly,observationModel,configuration:configurationOverride,knowledge:knowledgeOverride,evidenceReader=readEventEvidence,fetcher=fetch}={}){

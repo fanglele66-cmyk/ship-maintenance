@@ -1,6 +1,7 @@
 import {DatabaseSync} from 'node:sqlite'
 import {readFileSync} from 'node:fs'
 import {join,resolve,dirname} from 'node:path'
+import {telemetryDirectory} from './data-paths.mjs'
 
 export const HOUR=3600000
 export const toTime=s=>Date.parse(s.replace(' ','T')+(s.match(/Z$|[+-]\d\d:\d\d$/)?'':'+08:00'))
@@ -51,6 +52,7 @@ export function chronology(rows,ais,start,end){
 }
 
 export function openLocalData(root,directory=process.env.SHIP_DATA_DIR||join(root,'.local-data')){
+ directory=telemetryDirectory(root,directory)
  const manifest=JSON.parse(readFileSync(join(directory,'manifest.json'),'utf8'))
  const filename=resolve(directory,manifest.database)
  if(dirname(filename)!==resolve(directory))throw Error('Invalid dataset path')

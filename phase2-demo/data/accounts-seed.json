@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "accounts": [
+    {
+      "username": "admin",
+      "role": "admin",
+      "name": "超级管理员",
+      "label": "超级管理员",
+      "salt": "5ac681731e111b6b7ccdb8e967077e67",
+      "hash": "c5aceb3f04460688303445cc57efc6c58b075d20dbcab8629673fc8b65ba14ca4b7e5ab5d386debc2c2acee354bf0ef07db62f6d2c758b07e7f591d03c533561"
+    },
+    {
+      "username": "chief",
+      "role": "captain",
+      "name": "陈志远",
+      "label": "轮机长",
+      "salt": "208d61e0c266316fb2f622873eb9f6d4",
+      "hash": "e2bd372184095e1a5bc9a101fa9ac8f99d77a4659a0ec9239d6374a0f7d7b4c51de91dbae44de66ced8d9aaac53e78061f8b8fe92abfc6dcbee817650a6e93de"
+    },
+    {
+      "username": "engineer1",
+      "role": "engineer",
+      "name": "李建国",
+      "label": "大管轮",
+      "salt": "38d66d1f9aab72df840864bc045b7394",
+      "hash": "d2a8cddd03ba2f43f9f54203dd2e1b8dac5cfd29b84f78e7316d5b707122723c3594620cc0b40de275f12658d91e7cbefbfefff99585e21512d86cb79fc8441c"
+    },
+    {
+      "username": "engineer2",
+      "role": "secondEngineer",
+      "name": "王海",
+      "label": "二管轮",
+      "salt": "79c4686daf019e8196761634496e7e84",
+      "hash": "c877b620a4d09f77250ab002d081dae1c89baee396f6c36aef04a3469b0eb94c39b641287a67421ebf7d9b89f0f2ad9e5af856db74c8c8a75e7abb458ba31900"
+    }
+  ]
+}

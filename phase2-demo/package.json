@@ -13,6 +13,7 @@
     "start": "node server/local-server.mjs",
     "data:prepare": "python scripts/prepare-local-data.py",
     "data:compact": "python scripts/compact-stopped-data.py",
+    "deployment:export": "node scripts/export-deployment-data.mjs",
     "auth:test": "node --test tests/auth-api.test.mjs",
     "data:test": "node --test tests/local-data.test.mjs",
     "health:run": "node scripts/run-local-health.mjs"

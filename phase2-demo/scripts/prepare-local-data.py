@@ -94,6 +94,6 @@ if __name__ == '__main__':
     p.add_argument('--source', required=True)
     p.add_argument('--source-anchor', default='2026-07-04 12:00:00', help='Historical instant aligned to the current clock; retain >=24h before this instant.')
     p.add_argument('--cadence-seconds', type=int, default=12)
-    p.add_argument('--output', default=str(ROOT / '.local-data'))
+    p.add_argument('--output', default=str(ROOT / 'deployment-data/telemetry'))
     args = p.parse_args()
     prepare(args.source, args.output, args.source_anchor, cadence=args.cadence_seconds)

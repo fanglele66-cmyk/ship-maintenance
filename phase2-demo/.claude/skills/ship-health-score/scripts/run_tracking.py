@@ -14,6 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT.parents[2]
+sys.path.insert(0, str(APP / 'scripts'))
+from dataset_paths import dataset_database
 TZ = timezone(timedelta(hours=8))
 POLICY = {'minWindows': 30, 'minSpanDays': 7, 'tailWindows': 3,
           'maxTailGapHours': 24, 'maxHealthScore': 80, 'minAbsZ': 2,
@@ -42,11 +44,9 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)+'\n', encoding='utf-8')
 
 
-def export_windows(directory, output):
+def export_windows(directory, output, telemetry=None):
     """Read the entire selected local database only on explicit invocation."""
-    database = (directory/read_json(directory/'manifest.json')['database']).resolve()
-    if database.parent != directory.resolve():
-        raise ValueError('Database must stay in the selected data directory')
+    database = dataset_database(directory, telemetry)
     keys = [f'DC{i:04}' for i in range(1, 60)]
     fields = ['timestamp', 'time_start', 'time_end', 'source_file', 'n_samples']+keys
     with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True)) as db, output.open('w', encoding='utf-8', newline='') as file:
@@ -148,11 +148,12 @@ def main():
     source.add_argument('--result-dir', type=Path, help='Convert an existing score result; no full analysis')
     source.add_argument('--run-all-history', action='store_true', help='Explicitly analyze the entire local database')
     parser.add_argument('--data-dir', type=Path, default=APP/'.local-data')
+    parser.add_argument('--telemetry-dir', type=Path, help='Read-only telemetry directory')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(); output = args.output.resolve(); output.mkdir(parents=True, exist_ok=True)
     result_dir = args.result_dir
     if args.run_all_history:
-        windows = output/'windows.csv'; export_windows(args.data_dir.resolve(), windows)
+        windows = output/'windows.csv'; export_windows(args.data_dir.resolve(), windows, args.telemetry_dir)
         result_dir = output/'score'
         subprocess.run([sys.executable, str(ROOT/'health_score.py'), '--mode', 'score', '--input', str(windows),
                         '--output', str(result_dir), '--cylinder-detail-target', ''], check=True)

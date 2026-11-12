@@ -132,7 +132,8 @@ def compact(directory, now=None, max_hours=24):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--data-dir', type=Path, default=Path(__file__).resolve().parents[1] / '.local-data')
+    from dataset_paths import dataset_directory
+    parser.add_argument('--data-dir', type=Path, default=dataset_directory(Path(__file__).resolve().parents[1] / '.local-data'))
     args = parser.parse_args()
     result = compact(args.data_dir)
     print(json.dumps({k: v for k, v in result.items() if k != 'runs'}, ensure_ascii=False, indent=2))

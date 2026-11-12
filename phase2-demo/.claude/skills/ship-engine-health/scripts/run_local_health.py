@@ -3,18 +3,18 @@ import argparse
 import json
 import shutil
 import sqlite3
+import sys
 from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from run_engine_health import run, BEIJING_TZ, WORKSPACE_ROOT
+sys.path.insert(0, str(WORKSPACE_ROOT / 'scripts'))
+from dataset_paths import dataset_database
 
 
-def analyze(directory: Path, cutoff: datetime):
-    manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf-8'))
-    database = (directory / manifest['database']).resolve()
-    if database.parent != directory.resolve():
-        raise ValueError('Database must stay inside the dataset directory')
+def analyze(directory: Path, cutoff: datetime, telemetry=None):
+    database = dataset_database(directory, telemetry)
     workspace = directory / 'workspace'
     catalog_dir = workspace / 'data'
     catalog_dir.mkdir(parents=True, exist_ok=True)
@@ -79,6 +79,7 @@ def analyze(directory: Path, cutoff: datetime):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-dir', required=True)
+    parser.add_argument('--telemetry-dir', help='Read-only telemetry directory; outputs remain in --data-dir')
     parser.add_argument('--cutoff', default=datetime.now(BEIJING_TZ).replace(tzinfo=None, microsecond=0).isoformat(' '))
     args = parser.parse_args()
-    print(json.dumps(analyze(Path(args.data_dir).resolve(), datetime.fromisoformat(args.cutoff)), ensure_ascii=False))
+    print(json.dumps(analyze(Path(args.data_dir).resolve(), datetime.fromisoformat(args.cutoff), args.telemetry_dir), ensure_ascii=False))

@@ -1,10 +1,10 @@
 import {DatabaseSync} from 'node:sqlite'
 import {trustedAppRequest} from './request-origin.mjs'
+import {identities,readAccountSeed} from './account-seed.mjs'
 import {randomBytes,scryptSync,timingSafeEqual,createHash} from 'node:crypto'
 import {mkdir,writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 
-const identities=[['chief','captain','陈志远','轮机长'],['engineer1','engineer','李建国','大管轮'],['engineer2','secondEngineer','王海','二管轮'],['admin','admin','超级管理员','超级管理员']]
 const digest=token=>createHash('sha256').update(token).digest('hex')
 const safeUser=row=>({username:row.username,name:row.name,role:row.role,roleLabel:row.label,workflowRole:row.role==='admin'?'captain':row.role})
 const send=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value))}
@@ -17,14 +17,21 @@ export async function createAuthService(root,{directory=process.env.SHIP_DATA_DI
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,username TEXT,expires INTEGER);
  CREATE TABLE IF NOT EXISTS deleted_events(id TEXT PRIMARY KEY,deleted_by TEXT,deleted_at TEXT);
  CREATE TABLE IF NOT EXISTS login_attempts(username TEXT PRIMARY KEY,failures INTEGER,locked_until INTEGER);`)
- const created=[]
- for(const [username,role,name,label] of identities){
-  if(db.prepare('SELECT 1 FROM accounts WHERE username=?').get(username))continue
-  const password=passwords[username]||randomBytes(9).toString('base64url'),salt=randomBytes(16).toString('hex')
-  db.prepare('INSERT INTO accounts VALUES(?,?,?,?,?,?)').run(username,role,name,label,salt,scryptSync(password,salt,64).toString('hex'))
-  created.push({username,name,role:label,password})
- }
- if(created.length)await writeFile(join(directory,'accounts-initial.json'),JSON.stringify(created,null,2),'utf8')
+ const missing=identities.filter(([username])=>!db.prepare('SELECT 1 FROM accounts WHERE username=?').get(username)),created=[]
+ try{
+  const seed=missing.some(([username])=>!passwords[username])?await readAccountSeed(root):new Map()
+  db.exec('BEGIN IMMEDIATE')
+  try{
+   for(const [username,role,name,label] of missing){
+    const password=passwords[username],salt=password?randomBytes(16).toString('hex'):seed.get(username).salt
+    const row=password?{username,role,name,label,salt,hash:scryptSync(password,salt,64).toString('hex')}:seed.get(username)
+    const inserted=db.prepare('INSERT OR IGNORE INTO accounts VALUES(?,?,?,?,?,?)').run(row.username,row.role,row.name,row.label,row.salt,row.hash)
+    if(password&&inserted.changes)created.push({username,name,role:label,password})
+   }
+   db.exec('COMMIT')
+  }catch(error){db.exec('ROLLBACK');throw error}
+  if(created.length)await writeFile(join(directory,'accounts-initial.json'),JSON.stringify(created,null,2),'utf8')
+ }catch(error){db.close();throw error}
  const deleted=()=>db.prepare('SELECT id FROM deleted_events ORDER BY deleted_at').all().map(r=>r.id)
  // Explicit tab credentials take precedence, including the unauthenticated sentinel.
  // Cookies remain supported for existing clients; new UI sessions never share cookies.

@@ -15,7 +15,7 @@ export default defineConfig({
  writeBundle(options){const retained=resolve('.openai/retained-assets');if(!existsSync(retained))return;const target=join(options.dir,'assets');mkdirSync(target,{recursive:true});for(const name of readdirSync(retained)){if(/^[\w.-]+\.(js|css)$/.test(name)&&!existsSync(join(target,name)))copyFileSync(join(retained,name),join(target,name))}}
  }],
  resolve:{alias:{'@':resolve(__dirname,'src')}},
- server:{host:'127.0.0.1',port:5173,allowedHosts:['localhost','127.0.0.1'],fs:{deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/.local-ai/**','**/.local-data/**','**/.claude/**','**/server/**','**/wiki_rt-flex50/**']}},
+ server:{host:'127.0.0.1',port:5173,allowedHosts:['localhost','127.0.0.1'],fs:{deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/.local-ai/**','**/.local-data/**','**/deployment-data/**','**/accounts-seed.json','**/.claude/**','**/server/**','**/wiki_rt-flex50/**']}},
  build:{rollupOptions:{output:{manualChunks(id){if(id.includes('node_modules')&&/[/\\](echarts|zrender)[/\\]/.test(id))return 'charts'}}}},
  base:'./'
 })

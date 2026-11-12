@@ -6,7 +6,7 @@ const dist=resolve('dist')
 const html=await readFile(join(dist,'index.html'),'utf8')
 assert.match(html,/<script[^>]+src="\.\/assets\//,'Entry JS must use the relative build base')
 assert.doesNotMatch(html,/(?:src|href)="\/(?!\/)/,'HTML contains a root-relative resource')
-for(const name of ['.local-ai','.local-data','.git','server']){
+for(const name of ['.local-ai','.local-data','.git','server','deployment-data','data/accounts-seed.json']){
  let exists=true
  try{await stat(join(dist,name))}catch(error){if(error.code==='ENOENT')exists=false;else throw error}
  assert.equal(exists,false,`Private/runtime directory leaked into dist: ${name}`)
