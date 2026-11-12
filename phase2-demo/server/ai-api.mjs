@@ -1,4 +1,5 @@
 import {getWorkflowService} from './workflow-service.mjs'
+import {trustedAppRequest} from './request-origin.mjs'
 import {answerKnowledge} from './knowledge-chat.mjs'
 import {skillInstruction,hiddenContext,visibleText} from './skill-runtime.mjs'
 import {businessLanguageInstruction} from './business-language.mjs'
@@ -27,10 +28,7 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
   let streaming=false,counted=false
   const emit=(event,data)=>{if(!res.destroyed&&!res.writableEnded)res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)}
   const send=(code,data)=>{if(streaming){emit('error',data);return res.end()}res.statusCode=code;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(data))}
-  // This is a local prototype backend, not a deployed multi-user service.
-  const remote=req.socket.remoteAddress||'',local=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(remote)
-  let originOK=true;try{if(req.headers.origin)originOK=new URL(req.headers.origin).host===req.headers.host}catch{originOK=false}
-  if(!local||!originOK||req.headers['x-engine-room-client']!=='local-ui')return send(403,{error:'仅允许本机页面访问模型后台。'})
+  if(!trustedAppRequest(req))return send(403,{error:'请求来源不在允许范围内。'})
   try{
    if(req.method!=='POST')return send(405,{error:'不支持的请求方法。'})
    const chunks=[];let size=0

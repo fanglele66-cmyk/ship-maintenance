@@ -31,11 +31,12 @@
  </section>
 </template>
 <script setup>
+import {appUrl} from '../services/appUrl.js'
 import {computed,nextTick,onBeforeUnmount,ref,watch} from 'vue'
 const props=defineProps({images:{type:Array,default:()=>[]}})
 const dialog=ref(null),canvas=ref(null),active=ref(0),zoom=ref(1),failed=ref({})
 const selected=computed(()=>props.images[active.value])
-const assetUrl=path=>path?.startsWith('/')?import.meta.env.BASE_URL+path.slice(1):path
+const assetUrl=appUrl
 let previousOverflow,previousFocus
 async function open(index){active.value=index;zoom.value=1;previousFocus=document.activeElement;await nextTick();previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.value?.showModal()}
 function reset(){if(previousOverflow!==undefined){document.body.style.overflow=previousOverflow;previousOverflow=undefined}previousFocus?.focus();previousFocus=null;zoom.value=1}

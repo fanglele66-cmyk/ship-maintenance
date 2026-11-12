@@ -1,3 +1,4 @@
+import {appUrl} from '../services/appUrl.js'
 import { defineStore } from 'pinia'
 import {sessionHeaders} from '../services/session.js'
 import { ref, computed, reactive, watch, onScopeDispose } from 'vue'
@@ -17,7 +18,7 @@ export const useSensorStore = defineStore('sensor', () => {
     if(fetching)return
     fetching=true
     try{
-      const responses=await Promise.all(['/api/data/situation','/api/data/health'].map(url=>fetch(url,{headers:sessionHeaders(),signal:AbortSignal.timeout(15000)})))
+      const responses=await Promise.all(['/api/data/situation','/api/data/health'].map(url=>fetch(appUrl(url),{headers:sessionHeaders(),signal:AbortSignal.timeout(15000)})))
       if(!responses[0].ok)throw Error('本地数据不可用，请检查后端与数据副本。')
       const data=await responses[0].json()
       localData.value=data;sampledAt.value=data.sampledAt||Date.now()

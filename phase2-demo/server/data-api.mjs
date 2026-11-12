@@ -1,4 +1,5 @@
 import {openLocalData} from './local-data.mjs'
+import {trustedAppRequest} from './request-origin.mjs'
 import {createHealthScheduler} from './health-scheduler.mjs'
 
 export async function createDataService(root){
@@ -12,8 +13,7 @@ export async function createDataService(root){
    res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store')
    if(req.method!=='GET'){res.statusCode=405;return res.end(JSON.stringify({error:'GET required'}))}
    // Same-origin, loopback-only data service. Do not expose copied ship data to arbitrary websites.
-   const ip=req.socket.remoteAddress
-   if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(ip)||req.headers['x-engine-room-client']!=='local-ui'||req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`){res.statusCode=403;return res.end(JSON.stringify({error:'仅支持本机应用访问'}))}
+   if(!trustedAppRequest(req)){res.statusCode=403;return res.end(JSON.stringify({error:'请求来源不在允许范围内。'}))}
    try{
     if(url.pathname==='/api/data/health')return res.end(JSON.stringify(await scheduler.status()))
     if(url.pathname!=='/api/data/situation'){res.statusCode=404;return res.end('{}')}

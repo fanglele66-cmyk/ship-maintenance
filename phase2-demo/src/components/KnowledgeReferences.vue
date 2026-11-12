@@ -1,11 +1,12 @@
 <template>
  <section v-if="sources?.length" class="knowledge-references" aria-label="参考资料">
   <span>参考资料</span>
-  <a v-for="reference in references" :key="reference.id" :href="reference.href"><small v-if="reference.citations.length">[{{reference.citations.join('、')}}]</small> {{reference.title}} <b aria-hidden="true">↗</b></a>
-  <a v-if="!references.length" href="/#/knowledge">在知识库中查阅 ↗</a>
+  <a v-for="reference in references" :key="reference.id" :href="appUrl(reference.href)"><small v-if="reference.citations.length">[{{reference.citations.join('、')}}]</small> {{reference.title}} <b aria-hidden="true">↗</b></a>
+  <a v-if="!references.length" href="#/knowledge">在知识库中查阅 ↗</a>
  </section>
 </template>
 <script setup>
+import {appUrl} from '../services/appUrl.js'
 import {computed} from 'vue'
 import {knowledgeDocs} from '../mock/knowledge.js'
 import {knowledgeReferences} from '../workflow/knowledgeReferences.js'

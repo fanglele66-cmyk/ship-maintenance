@@ -1,4 +1,5 @@
 import {DatabaseSync} from 'node:sqlite'
+import {trustedAppRequest} from './request-origin.mjs'
 import {randomBytes,scryptSync,timingSafeEqual,createHash} from 'node:crypto'
 import {mkdir,writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
@@ -33,8 +34,7 @@ export async function createAuthService(root,{directory=process.env.SHIP_DATA_DI
  async function handler(req,res,next){
   const path=(req.url||'').split('?')[0]
   if(!path.startsWith('/api/'))return next()
-  const address=req.socket.remoteAddress
-  if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(address)||req.headers['x-engine-room-client']!=='local-ui'||req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`)return send(res,403,{error:'仅允许本机页面访问。'})
+  if(!trustedAppRequest(req))return send(res,403,{error:'请求来源不在允许范围内。'})
   db.prepare('DELETE FROM sessions WHERE expires<=?').run(clock())
   const user=db.prepare('SELECT accounts.* FROM sessions JOIN accounts USING(username) WHERE token=?').get(tokenFor(req))
   if(path==='/api/auth/me'&&req.method==='GET')return send(res,200,{user:user?safeUser(user):null,deletedIds:user?deleted():[]})

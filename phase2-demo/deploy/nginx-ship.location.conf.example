@@ -1,0 +1,18 @@
+# Include inside the company HTTP/HTTPS server block; Node runs on the same host.
+# Start Node with SHIP_PUBLIC_ORIGIN set to the exact external origin, e.g.
+# https://ship.example.com (NO /ship suffix). Keep its listener on 127.0.0.1.
+# This example proxies both the frontend and API, stripping /ship/ once.
+location = /ship {
+    return 301 /ship/;
+}
+location /ship/ {
+    proxy_pass http://127.0.0.1:5173/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 240s;
+    proxy_send_timeout 240s;
+    client_max_body_size 12m;
+}

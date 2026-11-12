@@ -147,6 +147,7 @@
 </template>
 
 <script setup>
+import {appHtml} from '../services/appUrl.js'
 import {ElPagination} from 'element-plus'
 import 'element-plus/es/components/pagination/style/css'
 
@@ -301,7 +302,7 @@ const contentSections = computed(() => {
 
 const renderContent = computed(() => {
   let index = 0
-  return rawContent.value.replace(/<h([34])([^>]*)>/gi, (_match, level, attrs) => {
+  return appHtml(rawContent.value).replace(/<h([34])([^>]*)>/gi, (_match, level, attrs) => {
     const id = `knowledge-section-${index++}`
     return `<h${level}${attrs} id="${id}" class="knowledge-anchor">`
   })

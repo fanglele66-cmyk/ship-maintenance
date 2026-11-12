@@ -1,8 +1,9 @@
+import {appUrl} from './appUrl.js'
 import {reactive} from 'vue'
 import {sessionHeaders,saveSession,clearSession} from './session.js'
 export const auth=reactive({ready:false,user:null,deletedIds:[],error:''})
 export async function accountRequest(path,body){
- const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{...sessionHeaders(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})})
+ const response=await fetch(appUrl('api/'+path),{method:body?'POST':'GET',headers:{...sessionHeaders(),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})})
  const data=await response.json()
  if(!response.ok)throw Object.assign(Error(data.error||'请求失败'),{status:response.status})
  return data

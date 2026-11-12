@@ -1,0 +1,9 @@
+# Template only. Replace the example host and scope with company-provided values.
+# Supply this as Jenkins's managed npm user config (NPM_CONFIG_USERCONFIG).
+# NEXUS_NPM_AUTH must come from Jenkins Credentials, not from source control.
+# Base64 username:password is a credential, not encryption.
+# @company-scope:registry=https://nexus.example.invalid/repository/npm-group/
+# //nexus.example.invalid/repository/npm-group/:_auth=${NEXUS_NPM_AUTH}
+
+# If the company proxies ALL packages through Nexus, configure registry as well.
+# registry=https://nexus.example.invalid/repository/npm-group/

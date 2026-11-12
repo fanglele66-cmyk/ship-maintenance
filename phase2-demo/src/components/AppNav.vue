@@ -17,7 +17,7 @@
       >
         <!-- Icon -->
         <Document v-if="item.path==='/reports'" class="nav-icon nav-report-icon" aria-hidden="true"/>
-        <span v-else class="nav-icon" :style="{ '--nav-icon-url': `url(${item.icon})` }"></span>
+        <span v-else class="nav-icon" :style="{ '--nav-icon-url': `url(${appStyleUrl(item.icon)})` }"></span>
         <span class="nav-label">{{ item.label }}</span>
         <!-- Unread badge -->
         <span
@@ -37,6 +37,7 @@
 </template>
 
 <script setup>
+import {appStyleUrl} from '../services/appUrl.js'
 import {ElPopover} from 'element-plus'
 import 'element-plus/es/components/popover/style/css'
 import {auth,logout} from '../services/auth'

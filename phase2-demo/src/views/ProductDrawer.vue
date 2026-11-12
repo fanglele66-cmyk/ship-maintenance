@@ -626,6 +626,7 @@
 </template>
 
 <script setup>
+import {appUrl} from '../services/appUrl.js'
 import { ref, computed, watch, inject, reactive, nextTick, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useEventStore } from '@/stores/eventStore'
@@ -698,7 +699,7 @@ const activeRepairSubTab = reactive({})
 const repairStageProgress = eventStore.workflowProgress
 const activeReportSubTab = ref('summary')
 const lightboxUrl = ref(null)
-function openLightbox(url) { if (url) lightboxUrl.value = url }
+function openLightbox(url) { if (url) lightboxUrl.value = appUrl(url) }
 
 const MAX_CHECK_IMAGES = 4
 const MAX_CHECK_IMAGE_SIZE = 5 * 1024 * 1024
