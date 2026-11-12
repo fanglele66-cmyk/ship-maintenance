@@ -6,7 +6,7 @@ export async function generateTaskReport(state,eventId,taskId,request,{ownerSess
  const role=state.role,requestId=crypto.randomUUID(),task=beginTaskReport(state,eventId,taskId,requestId),event=state.events[eventId]
  Object.assign(task.reportGeneration,{ownerSession,startedAt:Date.now()})
  const messageId='report-'+requestId
- task.conversations[role].push({id:messageId,kind:'model',text:'',at:new Date().toISOString(),status:'streaming',progress:task.reportGeneration.progress,progressLog:[],generatedReport:{summary:'',analysis:{}}})
+ task.conversations[role].push({id:messageId,kind:'model',text:'',reasoning:'',at:new Date().toISOString(),status:'streaming',progress:task.reportGeneration.progress,progressLog:[],generatedReport:{summary:'',analysis:{}}})
  const current=()=>{const e=state.events[eventId],t=e?.tasks.find(t=>t.id===taskId);return e?.phase!=='closed'&&e?.currentTask===taskId&&t?.status==='reporting'&&t?.reportGeneration?.requestId===requestId?{event:e,task:t,message:t.conversations[role].find(m=>m.id===messageId)}:null}
  const context=copy({id:event.id,title:event.title,number:event.number,tracking:event.tracking,phase:event.phase,currentTask:task.id,brief:event.brief,reports:currentReportContext(event,{excludeTaskId:task.id}),submissionContext:submissionContext(event,task,task.reportGeneration.factReportId),tasks:[task],taskContext:{title:task.title,scope:task.scope,owner:task.owner}})
  // Only original feedback and the dispatched plan are sent, never UI drafts or chat state.
@@ -15,6 +15,7 @@ export async function generateTaskReport(state,eventId,taskId,request,{ownerSess
   const result=await request({mode:'submit-report',role,actor:people[role],text:'根据本次已提交的逐项现场记录生成本轮报告。分别写清做过什么、发现什么、尚不能确认什么。现场事实和AI分析建议分开。明确区分：不适用是本项无需执行，按已反馈流转，不列入待恢复；未完成或实施条件受阻才保留补做项目。恢复后以本次记录为准，历史未完成现已完成属于状态更新，不是矛盾。',event:context,taskId},(kind,data)=>{
    const c=current();if(!c||c.task.status!=='reporting')return
    if(kind==='progress'){c.task.reportGeneration.progress=data;c.message.progress=data;c.message.progressLog.push(data)}
+   if(kind==='reasoning')c.message.reasoning+=data.delta||''
    if(kind==='report'){c.task.reportGeneration.patch=data.patch;c.message.generatedReport=data.patch}
    if(kind==='meta')c.message.sources=data.sources
   })
@@ -22,7 +23,7 @@ export async function generateTaskReport(state,eventId,taskId,request,{ownerSess
   const c=current();if(!c)throw Error('任务已有变化，生成内容未覆盖当前记录。')
   // A role switch in this tab must not change the owner of the in-flight submission.
   const report=submitTask({...state,role},eventId,taskId,{...result,requestId})
-  Object.assign(c.message,{status:'complete',text:'报告已生成，已交轮机长审阅。',generatedReport:result.patch,reportId:report.id,model:result.model,usage:result.usage,sources:result.sources})
+  Object.assign(c.message,{status:'complete',text:'报告已生成，已交轮机长审阅。',generatedReport:result.patch,reasoning:result.reasoning??c.message.reasoning,reportId:report.id,model:result.model,usage:result.usage,sources:result.sources})
   return report
  }catch(error){
   const c=current()

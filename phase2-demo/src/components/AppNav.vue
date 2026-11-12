@@ -2,7 +2,7 @@
   <nav class="app-nav">
     <!-- Logo -->
     <div class="nav-logo">
-      <span class="logo-icon" aria-hidden="true"></span>
+      <img class="logo-icon" src="/nav-icons/wenyao-white.png" alt="众数文鳐" width="36" height="28" />
     </div>
 
     <!-- Nav Items -->
@@ -115,12 +115,10 @@ const navItems = [
 }
 
 .logo-icon {
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 28px;
   display: block;
-  background: #FFFFFF;
-  mask: url('/nav-icons/logo.svg') center / contain no-repeat;
-  -webkit-mask: url('/nav-icons/logo.svg') center / contain no-repeat;
+  object-fit: contain;
 }
 
 .nav-items {

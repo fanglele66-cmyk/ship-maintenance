@@ -59,14 +59,14 @@ test('closure includes full rounds, revisions, actual materials, partial observa
  const falseState=createLifecycleState();decide(falseState,id,{action:'false',reason:'原触发窗口已核对，按记录确认为误报。'});assert.match(falseState.events[id].reports.at(-1).markdown,/未提交维修或维保作业报告/)
 })
 
-test('SSE gives real progress before slow config, retrieval and model output, with no hidden reasoning',async()=>{
+test('SSE gives real progress before slow config, retrieval and model output, with provider reasoning on its own channel',async()=>{
  let wire='',released=false,firstProgress=false
  let release;const gate=new Promise(resolve=>{release=()=>{released=true;resolve()}})
  const handler=createAiHandler(process.cwd(),{configuration:{read:async()=>{assert.ok(firstProgress);await gate;return {source:'manual',baseUrl:'https://example.test',apiKey:'secret',model:'test',protocol:'anthropic',enabled:true,knowledgeEnabled:true,maxTokens:4096,timeoutMs:5000}}},knowledge:{search:async()=>{assert.match(wire,/正在检索本地知识库/);return []}},fetcher:async()=>new Response('event: message_start\ndata: {"type":"message_start"}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"PRIVATE"}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"核对已提交记录。"}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n',{headers:{'Content-Type':'text/event-stream'}})})
  const req=Readable.from([Buffer.from(JSON.stringify({text:'概述当前事件',stream:true}))]);Object.assign(req,{url:'/api/ai/chat',method:'POST',socket:{remoteAddress:'127.0.0.1'},headers:{host:'localhost:5173','x-engine-room-client':'local-ui'}})
  const run=handler(req,{setHeader(){},write(text){wire+=text;if(text.includes('已收到请求')){firstProgress=true;assert.equal(released,false)}},end(){}},()=>assert.fail())
  await new Promise(resolve=>setImmediate(resolve));assert.equal(firstProgress,true);release();await run
- assert.match(wire,/AI 已开始分析资料/);assert.match(wire,/event: done/);assert.doesNotMatch(wire,/PRIVATE|secret/)
+ assert.match(wire,/AI 已开始分析资料/);assert.match(wire,/event: done/);assert.match(wire,/event: reasoning/);assert.match(wire,/PRIVATE/);assert.doesNotMatch(wire,/secret/)
 })
 
 test('repair feedback is capped at four without losing methods or marking partially filled groups complete',()=>{

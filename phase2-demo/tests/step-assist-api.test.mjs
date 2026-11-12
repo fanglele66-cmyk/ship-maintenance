@@ -20,6 +20,15 @@ function fixture(){
  return buildStepAssistRequest({event,task,stepIndex:0,role:'engineer',text:'请整理目前的检查记录。',images:[png],attachments:[{name:'record.txt',text:'现场记录：插接件未见松动。'}]})
 }
 const stream=text=>new Response(text,{headers:{'Content-Type':'text/event-stream'}})
+
+test('step-assist forwards provider thinking separately from validated note JSON',async()=>{
+ const body={...fixture(),stream:true}
+ const result=await request(body,async()=>stream('data: '+JSON.stringify({choices:[{delta:{reasoning_content:'仅整理执行人明确的事实。'}}]})+'\n\ndata: '+JSON.stringify({choices:[{delta:{content:JSON.stringify(reply)},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n'))
+ const frames=[];for await(const event of readEventStream(stream(result.output)))frames.push({type:event.event,data:JSON.parse(event.data)})
+ assert.equal(frames.find(e=>e.type==='reasoning').data.delta,'仅整理执行人明确的事实。')
+ const done=frames.find(e=>e.type==='done').data
+ assert.equal(done.reasoning,'仅整理执行人明确的事实。');assert.deepEqual(done.stepAssist,reply)
+})
 function modelResponse(value,protocol='openai'){
  const text=typeof value==='string'?value:JSON.stringify(value)
  return protocol==='openai'?stream('data: '+JSON.stringify({model:'test-vision',choices:[{delta:{content:text},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n'):

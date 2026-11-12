@@ -5,7 +5,7 @@
    <article v-for="(message,i) in displayedMessages" :key="message.id" :class="['lc-message',message.kind,{'step-assist-user':message.kind==='user'&&message.stepAssistance}]" :data-message-id="message.id">
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>
-    <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===displayedMessages.length-1,historical:i!==displayedMessages.length-1,actionLabel:'',compact:true,basisLabel:'思考过程'}" @stream-progress="follow"/>
+    <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===displayedMessages.length-1,historical:i!==displayedMessages.length-1,actionLabel:'',compact:true,basisLabel:'研判依据'}" @stream-progress="follow"/>
     <StepNoteProposal v-else-if="message.kind==='step-assist'" :message="message" :disabled="!!pending||!stepAvailable" @apply="applyStepNote" @revise="reviseStep"/>
     <template v-else><strong v-if="message.title">{{message.title}}</strong><p v-if="message.text">{{message.text}}</p><p v-if="message.taskFeedback">本轮报告待审阅。</p></template>
     <div v-if="message.images?.length" class="message-images"><div v-for="(photo,j) in message.images" :key="j"><button type="button" :aria-label="`查看图片：${photo.name}`" :title="photo.name" @click="previewImage(photo)"><img :src="photo.dataUrl" :alt="photo.name" loading="lazy"/></button><small v-if="isStepPhotoCopy(photo)">上传压缩副本</small></div></div>
@@ -164,7 +164,7 @@ function askFollowup(text){if(mode.value==='step'&&hasMessage.value){input.value
 function apply(messageId){submitError.value='';try{const report=store.applySupplement(props.event.id,messageId,props.taskId);emit('report',report.id)}catch(e){submitError.value=e.message}}
 watch([()=>props.taskId,()=>task.value?.status],()=>{if(props.taskId&&['reporting','report-error','submitted'].includes(task.value?.status))void revealReport()},{immediate:true})
 watch(()=>messages.value.length,(count,previous)=>{if(count>previous){following.value=true;nextTick(follow)}})
-watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.response?.text,m?.response?.note,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.progressLog?.length,m?.progressLog?.at(-1)?.label,m?.status]},()=>nextTick(follow))
+watch(()=>{const m=messages.value.at(-1);return [m?.text,m?.reasoning,m?.response?.text,m?.response?.note,m?.draft?.patch,m?.generatedReport,m?.taskDraft,m?.progress,m?.progressLog?.length,m?.progressLog?.at(-1)?.label,m?.status]},()=>nextTick(follow))
 watch(()=>props.activeStepIndex,index=>{if(stepAvailable.value&&stepIndex.value!==index){voice.cancel();assistStep(index,false)}})
 watch(stepAvailable,available=>{if(available)assistStep(props.activeStepIndex,false);else if(mode.value==='step'){voice.cancel();setMode('chat')}},{immediate:true})
 // Server snapshots replace the event object without changing the conversation.

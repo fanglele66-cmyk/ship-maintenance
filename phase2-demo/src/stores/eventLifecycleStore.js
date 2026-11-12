@@ -133,12 +133,12 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   if(pendingRequests[key])return
   if(draft.status!=='ready')throw Error('请等待待派任务生成完成后再修改。')
   const at=new Date().toISOString(),replyId='plan-'+crypto.randomUUID()
-  event.conversations.captain.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at},{id:replyId,kind:'model',text:'',at,status:'streaming',progress:{label:'正在提交任务修改请求'},progressLog:[],taskDraft:{scope:'',rationale:''}})
+  event.conversations.captain.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at},{id:replyId,kind:'model',text:'',reasoning:'',at,status:'streaming',progress:{label:'正在提交任务修改请求'},progressLog:[],taskDraft:{scope:'',rationale:''}})
   const reply=()=>state.events[id]?.conversations.captain.find(m=>m.id===replyId)
   pendingRequests[key]=true
   try{
-   const {draft:updated,result}=await prepareTaskPlan(id,{editText:text,onProgress:(kind,data)=>{const m=reply();if(m&&kind==='plan')m.taskDraft=data.plan;if(m&&kind==='progress'){m.progress=data;m.progressLog.push(data)}}})
-   const m=reply();Object.assign(m,{status:'complete',text:updated.editHistory.at(-1).summary,taskChange:{scope:updated.scope,rationale:updated.rationale,steps:updated.steps},usage:result.usage,sources:result.sources});delete m.taskDraft
+   const {draft:updated,result}=await prepareTaskPlan(id,{editText:text,onProgress:(kind,data)=>{const m=reply();if(m&&kind==='plan')m.taskDraft=data.plan;if(m&&kind==='reasoning')m.reasoning+=data.delta||'';if(m&&kind==='progress'){m.progress=data;m.progressLog.push(data)}}})
+   const m=reply();Object.assign(m,{status:'complete',text:updated.editHistory.at(-1).summary,taskChange:{scope:updated.scope,rationale:updated.rationale,steps:updated.steps},reasoning:result.reasoning??m.reasoning,usage:result.usage,sources:result.sources});delete m.taskDraft
   }catch(error){const m=reply();if(m){m.status='interrupted';m.modelError=error.message+(error.message.includes('原待派任务未修改')?'':' 原待派任务未修改。');delete m.taskDraft}}
   finally{delete pendingRequests[key]}
  }
@@ -157,13 +157,14 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   const baseMarkdown=report?.markdown
   const history=conversation.slice(-9,-1).map(m=>({role:m.kind==='user'?'user':'assistant',text:m.text||m.analysis||''}))
   const replyId='reply-'+requestId,reply=()=>{const current=state.events[id],messages=taskId?current?.tasks.find(t=>t.id===taskId)?.conversations?.[role]:current?.conversations[role];return messages?.find(m=>m.id===replyId)}
-  conversation.push({id:replyId,kind:'model',text:'',at,status:'streaming',progress:{label:'正在提交请求'},progressLog:[],...(mode==='report'?{draft:{reportTitle:report.title,baseMarkdown,patch:{summary:'',analysis:{}}}}:{})})
+  conversation.push({id:replyId,kind:'model',text:'',reasoning:'',at,status:'streaming',progress:{label:'正在提交请求'},progressLog:[],...(mode==='report'?{draft:{reportTitle:report.title,baseMarkdown,patch:{summary:'',analysis:{}}}}:{})})
   pendingRequests[key]=true
-  let queuedText='',queuedPatch=null,progressTimer
+  let queuedText='',queuedReasoning='',queuedPatch=null,progressTimer
   function flushProgress(){
    clearTimeout(progressTimer);progressTimer=null
    const message=reply();if(!message)return
    if(queuedText){message.text+=queuedText;queuedText=''}
+   if(queuedReasoning){message.reasoning+=queuedReasoning;queuedReasoning=''}
    if(queuedPatch){message.draft.patch=queuedPatch;queuedPatch=null}
   }
   try{
@@ -175,19 +176,20 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
     if(kind==='meta')message.sources=data.sources
     if(kind==='progress'){message.progress=data;message.progressLog.push(data)}
     if(kind==='text')queuedText+=data.delta||''
+    if(kind==='reasoning')queuedReasoning+=data.delta||''
     if(kind==='report'&&mode==='report')queuedPatch=data.patch
     if(!progressTimer)progressTimer=setTimeout(flushProgress,45)
    })
    flushProgress()
    const message=reply();if(!message)return
-   Object.assign(message,{status:'complete',text:result.answer||'已根据补充内容整理报告修订稿，请核对后写入。',at:new Date().toISOString(),model:result.model,sources:result.sources,usage:result.usage})
+   Object.assign(message,{status:'complete',text:result.answer||'已根据补充内容整理报告修订稿，请核对后写入。',at:new Date().toISOString(),model:result.model,reasoning:result.reasoning??message.reasoning,sources:result.sources,usage:result.usage})
    if(mode==='report')message.proposal={id:requestId,reportId:report.id,reportTitle:report.title,baseMarkdown,patch:result.patch,text,model:result.model,sources:result.sources,applied:false}
    delete message.draft
   }catch(error){
    flushProgress()
    const message=reply()
    if(message){message.status='interrupted';message.modelError=error.message+(mode==='report'?' 原报告未修改，补充原文已保留在会话中。':' 回答尚未完成，请重试。')}
-   if(mode!=='report'&&!message?.text){if(task&&message){message.text='本次任务范围：'+task.scope+' 请按本次步骤记录实际结果，未确认内容保留在备注中。';message.modelError=error.message+' 以下为已派发任务信息。'}else{const messages=state.events[id]?.conversations[role];if(message)messages.splice(messages.indexOf(message),1);askAssistant({...state,role},id,text,{skipUser:true});messages.at(-1).modelError=error.message+' 以下为现有规则建议。'}}
+   if(mode!=='report'&&!message?.text&&!message?.reasoning){if(task&&message){message.text='本次任务范围：'+task.scope+' 请按本次步骤记录实际结果，未确认内容保留在备注中。';message.modelError=error.message+' 以下为已派发任务信息。'}else{const messages=state.events[id]?.conversations[role];if(message)messages.splice(messages.indexOf(message),1);askAssistant({...state,role},id,text,{skipUser:true});messages.at(-1).modelError=error.message+' 以下为现有规则建议。'}}
   }finally{clearTimeout(progressTimer);delete pendingRequests[key]}
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.[state.role]:event?.conversations[state.role])?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}

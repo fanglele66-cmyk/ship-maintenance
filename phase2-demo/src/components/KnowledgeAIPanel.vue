@@ -61,11 +61,12 @@
         <template v-for="(m, i) in messages" :key="i">
           <div v-if="m.role === 'assistant'" class="km km-ai">
             <div v-if="m.kind==='knowledge'" class="km-bubble knowledge-answer">
+              <ModelThinking :text="m.reasoning" :status="m.status" :answer-started="!!m.content"/>
               <MarkdownContent v-if="m.content" :content="m.content"/>
-              <small v-if="m.status==='streaming'" role="status">{{m.progress}}</small>
+              <small v-if="m.status==='streaming'" role="status">正在生成回答…</small>
               <p v-if="m.error" class="knowledge-error" role="alert">{{m.error}}</p>
               <button v-if="m.error" type="button" :disabled="isTyping" @click="inputText=m.question;sendMessage()">重试回答</button>
-              <KnowledgeReferences :sources="m.sources"/>
+              <KnowledgeReferences v-if="m.status==='complete'" :sources="m.sources"/>
             </div>
             <div v-else
               class="km-bubble"
@@ -128,6 +129,7 @@ import {auth} from '../services/auth.js'
 import {aiStreamRequest} from '../services/aiClient.js'
 import {sendKnowledgeQuestion} from '../composables/knowledgeChat.js'
 import MarkdownContent from './MarkdownContent.vue'
+import ModelThinking from './ModelThinking.vue'
 import KnowledgeReferences from './KnowledgeReferences.vue'
 
 const props = defineProps({

@@ -1,10 +1,16 @@
 import {readEventStream} from '../src/services/eventStream.js'
 
-export async function invokeModel(provider,config,system,user,fetcher=fetch,{onDelta,signal,onActivity}={}){
+export async function invokeModel(provider,config,system,user,fetcher=fetch,{onDelta,onReasoning,signal,onActivity}={}){
  const base=provider.baseUrl.replace(/\/+$/,''),prefix=/\/v1$/.test(base)?base:base+'/v1',anthropic=provider.protocol==='anthropic'
  const headers={'Content-Type':'application/json',...(anthropic?{'x-api-key':provider.apiKey,'anthropic-version':'2023-06-01'}:{Authorization:'Bearer '+provider.apiKey})}
  const messages=anthropic?[{role:'user',content:user}]:[{role:'system',content:system},{role:'user',content:user}]
  const body={model:provider.model,max_tokens:config.maxTokens,messages,stream:!!onDelta,...(anthropic?{system}:onDelta?{stream_options:{include_usage:true}}:{})}
+ // Only interactive callers opt in. Never infer thinking from answer text or
+ // expose signatures/redacted blocks; consume the provider's dedicated channel.
+ const captureReasoning=typeof onReasoning==='function'
+ if(captureReasoning&&new URL(base).hostname==='api.deepseek.com')body.thinking={type:'enabled'}
+ let reasoning=''
+ async function appendReasoning(delta){if(!captureReasoning||typeof delta!=='string'||!delta)return;reasoning+=delta;if(reasoning.length>120000)throw Error('模型思考内容超出限制。');await onReasoning(delta,reasoning)}
  const timeout=AbortSignal.timeout(config.timeoutMs),requestSignal=signal?AbortSignal.any([signal,timeout]):timeout
  let response
  try{response=await fetcher(prefix+(anthropic?'/messages':'/chat/completions'),{method:'POST',headers,body:JSON.stringify(body),signal:requestSignal,redirect:'error'})}catch(error){throw Error(error.name==='TimeoutError'?'模型响应超时，请稍后重试。':'模型接口暂时无法连接，请检查网络和配置。')}
@@ -26,21 +32,22 @@ export async function invokeModel(provider,config,system,user,fetcher=fetch,{onD
     stopReason=anthropic?(data.delta?.stop_reason||stopReason):(data.choices?.[0]?.finish_reason||stopReason)
     if(stopReason==='max_tokens'||stopReason==='length')throw Error('模型输出被截断，请提高输出上限后重试。')
     const delta=anthropic?(type==='content_block_delta'&&data.delta?.type==='text_delta'?data.delta.text:type==='content_block_start'&&data.content_block?.type==='text'?data.content_block.text:''):data.choices?.[0]?.delta?.content
-    // Thinking/signature/reasoning deltas are deliberately not forwarded.
+    await appendReasoning(anthropic?(type==='content_block_delta'&&data.delta?.type==='thinking_delta'?data.delta.thinking:type==='content_block_start'&&data.content_block?.type==='thinking'?data.content_block.thinking:''):data.choices?.[0]?.delta?.reasoning_content)
     if(typeof delta==='string'&&delta){text+=delta;if(text.length>120000)throw Error('模型输出超出限制。');await onDelta(delta,text)}
     if(anthropic&&type==='message_stop'){complete=true;break}
    }
   }catch(error){if(requestSignal.aborted)throw Error(timeout.aborted?'模型响应超时，请稍后重试。':'请求已取消。');throw error}
   if(!complete)throw Error('模型连接提前结束，内容尚未生成完整，请重试。')
   if(!text.trim())throw Error('模型没有返回可显示的回答。')
-  return {text,usage,model}
+  return {text,usage,model,...(captureReasoning?{reasoning}:{})}
  }
  const data=await response.json()
  if(data.stop_reason==='max_tokens'||data.choices?.[0]?.finish_reason==='length')throw Error('模型输出被截断，请提高输出上限后重试。')
  const text=anthropic?(data.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n'):data.choices?.[0]?.message?.content
  if(!text?.trim())throw Error('模型没有返回可显示的回答。')
+ await appendReasoning(anthropic?(data.content||[]).filter(x=>x.type==='thinking').map(x=>x.thinking||'').join('\n'):data.choices?.[0]?.message?.reasoning_content)
  const usage={inputTokens:data.usage?.input_tokens??data.usage?.prompt_tokens??0,outputTokens:data.usage?.output_tokens??data.usage?.completion_tokens??0}
- return {text,usage,model:data.model||provider.model}
+ return {text,usage,model:data.model||provider.model,...(captureReasoning?{reasoning}:{})}
 }
 export function parseReportPatch(text){
  let value

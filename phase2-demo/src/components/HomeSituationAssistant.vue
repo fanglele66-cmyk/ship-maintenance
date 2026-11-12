@@ -4,7 +4,7 @@
   <div ref="stream" class="lc-conversation situation-conversation">
    <article class="lc-message situation-overview"><strong class="situation-overview-label"><span aria-hidden="true">✦</span> 工况概览</strong><p>当前{{chronology.periods.at(-1)?.status||'数据未就绪'}}，航速 {{readings.speed}} kn，主机转速 {{readings.rpm}} rpm，燃油指令 {{readings.fuelCommand??'—'}}%。</p><time v-if="readings.sampledAt" :datetime="readings.sampledAt">{{timeText(readings.sampledAt)}}</time></article>
    <article v-if="health" class="lc-message situation-overview"><strong>设备健康研判</strong><p>{{health.conclusion}}</p><time>{{health.completedAt}}</time></article>
-   <article v-for="(message,i) in messages" :key="i" :class="['lc-message',message.role]"><MarkdownContent v-if="message.text" :content="message.text"/><time v-if="message.text" :datetime="message.at">{{timeText(message.at)}}</time></article>
+   <article v-for="(message,i) in messages" :key="i" :class="['lc-message',message.role]"><ModelThinking v-if="message.role==='assistant'" :text="message.reasoning" :status="message.status" :answer-started="!!message.text"/><MarkdownContent v-if="message.text" :content="message.text"/><time v-if="message.text" :datetime="message.at">{{timeText(message.at)}}</time></article>
    <p v-if="pending" role="status" class="situation-status">正在分析工况资料…</p>
    <p v-if="error" role="alert" class="situation-error">{{error}}</p>
    <div v-if="!messages.length" class="lc-followups situation-questions" aria-label="工况追问"><button v-for="question in questions" :key="question" type="button" :disabled="pending" @click="ask(question)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{question}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
@@ -17,6 +17,7 @@ import {ref,watch,nextTick,onBeforeUnmount} from 'vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 import {aiStreamRequest} from '../services/aiClient'
 import MarkdownContent from './MarkdownContent.vue'
+import ModelThinking from './ModelThinking.vue'
 import {timeText} from '../workflow/eventLifecycle'
 const props=defineProps({open:Boolean,title:{type:String,default:'态势助手'},collapsible:{type:Boolean,default:true},health:{type:Object,default:null},chronology:{type:Object,required:true},readings:{type:Object,required:true}})
 defineEmits(['close'])
@@ -27,16 +28,16 @@ function submitOnEnter(event){if(event.isComposing)return;event.preventDefault()
 async function ask(text){
  if(!text.trim()||pending.value)return
  const history=messages.value.map(m=>({role:m.role,content:m.text})).slice(-8)
- messages.value.push({role:'user',text,at:new Date().toISOString()});messages.value.push({role:'assistant',text:'',at:new Date().toISOString()})
+ messages.value.push({role:'user',text,at:new Date().toISOString()});messages.value.push({role:'assistant',text:'',reasoning:'',status:'streaming',at:new Date().toISOString()})
  const index=messages.value.length-1;input.value='';error.value='';fileNotice.value='';pending.value=true
  nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))
  const requestController=new AbortController();controller=requestController
  try{
   const result=await aiStreamRequest({mode:'situation',role:store.state.role,text,history,situation:{ship:'长航碧玉',readings:props.readings,periods:props.chronology.periods,source:props.chronology.source,health:props.health?{conclusion:props.health.conclusion,next:props.health.next,detail:props.health.detail,completedAt:props.health.completedAt}:undefined}},(kind,data)=>{
-   if(kind==='text'&&controller===requestController){messages.value[index].text+=data.delta;nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))}
+   if(controller===requestController&&['text','reasoning'].includes(kind)){messages.value[index][kind==='text'?'text':'reasoning']+=data.delta||'';nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))}
   },{signal:requestController.signal})
-  if(controller===requestController){messages.value[index].text=result.answer;nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))}
- }catch(e){if(!requestController.signal.aborted)error.value=e.message}
+  if(controller===requestController){Object.assign(messages.value[index],{text:result.answer,reasoning:result.reasoning??messages.value[index].reasoning,status:'complete'});nextTick(()=>stream.value?.scrollTo({top:stream.value.scrollHeight}))}
+ }catch(e){if(controller===requestController)messages.value[index].status='interrupted';if(!requestController.signal.aborted)error.value=e.message}
  finally{if(controller===requestController){pending.value=false;controller=null}}
 }
 async function attach(event){const file=event.target.files?.[0];if(!file)return;fileNotice.value='';try{if(file.size>2*1024*1024)throw Error('请选择不超过 2 MB 的文字记录。');input.value=await file.text();fileNotice.value='文件内容已加入会话草稿';await nextTick();inputEl.value?.focus()}catch(e){fileNotice.value=e.message}event.target.value=''}

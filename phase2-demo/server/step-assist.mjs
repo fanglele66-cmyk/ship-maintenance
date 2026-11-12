@@ -76,7 +76,7 @@ export async function assistTaskStep(input,{root,configuration,knowledge,fetcher
  const data={...modelContext,history:modelContext.history.map(({stepIndex,...entry})=>entry),knowledge:sources.map(({id,file,title,startLine,endLine,text})=>({id,file,title,startLine,endLine,text}))}
  let result
  try{
-  result=await invokeModel(provider,{...config,maxTokens:8192},stepAssistInstruction+'\n'+(root?await skillInstruction(root,'ship-task-assistant'):'')+'\n响应传输格式：整个回复必须是一个 JSON 对象，首字符为 {，尾字符为 }。自然语言只能写在 text 或 note 字段内，不能直接输出一段回答。咨询示例：{"kind":"answer","text":"当前任务列出了适配本机的备用总成及密封件，具体型号以批准作业卡为准。"}；追问用 question；满足记录条件才用 draft 并附 note。',stepAssistUserContent(provider.protocol,data,images),fetcher,{signal,onDelta:()=>{},onActivity:()=>emit('progress',{stage:'analysis',label:'AI 正在核对已提供的现场信息'})})
+  result=await invokeModel(provider,{...config,maxTokens:8192},stepAssistInstruction+'\n'+(root?await skillInstruction(root,'ship-task-assistant'):'')+'\n响应传输格式：整个回复必须是一个 JSON 对象，首字符为 {，尾字符为 }。自然语言只能写在 text 或 note 字段内，不能直接输出一段回答。咨询示例：{"kind":"answer","text":"当前任务列出了适配本机的备用总成及密封件，具体型号以批准作业卡为准。"}；追问用 question；满足记录条件才用 draft 并附 note。',stepAssistUserContent(provider.protocol,data,images),fetcher,{signal,onReasoning:delta=>emit('reasoning',{delta}),onDelta:()=>{},onActivity:()=>emit('progress',{stage:'analysis',label:'AI 正在核对已提供的现场信息'})})
  }catch(error){
   if(images.length&&/HTTP (400|415|422)\b/.test(error.message))throw Error('当前模型接口未接受图片请求。请检查模型是否支持图片及接口协议；图片未被忽略，也未生成判断。')
   throw error
@@ -92,5 +92,5 @@ export async function assistTaskStep(input,{root,configuration,knowledge,fetcher
  }
  let stepAssist=normalizeStepAssistResult(value)
  stepAssist.text=visibleText(stepAssist.text);if(stepAssist.note)stepAssist.note=visibleText(stepAssist.note)
- return {stepAssist,answer:stepAssist.text,source:'model',sources,model:result.model,usage:result.usage,provider:provider.name}
+ return {stepAssist,answer:stepAssist.text,source:'model',sources,model:result.model,usage:result.usage,reasoning:result.reasoning,provider:provider.name}
 }

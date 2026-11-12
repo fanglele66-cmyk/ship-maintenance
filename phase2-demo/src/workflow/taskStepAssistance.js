@@ -31,12 +31,15 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
  if(estimated>4*1024*1024)throw Error('记录中的图片较大，请压缩图片后重试；现有备注和对话未修改。')
  const at=now(),replyId=crypto.randomUUID(),baseNote=record.note||'',baseResult=record.result||'',baseExecutionStatus=record.executionStatus||'',baseStep=signature(task.steps[stepIndex])
  conversation.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at,stepAssistance:true,stepIndex,images:copy(body.images||[]),attachments:copy(body.attachments||[])})
- conversation.push({id:replyId,kind:'step-assist',stepIndex,baseNote,baseResult,baseExecutionStatus,baseStep,at,status:'streaming',response:null,progress:'正在整理本步骤的现场信息…',progressLog:[]})
+ conversation.push({id:replyId,kind:'step-assist',stepIndex,baseNote,baseResult,baseExecutionStatus,baseStep,at,status:'streaming',reasoning:'',response:null,progress:'正在整理本步骤的现场信息…',progressLog:[]})
  const locate=()=>state.events[eventId]?.tasks.find(t=>t.id===taskId)?.conversations?.[role]?.find(m=>m.id===replyId)
  pendingRequests[key]=true
  try{
   const result=await request(body,(kind,data)=>{
-   const m=locate();if(!m||kind!=='progress')return
+   const m=locate();if(!m)return
+   if(kind==='reasoning'){m.reasoning+=data.delta||'';return}
+   if(kind==='meta'){m.sources=data.sources||[];return}
+   if(kind!=='progress')return
    m.progress=data.label||'正在整理本步骤的现场信息…'
    const entry={stage:data.stage||'processing',label:m.progress}
    m.progressLog||=[]
@@ -46,7 +49,7 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
   if(!message)return null
   const latest=state.events[eventId]?.tasks.find(t=>t.id===taskId)
   if(!canUseStepAssist(state.events[eventId],latest,role)||signature(latest.steps[stepIndex])!==baseStep)throw Error('任务范围或状态已变化，请回到当前步骤重新协助。')
-  Object.assign(message,{response,status:'complete',source:result.source||'model',model:result.model,usage:result.usage,sources:result.sources||[],at:now()})
+  Object.assign(message,{response,status:'complete',source:result.source||'model',reasoning:result.reasoning??message.reasoning,model:result.model,usage:result.usage,sources:result.sources||[],at:now()})
   message.progressLog||=[]
   message.progressLog.push({stage:'complete',label:response.kind==='answer'?'已回答您的问题':response.kind==='question'?'已整理待确认的问题':'备注草稿已生成，待您核对'})
   for(const old of latest.conversations[role])if(old.id!==replyId&&old.kind==='step-assist'&&old.stepIndex===stepIndex&&old.response?.kind==='draft'&&!old.appliedAt)old.supersededAt=message.at

@@ -71,7 +71,7 @@ test('report API emits previews but only makes a validated completed patch appli
   const final=events.find(e=>e.event==='done')
   if(complete)assert.deepEqual(final.data.patch,patch)
   else{assert.equal(final,undefined);assert.ok(events.some(e=>e.event==='error'))}
-  assert.doesNotMatch(output,/private-test-key|private hidden reasoning/)
+  assert.doesNotMatch(output,/private-test-key/);assert.equal(events.find(e=>e.event==='reasoning').data.delta,'private hidden reasoning')
  }
 })
 test('browser stream client delivers progress before completion and rejects disconnects',async t=>{

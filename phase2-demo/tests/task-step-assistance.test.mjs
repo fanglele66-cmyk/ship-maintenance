@@ -35,6 +35,17 @@ test('free-form answers remain conversation messages without note adoption or ch
  assert.equal(records(f),before)
 })
 
+test('step thinking streams independently, persists, and never becomes a note or model conversation fact',async()=>{
+ const f=fixture(),before=records(f)
+ const message=await ask(f,async(_body,emit)=>{
+  emit('reasoning',{delta:'先核对本步事实。'});emit('meta',{sources:[{id:'K1'}]})
+  assert.equal(f.task.conversations.engineer.at(-1).reasoning,'先核对本步事实。')
+  return {...question,reasoning:'先核对本步事实。',sources:[{id:'K1'}]}
+ })
+ assert.equal(JSON.parse(JSON.stringify(message)).reasoning,'先核对本步事实。');assert.equal(records(f),before)
+ await ask(f,async(body)=>{assert.doesNotMatch(JSON.stringify(body.history),/先核对本步事实/);return question})
+})
+
 test('only the current owned C2 investigation or repair task can start step collaboration',async()=>{
  for(const kind of ['investigation','repair']){
   const f=fixture(kind),message=await ask(f)
