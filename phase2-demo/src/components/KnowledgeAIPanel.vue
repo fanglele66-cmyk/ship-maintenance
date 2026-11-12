@@ -46,7 +46,7 @@
           <span class="kap-title">AI 助手</span>
         </div>
         <div class="kap-header-right">
-          <ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="selectConversation" @new-conversation="newConversation" />
+          <ConversationHistory :conversations="sessions.conversations.value" :current-id="sessions.active.value.id" @select="selectConversation" @new-conversation="newConversation" deletable @delete="deleteConversation" />
           <button class="kap-close-btn" @click="closePanel" title="关闭">✕</button>
         </div>
       </div>
@@ -60,7 +60,14 @@
         </div>
         <template v-for="(m, i) in messages" :key="i">
           <div v-if="m.role === 'assistant'" class="km km-ai">
-            <div
+            <div v-if="m.kind==='knowledge'" class="km-bubble knowledge-answer">
+              <MarkdownContent v-if="m.content" :content="m.content"/>
+              <small v-if="m.status==='streaming'" role="status">{{m.progress}}</small>
+              <p v-if="m.error" class="knowledge-error" role="alert">{{m.error}}</p>
+              <button v-if="m.error" type="button" :disabled="isTyping" @click="inputText=m.question;sendMessage()">重试回答</button>
+              <KnowledgeReferences :sources="m.sources"/>
+            </div>
+            <div v-else
               class="km-bubble"
               :class="{ 'km-bubble-structured': hasKnowledgeCards(m) }"
               v-html="getMsgContent(m)"
@@ -102,7 +109,7 @@
             v-model="inputText" class="kap-input-field"
             placeholder="输入追问..." @keyup.enter="sendMessage"
           />
-          <button class="kap-send-btn" :disabled="!inputText.trim()" @click="sendMessage" title="发送">
+          <button class="kap-send-btn" :disabled="!inputText.trim() || isTyping" @click="sendMessage" title="发送">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
           </button>
         </div>
@@ -114,9 +121,14 @@
 
 <script setup>
 import ConversationHistory from './messages/ConversationHistory.vue'
-import { useAgentConversations, demoConversations } from '@/composables/useAgentConversations'
+import { useAgentConversations } from '@/composables/useAgentConversations'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { knowledgeDocs } from '@/mock/knowledge'
+import {auth} from '../services/auth.js'
+import {aiStreamRequest} from '../services/aiClient.js'
+import {sendKnowledgeQuestion} from '../composables/knowledgeChat.js'
+import MarkdownContent from './MarkdownContent.vue'
+import KnowledgeReferences from './KnowledgeReferences.vue'
 
 const props = defineProps({
   compact: { type: Boolean, default: false },
@@ -261,7 +273,7 @@ const hasFilter = computed(() => props.selectedDevice !== '全部' || props.sele
 
 const contextBarText = computed(() => {
   const parts = []
-  if (props.searchQuery) parts.push(`搜索"${props.searchQuery}"`)
+  if (props.searchQuery) parts.push(`搜索"${escapeHtml(props.searchQuery)}"`)
   if (props.selectedDevice !== '全部') parts.push(props.selectedDevice)
   if (props.selectedSystem !== '全部系统') {
     const label = props.selectedSystem.startsWith(props.selectedDevice)
@@ -275,66 +287,23 @@ const contextBarText = computed(() => {
 
 // ============ 消息系统 ============
 const msgsRef = ref(null)
-const isTyping = ref(false)
-const sessions=useAgentConversations(computed(()=>'knowledge'),id=>demoConversations(id).map(item=>({...item,messages:item.messages.map(message=>({role:message.role,content:message.text,ts:item.updatedAt}))})))
+const sessions=useAgentConversations(computed(()=>'knowledge:'+ (auth.user?.username||'guest')),()=>[],{persist:true})
 const inputText=sessions.draft
-const messages=computed({get:()=>sessions.active.value.messages,set:value=>{sessions.active.value.messages=value}})
+const messages=computed(()=>sessions.active.value.messages)
+const isTyping=computed(()=>messages.value.some(m=>m.status==='streaming'))
+const requests=new Map()
 function selectConversation(id){sessions.select(id);scrollToBottom()}
 function newConversation(){sessions.newConversation();scrollToBottom()}
-let initialResponseTimer = null
-
-function scrollToBottom() {
-  nextTick(() => { if (msgsRef.value) msgsRef.value.scrollTop = msgsRef.value.scrollHeight })
-}
-
-function streamMessage(msg, fullText) {
-  const parts = fullText.split(/(<[^>]+>|\s+)/g).filter(Boolean)
-  let pos = 0
-  if (!msg) return
-  msg.streamed = ''
-  const timer = setInterval(() => {
-    msg.streamed = parts.slice(0, pos + 1).join('')
-    pos++
-    scrollToBottom()
-    if (pos >= parts.length) {
-      clearInterval(timer)
-      msg.streamed = undefined
-      msg.content = fullText
-      scrollToBottom()
-    }
-  }, 16)
-}
-
-function pushAssistantMessage(content, delay = 400, session = sessions.active.value) {
-  const message = { role: 'assistant', content: '', raw: content, ts: Date.now() }
-  session.messages.push(message)
-  sessions.touch(session)
-  setTimeout(() => streamMessage(message, content), delay)
-}
-
-function pushUserMessage(text) {
-  messages.value.push({ role: 'user', content: text, ts: Date.now() })
-  sessions.touch()
-}
-
-function generateInitialResponse() {
-  const session=sessions.active.value
-  if (initialResponseTimer) clearTimeout(initialResponseTimer)
-  isTyping.value = true
-  initialResponseTimer = setTimeout(() => {
-    initialResponseTimer = null
-    isTyping.value = false
-    if (props.searchQuery) pushAssistantMessage(generateSearchSummary(),400,session)
-    else if (hasFilter.value) pushAssistantMessage(generateFilterSummary(),400,session)
-    else pushAssistantMessage(generateWelcome(),400,session)
-    scrollToBottom()
-  }, 600)
-}
+function deleteConversation(id){requests.get(id)?.abort();requests.delete(id);sessions.remove(id)}
+function scrollToBottom(){nextTick(()=>{if(msgsRef.value)msgsRef.value.scrollTop=msgsRef.value.scrollHeight})}
+function pushAssistantMessage(content){sessions.active.value.messages.push({role:'assistant',content,ts:Date.now()});sessions.touch();scrollToBottom()}
+function generateInitialResponse(){pushAssistantMessage(props.searchQuery?generateSearchSummary():hasFilter.value?generateFilterSummary():generateWelcome())}
+const escapeHtml=text=>String(text).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))
 
 // ============ AI 回复生成 ============
 function generateSearchSummary() {
   const docs = props.filteredDocs
-  if (docs.length === 0) return `没有找到与"<b>${props.searchQuery}</b>"匹配的文档。`
+  if (docs.length === 0) return `没有找到与"<b>${escapeHtml(props.searchQuery)}</b>"匹配的文档。`
   const top = docs.slice(0, 3)
   const deviceCounts = {}; const typeCounts = {}
   docs.forEach(d => {
@@ -344,7 +313,7 @@ function generateSearchSummary() {
   const deviceSummary = Object.entries(deviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join('、')
   const typeSummary = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join('、')
   const docLinks = top.map(d => `<div class="km-ref" data-doc-id="${d.id}">📄 <b>${d.title}</b><span class="km-ref-meta">${d.device} · ${d.docType} · ${d.id}</span></div>`).join('')
-  return `根据搜索"<b>${props.searchQuery}</b>"共找到 <b>${docs.length}</b> 篇相关文档，涉及 ${deviceSummary}，涵盖 ${typeSummary}。<br><br><div class="km-section-title">推荐阅读</div>${docLinks}<br>💡 可在左侧资料列表按文档名称查阅原文。`
+  return `根据搜索"<b>${escapeHtml(props.searchQuery)}</b>"共找到 <b>${docs.length}</b> 篇相关文档，涉及 ${deviceSummary}，涵盖 ${typeSummary}。<br><br><div class="km-section-title">推荐阅读</div>${docLinks}<br>💡 可在左侧资料列表按文档名称查阅原文。`
 }
 
 function generateFilterSummary() {
@@ -362,120 +331,14 @@ function generateWelcome() {
 }
 
 // ============ 文档搜索 ============
-const lastSearchKeyword = ref('')
 
-function searchDocs(keyword) {
-  if (!keyword) return null
-  const q = keyword.toLowerCase()
-  const matches = knowledgeDocs.filter(d =>
-    d.title.toLowerCase().includes(q) ||
-    d.subcategory.toLowerCase().includes(q) ||
-    d.category.toLowerCase().includes(q) ||
-    d.device.toLowerCase().includes(q) ||
-    d.docType.toLowerCase().includes(q) ||
-    d.id.toLowerCase().includes(q)
-  )
-  return matches
-}
-
-function buildSearchResultHtml(matches, keyword) {
-  if (matches.length === 0) {
-    return `未找到与"<b>${keyword}</b>"相关的文档。试试换个关键词？`
-  }
-  const top = matches.slice(0, 5)
-  const docLinks = top.map(d =>
-    `<div class="km-ref" data-doc-id="${d.id}">📄 <b>${d.title}</b><span class="km-ref-meta">${d.device} · ${d.docType} · ${d.id}</span></div>`
-  ).join('')
-
-  const deviceStats = {}
-  matches.forEach(d => { deviceStats[d.device] = (deviceStats[d.device] || 0) + 1 })
-  const typeStats = {}
-  matches.forEach(d => { typeStats[d.docType] = (typeStats[d.docType] || 0) + 1 })
-  const devStr = Object.entries(deviceStats).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join('、')
-  const typeStr = Object.entries(typeStats).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join('、')
-
-  return `找到 <b>${matches.length}</b> 篇与"<b>${keyword}</b>"相关的文档：<br>涉及 ${devStr}，涵盖 ${typeStr}<br><br>${docLinks}${matches.length > 5 ? `<br>…还有 ${matches.length - 5} 篇` : ''}<br><br>💡 可在左侧资料列表按文档名称查阅原文。`
-}
-
-// ============ AI 回复生成（含搜索） ============
-function generateFollowUp(text) {
-  const t = text.toLowerCase()
-
-  // 搜索意图：帮我找 / 搜索 / 查一下 / 找一找 + 关键词
-  const searchMatch = t.match(/(?:帮我找|搜索|查找|查一下|找一下|找找|有没有|找到)(.+?(?:文件|文档|资料|案例|手册|规程|标准|通告))?/)
-  const searchKeyword = searchMatch ? (searchMatch[2] || searchMatch[1]) : null
-  if (searchKeyword || /找.*文件|找.*文档|搜索/.test(t)) {
-    const kw = searchKeyword || t.replace(/.*?(帮我|请|可以|想|要|能)\s*(找|搜索|查找|查|看)/, '').replace(/的?(文件|文档|资料|案例|手册|规程|标准|通告)?$/, '').trim()
-    if (kw && kw.length > 0) {
-      const matches = searchDocs(kw)
-      lastSearchKeyword.value = kw
-      return buildSearchResultHtml(matches, kw)
-    }
-  }
-
-  // 意图匹配
-  if (/原因|为什么|故障|什么原因/.test(t)) {
-    const docs = knowledgeDocs.filter(d => d.docType === '故障案例')
-    if (docs.length > 0) {
-      const d = docs[0]
-      return `根据《<b>${d.title}</b>》等 ${docs.length} 篇故障案例，常见原因包括：<br><br>• 密封件老化或损坏<br>• 运动部件磨损超标<br>• 内部通道杂质堵塞<br>• 润滑油路不畅<br><br>📄 <div class="km-ref" data-doc-id="${d.id}">相关案例：${d.title}</div>`
-    }
-    return '建议在搜索框中输入具体故障现象。'
-  }
-  if (/维修|处理|怎么修|步骤|怎么做/.test(t)) {
-    const docs = knowledgeDocs.filter(d => d.docType === '操作规程' || d.docType === '设备手册')
-    if (docs.length > 0) {
-      const list = docs.slice(0, 3).map(d => `<div class="km-ref" data-doc-id="${d.id}">📄 ${d.title}</div>`).join('')
-      return `以下是 ${docs.length} 篇相关操作规程：<br>${list}<br><br>一般维修步骤：<br>1️⃣ 停机断电<br>2️⃣ 拆卸检查<br>3️⃣ 更换损坏件<br>4️⃣ 清洗通道<br>5️⃣ 装配调试<br>6️⃣ 试车验收`
-    }
-    return '建议在搜索框中输入具体关键词。'
-  }
-  if (/备件|零件|型号|规格/.test(t)) {
-    const docs = knowledgeDocs.filter(d => d.docType === '设备手册')
-    if (docs.length > 0) {
-      const list = docs.slice(0, 3).map(d => `<div class="km-ref" data-doc-id="${d.id}">📄 ${d.title}</div>`).join('')
-      return `以下是相关的设备手册：<br>${list}<br><br>备件信息通常在"备件清单"章节中，可在左侧资料列表查阅原文。`
-    }
-    return '建议搜索对应设备的手册文档。'
-  }
-  if (/预防|检查|日常|保养|维保/.test(t)) {
-    const docs = knowledgeDocs.filter(d => d.docType === '操作规程')
-    if (docs.length > 0) {
-      const list = docs.slice(0, 3).map(d => `<div class="km-ref" data-doc-id="${d.id}">📄 ${d.title}</div>`).join('')
-      return `日常预防措施：<br>1️⃣ 缩短检查周期<br>2️⃣ 定期润滑清洁<br>3️⃣ 建立备件库存<br>4️⃣ 及时记录异常<br><br>相关操作规程：<br>${list}`
-    }
-    return '日常预防措施：<br>1️⃣ 缩短检查周期<br>2️⃣ 定期润滑清洁<br>3️⃣ 建立备件库存<br>4️⃣ 及时记录异常'
-  }
-  if (/参数|标准|阈值|正常范围|多少/.test(t)) {
-    const docs = knowledgeDocs.filter(d => d.docType === '设备手册')
-    if (docs.length > 0) {
-      const d = docs[0]
-      return `建议查看《<b>${d.title}</b>》。以增压器为例：<br>• 转速：18,500 rpm<br>• 压比：3.2<br>• 效率：≥72%<br><br>📄 <div class="km-ref" data-doc-id="${d.id}">参数来源：${d.title}</div>`
-    }
-    return '建议搜索"技术参数+设备名"。'
-  }
-  // 兜底：尝试搜索
-  const fallbackMatches = searchDocs(t.replace(/^(我想|我要|帮我|请|可以|能)\s*/, '').trim())
-  if (fallbackMatches && fallbackMatches.length > 0) {
-    lastSearchKeyword.value = t
-    return buildSearchResultHtml(fallbackMatches, t)
-  }
-  return `已收到。试试直接问我：<br>• "帮我找增压器相关的文件"<br>• "搜索冷却系统操作规程"<br>• "故障案例有哪些"`
-}
-
-function sendMessage() {
-  const text = inputText.value.trim()
-  if (!text) return
-  const session=sessions.active.value
-  pushUserMessage(text)
-  inputText.value = ''
-  isTyping.value = true
-  scrollToBottom()
-  setTimeout(() => {
-    isTyping.value = false
-    pushAssistantMessage(generateFollowUp(text),400,session)
-    scrollToBottom()
-  }, 800)
+async function sendMessage(){
+  const text=inputText.value.trim()
+  if(!text||isTyping.value)return
+  const session=sessions.active.value,controller=new AbortController()
+  inputText.value='';requests.set(session.id,controller)
+  try{await sendKnowledgeQuestion(session,text,contextBarText.value,aiStreamRequest,{signal:controller.signal,onChange:()=>{sessions.touch(session);if(sessions.active.value.id===session.id)scrollToBottom()}})}
+  finally{if(requests.get(session.id)===controller)requests.delete(session.id)}
 }
 
 const chips = computed(() => {
@@ -490,15 +353,6 @@ const chips = computed(() => {
       { text: '搜索冷却系统操作规程', highlight: false },
       { text: '主机设备手册有哪些', highlight: false },
       { text: '查找控制空气系统资料', highlight: true }
-    ]
-  }
-  // 有搜索关键词 → 基于搜索结果推荐
-  if (lastSearchKeyword.value) {
-    return [
-      { text: `这些文档的常见原因？`, highlight: false },
-      { text: `查看维修步骤`, highlight: false },
-      { text: `相关技术参数`, highlight: false },
-      { text: `帮你找其他内容`, highlight: true }
     ]
   }
   // 通用追问
@@ -526,7 +380,7 @@ watch([() => props.selectedDevice, () => props.selectedSystem, () => props.selec
 
 function getMsgContent(m) {
   if (m.streamed !== undefined) return m.streamed + '<span class="cursor-blink">▍</span>'
-  return m.content
+  return m.content || m.raw || m.text || ''
 }
 
 function hasKnowledgeCards(message) {
@@ -610,12 +464,14 @@ function toggleVoice() {
 }
 
 onBeforeUnmount(() => {
-  if (initialResponseTimer) clearTimeout(initialResponseTimer)
+  for(const controller of requests.values())controller.abort()
   stopVoice()
 })
 </script>
 
 <style scoped>
+.knowledge-answer :deep(.markdown-content){font-size:13px;line-height:1.75}.knowledge-answer small{color:#8b8f99}.knowledge-error{color:#b04737;font-size:12px}
+
 .knowledge-assistant-shell {
   flex: 0 0 400px;
   width: 400px;

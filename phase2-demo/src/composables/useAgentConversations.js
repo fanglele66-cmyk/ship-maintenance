@@ -1,31 +1,47 @@
-import { computed, reactive } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 // Prototype session registry: isolated by agent, retained across page mounts in this runtime.
 const agents = reactive({})
 let sequence = 0
 export function createConversation(title = '新对话', messages = [], updatedAt = Date.now()) {
-  return { id: `conversation-${++sequence}`, title, messages, draft: '', updatedAt }
+  return { id: `conversation-${Date.now()}-${++sequence}`, title, messages, draft: '', updatedAt }
 }
-export function useAgentConversations(agentId, seeds = () => []) {
+export function useAgentConversations(agentId, seeds = () => [], {persist=false}={}) {
   const agent = computed(() => {
     const id = agentId.value
     if (!agents[id]) {
       const initial = createConversation()
       agents[id] = { activeId: initial.id, primaryId: initial.id, conversations: [initial, ...seeds(id)] }
+      if(persist)try{
+        const saved=JSON.parse(localStorage.getItem('engine-room-agent:'+id))
+        if(saved?.conversations?.length&&saved.conversations.every(c=>typeof c.id==='string'&&Array.isArray(c.messages))){
+          agents[id]=saved
+          if(!saved.conversations.some(c=>c.id===saved.activeId))agents[id].activeId=saved.conversations[0].id
+          for(const c of agents[id].conversations)for(const m of c.messages)if(m.status==='streaming'){m.status='error';m.error='上次回答已中断，请重新提问。'}
+        }
+      }catch{}
     }
     return agents[id]
   })
   const active = computed(() => agent.value.conversations.find(item => item.id === agent.value.activeId))
-  const draft = computed({ get: () => active.value.draft, set: value => { active.value.draft = value } })
+  const draft = computed({ get: () => active.value.draft || '', set: value => { active.value.draft = value } })
   const conversations = computed(() => [...agent.value.conversations].sort((a,b) => b.updatedAt-a.updatedAt))
   function select(id) { if (agent.value.conversations.some(item => item.id === id)) agent.value.activeId = id }
   function newConversation() { const item = createConversation(); agent.value.conversations.push(item); agent.value.activeId = item.id }
+  function remove(id) {
+    if(!agent.value.conversations.some(item=>item.id===id))return
+    agent.value.conversations=agent.value.conversations.filter(item=>item.id!==id)
+    if(!agent.value.conversations.length)newConversation()
+    if(agent.value.activeId===id)agent.value.activeId=conversations.value[0].id
+    if(agent.value.primaryId===id)agent.value.primaryId=agent.value.activeId
+  }
   function touch(item = active.value) {
     const first = item.messages.find(message => message.role === 'user' && (message.text || message.content))
     if (item.title === '新对话' && first) item.title = (first.text || first.content).slice(0,28)
     item.updatedAt = Date.now()
   }
-  return { agent, active, draft, conversations, select, newConversation, touch }
+  if(persist)watch(agent,value=>{try{localStorage.setItem('engine-room-agent:'+agentId.value,JSON.stringify(value))}catch{}},{deep:true,flush:'post'})
+  return { agent, active, draft, conversations, select, newConversation, remove, touch }
 }
 export function demoConversations(agentId) {
   const subject = agentId === 'knowledge' ? '知识资料' : agentId.includes('maintenance-advice') ? '轴承维保建议' : agentId.includes('maintenance-arrangements') ? '已有维保安排' : agentId.includes('device') ? '主机设备' : agentId.includes('ship') ? '船舶运行' : '当前事项'

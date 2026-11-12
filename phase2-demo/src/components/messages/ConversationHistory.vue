@@ -10,25 +10,30 @@
   <section v-if="opened" class="conversation-history-panel" role="dialog" aria-label="历史对话" @keydown.esc.stop="close">
     <header><div><strong>历史对话</strong><small>当前智能体的对话</small></div><button ref="closeButton" type="button" aria-label="关闭历史消息" @click="close">✕</button></header>
     <div class="conversation-history-list">
-      <button v-for="conversation in visibleConversations" :key="conversation.id" class="conversation-history-item" :class="{active:conversation.id===currentId}" type="button" :aria-current="conversation.id===currentId?'true':undefined" @click="select(conversation.id)">
+      <article v-for="conversation in visibleConversations" :key="conversation.id" class="conversation-history-item" :class="{active:conversation.id===currentId}">
+       <button class="conversation-history-select" type="button" :aria-current="conversation.id===currentId?'true':undefined" @click="select(conversation.id)">
         <div class="conversation-history-item-heading"><strong>{{ conversation.title }}</strong><span v-if="conversation.id===currentId">当前</span></div>
         <time>{{ formatTime(conversation.updatedAt) }}</time>
         <p>{{ preview(conversation) }}</p>
-      </button>
+       </button>
+       <button v-if="deletable" class="conversation-delete" type="button" :aria-label="'删除会话：'+conversation.title" @click="remove(conversation)">删除</button>
+      </article>
+      <p v-if="!visibleConversations.length" class="conversation-empty">暂无历史对话</p>
     </div>
   </section>
 </template>
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { historyConversations } from '@/composables/useAgentConversations'
-const props=defineProps({conversations:{type:Array,required:true},currentId:{type:String,required:true}})
+const props=defineProps({conversations:{type:Array,required:true},currentId:{type:String,required:true},deletable:Boolean})
 const visibleConversations=computed(()=>historyConversations(props.conversations))
-const emit=defineEmits(['select','new-conversation'])
+const emit=defineEmits(['select','new-conversation','delete'])
 const opened=ref(false),trigger=ref(null),closeButton=ref(null)
 async function open(){opened.value=true;await nextTick();closeButton.value?.focus()}
 async function close(){opened.value=false;await nextTick();trigger.value?.focus()}
 function select(id){emit('select',id);close()}
 function create(){emit('new-conversation');close()}
+function remove(conversation){if(window.confirm('删除这段会话及其消息？此操作不会删除事件、任务或报告。'))emit('delete',conversation.id)}
 function preview(conversation){const message=conversation.messages.at(-1);return message?.text || message?.title || (message?.content || message?.raw || '').replace(/<[^>]*>/g,' ').replace(/&[^;]+;/g,' ') || '暂无消息'}
 function formatTime(value){const date=new Date(value),today=new Date(); const day=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime(),start=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime(); const label=day===start?'今天':day===start-86400000?'昨天':`${date.getMonth()+1}月${date.getDate()}日`;return `${label} ${date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`}
 watch(()=>props.currentId,()=>{opened.value=false})
@@ -47,6 +52,10 @@ watch(()=>props.currentId,()=>{opened.value=false})
 .conversation-history-list { flex:1; min-height:0; overflow:auto; padding:16px; }
 .conversation-history-item { display:block; width:100%; margin:0 0 10px; padding:14px; border:1px solid #ebeef5; border-radius:8px; background:#fff; text-align:left; cursor:pointer; font:inherit; }
 .conversation-history-item:hover { border-color:#cbb58e; }
+.conversation-history-select {display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer}
+.conversation-delete {display:block;margin:8px 0 0 auto;border:0;background:transparent;color:#a35c4d;font:inherit;font-size:12px;cursor:pointer;padding:4px 6px}
+.conversation-delete:hover {background:#fff0ed;border-radius:4px}
+.conversation-empty {color:#9195a2;font-size:13px}
 .conversation-history-item.active { background:#faf8f3; border-color:#d8c4a2; }
 .conversation-history-item-heading { display:flex; align-items:baseline; gap:8px; }
 .conversation-history-item-heading strong { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; line-height:24px; color:#1d2129; }

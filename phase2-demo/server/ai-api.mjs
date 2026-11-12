@@ -1,4 +1,5 @@
 import {getWorkflowService} from './workflow-service.mjs'
+import {answerKnowledge} from './knowledge-chat.mjs'
 import {skillInstruction,hiddenContext,visibleText} from './skill-runtime.mjs'
 import {businessLanguageInstruction} from './business-language.mjs'
 import {analyzeManualAnomaly} from './manual-anomaly.mjs'
@@ -55,6 +56,13 @@ export function createAiHandler(root,{fetcher=fetch,configuration=configStore(ro
    }
    const text=input.text?.trim()
    if(!text||text.length>12000)return send(400,{error:'请输入 1—12000 字的问题或补充内容。'})
+   if(input.mode==='knowledge'){
+    busy++;counted=true;streaming=input.stream===true
+    if(streaming){res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.flushHeaders?.()}
+    const controller=new AbortController(),disconnect=()=>{if(!res.writableEnded)controller.abort()}
+    res.on?.('close',disconnect)
+    try{const output=await answerKnowledge({...input,text},{configuration,knowledge,fetcher,emit:streaming?emit:()=>{},signal:controller.signal});if(streaming){emit('done',output);return res.end()}return send(200,output)}finally{res.off?.('close',disconnect)}
+   }
    const situation=input.mode==='situation',polishing=input.mode==='note'
    const refreshing=input.mode==='refresh-report',revision=input.mode==='report',generating=input.mode==='submit-report'||refreshing,structuredReport=revision||generating,planning=input.mode==='plan',observing=input.mode==='observation',editing=planning&&input.planMode==='edit',report=input.report
    const submittedTask=input.event?.tasks?.find(t=>t.id===input.taskId)
