@@ -2,17 +2,16 @@
  <aside class="lc-assistant"><header><div class="assistant-heading"><strong>{{taskId?'任务助手':'事件助手'}}</strong></div><button v-if="taskId" type="button" class="assistant-collapse" aria-label="收起任务助手" @click="$emit('collapse')">收起 →</button></header>
   <div ref="stream" class="lc-conversation" @wheel.passive="following=false" @pointerdown="following=false">
    <article v-if="introduction.length" class="lc-message task-assistant-intro"><p v-for="(sentence,i) in introduction" :key="i">{{sentence}}</p></article>
-   <article v-for="(message,i) in messages" :key="message.id" :class="['lc-message',message.kind,{'step-assist-user':message.kind==='user'&&message.stepAssistance}]" :data-message-id="message.id">
+   <article v-for="(message,i) in displayedMessages" :key="message.id" :class="['lc-message',message.kind,{'step-assist-user':message.kind==='user'&&message.stepAssistance}]" :data-message-id="message.id">
     <p v-if="message.modelError" class="lc-model-error">{{message.modelError}}</p>
     <ModelReply v-if="message.kind==='model'" :message="message" @apply="apply" @report="$emit('report',$event)" @plan="$emit('plan')"/>
-    <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===messages.length-1,historical:i!==messages.length-1,actionLabel:'',compact:true,basisLabel:'思考过程'}" @stream-progress="follow"/>
+    <AssistantAdviceMessage v-else-if="message.kind==='advice'" :message="{...message,currentAdvice:i===displayedMessages.length-1,historical:i!==displayedMessages.length-1,actionLabel:'',compact:true,basisLabel:'思考过程'}" @stream-progress="follow"/>
     <StepNoteProposal v-else-if="message.kind==='step-assist'" :message="message" :disabled="!!pending||!stepAvailable" @apply="applyStepNote" @revise="reviseStep"/>
-    <template v-else><strong v-if="message.title">{{message.title}}</strong><p v-if="message.text">{{message.text}}</p></template>
+    <template v-else><strong v-if="message.title">{{message.title}}</strong><p v-if="message.text">{{message.text}}</p><p v-if="message.taskFeedback">本轮报告待审阅。</p></template>
     <div v-if="message.images?.length" class="message-images"><div v-for="(photo,j) in message.images" :key="j"><button type="button" :aria-label="`查看图片：${photo.name}`" :title="photo.name" @click="previewImage(photo)"><img :src="photo.dataUrl" :alt="photo.name" loading="lazy"/></button><small v-if="isStepPhotoCopy(photo)">上传压缩副本</small></div></div>
     <ul v-if="message.attachments?.length" class="message-files"><li v-for="(file,j) in message.attachments" :key="j">附件 · {{file.name}}</li></ul>
     <time>{{timeText(message.at)}}</time>
    </article>
-   <article v-if="taskId&&task?.status==='submitted'&&!messages.some(m=>m.reportId)" class="lc-message receipt"><strong>本轮反馈已收录</strong><p>{{task.summary}}</p><p>本轮报告待审阅。</p><time>{{timeText(task.submittedAt)}}</time></article>
    <p v-if="submitError" class="lc-model-error" role="alert">{{submitError}}</p>
    <div v-if="!stepAvailable" class="lc-followups" aria-label="继续追问"><button v-for="q in questions" :key="q" type="button" :disabled="!!pending" @click="askFollowup(q)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/><path d="M7 7h6M7 10h4"/></svg><span>{{q}}</span><span class="lc-followup-arrow" aria-hidden="true">↗</span></button></div>
   </div>
@@ -47,12 +46,14 @@ import {suggestionAction} from '../workflow/lifecycleDecisions'
 import {supplementaryReports} from '../workflow/reportRevisions'
 import {taskConversation} from '../workflow/lifecycleWorkItems'
 import {taskAssistantIntro} from '../workflow/taskAssistantIntro.js'
+import {taskAssistantTimeline} from '../workflow/taskAssistantTimeline.js'
 import {createSpeechDraftInput} from '../workflow/speechDraftInput.js'
 import {canUseStepAssist,isStepAssistEvent,STEP_ASSIST_LIMITS} from '../workflow/stepAssistContract.js'
 import {taskAssistantOpening} from '../workflow/taskAssistantOpening.js'
 import {prepareStepPhoto,stepPhotoBytes,isStepPhotoCopy} from '../workflow/stepPhotoUpload.js'
 const props=defineProps({event:{type:Object,required:true},taskId:{type:String,default:''},activeStepIndex:{type:Number,default:0},historical:{type:Boolean,default:false},pendingPlanView:{type:Boolean,default:false},phaseId:String}),emit=defineEmits(['submitted','report','plan','task','collapse','shore-report']),store=useEventLifecycleStore()
 const captain=computed(()=>store.state.role==='captain'),closed=computed(()=>props.event.phase==='closed'),task=computed(()=>props.taskId?props.event.tasks.find(t=>t.id===props.taskId):currentTask(props.event)),messages=computed(()=>props.taskId&&task.value?taskConversation(task.value,store.state.role):props.event.conversations[store.state.role]||[])
+const displayedMessages=computed(()=>props.taskId?taskAssistantTimeline(task.value,messages.value,props.event.reports):messages.value)
 const isSupportedTask=computed(()=>!!props.taskId&&isStepAssistEvent(props.event)&&['investigation','repair','maintenance'].includes(task.value?.kind)),stepAvailable=computed(()=>!!props.taskId&&canUseStepAssist(props.event,task.value,store.state.role))
 const introduction=computed(()=>props.taskId?taskAssistantIntro(props.event,task.value):[])
 const opening=computed(()=>taskAssistantOpening(task.value))
