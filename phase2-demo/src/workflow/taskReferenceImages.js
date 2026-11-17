@@ -31,6 +31,10 @@ function candidateImages({event,task,step,part}={}){
  const family=families[event?.sourceEventId]||families[event?.id]
  const operation=part||step
  if(!family||!operation||(!part&&step?.substeps?.length))return []
+ if(operation.mergedOperations?.length){
+  const images=operation.mergedOperations.flatMap(original=>candidateImages({event,task,step,part:original}))
+  return [...new Map(images.map(image=>[image.src,image])).values()]
+ }
  const label=operation.label||'',text=content(operation)
  const work=['repair','maintenance'].includes(task?.kind||task?.action)
  // Administrative/temporal records do not benefit from a dismantling diagram.

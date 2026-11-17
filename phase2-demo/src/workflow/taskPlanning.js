@@ -3,6 +3,7 @@ import {dispatchAction} from './lifecycleDecisions.js'
 import {groupRepairSteps} from './repairStepGroups.js'
 import {verifyTaskEdit} from './taskEdits.js'
 import {c4FollowupSteps} from './stepAssistScenarios.js'
+import {maxRepairSubsteps} from './repairPreparation.js'
 
 export function taskPlanKey(event){
  const report=event.reports.at(-1),text=JSON.stringify([event.phase,event.phases.at(-1)?.id,event.currentTask,report?.id,report?.planningBasisMarkdown??report?.markdown])
@@ -40,7 +41,9 @@ export function normalizeTaskPlan(value,action){
  }
  const steps=value.steps.map(s=>normalizeStep(s))
  if(work&&steps.reduce((total,step)=>total+(step.substeps?.length||1),0)>12)throw Error('维修作业子项合计最多 12 项，请合并重复准备、隔离与复装要求后重新生成。')
- return {scope,rationale,steps:['repair','maintenance'].includes(action)?groupRepairSteps(steps).map(({sourceIndices,...step})=>step):steps}
+ const groupedSteps=work?groupRepairSteps(steps).map(({sourceIndices,...step})=>step):steps
+ if(action==='repair'&&groupedSteps.some(step=>step.substeps?.length>maxRepairSubsteps))throw Error('每个维修步骤最多 2 个子项，请合并相关作业要求后重新生成。')
+ return {scope,rationale,steps:groupedSteps}
 }
 export function acceptTaskPlan(event,expected,result){
  const draft=event.pendingPlan

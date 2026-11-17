@@ -16,8 +16,8 @@ test('new repair plans merge duplicated preparation/restoration while retaining 
   const methods=compactRepair({realType:type,packages:taskPackages(type)},keys).tasks
   const plan=detailedRepairSteps(event,methods),operations=plan.flatMap(s=>s.substeps||[s])
   assert.equal(plan.length,4)
-  assert.equal(operations.length,id==='real-alarm-0430'?8:9,'C2 additionally combines scope and material preparation')
-  assert.equal(plan[0].substeps.length,id==='real-alarm-0430'?2:3)
+  assert.equal(operations.length,7)
+  assert.ok(plan.every(step=>step.substeps.length<=2))
   assert.ok(!operations.some(s=>/^(确认供气配置与隔离范围|确认作业范围与隔离标识|恢复供气并复测压力响应|恢复系统并复测喷射响应)$/.test(s.label)))
   const text=JSON.stringify(plan)
   for(const method of methods)for(const check of method.checks)assert.ok(text.includes(check),check)
@@ -29,6 +29,7 @@ test('new repair plans merge duplicated preparation/restoration while retaining 
 test('the model operation budget counts nested substeps, not just their parent groups',()=>{
  const step=i=>({label:'作业项目'+i,guide:'按本机作业卡核对本项',checks:['落实本项作业要求','保存本项实际记录'],recordHint:'登记实际结果与未完成项'})
  const plan=count=>({scope:'本轮批准范围',rationale:'依据本轮现场记录',steps:[{...step(0),checks:[],substeps:Array.from({length:count},(_,i)=>step(i+1))},step(99)]})
- assert.equal(normalizeTaskPlan(plan(11),'repair').steps.length,2)
+ assert.equal(normalizeTaskPlan(plan(2),'repair').steps.length,2)
+ assert.throws(()=>normalizeTaskPlan(plan(11),'repair'),/每个维修步骤最多 2 个子项/)
  assert.throws(()=>normalizeTaskPlan(plan(12),'repair'),/子项合计最多 12 项/)
 })

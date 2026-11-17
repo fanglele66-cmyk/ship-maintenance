@@ -11,6 +11,7 @@ import {ensurePlanDraft,taskPlanKey} from './taskPlanning.js'
 import {detailedRepairSteps,presetRecheckSteps,repairProcedureVersion} from './repairPlanning.js'
 import {closureContent,closurePresentationVersion} from './closureReport.js'
 import {groupRepairSteps,compactAssignedRepair} from './repairStepGroups.js'
+import {compactRepairSubsteps} from './repairPreparation.js'
 import {hasObservation,observationStart,observationTaskFor,isVerificationObservation,isVerificationReview,observationPolicy} from './observationContext.js'
 import {taskExecution,executionFacts,carryForwardSteps,taskRecordSummary,hasSubmittedFeedback} from './taskExecution.js'
 import {createObservationEvent,migrateObservationEvents,observationTasks,observationChain,isObservationEvent} from './observationEvents.js'
@@ -91,6 +92,7 @@ export function ensureTaskPlan(event){
  }
  if(action==='repair'&&draft.source==='existing'&&draft.procedureVersion!==repairProcedureVersion){draft.steps=steps;draft.procedureVersion=repairProcedureVersion;draft.version++}
  if(['repair','maintenance'].includes(action)&&draft.steps.length>4){draft.steps=groupRepairSteps(draft.steps);draft.version++}
+ if(action==='repair'&&draft.steps.some(step=>step.substeps?.length>2)){draft.steps=draft.steps.map(compactRepairSubsteps);draft.version++}
  if(action==='recheck'&&!draft.steps.length){draft.steps=steps;draft.scope=scope;draft.source='preset'}
  return draft
 }

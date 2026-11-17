@@ -37,6 +37,7 @@ for(const action of ['repair','observe','close'])test(`AI completes its original
  else decide(state,event.id,{action,reason:'依据已提交记录确认本次安排。'})
  const business=JSON.stringify([event.phase,event.status,event.currentTask,event.decisions,event.phases])
  const next=currentTask(event),nextDraft=structuredClone(next.draft)
+ if(action==='repair')assert.ok(next.steps.every(step=>(step.substeps?.length||0)<=2),'repair dispatched while AI is streaming has at most two substeps per feedback step')
  emit('report',{patch:{summary:'AI 报告继续生成',analysis:{}}});finish(model)
  const result=await pending
  assert.equal(result.id,original.id);assert.deepEqual(result.submissionSnapshot,facts)

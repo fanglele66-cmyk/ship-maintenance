@@ -4,7 +4,8 @@ import {createServer} from 'vite'
 import {createSSRApp,h} from 'vue'
 import {renderToString} from '@vue/server-renderer'
 import {createPinia,setActivePinia,disposePinia} from 'pinia'
-import {compactC2RepairPreparation,repairStepForDisplay} from '../src/workflow/repairPreparation.js'
+import {compactC2RepairPreparation,compactRepairSubsteps,repairStepForDisplay} from '../src/workflow/repairPreparation.js'
+import {getTaskReferenceImages} from '../src/workflow/taskReferenceImages.js'
 import {createLifecycleState,decide,currentTask,submitTask,ensureTaskPlan,people} from '../src/workflow/eventLifecycle.js'
 import {repairProcedureVersion} from '../src/workflow/repairPlanning.js'
 
@@ -63,6 +64,25 @@ test('new and refreshed pending C2 repair plans dispatch two preparation substep
  assert.equal(task.draft.records.length,4);assert.ok(task.draft.records.every(record=>!record.result&&!record.note))
 })
 
+test('execution cards retain all operations and references in two substeps, including cached plans',()=>{
+ const {event}=repairState(),plan=ensureTaskPlan(event),step=plan.steps[1]
+ const legacy={...step,substeps:step.substeps.flatMap(part=>part.mergedOperations||[part])}
+ assert.equal(legacy.substeps.length,3)
+ const task={kind:'repair',status:'assigned',steps:[legacy]},before=structuredClone(task)
+ const displayed=repairStepForDisplay({event,task,step:legacy})
+ assert.equal(displayed.substeps.length,2)
+ for(const part of legacy.substeps)for(const text of [part.label,part.guide,...part.checks,part.recordHint].filter(Boolean))assert.ok(JSON.stringify(displayed).includes(text),text)
+ const images=step=>new Set(step.substeps.flatMap((part,partIndex)=>getTaskReferenceImages({event,task:{...task,steps:[step]},step,part,stepIndex:0,partIndex})).map(image=>image.id))
+ assert.deepEqual(images(displayed),images(legacy))
+ assert.deepEqual(task,before)
+ assert.equal(compactRepairSubsteps(displayed),displayed)
+ assert.equal(repairStepForDisplay({event,task:{...task,status:'submitted'},step:legacy}),legacy)
+ plan.steps[1]=legacy;plan.source='model';const version=plan.version,scope=plan.scope
+ assert.equal(ensureTaskPlan(event).steps[1].substeps.length,2)
+ assert.equal(plan.version,version+1);assert.equal(plan.scope,scope)
+ assert.equal(ensureTaskPlan(event).version,version+1,'normalization is idempotent')
+})
+
 test('assigned legacy preparation renders two cards without pagination and keeps the isolation reference',async()=>{
  const oldWindow=globalThis.window;globalThis.window={addEventListener(){}}
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'}),pinia=createPinia()
@@ -86,5 +106,18 @@ test('assigned legacy preparation renders two cards without pagination and keeps
   const archived=await renderToString(createSSRApp(Instructions,{event,task,step:task.steps[0],compact:true,paginate:true,number:1}))
   assert.match(archived,/本步骤共 3 项/);assert.match(archived,/aria-label="本步骤作业子项"/)
   assert.deepEqual(task.steps,snapshot.steps);assert.deepEqual(task.draft,snapshot.draft)
+  task.status='assigned'
+  const execution=task.steps[1]
+  task.steps[1]={...execution,substeps:execution.substeps.flatMap(part=>part.mergedOperations||[part])}
+  task.draft.stepIndex=1
+  const executionSnapshot=structuredClone(task)
+  const executionHtml=await renderToString(createSSRApp({render:()=>h(Steps,{event,task})}).use(pinia))
+  assert.match(executionHtml,/本步骤共 2 个子项/)
+  assert.doesNotMatch(executionHtml,/aria-label="本步骤作业子项"/)
+  assert.equal((executionHtml.match(/class="substep"/g)||[]).length,2)
+  assert.match(executionHtml,/标识连接并保存处理前状态/)
+  assert.match(executionHtml,/处理已定位的燃油供给问题/)
+  assert.match(executionHtml,/icu_servo_piston_disassembly/)
+  assert.deepEqual(task,executionSnapshot)
  }finally{disposePinia(pinia);await server.close();if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow}
 })
