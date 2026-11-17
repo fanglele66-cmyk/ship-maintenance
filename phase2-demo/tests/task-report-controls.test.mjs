@@ -117,7 +117,7 @@ test('task submissions open the assistant through generation, completion and ret
    try{
     await assert.rejects(generateTaskReport(store.state,id,task.id,async()=>{throw Error('test connection failure')}),/test connection failure/)
     await nextTick()
-    assert.equal(currentTask(store.state.events[id]).status,'report-error')
+    assert.equal(currentTask(store.state.events[id]).status,'submitted');assert.equal(currentTask(store.state.events[id]).reportGeneration.status,'error')
     assert.equal(mounted.state.assistantOpen,true)
     mounted.state.assistantOpen=false
     let finish

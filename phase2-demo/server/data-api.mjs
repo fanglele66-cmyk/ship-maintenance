@@ -2,10 +2,10 @@ import {openLocalData} from './local-data.mjs'
 import {trustedAppRequest} from './request-origin.mjs'
 import {createHealthScheduler} from './health-scheduler.mjs'
 
-export async function createDataService(root){
+export async function createDataService(root,{startScheduler=process.env.SHIP_SCHEDULERS_ENABLED!=='false'}={}){
  let data=null,cache=null,at=0
  const scheduler=await createHealthScheduler(root)
- scheduler.start()
+ if(startScheduler)scheduler.start()
  return {
   handler:async(req,res,next)=>{
    const url=new URL(req.url,'http://localhost')

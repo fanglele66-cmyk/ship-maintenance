@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "database": "ship-continuous-24h.db",
+  "bytes": 976711680,
+  "sha256": "4f46ed9a2f59f4ebfc86c79a3e0eb10a060722fc075c67650e2c5423456dbb5c",
+  "manifestSha256": "4919aaa484af813a7e2f15c3ac24a0db44eb75267ef2e39e1d802691be44090b",
+  "sensorReadings": {
+    "count": 1682921,
+    "start": "2026-06-11 16:51:23",
+    "end": "2027-01-31 10:35:23"
+  },
+  "accounts": {
+    "count": 4,
+    "file": "data/accounts-seed.json",
+    "containsPlaintextPasswords": false,
+    "containsSessions": false
+  }
+}

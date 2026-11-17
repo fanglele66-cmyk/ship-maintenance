@@ -1,3 +1,4 @@
+import {reportGenerationStatus} from './reportGenerationState.js'
 import {pendingDecision,taskName,timeText} from './eventLifecycle.js'
 import {taskLocation,taskTitle} from './lifecycleWorkItems.js'
 import {lifecycleDecisionOptions} from './lifecycleDecisions.js'
@@ -22,7 +23,7 @@ export function decisionStage(event){
 export function workbenchDetails(event,item){
  const task=event.tasks.find(t=>t.id===(item.taskId||event.currentTask)),phase=event.phases.at(-1)
  if(phase?.observationWaiting)return ['系统持续观测',phase.observationDueAt?'计划汇报 '+timeText(phase.observationDueAt):'按计划汇报']
- if(item.kind==='decision')return [currentDecisionPrompt(event),task?.submittedAt?`${task.owner}已回交${taskName(task)}报告`:phase?.observationReview?'观察报告已生成':'',task?.status==='reporting'?'AI 分析生成中':task?.status==='report-error'?'AI 分析待重试':''].filter(Boolean)
+ if(item.kind==='decision')return [currentDecisionPrompt(event),task?.submittedAt?`${task.owner}已回交${taskName(task)}报告`:phase?.observationReview?'观察报告已生成':'',reportGenerationStatus(task)==='streaming'?'AI 分析生成中':reportGenerationStatus(task)==='error'?'AI 分析待重试':''].filter(Boolean)
  if(!task)return []
  const formal=Boolean(task.submittedAt)&&task.status!=='assigned'
  const count=(formal?task.records:task.draft?.records||[]).filter(r=>r.result).length

@@ -25,6 +25,7 @@ export function applyReportSupplement(state,eventId,proposal){
  const analysisMarkdown=revisionAnalysis(patch)
  updated.markdown=updated.markdown.replace(updated.analysisMarkdown,analysisMarkdown)+'\n\n## 提交后补充记录\n\n'+revisions.map((r,i)=>`### 第 ${i+1} 次补充 · ${r.actor}\n\n${r.at}\n\n${prose(r.text)}\n\n${r.sources.length?'参考资料：'+r.sources.map(s=>'['+s.id+'] '+s.title+'（'+s.file+' L'+s.startLine+'—'+s.endLine+'）').join('；'):'未关联知识库资料。'}`).join('\n\n')
  Object.assign(report,updated,{analysisMarkdown,analysis:prose(patch.summary),revisions,updatedAt:at,original:report.original||before})
+ delete report.planningBasisMarkdown // Explicit supplements change the plan's evidence.
  proposal.applied=true
  event.unread.captain=true
  event.conversations.captain.push({id:'supplement-'+proposal.id,kind:'receipt',title:'报告补充已提交',text:`${people[state.role]}补充了《${report.title}》，请复核更新后的结论与依据。`,reportId:report.id,at})

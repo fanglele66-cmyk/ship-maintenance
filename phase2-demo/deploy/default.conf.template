@@ -1,0 +1,33 @@
+log_format ship_json escape=json '{"time":"$time_iso8601","method":"$request_method","uri":"$uri","status":$status,"duration":$request_time}';
+server {
+    listen 80;
+    server_name _;
+    server_tokens off;
+    client_max_body_size 12m;
+    access_log /var/log/nginx/access.log ship_json;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+    location = /${SHIP_CONTEXT_PATH} {
+        return 301 /${SHIP_CONTEXT_PATH}/;
+    }
+    location ^~ /${SHIP_CONTEXT_PATH}/api/ {
+        proxy_pass http://backend:5173/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 240s;
+        proxy_send_timeout 240s;
+    }
+    location /${SHIP_CONTEXT_PATH}/ {
+        alias /usr/share/nginx/html/;
+        index index.html;
+        add_header Cache-Control "no-cache";
+    }
+    location / { return 404; }
+}

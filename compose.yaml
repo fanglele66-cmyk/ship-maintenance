@@ -1,0 +1,62 @@
+name: ship-smart-engine-room
+services:
+  backend:
+    image: ship-smart-engine-room-backend:${SHIP_IMAGE_TAG:-local}
+    build:
+      context: ./phase2-demo
+      target: backend
+      args:
+        BUILD_SCRIPT: ${SHIP_BUILD_SCRIPT:-build:prod}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      HOST: 0.0.0.0
+      PORT: 5173
+      SHIP_CONTEXT_PATH: ${SHIP_CONTEXT_PATH:-ship-smart-engine-room}
+      SHIP_REQUEST_MODE: ${SHIP_REQUEST_MODE:-web}
+      SHIP_PUBLIC_ORIGIN: ${SHIP_PUBLIC_ORIGIN:-http://localhost:8080}
+      SHIP_TRUSTED_PROXY_IPS: ${SHIP_PROXY_IP:-172.30.86.2}
+      SHIP_SCHEDULERS_ENABLED: ${SHIP_SCHEDULERS_ENABLED:-true}
+      SHIP_SHUTDOWN_TIMEOUT_MS: 30000
+    volumes:
+      - ship-runtime:/app/runtime
+      - type: bind
+        source: ./phase2-demo/deployment-data/telemetry
+        target: /app/deployment-data/telemetry
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [ship]
+    security_opt: [no-new-privileges:true]
+
+  frontend:
+    image: ship-smart-engine-room-frontend:${SHIP_IMAGE_TAG:-local}
+    build:
+      context: ./phase2-demo
+      target: frontend
+      args:
+        BUILD_SCRIPT: ${SHIP_BUILD_SCRIPT:-build:prod}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SHIP_CONTEXT_PATH: ${SHIP_CONTEXT_PATH:-ship-smart-engine-room}
+    ports:
+      - "${SHIP_BIND_IP:-127.0.0.1}:${SHIP_HTTP_PORT:-8080}:80"
+    networks:
+      ship:
+        ipv4_address: ${SHIP_PROXY_IP:-172.30.86.2}
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  ship-runtime:
+
+networks:
+  ship:
+    ipam:
+      config:
+        - subnet: ${SHIP_NETWORK_SUBNET:-172.30.86.0/24}

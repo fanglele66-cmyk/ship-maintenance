@@ -1,0 +1,13 @@
+{
+  "enabled": false,
+  "source": "manual",
+  "model": "deepseek-v4-flash",
+  "baseUrl": "https://api.deepseek.com",
+  "protocol": "openai",
+  "apiKey": "",
+  "maxTokens": 393216,
+  "timeoutMs": 180000,
+  "taskMaxTokens": 393216,
+  "taskTimeoutMs": 180000,
+  "knowledgeEnabled": true
+}

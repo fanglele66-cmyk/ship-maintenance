@@ -10,9 +10,21 @@ public/ship-bg-t.png
 public/ship-bg-transparent.png
 public/ship-bg.jpg
 
-# Local ship data and health runtime (never publish raw database or secrets)
+# GitHub distributes code and frontend assets; runtime data and model keys stay local.
 phase2-demo/.local-data/
-phase2-demo/.local-ai/
+phase2-demo/.local-ai/*
+!phase2-demo/.local-ai/config.example.json
+!phase2-demo/.local-ai/README.md
+!phase2-demo/dist/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+.env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 

@@ -1,5 +1,6 @@
-# Upload these files directly to the server; do not add the large dataset to Git.
 *.db
 *.db-*
-manifest.json
-receipt.json
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*

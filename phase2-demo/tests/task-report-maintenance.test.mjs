@@ -14,9 +14,9 @@ function ready(){const state=createLifecycleState();decide(state,id,{action:'inv
 test('first report streams real response fields before final handoff and preserves raw records',async()=>{
  const {state,event,task}=ready(),original=JSON.parse(JSON.stringify(task.draft));let finish,calls=0
  const pending=generateTaskReport(state,id,task.id,async(body,on)=>{calls++;assert.equal(body.mode,'submit-report');assert.deepEqual(body.event.tasks[0].records,original.records);on('progress',{label:'分析本轮反馈'});on('report',{patch:{summary:'现场与系统一致',analysis:{}}});return new Promise(resolve=>finish=resolve)})
- assert.equal(task.status,'reporting');assert.equal(event.reports.length,0);assert.equal(event.phase,'investigation');assert.match(task.reportGeneration.patch.summary,/现场/)
+ assert.equal(task.status,'submitted');assert.equal(task.reportGeneration.status,'streaming');assert.equal(event.reports.length,1);assert.equal(event.phase,'decision');assert.match(task.reportGeneration.patch.summary,/现场/)
  await assert.rejects(generateTaskReport(state,id,task.id,async()=>assert.fail()),/正在生成/)
- state.role='captain';assert.equal(lifecycleWorkItems(state).pending.some(t=>t.eventId===id),false)
+ state.role='captain';assert.equal(lifecycleWorkItems(state).pending.some(t=>t.eventId===id),true)
  finish(model);const report=await pending
  assert.equal(calls,1);assert.equal(task.status,'submitted');assert.equal(event.phase,'decision');assert.equal(report.summary,patch.summary);assert.deepEqual(report.usage,model.usage);assert.deepEqual(task.records,original.records);assert.equal(task.summary,original.summary)
  assert.match(report.markdown,/现场原始记录 0/);assert.match(report.markdown,/具体部件原因待计划内检查确认/)
@@ -27,7 +27,7 @@ test('first report streams real response fields before final handoff and preserv
 test('failed or malformed report retains feedback; retry creates exactly one report',async()=>{
  const {state,event,task}=ready()
  await assert.rejects(generateTaskReport(state,id,task.id,async(body,on)=>{on('report',{patch:{summary:'部分内容',analysis:{}}});throw Error('连接中断')}),/连接中断/)
- assert.equal(task.status,'report-error');assert.equal(event.reports.length,0);assert.equal(event.phase,'investigation');assert.ok(lifecycleWorkItems(state).pending.some(t=>t.taskId===task.id))
+ assert.equal(task.status,'submitted');assert.equal(task.reportGeneration.status,'error');assert.equal(event.reports.length,1);assert.equal(event.phase,'decision');assert.ok(lifecycleWorkItems(state).pending.some(t=>t.taskId===task.id))
  task.draft.summary='未提交的意外草稿变化'
  await assert.rejects(generateTaskReport(state,id,task.id,async()=>({patch:{summary:'只有结论'}})),/不完整/)
  const report=await generateTaskReport(state,id,task.id,async body=>{assert.notEqual(body.event.tasks[0].summary,task.draft.summary);return model})
@@ -36,9 +36,9 @@ test('failed or malformed report retains feedback; retry creates exactly one rep
 test('reload recovery is scoped to the generating session; another role tab does not cancel it',async()=>{
  const {state,task}=ready();let finish
  const pending=generateTaskReport(state,id,task.id,()=>new Promise(resolve=>finish=resolve),{ownerSession:'one'})
- recoverTaskReportGeneration(state,'two');assert.equal(task.status,'reporting')
- recoverTaskReportGeneration(state,'one');assert.equal(task.status,'report-error')
- finish(model);await assert.rejects(pending,/状态已变化/);assert.equal(state.events[id].reports.length,0)
+ recoverTaskReportGeneration(state,'two');assert.equal(task.status,'submitted');assert.equal(task.reportGeneration.status,'streaming')
+ recoverTaskReportGeneration(state,'one');assert.equal(task.status,'submitted');assert.equal(task.reportGeneration.status,'error')
+ finish(model);await assert.rejects(pending,/任务已有变化/);assert.equal(state.events[id].reports.length,1)
 })
 test('unknown, restricted or inconsistent tracking feedback never silently enables early maintenance',()=>{
  for(const results of [['现场与系统一致','无法确认'],['现场与系统一致','条件受限，已记录限制'],['无法确认','信息已记录'],['读数不一致','信息已记录']]){
@@ -78,5 +78,5 @@ test('submission API invokes provider, streams report previews and validates com
   const original=globalThis.fetch;globalThis.fetch=async()=>new Response(wire,{headers:{'content-type':'text/event-stream'}})
   try{return await aiStreamRequest(body,on)}finally{globalThis.fetch=original}
  })
- assert.equal(calls,1);assert.match(sent.system,/当前提交的报告/);assert.deepEqual(JSON.parse(sent.messages.at(-1).content).availableDecisions.map(o=>o.value),['maintenance','observe','close']);assert.equal(report.usage.inputTokens,12);assert.equal(report.usage.outputTokens,24);assert.equal(report.summary,patch.summary)
+ assert.equal(calls,1);assert.match(sent.system,/当前提交的报告/);assert.deepEqual(JSON.parse(sent.messages.at(-1).content).availableDecisions.map(o=>o.value),['maintenance','observe','close','shore']);assert.equal(report.usage.inputTokens,12);assert.equal(report.usage.outputTokens,24);assert.equal(report.summary,patch.summary)
 })

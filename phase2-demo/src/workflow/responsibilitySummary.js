@@ -1,3 +1,4 @@
+import {reportGenerationStatus} from './reportGenerationState.js'
 import {eventSubject,taskRecommendation,shortSentence} from './contentRecommendations.js'
 const clock=value=>value?new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16):'计划汇报时间'
 export function responsibilitySummary(event,state,task){
@@ -6,7 +7,7 @@ export function responsibilitySummary(event,state,task){
  if(task?.waiting?.reviewRequested)return `${shortSentence(task.waiting.reviewRequested.reason)||subject.name+'执行条件已更新'}；审阅恢复条件与完成时限。`
  if(task?.status==='waiting')return `${shortSentence(task.waiting.reason)||subject.name+'作业条件尚缺'}；先落实本轮受阻条件。`
  if(state==='观察中')return `${subject.name}观察中；跟踪原异常信号至${clock(event.observationPlan?.dueAt||phase?.observationDueAt)}。`
- if(['reporting','report-error'].includes(task?.status))return `${subject.name}现场记录已提交；${task.status==='report-error'?'重试生成本轮报告':'等待本轮报告生成'}。`
+ if(['streaming','error'].includes(reportGenerationStatus(task)))return `${subject.name}现场记录已提交，可据此决定下一步；${reportGenerationStatus(task)==='error'?'AI 分析待重试':'AI 分析正在补充'}。`
  if(state==='待决策'){
   if(!task&&event.manualReport&&event.phase==='reminder')return event.manualReport.analysis.summary
   if(event.type==='效果观察'){

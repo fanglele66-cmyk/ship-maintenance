@@ -1,7 +1,9 @@
 import {mergeWorkflowEvent} from './mergeWorkflowEvent.js'
+import {persistedEvent,preserveReportStream} from './reportGenerationState.js'
 const copy=value=>JSON.parse(JSON.stringify(value))
-const signature=event=>{const value={...event};delete value.serverRevision;return JSON.stringify(value)}
-export function createBackendWorkflowSync(state,request,{onError=()=>{}}={}){
+const signature=event=>{const value=persistedEvent(event);delete value.serverRevision;return JSON.stringify(value)}
+export function createBackendWorkflowSync(state,request,{onError=()=>{},preserve=(local,incoming)=>incoming}={}){
+ const replace=event=>state.events[event.id]=preserve(state.events[event.id],preserveReportStream(state.events[event.id],event))
  const acknowledged=new Map();let ready=false,merging=false,saving=null,timer,closed=false
  const unchanged=event=>signature(event)===signature(acknowledged.get(event.id)||{})
  async function pull(){
@@ -10,7 +12,7 @@ export function createBackendWorkflowSync(state,request,{onError=()=>{}}={}){
   try{
    const ids=new Set(result.events.map(e=>e.id))
    for(const event of Object.values(state.events))if(event.backendManaged&&!ids.has(event.id)){delete state.events[event.id];acknowledged.delete(event.id)}
-   for(const event of result.events){const local=state.events[event.id];if(!ready||!local||event.serverRevision>(local.serverRevision||0)&&unchanged(local)){state.events[event.id]=event;acknowledged.set(event.id,copy(event))}}
+   for(const event of result.events){const local=state.events[event.id];if(!ready||!local||event.serverRevision>(local.serverRevision||0)&&unchanged(local)){acknowledged.set(event.id,copy(event));replace(event)}}
    ready=true;onError('')
   }finally{merging=false}
  }
@@ -24,7 +26,7 @@ export function createBackendWorkflowSync(state,request,{onError=()=>{}}={}){
    for(const event of list){
     for(let attempt=0;attempt<3;attempt++){
      const current=state.events[event.id];if(!current||unchanged(current))break
-     const sent=copy(current)
+     const sent=persistedEvent(current)
      let result
      try{result=await request('workflow/save',{event:sent,revision:sent.serverRevision})}
      catch(error){
@@ -32,11 +34,11 @@ export function createBackendWorkflowSync(state,request,{onError=()=>{}}={}){
       const latest=await request('workflow/events'),remote=latest.events.find(item=>item.id===event.id)
       if(!remote)throw Error('此事件已删除或当前账号无权查看。')
       const merged=mergeWorkflowEvent(acknowledged.get(event.id),copy(state.events[event.id]),remote)
-      acknowledged.set(event.id,copy(remote));state.events[event.id]=merged
+      acknowledged.set(event.id,copy(remote));replace(merged)
       continue
      }
      const merged=mergeWorkflowEvent(sent,copy(state.events[event.id]),result.event)
-     acknowledged.set(event.id,copy(result.event));state.events[event.id]=merged
+     acknowledged.set(event.id,copy(result.event));replace(merged)
      break
     }
    }

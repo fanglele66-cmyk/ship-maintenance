@@ -1,3 +1,4 @@
+import {persistedEvent} from './reportGenerationState.js'
 // One clock per persisted prototype workspace. Source evidence is never rebased.
 export const lifecycleStorageKey='engine-room-captain-workflow-v1'
 const seeds={
@@ -44,7 +45,7 @@ export function applyInitialTimeline(event,timeBase){
  return event
 }
 export function lifecycleSnapshot(state){
- return JSON.stringify({version:1,timeBase:state.timeBase,events:state.events,notices:state.notices||[]})
+ return JSON.stringify({version:1,timeBase:state.timeBase,events:Object.fromEntries(Object.entries(state.events).map(([id,event])=>[id,persistedEvent(event)])),notices:state.notices||[]})
 }
 export function loadLifecycleState(storage,createState,now=Date.now()){
  let saved

@@ -1,4 +1,8 @@
 // Execution completeness is independent of whether a root cause is known.
+// AI enrichment is optional: an already submitted factual report is actionable.
+export function hasSubmittedFeedback(event,task){
+ return Boolean(task&&['submitted','reporting','report-error'].includes(task.status)&&task.submittedAt&&event.reports?.some(report=>report.taskId===task.id))
+}
 function blocked(text,kind){
  // An investigation does not include unassigned repair work. Saying it has not
  // been repaired is not an incomplete investigation or a condition to resume it.
@@ -25,7 +29,7 @@ export function taskRecordSummary(records){
 }
 export function carryForwardSteps(event){
  const previous=event.tasks.findLast(t=>['repair','maintenance'].includes(t.kind))
- if(!previous||previous.status!=='submitted')return []
+ if(!hasSubmittedFeedback(event,previous))return []
  const result=taskExecution(previous)
  const steps=result.outstanding.map(r=>({...JSON.parse(JSON.stringify(r.step||{label:r.label,guide:r.reason,checks:[r.reason]})),carryFromTaskId:previous.id,guide:`上轮${r.result}：${r.reason} 核对实施条件及批准范围后继续本项。`,recordHint:'说明条件是否具备、实际完成内容及仍未执行的原因。',options:['已完成','未完成','不适用']}))
  if(result.summaryBlocked&&!steps.length)steps.push({label:'核对上轮受阻项目并完成剩余作业',guide:previous.summary,checks:['核对上轮汇总中受阻的具体项目、备件和停机条件；未具备条件不得实施。','在批准范围内补做未执行项目，保留已完成项记录。'],recordHint:'逐项记录补做结果和仍受限的原因。',options:['已完成','未完成','不适用'],carryFromTaskId:previous.id})

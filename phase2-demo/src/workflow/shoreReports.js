@@ -1,3 +1,4 @@
+import {reportGenerationStatus} from './reportGenerationState.js'
 import {observationChain} from './observationEvents.js'
 import {composeShoreNarrative} from './shoreReportNarrative.js'
 const copy=value=>JSON.parse(JSON.stringify(value))
@@ -9,7 +10,7 @@ export function shoreReportBasis(event,state={events:{[event.id]:event}},fields=
  const chain=observationChain(state,event.id).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)))
  const reports=chain.flatMap(e=>(e.reports||[]).filter(r=>!r.linkedSource).map(r=>{
   const task=e.tasks?.find(t=>t.reportGeneration?.factReportId===r.id)
-  const analysisState=task?.status==='report-error'?'AI 分析生成失败，现场报告已提交，可在原报告重试':task?.status==='reporting'?'AI 分析生成中，现场报告已提交':r.generatedBy?'AI 分析已生成':''
+  const analysisState=reportGenerationStatus(task)==='error'?'AI 分析生成失败，现场报告已提交，可在原报告重试':reportGenerationStatus(task)==='streaming'?'AI 分析生成中，现场报告已提交':r.generatedBy?'AI 分析已生成':''
   return {...copy(r),eventId:e.id,eventNumber:e.number,analysisState}
  }))
  const seen=new Set(),includedReports=reports.filter(r=>!seen.has(r.id)&&seen.add(r.id)).sort((a,b)=>String(a.at).localeCompare(String(b.at)))

@@ -1,3 +1,5 @@
+import {createDecisionEditing} from '../workflow/decisionEditing.js'
+import {reportGenerationStatus} from '../workflow/reportGenerationState.js'
 import {createBackendWorkflowSync} from '../workflow/backendWorkflowSync.js'
 import {workflowStatus} from '../services/workflowStatus.js'
 import {auth,accountRequest,pruneDeletedEvents} from '../services/auth'
@@ -37,11 +39,12 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  for(const event of Object.values(initial.events))for(const messages of Object.values(event.conversations))for(const message of messages)if(message.status==='streaming'){
   message.status='interrupted';message.text='';message.modelError='上次生成已中断，请重新发送。原报告未修改。'
  }
- for(const event of Object.values(initial.events))for(const task of event.tasks)for(const messages of Object.values(task.conversations||{}))for(const message of messages)if(message.status==='streaming'&&(!message.generatedReport||task.status!=='reporting')){message.status='interrupted';message.modelError='上次生成已中断，请重新发送。原报告未修改。';delete message.draft}
+ for(const event of Object.values(initial.events))for(const task of event.tasks)for(const messages of Object.values(task.conversations||{}))for(const message of messages)if(message.status==='streaming'&&(!message.generatedReport||reportGenerationStatus(task)!=='streaming')){message.status='interrupted';message.modelError='上次生成已中断，请重新发送。原报告未修改。';delete message.draft}
  initial.notices||=[];initial.role||='captain'
  for(const event of Object.values(initial.events))if(['generating','updating'].includes(event.pendingPlan?.status))event.pendingPlan.status=event.pendingPlan.source==='preset'?'pending':event.pendingPlan.steps?.length?'ready':'pending'
  const state=reactive(initial)
- const backend=createBackendWorkflowSync(state,accountRequest,{onError:error=>workflowStatus.error=error})
+ const decisionEditing=createDecisionEditing()
+ const backend=createBackendWorkflowSync(state,accountRequest,{onError:error=>workflowStatus.error=error,preserve:(local,incoming)=>decisionEditing.preserve(local,incoming)})
  const aiStreamRequest=async(body,progress)=>{if(body.event&&state.events[body.event.id]?.backendManaged)await backend.flush();return rawAiRequest(body,progress)}
  watch(()=>state.events,()=>backend.schedule(),{deep:true})
  if(!import.meta.env?.SSR&&auth.user){
@@ -60,6 +63,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   if(event.key!==storageKey||!event.newValue)return
   try{const saved=JSON.parse(event.newValue);if(saved.version!==1||!saved.events)return
    const incoming=mergeDemoWorkspace(state,saved)
+   for(const event of Object.values(incoming.events))decisionEditing.preserve(state.events[event.id],event)
    pruneDeletedEvents(incoming)
    refreshLifecyclePresentation(incoming)
    pruneDeletedEvents(incoming)
@@ -193,6 +197,12 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
   }finally{clearTimeout(progressTimer);delete pendingRequests[key]}
  }
  function applySupplement(id,messageId,taskId){const event=state.events[id],task=event?.tasks.find(t=>t.id===taskId),message=(taskId?task?.conversations?.[state.role]:event?.conversations[state.role])?.find(m=>m.id===messageId);if(!message?.proposal||taskId&&event.reports.find(r=>r.id===message.proposal.reportId)?.taskId!==taskId)throw Error('找不到本任务的修订稿。');return applyReportSupplement(state,id,message.proposal)}
- async function submit(id,taskId){const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession});syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{});return report}
- return {flush:()=>backend.flush(),deleteEvent,assistStep:(id,taskId,stepIndex,text,uploads)=>assistTaskStep(state,id,taskId,stepIndex,text,uploads,aiStreamRequest,pendingRequests),applyStepNote:(id,taskId,messageId)=>applyTaskStepNote(state,id,taskId,messageId,pendingRequests),reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
+ async function submit(id,taskId){
+  const report=await generateTaskReport(state,id,taskId,aiStreamRequest,{ownerSession:reportSession})
+  // Finishing an old analysis must not acknowledge a newly assigned task/closure.
+  const event=state.events[id]
+  if(event?.currentTask===taskId&&['decision','review'].includes(event.phase)){syncObservations();acknowledge(id);void prepareTaskPlan(id).catch(()=>{})}
+  return report
+ }
+ return {beginDecisionEdit:event=>decisionEditing.begin(event),endDecisionEdit:id=>decisionEditing.end(id),flush:()=>backend.flush(),deleteEvent,assistStep:(id,taskId,stepIndex,text,uploads)=>assistTaskStep(state,id,taskId,stepIndex,text,uploads,aiStreamRequest,pendingRequests),applyStepNote:(id,taskId,messageId)=>applyTaskStepNote(state,id,taskId,messageId,pendingRequests),reportAnomaly,resumeTask:(id,taskId,form)=>resumeOwnTask(state,id,taskId,form),state,events,pending,tasks,reports,shoreReports,workItems,notifications,unread,notices,people,pendingRequests,refreshReport:(id,reportId,onProgress)=>refreshTaskReport(state,id,reportId,aiStreamRequest,onProgress),prepareTaskPlan,refreshObservations:syncObservations,setRole,markRead,acknowledge,ask,applySupplement,updateObservationAdvice:(id,phaseId,patch)=>updateObservationAdvice(state,id,phaseId,patch),decide:(id,f)=>{syncObservations();decide(state,id,f);syncObservations();acknowledge(id)},submit}
 })

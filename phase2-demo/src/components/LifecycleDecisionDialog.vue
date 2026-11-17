@@ -1,11 +1,11 @@
 <template>
- <Teleport to="body"><dialog ref="dialog" class="decision-dialog" :class="{'shore-dialog':action==='shore'}" :aria-labelledby="titleId" @click="outside" @cancel.prevent="close" @close="visible=false">
+ <Teleport to="body"><dialog ref="dialog" class="decision-dialog" :class="{'shore-dialog':action==='shore'}" :aria-labelledby="titleId" @click="outside" @cancel.prevent="close" @close="nativeClosed">
   <header><div><small>{{event.title}}</small><h2 :id="titleId">{{archive?'上报岸基报告':action==='shore'?'上报岸基':'轮机长决策'}}</h2></div><button type="button" aria-label="关闭决策弹窗" @click="close">×</button></header>
   <div class="decision-dialog-body"><LifecycleReport v-if="archive" :report="archive.syncedReport"/><LifecycleActionForm v-else-if="visible" :event="event" :show-basis="false" @submitted="submitted" @plan="showPlan"/></div>
  </dialog></Teleport>
 </template>
 <script setup>
-import {computed,ref,watch,nextTick,useId} from 'vue'
+import {computed,ref,watch,nextTick,useId,onDeactivated,onBeforeUnmount} from 'vue'
 import LifecycleActionForm from './LifecycleActionForm.vue'
 import LifecycleReport from './LifecycleReport.vue'
 import {people} from '../workflow/eventLifecycle'
@@ -14,6 +14,7 @@ import {createShoreReportDraft} from '../workflow/shoreReports.js'
 const props=defineProps({event:{type:Object,required:true}}),emit=defineEmits(['submitted','plan'])
 const store=useEventLifecycleStore(),titleId=useId()
 const dialog=ref(null),visible=ref(false),archive=ref(null),action=computed(()=>props.event.decisionDraft?.action)
+let editingEventId
 function open(selected,sourceShoreId){
  archive.value=null
  props.event.decisionDraft||={action:'',reason:'',owner:people.engineer,dispatcher:people.captain,deadline:'',maintenancePlanId:'',window:''}
@@ -27,15 +28,20 @@ function open(selected,sourceShoreId){
    form.shoreMarkdown=form.shoreDraftReport.markdown
   }
  }
- visible.value=true
- nextTick(()=>!dialog.value?.open&&dialog.value?.showModal())
+ display()
 }
-function showReport(id){archive.value=props.event.shore.find(s=>s.id===id);visible.value=true;nextTick(()=>!dialog.value?.open&&dialog.value?.showModal())}
-function close(){dialog.value?.close();visible.value=false;if(props.event.decisionDraft?.action==='shore')props.event.decisionDraft.action=''}
+function display(){if(editingEventId)store.endDecisionEdit(editingEventId);editingEventId=props.event.id;store.beginDecisionEdit(props.event);visible.value=true;nextTick(()=>{if(visible.value&&!dialog.value?.open)dialog.value?.showModal()})}
+function showReport(id){archive.value=props.event.shore.find(s=>s.id===id);display()}
+// Native close events are queued; an earlier close must not hide a reopened form.
+function endEditing(){if(editingEventId)store.endDecisionEdit(editingEventId);editingEventId=null}
+function nativeClosed(){if(!dialog.value?.open){endEditing();visible.value=false}}
+function close(){endEditing();dialog.value?.close();visible.value=false;if(props.event.decisionDraft?.action==='shore')props.event.decisionDraft.action=''}
 function outside(e){if(e.target===dialog.value){const r=dialog.value.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}}
 function showPlan(action){close();emit('plan',action)}
 function submitted(action){close();emit('submitted',action)}
 watch(()=>props.event.id,close)
+onDeactivated(close)
+onBeforeUnmount(close)
 defineExpose({open,showReport})
 </script>
 <style scoped>

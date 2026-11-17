@@ -1,3 +1,4 @@
+import {reportGenerationStatus} from './reportGenerationState.js'
 import {currentResponsibility} from './lifecyclePresentation.js'
 import {ownsTask,capabilities} from './lifecyclePermissions.js'
 import {people,pendingDecision,taskName} from './eventLifecycle.js'
@@ -32,7 +33,7 @@ export function lifecycleWorkItems(state){
    const report=event.reports.findLast(r=>r.taskId===task.id),submitted=task.status==='submitted',done=task.goalStatus==='completed'
    const item={id:'task:'+task.id,taskId:task.id,kind:'task',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:taskName(task)+'任务',eventType:event.type,title:taskTitle(task),number:taskNumber(event,task),summary:task.status==='waiting'?task.waiting.reason:submitted?report?.summary||task.summary:task.scope,owner:task.owner,assignedBy:task.assignedBy||people.captain,assignedAt:task.assignedAt,deadline:task.deadline,at:task.resumedAt||task.assignedAt,completedAt:task.submittedAt,waiting:task.status==='waiting',status:task.status==='waiting'?'等待条件':task.status==='terminated'?'已终止':task.status==='reporting'?'报告生成中':task.status==='report-error'?'报告待生成':done?'已完成':submitted?(task.goalStatus==='unresolved'?'目标未完成':'反馈待审阅'):'待执行',done,progress:(submitted?task.records:task.draft?.records||[]).filter(r=>r.result).length,total:task.steps.length,location:taskLocation(task),actionLabel:task.status==='waiting'?'查看等待条件':submitted?'查看任务记录':canExecuteTask(state,event,task)?'执行任务':'查看执行进度'}
    tasks.push(item)
-   if(canExecuteTask(state,event,task)||ownsTask(role,task)&&['report-error','waiting'].includes(task.status)){if(task.status==='report-error')item.actionLabel='重新生成报告';pending.push(item)}
+   if(canExecuteTask(state,event,task)||ownsTask(role,task)&&(reportGenerationStatus(task)==='error'||task.status==='waiting')){if(reportGenerationStatus(task)==='error')item.actionLabel='重新生成报告';pending.push(item)}
    if(done&&(task.owner===actor||item.assignedBy===actor))completed.push({...item,at:task.submittedAt})
    if(role==='captain'&&item.assignedBy===actor&&!event.decisions.some(d=>d.taskId===task.id&&['investigate','repair','maintenance','recheck'].includes(d.action))){
     completed.push({id:'legacy-dispatch:'+task.id,kind:'decision',eventId:event.id,eventTitle:event.title,eventNumber:event.number,device:event.device,type:'决策记录',eventType:event.type,title:'派发'+taskName(task),summary:task.scope,owner:actor,status:'已完成',at:task.assignedAt,done:true,location:{path:'/situation/issue/'+event.id,query:{from:'tasks',phase:task.id}},actionLabel:'查看处置记录'})

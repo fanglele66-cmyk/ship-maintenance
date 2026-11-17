@@ -1,0 +1,440 @@
+{
+  "version": 3,
+  "database": "ship-continuous-24h.db",
+  "source": "D:\\zstech\\ship_sop\\ship-data-collector\\ship-data-collector\\data\\ship.db",
+  "timezone": "Asia/Shanghai",
+  "sourceAnchor": "2026-07-04T12:00:00+08:00",
+  "playbackAnchor": "2026-11-10T16:07:35+08:00",
+  "cadenceSeconds": 12,
+  "anchorSequence": 1094181,
+  "createdAt": "2026-11-10T14:32:19+08:00",
+  "tables": {
+    "sensor_readings": {
+      "sourceCount": 2094567,
+      "sourceStart": "2025-10-22 13:46:47",
+      "sourceEnd": "2026-11-10 11:01:18",
+      "count": 1682921,
+      "start": "2026-06-11 16:51:23",
+      "end": "2027-01-31 10:35:23"
+    },
+    "ais_track": {
+      "sourceCount": 118474,
+      "sourceStart": "2025-11-01 00:02:00",
+      "sourceEnd": "2026-11-10 11:00:09",
+      "count": 87579,
+      "start": "2026-06-19 12:22:56.000000",
+      "end": "2027-01-31 10:34:08.230769"
+    },
+    "weather_data": {
+      "sourceCount": 9674,
+      "sourceStart": "2025-11-01 00:00:00",
+      "sourceEnd": "2026-11-10 08:00:00",
+      "count": 7416,
+      "start": "2026-06-19 12:20:51.000000",
+      "end": "2027-01-31 07:41:43.000000"
+    }
+  },
+  "removedGapCount": 7700,
+  "seamThresholdSeconds": 60,
+  "mode": "historical-copy-replay",
+  "clockPolicy": "continuous-sample-sequence-no-loop",
+  "stopCompaction": {
+    "maximumHours": 24,
+    "rpmThreshold": 5,
+    "policy": "retain-first-and-last-half",
+    "runsCompacted": 76,
+    "removedSensorRows": 411646,
+    "removedAncillaryRows": {
+      "ais_track": 14360,
+      "weather_data": 1372
+    },
+    "maximumStoppedSeconds": 86400,
+    "nonCadenceIntervals": 0,
+    "runs": [
+      {
+        "startSequence": 40721,
+        "endSequence": 53298,
+        "removedRows": 5378
+      },
+      {
+        "startSequence": 86606,
+        "endSequence": 99662,
+        "removedRows": 5857
+      },
+      {
+        "startSequence": 137589,
+        "endSequence": 150297,
+        "removedRows": 5509
+      },
+      {
+        "startSequence": 179200,
+        "endSequence": 190352,
+        "removedRows": 3953
+      },
+      {
+        "startSequence": 194497,
+        "endSequence": 203971,
+        "removedRows": 2275
+      },
+      {
+        "startSequence": 204733,
+        "endSequence": 212012,
+        "removedRows": 80
+      },
+      {
+        "startSequence": 229245,
+        "endSequence": 242610,
+        "removedRows": 6166
+      },
+      {
+        "startSequence": 251534,
+        "endSequence": 264584,
+        "removedRows": 5851
+      },
+      {
+        "startSequence": 264945,
+        "endSequence": 292833,
+        "removedRows": 20689
+      },
+      {
+        "startSequence": 298718,
+        "endSequence": 320755,
+        "removedRows": 14838
+      },
+      {
+        "startSequence": 321173,
+        "endSequence": 328985,
+        "removedRows": 613
+      },
+      {
+        "startSequence": 329490,
+        "endSequence": 340066,
+        "removedRows": 3377
+      },
+      {
+        "startSequence": 340292,
+        "endSequence": 347689,
+        "removedRows": 198
+      },
+      {
+        "startSequence": 370880,
+        "endSequence": 378771,
+        "removedRows": 692
+      },
+      {
+        "startSequence": 416006,
+        "endSequence": 425122,
+        "removedRows": 1917
+      },
+      {
+        "startSequence": 425709,
+        "endSequence": 445204,
+        "removedRows": 12296
+      },
+      {
+        "startSequence": 466401,
+        "endSequence": 485801,
+        "removedRows": 12201
+      },
+      {
+        "startSequence": 492633,
+        "endSequence": 500235,
+        "removedRows": 403
+      },
+      {
+        "startSequence": 534179,
+        "endSequence": 543020,
+        "removedRows": 1642
+      },
+      {
+        "startSequence": 543419,
+        "endSequence": 555280,
+        "removedRows": 4662
+      },
+      {
+        "startSequence": 555373,
+        "endSequence": 567548,
+        "removedRows": 4976
+      },
+      {
+        "startSequence": 586862,
+        "endSequence": 596073,
+        "removedRows": 2012
+      },
+      {
+        "startSequence": 602069,
+        "endSequence": 610230,
+        "removedRows": 962
+      },
+      {
+        "startSequence": 644843,
+        "endSequence": 654579,
+        "removedRows": 2537
+      },
+      {
+        "startSequence": 690071,
+        "endSequence": 703712,
+        "removedRows": 6442
+      },
+      {
+        "startSequence": 712285,
+        "endSequence": 722229,
+        "removedRows": 2745
+      },
+      {
+        "startSequence": 740828,
+        "endSequence": 757950,
+        "removedRows": 9923
+      },
+      {
+        "startSequence": 773570,
+        "endSequence": 782087,
+        "removedRows": 1318
+      },
+      {
+        "startSequence": 796193,
+        "endSequence": 808451,
+        "removedRows": 5059
+      },
+      {
+        "startSequence": 827660,
+        "endSequence": 835919,
+        "removedRows": 1060
+      },
+      {
+        "startSequence": 837435,
+        "endSequence": 848933,
+        "removedRows": 4299
+      },
+      {
+        "startSequence": 869532,
+        "endSequence": 878451,
+        "removedRows": 1720
+      },
+      {
+        "startSequence": 912004,
+        "endSequence": 930832,
+        "removedRows": 11629
+      },
+      {
+        "startSequence": 946765,
+        "endSequence": 954274,
+        "removedRows": 310
+      },
+      {
+        "startSequence": 970883,
+        "endSequence": 984727,
+        "removedRows": 6645
+      },
+      {
+        "startSequence": 993687,
+        "endSequence": 1010829,
+        "removedRows": 9943
+      },
+      {
+        "startSequence": 1027029,
+        "endSequence": 1041645,
+        "removedRows": 7417
+      },
+      {
+        "startSequence": 1054679,
+        "endSequence": 1062676,
+        "removedRows": 798
+      },
+      {
+        "startSequence": 1080068,
+        "endSequence": 1094071,
+        "removedRows": 6804
+      },
+      {
+        "startSequence": 1119266,
+        "endSequence": 1146315,
+        "removedRows": 19850
+      },
+      {
+        "startSequence": 1159236,
+        "endSequence": 1169391,
+        "removedRows": 2956
+      },
+      {
+        "startSequence": 1176106,
+        "endSequence": 1185328,
+        "removedRows": 2023
+      },
+      {
+        "startSequence": 1189495,
+        "endSequence": 1205209,
+        "removedRows": 8515
+      },
+      {
+        "startSequence": 1238374,
+        "endSequence": 1252081,
+        "removedRows": 6508
+      },
+      {
+        "startSequence": 1270998,
+        "endSequence": 1288110,
+        "removedRows": 9913
+      },
+      {
+        "startSequence": 1294681,
+        "endSequence": 1303798,
+        "removedRows": 1918
+      },
+      {
+        "startSequence": 1307711,
+        "endSequence": 1316091,
+        "removedRows": 1181
+      },
+      {
+        "startSequence": 1320044,
+        "endSequence": 1329721,
+        "removedRows": 2478
+      },
+      {
+        "startSequence": 1332365,
+        "endSequence": 1339870,
+        "removedRows": 306
+      },
+      {
+        "startSequence": 1341425,
+        "endSequence": 1361085,
+        "removedRows": 12461
+      },
+      {
+        "startSequence": 1362635,
+        "endSequence": 1373077,
+        "removedRows": 3243
+      },
+      {
+        "startSequence": 1397509,
+        "endSequence": 1404719,
+        "removedRows": 11
+      },
+      {
+        "startSequence": 1410705,
+        "endSequence": 1421011,
+        "removedRows": 3107
+      },
+      {
+        "startSequence": 1440745,
+        "endSequence": 1450594,
+        "removedRows": 2650
+      },
+      {
+        "startSequence": 1478585,
+        "endSequence": 1486080,
+        "removedRows": 296
+      },
+      {
+        "startSequence": 1494827,
+        "endSequence": 1528507,
+        "removedRows": 26481
+      },
+      {
+        "startSequence": 1546392,
+        "endSequence": 1558081,
+        "removedRows": 4490
+      },
+      {
+        "startSequence": 1567481,
+        "endSequence": 1605242,
+        "removedRows": 30562
+      },
+      {
+        "startSequence": 1611675,
+        "endSequence": 1618918,
+        "removedRows": 44
+      },
+      {
+        "startSequence": 1639944,
+        "endSequence": 1653415,
+        "removedRows": 6272
+      },
+      {
+        "startSequence": 1654776,
+        "endSequence": 1663020,
+        "removedRows": 1045
+      },
+      {
+        "startSequence": 1664056,
+        "endSequence": 1673667,
+        "removedRows": 2412
+      },
+      {
+        "startSequence": 1677566,
+        "endSequence": 1697295,
+        "removedRows": 12530
+      },
+      {
+        "startSequence": 1716391,
+        "endSequence": 1724321,
+        "removedRows": 731
+      },
+      {
+        "startSequence": 1747978,
+        "endSequence": 1765069,
+        "removedRows": 9892
+      },
+      {
+        "startSequence": 1788780,
+        "endSequence": 1796319,
+        "removedRows": 340
+      },
+      {
+        "startSequence": 1821053,
+        "endSequence": 1834000,
+        "removedRows": 5748
+      },
+      {
+        "startSequence": 1846403,
+        "endSequence": 1855102,
+        "removedRows": 1500
+      },
+      {
+        "startSequence": 1868071,
+        "endSequence": 1879666,
+        "removedRows": 4396
+      },
+      {
+        "startSequence": 1901043,
+        "endSequence": 1921068,
+        "removedRows": 12826
+      },
+      {
+        "startSequence": 1940311,
+        "endSequence": 1948524,
+        "removedRows": 1014
+      },
+      {
+        "startSequence": 1972933,
+        "endSequence": 1985355,
+        "removedRows": 5223
+      },
+      {
+        "startSequence": 1986129,
+        "endSequence": 1996913,
+        "removedRows": 3585
+      },
+      {
+        "startSequence": 2025086,
+        "endSequence": 2036532,
+        "removedRows": 4247
+      },
+      {
+        "startSequence": 2047216,
+        "endSequence": 2054805,
+        "removedRows": 390
+      },
+      {
+        "startSequence": 2075770,
+        "endSequence": 2088275,
+        "removedRows": 5306
+      }
+    ],
+    "previousDatabase": "ship-replay.db",
+    "previousAnchorSequence": 1355019,
+    "selectedOldSequence": 1357486,
+    "completedAt": "2026-11-10T16:07:35+08:00"
+  }
+}

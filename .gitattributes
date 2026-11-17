@@ -1,0 +1,9 @@
+phase2-demo/deployment-data/telemetry/*.db filter=lfs diff=lfs merge=lfs -text
+# Ship this fixed deployment dataset as ordinary Git binary content.
+phase2-demo/deployment-data/telemetry/ship-continuous-24h.db -filter -diff -merge -text
+phase2-demo/deployment-data/telemetry/manifest.json -text whitespace=cr-at-eol
+phase2-demo/deployment-data/telemetry/receipt.json -text
+phase2-demo/dist/** -text -whitespace
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.template text eol=lf

@@ -1,3 +1,4 @@
+import {preserveReportStream} from './reportGenerationState.js'
 // Only demo cases share browser storage. Real events use authenticated backend reads.
 export function demoWorkspace(state){
  const events=Object.fromEntries(Object.entries(state.events||{}).filter(([,event])=>!event.backendManaged))
@@ -5,6 +6,7 @@ export function demoWorkspace(state){
 }
 export function mergeDemoWorkspace(state,incoming){
  const demo=demoWorkspace(incoming)
+ for(const event of Object.values(demo.events))preserveReportStream(state.events[event.id],event)
  const real=Object.fromEntries(Object.entries(state.events).filter(([,event])=>event.backendManaged))
  return {...demo,events:{...demo.events,...real},notices:[...demo.notices,...state.notices.filter(notice=>real[notice.eventId])]}
 }

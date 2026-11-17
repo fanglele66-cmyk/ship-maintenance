@@ -1,3 +1,4 @@
+import {reportTask,submissionSnapshot,submissionContext} from '../src/workflow/reportSubmissions.js'
 import {existsSync} from 'node:fs'
 import {mkdir,readFile,writeFile,rm,lstat,realpath} from 'node:fs/promises'
 import {join,resolve,dirname} from 'node:path'
@@ -83,6 +84,13 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
   if(unavailable(event)||!canSeeEvent(event,user))throw Error('没有该事件的访问权限。')
   // Model context must refer to the persisted identity/plan; operator draft records may be in-flight.
   input.event.number=event.number;input.event.title=event.title;input.event.brief=event.brief;input.event.manualReport=event.manualReport;input.event.detectionReport=event.detectionReport
+  if(input.mode==='submit-report'){
+   const report=event.reports.find(r=>r.id===input.reportId&&r.taskId===input.taskId)
+   const task=report&&reportTask(event,report)
+   if(!task||task.owner!==people[user.workflowRole]||report.submissionNumber!==input.submissionNumber)throw Error('只能分析本人已正式提交的对应版本报告。')
+   input.event.tasks=[{...submissionSnapshot(task),status:'submitted'}]
+   input.event.submissionContext=submissionContext(event,task,report.id)
+  }
   if(input.mode==='step-assist'){
    const requested=input.task?.id||input.taskId,task=event.tasks.find(t=>t.id===requested)
    if(!task||task.status!=='assigned'||event.currentTask!==task.id||task.owner!==people[user.workflowRole])throw Error('只能协助本人当前正在执行的任务。')

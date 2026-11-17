@@ -65,6 +65,23 @@ test('simultaneous chief conversation and engineer task feedback retain server a
  const invalid=copy(b.state.events[id]);invalid.conversations.captain.push({id:'forged',kind:'user',text:'冒充轮机长'})
  await assert.rejects(service.save(invalid,invalid.serverRevision,engineer),/他人会话/)
 })
+
+test('report analysis authorization reads the saved submission and rejects another owner or version',async t=>{
+ const {service}=await fixture(t),result=await service.manual({requestId:'report-authorization',report:form()},{user:engineer})
+ const state={role:'captain',events:{[result.event.id]:result.event},notices:[]},event=result.event
+ ensureTaskPlan(event);decide(state,event.id,{action:'investigate',owner:people.engineer,deadline:new Date(Date.now()+86400000).toISOString()})
+ state.role='engineer';const task=currentTask(event)
+ task.draft.records.forEach(r=>{r.result='未见异常';r.note='现场表计与系统一致。'})
+ beginTaskReport(state,event.id,task.id,'authorized-report')
+ await service.repository.save(event)
+ const report=event.reports[0]
+ const input={mode:'submit-report',event:{id:event.id,tasks:[{records:[{note:'伪造浏览器输入'}]}]},taskId:task.id,reportId:report.id,submissionNumber:report.submissionNumber}
+ await service.authorize(input,engineer)
+ assert.deepEqual(input.event.tasks[0].records,report.submissionSnapshot.records)
+ assert.equal(input.event.tasks[0].status,'submitted')
+ await assert.rejects(service.authorize({...input,submissionNumber:99},engineer),/对应版本/)
+ await assert.rejects(service.authorize(input,chief),/本人/)
+})
 test('hourly detection is startup relative and does not duplicate a completed slot',async t=>{
  const f=await fixture(t);await f.service.tick();assert.equal(f.calls(),1);f.advance(59*60000);await f.service.tick();assert.equal(f.calls(),1);f.advance(60000);await f.service.tick();assert.equal(f.calls(),2)
  const status=await f.service.status();assert.equal(status.runs.filter(r=>r.status==='complete').length,2)

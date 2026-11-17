@@ -1,4 +1,5 @@
-import {readFile,mkdir,writeFile,rename} from 'node:fs/promises'
+import {readFile,mkdir,writeFile,rename,copyFile} from 'node:fs/promises'
+import {constants} from 'node:fs'
 import {join} from 'node:path'
 import {homedir} from 'node:os'
 
@@ -8,10 +9,19 @@ const defaultProviderId='0a032ef9-8898-4498-94d5-8071c3545ddd' // CC Switch: Dee
 // DeepSeek /models reports a maximum of 393216 output tokens (384K).
 export const maxOutputTokens=393216
 export const defaults={enabled:true,source:'cc-switch',providerId:defaultProviderId,model:'',baseUrl:'',protocol:'anthropic',maxTokens:maxOutputTokens,timeoutMs:180000,taskMaxTokens:maxOutputTokens,taskTimeoutMs:180000,knowledgeEnabled:true}
-export function configStore(root){
- const directory=join(root,'.local-ai'),file=join(directory,'config.json')
+export function configStore(root,{directory=process.env.SHIP_AI_DIR||join(root,'.local-ai'),seedFile=process.env.SHIP_AI_SEED_FILE}={}){
+ const file=join(directory,'config.json')
  return {
-  async read(){try{return {...defaults,...JSON.parse(await readFile(file,'utf8'))}}catch(e){if(e.code==='ENOENT')return {...defaults};throw Error('本地模型配置文件无法读取。')}},
+  async read(){
+   try{return {...defaults,...JSON.parse(await readFile(file,'utf8'))}}
+   catch(e){
+    if(e.code!=='ENOENT')throw Error('本地模型配置文件无法读取。')
+    if(!seedFile)return {...defaults}
+    await mkdir(directory,{recursive:true})
+    try{await copyFile(seedFile,file,constants.COPYFILE_EXCL)}catch(error){if(error.code!=='EEXIST')throw Error('服务器模型初始配置无法读取。')}
+    return {...defaults,...JSON.parse(await readFile(file,'utf8'))}
+   }
+  },
   async write(input){
    const current=await this.read(),next={...current}
    for(const k of Object.keys(defaults))if(Object.hasOwn(input,k))next[k]=input[k]

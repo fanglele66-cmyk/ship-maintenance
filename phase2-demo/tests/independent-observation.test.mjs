@@ -54,15 +54,15 @@ test('旧记录已有观察闭环时补齐原事件闭环，重复加载不生�
  refreshLifecyclePresentation(state);assert.equal(parent.reports.length,reports);assert.equal(parent.decisions.length,decisions);assert.equal(state.notices.length,notices)
 })
 
-test('关联链路闭环会中止尚在生成的报告，迟到结果不能重新打开事件',()=>{
+test('关联链路闭环后可补充原回执分析，迟到结果不能重新打开事件',()=>{
  const {state,parent,event}=observed()
  parent.reports.push({...structuredClone(parent.reports.at(-1)),id:'parallel-source-report'})
  const child=createObservationEvent(state,parent,currentTask(parent),{reason:'另一轮观察'})
  const pending=dispatch(state,event,'recheck');pending.draft.records.forEach(r=>r.result='未见异常');pending.draft.summary='提交中的原始记录'
  state.role='engineer';beginTaskReport(state,event.id,pending.id,'in-flight')
  state.role='captain';decide(state,child.id,{action:'close',reason:'关联观察确认闭环'})
- assert.equal(parent.phase,'closed');assert.equal(pending.status,'terminated');assert.equal(pending.reportGeneration.status,'cancelled');assert.equal(pending.summary,'提交中的原始记录')
- state.role='engineer';assert.throws(()=>submitTask(state,event.id,pending.id,{requestId:'in-flight'}),/报告生成状态已变化/);assert.equal(event.status,'已闭环')
+ assert.equal(parent.phase,'closed');assert.equal(pending.status,'submitted');assert.equal(pending.reportGeneration.status,'streaming');assert.equal(pending.summary,'提交中的原始记录')
+ state.role='engineer';submitTask(state,event.id,pending.id,{requestId:'in-flight',model:'test',patch:{summary:'原回执的分析补充。',analysis:{evidence:'依据原始记录。',interpretation:'现场情况已核对。',unverified:'保留未验证事项。',next:'按已确认安排执行。'}}});assert.equal(event.status,'已闭环');assert.equal(pending.reportGeneration.status,'complete')
 })
 
 test('新旧排查回交统一待决策，当前阶段为决策中，观察选项显示效果观察',()=>{

@@ -1,5 +1,5 @@
 import {isVerificationReview} from './observationContext.js'
-import {taskExecution} from './taskExecution.js'
+import {taskExecution,hasSubmittedFeedback} from './taskExecution.js'
 export const isAbnormalResult=record=>/发现异常|读数不一致|偏离仍存在/.test(record.result||'')
 export const hasAbnormalFindings=task=>(task?.records||[]).some(isAbnormalResult)
 // Only an explicit conclusion about the trend can negate it; "原因未明" cannot.
@@ -24,7 +24,7 @@ export function lifecycleDecisionOptions(event){
  if(event.phase==='reminder')return [{value:'investigate',label:'派发排查'},{value:'false',label:'确认误报'},...shore]
  const current=event.tasks.find(t=>t.id===event.currentTask)
  // Formal feedback is usable while its optional AI enrichment is pending or failed.
- const task=current&&['reporting','report-error'].includes(current.status)&&current.submittedAt&&event.reports.some(r=>r.taskId===current.id)?{...current,status:'submitted'}:current
+ const task=hasSubmittedFeedback(event,current)?{...current,status:'submitted'}:current
  if(task?.status==='waiting')return [{value:'resume',label:'条件具备，恢复原任务'},{value:'terminate',label:'终止未执行部分'},...shore]
  if(['assigned','reporting','report-error'].includes(task?.status))return shore
  if(task?.status==='submitted'&&taskExecution(task).incomplete&&(task.kind!=='investigation'||taskExecution(task).summaryBlocked||task.records.some(r=>/未完成|受限/.test(r.result)||r.executionStatus==='未完成')))return [{value:task.kind==='investigation'&&!hasAbnormalFindings(task)?'investigate':'repair',label:task.kind==='investigation'&&!hasAbnormalFindings(task)?'继续排查':'派发剩余维修'},{value:'wait',label:'等待条件，保留原任务'},{value:'terminate',label:'终止未执行部分'},{value:'close',label:'说明剩余事项并闭环'},...shore]
