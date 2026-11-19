@@ -1,6 +1,6 @@
 # GitHub 代码同步说明
 
-本次同步源：公司 GitLab `env/dev`，提交 `0ff66126965c49193d2d7f41521f1ec0dd3c8aec`。
+本次同步源：公司 GitLab `env/dev`，提交 `742947cbbdd9555ef284a4e141f82d5cf4dca627`。
 
 应用源代码、测试、构建产物 `phase2-demo/dist`、部署脚本和 Windows 启动脚本均与该提交一致。GitHub 分支沿用自己的提交历史，不包含公司部署分支中的数据库或实际模型配置。
 

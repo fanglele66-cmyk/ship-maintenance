@@ -128,6 +128,19 @@
 /* Conversation surfaces: fewer nested frames; warm user bubbles and quiet receipts. */
 .app-container.app-container :is(.lc-assistant>header, .p2-restored-assistant .p2-assistant-head, .kap-header) { border-bottom: 1px solid var(--ui-line); background: linear-gradient(#fff, #fdfdfa); }
 .app-container.app-container .lc-assistant>header strong { font-size: 16px; font-weight: 600; color: #3b453d; }
+.lc-conversation .lc-message { overflow-wrap: anywhere; color: #405369; }
+.lc-conversation .lc-message > time { text-align: left; }
+.lc-message > .markdown-content,
+.lc-message .model-reply > .markdown-content,
+.lc-message .step-note-message > p,
+.lc-message.user > p,
+.lc-message.task-assistant-intro > p { font-size: 14px; line-height: 1.8; }
+.lc-message > .markdown-content > :first-child,
+.lc-message .model-reply > .markdown-content > :first-child,
+.lc-message.user > p:first-child { margin-top: 0; }
+.lc-message > .markdown-content > :last-child,
+.lc-message .model-reply > .markdown-content > :last-child,
+.lc-message.user > p:last-of-type { margin-bottom: 0; }
 .app-container.app-container .lc-message.user,
 .app-container.app-container .p2-restored-assistant .p2-message.user .p2-bubble,
 .app-container.app-container .km-user-bubble { background: #f2f3ee; border: 1px solid #e9ebe3; border-radius: 12px 12px 4px 12px; color: #48564d; box-shadow: inset 0 1px 0 #ffffff99; }
@@ -144,7 +157,14 @@
  border: 1px solid #d8dcd1; border-radius: 13px; padding: 12px; background: #fff;
  box-shadow: 0 3px 12px #29332108, inset 0 1px 0 #fff;
 }
-.app-container.app-container .lc-composer { margin: 10px 12px 12px; }
+.app-container.app-container .lc-assistant .lc-composer {
+ margin: 8px 12px 12px;
+ padding: 11px 12px 10px;
+ background: linear-gradient(180deg, #fff 55%, #fbfbf8);
+ border: 1px solid #d5d8ce;
+ border-radius: 14px;
+ box-shadow: 0 2px 6px #2834210a, inset 0 1px 0 #fff;
+}
 .app-container.app-container :is(.lc-composer, .p2-restored-assistant .p2-compose-shell, .kap-input-wrapper):focus-within { border-color: #c3ac7d; box-shadow: var(--ui-ring), 0 3px 12px #29332108; }
 .app-container.app-container :is(.lc-composer, .p2-restored-assistant .p2-compose, .kap-input-wrapper) :is(textarea, input),
 .app-container.app-container :is(.lc-composer, .p2-restored-assistant .p2-compose, .kap-input-wrapper) :is(textarea, input):focus { border: 0; outline: none; box-shadow: none; background: transparent; border-radius: 0; color: #46534b; }
@@ -167,6 +187,62 @@
 .app-container.app-container .lc-chat-mode button { min-height: 25px; border: 1px solid #e3e6db; padding: 3px 8px; border-radius: 6px; font-size: 11px; line-height: 1.4; background: #f7f8f3; color: #818972; box-shadow: none; }
 .app-container.app-container .lc-chat-mode button[aria-pressed=true] { background: #f5eddb; border-color: #d5bf91; color: #876a33; }
 .app-container.app-container .lc-chat-mode button:disabled { background: #f7f8f4; opacity: .5; cursor: not-allowed; }
+
+/* Quick questions and composer controls share the quiet finish of the situation panel. */
+.app-container.app-container .lc-followups { gap: 6px; }
+.app-container.app-container .lc-followups button {
+ min-height: 34px;
+ padding: 6px 11px;
+ border: 1px solid var(--ui-line);
+ border-radius: var(--ui-radius);
+ background: #fafbf8;
+ color: #526054;
+ box-shadow: inset 0 1px 0 white;
+}
+.app-container.app-container .lc-followups button:hover:not(:disabled) {
+ color: #54452c;
+ border-color: var(--ui-accent-line);
+ background: #faf7ef;
+}
+.app-container.app-container .lc-followups .lc-followup-arrow { color: var(--ui-accent); margin: 0; }
+.lc-followups button > span:not(.lc-followup-arrow) { min-width: 0; overflow-wrap: anywhere; }
+.app-container.app-container .lc-composer textarea {
+ width: 100%;
+ min-height: 54px;
+ display: block;
+ box-sizing: border-box;
+}
+.app-container.app-container .lc-composer textarea::placeholder { color: #798176; }
+.app-container.app-container .lc-composer footer { gap: 6px; padding-top: 6px; }
+.app-container.app-container .lc-assistant .lc-composer footer button {
+ width: 32px; height: 32px; min-height: 32px;
+}
+.app-container.app-container .lc-assistant .lc-composer footer button[type=button] {
+ border-color: #dfe3d8;
+ color: #5d6959;
+ background: linear-gradient(#fff, #f1f3eb);
+ box-shadow: var(--ui-control-shadow);
+}
+.app-container.app-container .lc-assistant .lc-composer footer button[type=button]:hover:not(:disabled) {
+ color: #414d3d; border-color: #b7bead; background: #edf0e6;
+}
+.app-container.app-container .lc-assistant .lc-composer footer button[aria-pressed=true] {
+ background: #f8ece6; color: #96573d; border-color: #d6b29e;
+}
+.app-container.app-container .lc-assistant .lc-composer footer button[type=submit] {
+ margin-left: auto;
+ border-radius: 50%;
+ box-shadow: 0 2px 4px #252a201c, inset 0 1px 0 #ffffff26;
+}
+.app-container.app-container .lc-assistant .lc-composer footer button[type=submit]:disabled {
+ box-shadow: none;
+}
+.app-container.app-container :is(.lc-composer footer, .lc-followups) button:active:not(:disabled) {
+ box-shadow: inset 0 1px 3px #29332124;
+}
+.app-container.app-container .lc-chat-mode button:hover:not(:disabled) {
+ border-color: var(--ui-accent-line); color: #765d34; background: #faf7ef;
+}
 .app-container.app-container :is(.lc-observation-dismiss, .lc-observation-advice footer button, .lc-observation-advice-hidden button) { border: 0; background: transparent; box-shadow: none; }
 
 @media(min-width:2300px) { .app-container.app-container { --ui-header-control: 36px; } .app-container.app-container .header-role-switch { font-size: 13px; } }

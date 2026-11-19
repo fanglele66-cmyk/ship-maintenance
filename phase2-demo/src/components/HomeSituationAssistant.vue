@@ -51,8 +51,7 @@ onBeforeUnmount(()=>controller?.abort())
 .home-situation-assistant>header{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}
 .assistant-collapse{justify-self:end;padding:4px 8px;border:0;border-radius:5px;background:transparent;color:#96723e;font:inherit;font-size:12px;cursor:pointer}
 .assistant-collapse:hover{background:#f8f6f0}
-.situation-conversation article{overflow-wrap:anywhere}.situation-overview{margin:0}.situation-overview-label{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:13px;font-weight:600;color:#a37c3c}
-.situation-conversation time{text-align:left}.situation-conversation :deep(.markdown-content){font-size:14px;line-height:1.8}.situation-conversation :deep(.markdown-content>:first-child){margin-top:0}.situation-conversation :deep(.markdown-content>:last-child){margin-bottom:0}
+.situation-overview{margin:0}.situation-overview-label{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:13px;font-weight:600;color:#a37c3c}
 .situation-questions button{font:inherit;font-size:12px;cursor:pointer}.situation-status,.situation-error{font-size:12px;line-height:1.6;padding:8px 0;color:#7c8790}.situation-error{color:#a8593c}.lc-composer footer small{flex:1;min-width:0;line-height:1.5}
 .situation-assistant-enter-active{transition:opacity 180ms ease,transform 180ms ease}.situation-assistant-enter-from{opacity:0;transform:translateX(12px)}
 @media(prefers-reduced-motion:reduce){.situation-assistant-enter-active{transition:none}}
