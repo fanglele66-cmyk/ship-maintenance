@@ -37,7 +37,7 @@
           <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @open-data="sensorView='list';sensorSearchQuery=''" @back="goToLayer(1)">
             <template #data>
               <div class="device-data-toolbar">
-                <SensorSimulationControls/>
+                <span class="sensor-update-time">数据更新于 {{ sensorUpdateTime }}</span>
                 <label class="layer-header-search">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
                   <input v-model="sensorSearchQuery" type="search" placeholder="搜索传感器" aria-label="搜索传感器" />
@@ -109,7 +109,6 @@ import { ElMessage } from 'element-plus'
 const AbnormalReportDialog=lazyPane(()=>import('@/components/AbnormalReportDialog.vue'))
 import ShipOverview from './ShipOverview.vue'
 import HomeSituationAssistant from '@/components/HomeSituationAssistant.vue'
-import SensorSimulationControls from '@/components/SensorSimulationControls.vue'
 const SensorGrid=lazyPane(()=>import('./SensorGrid.vue'))
 const SensorTrend=lazyPane(()=>import('./SensorTrend.vue'))
 const DeviceSituation=lazyPane(()=>import('./DeviceSituation.vue'))
@@ -124,6 +123,7 @@ import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import { useAbnormalReport } from '@/composables/useAbnormalReport'
 
 const sensorStore = useSensorStore()
+const sensorUpdateTime = computed(() => new Date(sensorStore.sampledAt).toLocaleTimeString('zh-CN', { hour12: false }))
 const localReadings=computed(()=>{
  const value=id=>{const v=sensorStore.allSensors.find(s=>s.id===id)?.value;return Number.isFinite(v)?v.toFixed(1):'—'}
  return {speed:value('ship-speed'),rpm:value('s-012'),fuelCommand:value('local-DC0058'),sampledAt:new Date(sensorStore.sampledAt).toISOString()}
@@ -622,8 +622,7 @@ situationContext.action = currentLayer.value === 1 ? 'enter_layer' : 'restore_la
   gap: 8px;
   margin: 3px 0 10px;
 }
-.device-data-toolbar :deep(.simulation-controls) { padding: 0; margin-right: auto; gap: 10px; font-size: 10px; }
-.device-data-toolbar :deep(.simulation-controls form) { left: 0; right: auto; }
+.device-data-toolbar .sensor-update-time { margin-right: auto; color: #7b8798; font-size: 10px; }
 .layer-header-search {
   width: clamp(160px, 32%, 240px);
   height: 32px;
@@ -814,8 +813,7 @@ situationContext.action = currentLayer.value === 1 ? 'enter_layer' : 'restore_la
   .layer-header { gap: 6px; padding: 0 12px; }
   .layer-header-tools { flex: 1 1 auto; }
   .device-data-toolbar { flex-wrap: wrap; }
-  .device-data-toolbar :deep(.simulation-controls) { width: 100%; justify-content: space-between; }
-  .device-data-toolbar :deep(.simulation-controls form) { max-width: calc(100vw - 80px); }
+  .device-data-toolbar .sensor-update-time { width: 100%; }
   .device-data-toolbar .layer-header-search { min-width: 0; flex: 1 1 144px; width: auto; }
   .layer-header-search { min-width: 0; flex: 1 1 144px; width: auto; }
   .sensor-view-switch button { padding: 0 8px; }
