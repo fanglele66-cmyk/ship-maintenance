@@ -141,6 +141,6 @@ test('captain summaries distinguish fleet decisions from assigned task execution
       assert.match(html,/保留真实措施正文/)
       assert.match(html,/保留真实验收正文/)
     })
-    for(const name of ['ShipOverview','TodoCenterView'])await server.ssrLoadModule(`/src/views/${name}.vue`)
+    for(const name of ['ShipOverview'])await server.ssrLoadModule(`/src/views/${name}.vue`)
   }finally{pinias.forEach(disposePinia);await server.close()}
 })

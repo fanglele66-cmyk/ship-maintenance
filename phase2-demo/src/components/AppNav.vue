@@ -44,18 +44,16 @@ import {auth,logout} from '../services/auth'
 import {Document} from '@element-plus/icons-vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useEventStore } from '@/stores/eventStore'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 
 const route = useRoute()
-const eventStore = useEventStore()
 const demoStore = usePhase2DemoStore()
 const lifecycle=useEventLifecycleStore(),roleMenuOpen=ref(false)
 const roleLabel=computed(()=>auth.user?.roleLabel||''),logoutError=ref('')
 async function signOut(){try{await logout()}catch(e){logoutError.value=e.message}}
 function navigate(path){if(path==='/event')demoStore.closeTodo();if(path==='/situation')demoStore.showCaptainWorkbench()}
-const totalUnread = computed(() => route.path==='/phase1-event'?eventStore.totalUnread:lifecycle.workItems.pending.filter(item=>item.kind==='task').length)
+const totalUnread = computed(() => lifecycle.workItems.pending.filter(item=>item.kind==='task').length)
 
 // 精确匹配 + 子路由匹配
 function isActive(path) {

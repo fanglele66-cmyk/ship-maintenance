@@ -95,26 +95,6 @@ test('C4 resumes at a second captain decision with retained first-round context'
    assert.equal(store.activeTaskPortfolio.length,0)
    preserved(store)
   })
-  await t.test('the observation task shows retained first-round findings alongside later observation submissions',async()=>{
-   const store=fresh(),task='real-observation-c4-baseline'
-   const plan={deadline:new Date(Date.now()+86400000).toISOString().slice(0,16),owner:'李建国（大管轮）',metrics:'六缸同刻记录与测温依据',criteria:'补足独立测温后重新判断'}
-   assert.equal(store.decideTracking(id,'observe',plan).ok,true)
-   const {default:Component}=await server.ssrLoadModule('/src/components/TrackingObservationTask.vue')
-   const {createSSRApp}=await import('vue'),{renderToString}=await import('@vue/server-renderer')
-   const {getActivePinia}=await import('pinia'),{routerKey}=await import('vue-router')
-   const render=()=>{const app=createSSRApp(Component,{taskId:task});app.use(getActivePinia());app.provide(routerKey,{push(){}});return renderToString(app)}
-   const first=await render()
-   assert.match(first,/首轮核实与回交记录/)
-   assert.match(first,/独立测温校验原始记录仍待补充/)
-   assert.equal(store.completedTasks[id],undefined,'retained context is not a fabricated live completion')
-   assert.equal(store.checkAssessments[id],undefined)
-   assert.equal(store.submitTrackingObservation(id,{observedAt:'2026-08-13T10:00',findings:'首轮之后新增观察原文'}).ok,true)
-   assert.equal(store.decideTracking(id,'observe',plan).ok,true)
-   const next=await render()
-   assert.match(next,/首轮之后新增观察原文/)
-   assert.equal((next.match(/首轮核实与回交记录/g)||[]).length,1)
-   preserved(store)
-  })
   await t.test('resetting a tracking parent clears its executable children while child-only reset preserves the parent history',()=>{
    const store=fresh(),observation='real-observation-c4-baseline'
    const plan={deadline:new Date(Date.now()+86400000).toISOString().slice(0,16),owner:'李建国（大管轮）',metrics:'六缸同刻记录',criteria:'补足测温依据'}

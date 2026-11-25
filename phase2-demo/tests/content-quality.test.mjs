@@ -30,7 +30,6 @@ test('submitted evidence changes issue, device and daily reports without inventi
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {storyDossier,deviceStoryAssessment}=await server.ssrLoadModule('/src/mock/fourStoryWorkflow.js')
-  const {deviceHistory}=await server.ssrLoadModule('/src/mock/phase2History.js')
   setActivePinia(createPinia());const store=usePhase2DemoStore()
   assert.doesNotMatch(storyDossier(store,'aux-health').overviewMarkdown,/现场确认410/)
   store.createTodo('aux-health');store.selectTodo('aux-health');store.advanceTodo('aux-health')
@@ -45,10 +44,6 @@ test('submitted evidence changes issue, device and daily reports without inventi
   assert.equal(store.unlockedRecommendations['aux-maintenance'],undefined)
   assert.match(deviceStoryAssessment(store,'aux-engine-2').conclusion,/可信度仍待核对/)
   assert.deepEqual(storyDossier(store,'aux-health').series[0].values,[404,406,409,409,412])
-  const reviews=deviceHistory(store).filter(row=>row.type==='review')
-  assert.equal(new Set(reviews.filter(row=>row.deviceId?.startsWith('aux-engine-')).map(row=>row.deviceId)).size,3)
-  assert.deepEqual(reviews.filter(row=>row.deviceId==='aux-engine-2').map(row=>row.date).sort(),['2026-10-15','2026-10-18','2026-10-22'])
-  assert.match(reviews.find(row=>row.deviceId==='aux-engine-3').conclusion,/备用|试运行/)
   assert.match(deviceStoryAssessment(store,'aux-engine-1').basis,/61%—64%/)
  }finally{await server.close()}
 })

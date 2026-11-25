@@ -121,7 +121,7 @@ test('right-side messages retain content while navigation and confirmation contr
         }finally{mounted.app.unmount()}
       }
     })
-    // Compile the legacy and knowledge views too, to catch template regressions.
-    for(const name of ['AssistantPanel','KnowledgeAIPanel'])await server.ssrLoadModule(`/src/components/${name}.vue`)
+    // Compile the knowledge view too, to catch template regressions.
+    for(const name of ['KnowledgeAIPanel'])await server.ssrLoadModule(`/src/components/${name}.vue`)
   }finally{await server.close()}
 })

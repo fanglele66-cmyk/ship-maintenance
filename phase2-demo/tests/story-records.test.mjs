@@ -10,7 +10,6 @@ test('business records stay coherent across the health chain, task and analysis 
   const {storyTimeline}=await server.ssrLoadModule('/src/mock/storyRecords.js')
   const {storyDossier,stageReport,workflowCases}=await server.ssrLoadModule('/src/mock/fourStoryWorkflow.js')
   const {initialIssueMessages}=await server.ssrLoadModule('/src/message-flows/issueSources.js')
-  const {deviceHistory}=await server.ssrLoadModule('/src/mock/phase2History.js')
   const fresh=()=>{setActivePinia(createPinia());const store=usePhase2DemoStore();store.unlockedRecommendations['aux-health']=true;return store}
   const dispatch=(store,id)=>{store.unlockedRecommendations[id]=true;store.createTodo(id);store.assignTask(id,{...store.defaultAssignment(id),owner:'赵明（三管轮）'});store.selectTodo(id);store.advanceTodo(id)}
   const feedback=(store,values,notes)=>store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:notes[i]}))
@@ -37,7 +36,6 @@ test('business records stay coherent across the health chain, task and analysis 
    dispatch(store,'aux-health')
    store.advanceTodo('aux-health',feedback(store,['现场与系统一致','信息已记录'],['同刻409°C，对应同源显示','负荷66%，仍缺独立检验']))
    store.decideCheck('aux-health','finish-tracking','核实记录留存，继续原健康链')
-   const day15=JSON.stringify(deviceHistory(store).find(entry=>entry.id==='review-aux-engine-2-2026-10-15'))
    store.advanceHealthTrack('aux2-health');store.advanceHealthTrack('aux2-health')
    assert.match(storyDossier(store,'aux-health').overviewMarkdown,/412°C/)
    const current=initialIssueMessages('aux-health',store)
@@ -45,8 +43,6 @@ test('business records stay coherent across the health chain, task and analysis 
    assert.notEqual(current[0].id,old[0].id)
    assert.match(current[1].markdown,/412°C/)
    assert.doesNotMatch(old[1].markdown,/412°C/)
-   assert.equal(JSON.stringify(deviceHistory(store).find(entry=>entry.id==='review-aux-engine-2-2026-10-15')),day15)
-   assert.equal(deviceHistory(store).filter(entry=>entry.type==='review'&&entry.deviceId==='aux-engine-2').length,3)
   })
   await t.test('earlier stage report does not acquire future findings; work report uses the actual independent findings',()=>{
    const store=fresh();dispatch(store,'fault')

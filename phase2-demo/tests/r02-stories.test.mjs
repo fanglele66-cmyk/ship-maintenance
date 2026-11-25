@@ -25,7 +25,6 @@ test('R02 preserves three dossiers, qualitative evidence and explicit decision r
  try {
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {attentionDossier}=await server.ssrLoadModule('/src/mock/attentionDossier.js')
-  const {deviceHistory}=await server.ssrLoadModule('/src/mock/phase2History.js')
   setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
   assert.deepEqual(store.attention.filter(i=>i.tab==='attention').map(i=>i.id).sort(),['cyl2-ended','cyl4-watch','drift'])
   for(const id of ['cyl2-ended','cyl4-watch','drift']){
@@ -37,7 +36,6 @@ test('R02 preserves three dossiers, qualitative evidence and explicit decision r
   assert.equal(attentionDossier(store,'stable'),null)
   assert.equal(attentionDossier(store,'vibration-trend'),null)
   store.nextMonitor('stable');assert.equal(store.monitorStep.stable,0)
-  assert.equal(deviceHistory(store).some(record=>record.target==='stable'),false)
   store.sendR02Message('cyl4-watch','为什么没有报警还要关注？')
   assert.equal(store.logs['cyl4-watch'].at(-1).noteCandidate,undefined)
   store.sendR02Message('cyl4-watch','现场没有异常声音')

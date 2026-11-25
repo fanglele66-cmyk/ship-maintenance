@@ -38,23 +38,15 @@ import LifecycleNotifications from './LifecycleNotifications.vue'
 import {useSensorStore} from '@/stores/sensorStore'
 import { shipInfo } from '@/mock/devices'
 import { knowledgeDocs } from '@/mock/knowledge'
-import { useEventStore } from '@/stores/eventStore'
-import { knowledgeViewCache, inspectionViewCache } from '@/stores/viewCache'
+import { knowledgeViewCache } from '@/stores/viewCache'
 import { useRoute, useRouter } from 'vue-router'
 
-const eventStore = useEventStore()
 const route = useRoute()
 const router = useRouter()
 const sensorStore=useSensorStore()
 const displayShipName=computed(()=>shipInfo.name)
-const selectedEvent = computed(() => route.path.startsWith('/phase1-event') && eventStore.isDrawerOpen ? eventStore.selectedEvent : null)
 const sectionTitle = computed(() => route.path.startsWith('/situation/issue/')?(route.query.from==='tasks'?'我的任务':'事件中心'):route.meta.title || '船舶设备检修助手')
 const detailTitle = computed(() => {
-  if (selectedEvent.value) return selectedEvent.value.title
-  if (route.path.startsWith('/inspection')) {
-    const reportId = route.query.report || inspectionViewCache.selectedReportId
-    if (reportId) return '报告详情'
-  }
   if (route.path.startsWith('/knowledge')) {
     const docId = route.query.doc || knowledgeViewCache.selectedDocId
     if (docId) {
@@ -65,14 +57,6 @@ const detailTitle = computed(() => {
 })
 
 function closeDetail() {
-  if (selectedEvent.value) {
-    eventStore.closeDrawer()
-    return
-  }
-  if (route.path.startsWith('/inspection')) {
-    inspectionViewCache.selectedReportId = null
-    router.replace({ path: route.path })
-  }
   if (route.path.startsWith('/knowledge')) {
     knowledgeViewCache.selectedDocId = null
     router.replace({ path: route.path })

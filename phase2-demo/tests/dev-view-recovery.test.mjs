@@ -16,7 +16,7 @@ test('rebuilds once after a Vue HMR batch, ignores CSS and releases old listener
   notify([{type:'js-update',path:'/src/mock/data.js'}])
   assert.equal(rebuilds,0)
   notify([
-    {type:'js-update',path:'/src/views/TodoCenterView.vue'},
+    {type:'js-update',path:'/src/views/LifecycleTodoView.vue'},
     {type:'js-update',path:'/src/components/messages/InquiryMessage.vue'}
   ])
   assert.equal(rebuilds,1)

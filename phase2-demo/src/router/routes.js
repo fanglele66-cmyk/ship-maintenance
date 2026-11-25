@@ -21,18 +21,6 @@ export const routes = [
     meta: { title: '态势', icon: '📡' }
   },
   {
-    path: '/phase1-event',
-    name: 'Phase1EventCenter',
-    component: () => import('@/views/EventCenterView.vue'),
-    meta: { title: '一期事件原稿', icon: '📌' }
-  },
-  {
-    path: '/inspection',
-    name: 'Inspection',
-    component: () => import('@/views/InspectionReportView.vue'),
-    meta: { title: '日志中心', icon: '' }
-  },
-  {
     path: '/knowledge',
     name: 'Knowledge',
     component: () => import('@/views/KnowledgeView.vue'),
