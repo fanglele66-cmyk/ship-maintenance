@@ -25,7 +25,7 @@ async function readJsonBody(req, limit = 512 * 1024) {
 }
 
 export function loadDeviceTypeTemplate(root) {
-  const filePath = join(root, 'docs', 'device-type-template.json')
+  const filePath = join(root, 'data', 'device-type-template.json')
   return JSON.parse(readFileSync(filePath, 'utf8'))
 }
 

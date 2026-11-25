@@ -1,5 +1,5 @@
 import catalog from '../../data/sensor-point-mapping.json' with { type: 'json' }
-import templateData from '../../docs/device-type-template.json' with { type: 'json' }
+import templateData from '../../data/device-type-template.json' with { type: 'json' }
 
 const aliases = {
   1: 's-012',

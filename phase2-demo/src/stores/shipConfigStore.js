@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import defaultTemplate from '../../docs/device-type-template.json' with { type: 'json' }
+import defaultTemplate from '../../data/device-type-template.json' with { type: 'json' }
 import { appUrl } from '@/services/appUrl.js'
 import { sessionHeaders } from '@/services/session.js'
 import { auth } from '@/services/auth'
