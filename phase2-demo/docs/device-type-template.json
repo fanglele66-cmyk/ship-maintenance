@@ -1,0 +1,4506 @@
+{
+  "schemaVersion": "1.0.0",
+  "templateId": "ship-device-type-master-template",
+  "title": "智能机舱船端 2.0 设备类型与标准点位总模板（T1）",
+  "updatedAt": "2026-11-25",
+  "designModel": {
+    "paradigm": "class-to-instance-tree",
+    "summary": "本模板采用“设备类型（最大点位全集类）→ 直接挂接标准点位（每点位携带系统标签、数值/报警类型、单位、量程、正常上下限、厂家报警限值等属性列）”的树形结构。单船存在多台同类型设备时，每台设备实例均从同一设备类型类实例化，可全选或按实船可采情况部分勾选点位。",
+    "inheritanceRules": {
+      "pointCodeImmutable": "属于设备类型类的点位编号（pointCode）与内部键名（internalKey）全局不可变，作为 T2 实船映射、T4 同类设备合并训练及算法对齐的唯一主键。",
+      "instancePointNameMutable": "设备实例层的点位中文/英文展示名（instancePointName）允许由船端超级管理员按本船习惯自定义修改（如“1#主机1缸排温”），不影响底层 pointCode。",
+      "partialSelectionSupported": "同类型不同设备实例（如 1#/2#/3# 主机）允许只启用类中的部分点位子集；同类设备合并训练（T4）时按所选实例的已启用 pointCode 交集或指定特征清单对齐。",
+      "unitStandardization": "设备类型模板压力统一采用 bar；若某台实例底层采集单位不同（例如本地历史库为 MPa），在实例绑定层按换算系数（×10）折算后进入统一口径。",
+      "optionalThresholds": "正常上下限（normalRange）、厂家运行范围（manualOperatingRange）及保护限值（oemProtectionLimits）均为选填列；存在版本/硬件配置差异或控制指令类测点时保持 null，避免误配默认值。"
+    }
+  },
+  "pointAttributeSchema": {
+    "requiredTags": [
+      {
+        "field": "pointCode",
+        "label": "点位编号（类级不可变）",
+        "type": "string",
+        "mutableAtInstance": false
+      },
+      {
+        "field": "internalKey",
+        "label": "内部标准键（类级不可变）",
+        "type": "string",
+        "mutableAtInstance": false
+      },
+      {
+        "field": "defaultName",
+        "label": "默认点位名称（实例可改）",
+        "type": "string",
+        "mutableAtInstance": true
+      },
+      {
+        "field": "systemId / systemName",
+        "label": "所属系统标签",
+        "type": "string",
+        "mutableAtInstance": false
+      },
+      {
+        "field": "pointKind / apiDataType",
+        "label": "点位类型（numeric=1 / alarm=2）",
+        "type": "enum",
+        "mutableAtInstance": false
+      },
+      {
+        "field": "unit",
+        "label": "标准数据单位（压力统一 bar）",
+        "type": "string",
+        "mutableAtInstance": false
+      }
+    ],
+    "optionalTags": [
+      {
+        "field": "subsystemTag",
+        "label": "子系统/功能分组标签",
+        "type": "string"
+      },
+      {
+        "field": "signalRole",
+        "label": "信号角色（measurement 测量型 / derived_deviation 派生偏差 / control_command 控制指令 / discrete_alarm 开关报警）",
+        "type": "enum"
+      },
+      {
+        "field": "dataValueType / precision",
+        "label": "数据类型与建议小数精度",
+        "type": "string / integer"
+      },
+      {
+        "field": "cylinderNo / componentTag",
+        "label": "关联缸号与物理部件标签",
+        "type": "integer|null / string"
+      },
+      {
+        "field": "loadDependent",
+        "label": "是否随主机负荷变化",
+        "type": "boolean"
+      },
+      {
+        "field": "signed16Decode",
+        "label": "是否需有符号16位补码解码",
+        "type": "boolean"
+      },
+      {
+        "field": "modbusAddress / oemTagCode / signalType",
+        "label": "采集地址、厂家位号与物理信号类型",
+        "type": "integer|null / string"
+      },
+      {
+        "field": "physicalRange / sensorAccuracy",
+        "label": "传感器物理量程与精度",
+        "type": "object|null / string|null"
+      },
+      {
+        "field": "normalRange",
+        "label": "正常上下限（选填；不硬写默认值的测点保持 null）",
+        "type": "object|null"
+      },
+      {
+        "field": "manualOperatingRange",
+        "label": "厂家手册 MCR 持续运行上下限（选填）",
+        "type": "object|null"
+      },
+      {
+        "field": "oemProtectionLimits",
+        "label": "厂家报警(ALM)/减速(SLD)/停机(SHD)设定值与延时（选填）",
+        "type": "object|null"
+      },
+      {
+        "field": "alarmStateSpec",
+        "label": "报警点位 0/1 状态语义与触发跳变定义",
+        "type": "object|null"
+      },
+      {
+        "field": "unitConversionNote",
+        "label": "历史采集源单位差异换算提示",
+        "type": "string|null"
+      },
+      {
+        "field": "algorithmUsage",
+        "label": "算法/模型使用标签（异常检测分组、NF50特征集、健康评分、多缸组、工况驱动点）",
+        "type": "object"
+      },
+      {
+        "field": "collectorKeyAliases",
+        "label": "采集侧/历史映射别名列表（辅助新船自动匹配）",
+        "type": "string[]"
+      }
+    ]
+  },
+  "deviceTypes": [
+    {
+      "deviceTypeId": "rt-flex50-main-engine",
+      "deviceTypeCode": "ME-RTFLEX50",
+      "deviceTypeName": "RT-flex50主机",
+      "deviceTypeNameEn": "Wärtsilä RT-flex50 Main Engine",
+      "category": "main_propulsion",
+      "categoryName": "推进主机",
+      "manufacturer": "Wärtsilä / WinGD",
+      "modelSeries": [
+        "6RT-flex50",
+        "RT-flex50",
+        "RT-flex50-D"
+      ],
+      "legacyModelAliases": [
+        "MAN B&W 6S50ME-B9.3",
+        "MAN B&W 6S50ME-B9.3 / RT-flex50"
+      ],
+      "modelNamingNote": "长航碧玉实船主机为 Wärtsilä 6RT-flex50（2005 纸质参数表），早年岸端数据接口曾登记型号为 MAN B&W 6S50ME-B9.3；模板以 RT-flex50 为正式设备类型名，并保留旧别名以兼容历史接入。",
+      "defaultCylinderCount": 6,
+      "supportedCylinderCounts": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "knowledgePackageId": "rt-flex50",
+      "dataSources": [
+        "ship-maintenance/phase2-demo/data/sensor-point-mapping.json",
+        "ship-maintenance/phase2-demo/.claude/skills/ship-anomaly-detection/data/mappings/changhangbiyu_mapping.json",
+        "ship-maintenance/phase2-demo/data/local-replay.json",
+        "ship-maintenance/phase2-demo/wiki_rt-flex50/concepts/传感器测点清单.md",
+        "ship-maintenance/phase2-demo/wiki_rt-flex50/concepts/持续运行参数与版本对照.md",
+        "ship-maintenance/phase2-demo/wiki_rt-flex50/concepts/主机报警与保护设定速查.md",
+        "ship-maintenance/phase2-demo/wiki_rt-flex50/concepts/扫气温度正常范围与测点辨识.md",
+        "ship-maintenance/phase2-demo/wiki_rt-flex50/concepts/RT-flex报警对策对照表.md",
+        "ship_sop/ship-data-collector/ship-data-collector/config.yaml",
+        "ship_sop/ship-fault-diagnosis/ship-fault-diagnosis/data/传感器数据范围.csv",
+        "ship_sop/ship-fault-diagnosis/ship-fault-diagnosis/references/sensor-mapping.md",
+        "ship_sop/model-training-platform/storage/profiles/ship_chby/rtflex50_feature_manifest.json",
+        "ship_sop/ship-health-score/health_score.py",
+        "ship-changhangbiyu/.claude/skills/ship-manual-anomaly-analysis/data/system-profiles.json"
+      ],
+      "pointSummary": {
+        "totalPoints": 59,
+        "numericPoints": 58,
+        "alarmPoints": 1,
+        "systemCount": 11,
+        "nfForecast50Count": 50,
+        "healthScoreCount": 52
+      },
+      "systemTags": [
+        {
+          "systemId": "main_engine",
+          "systemName": "主机系统",
+          "systemNameEn": "Main Engine Core",
+          "description": "主机本体转速等核心运行工况测点",
+          "pointCount": 1
+        },
+        {
+          "systemId": "turbocharger",
+          "systemName": "增压系统",
+          "systemNameEn": "Turbocharging System",
+          "description": "涡轮增压器转速与扫气总管增压空气压力测点",
+          "pointCount": 2
+        },
+        {
+          "systemId": "shafting",
+          "systemName": "轴系系统",
+          "systemNameEn": "Shafting System",
+          "description": "艉管后轴承与中间轴承温度监测（非主机本体WECS监控，实船归口主机关联监测）",
+          "pointCount": 2
+        },
+        {
+          "systemId": "starting",
+          "systemName": "启动系统",
+          "systemNameEn": "Starting Air System",
+          "description": "主机起动空气进口压力监测",
+          "pointCount": 1
+        },
+        {
+          "systemId": "control_air",
+          "systemName": "控制系统",
+          "systemNameEn": "Control Air System",
+          "description": "控制空气与安全控制空气压力监测",
+          "pointCount": 2
+        },
+        {
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "systemNameEn": "Exhaust Gas System",
+          "description": "各缸排气温度、缸间排温偏差及增压器前后排烟温度监测",
+          "pointCount": 14
+        },
+        {
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "systemNameEn": "Scavenge Air System",
+          "description": "各缸扫气温度监测",
+          "pointCount": 6
+        },
+        {
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "systemNameEn": "Lubricating Oil System",
+          "description": "主轴承滑油、推力轴承滑油、增压器滑油及轴向减振器滑油监测",
+          "pointCount": 7
+        },
+        {
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "systemNameEn": "Cooling System",
+          "description": "活塞冷却油、缸套冷却淡水及空冷器冷却水回路监测",
+          "pointCount": 16
+        },
+        {
+          "systemId": "fuel_oil",
+          "systemName": "燃油系统",
+          "systemNameEn": "Fuel Oil System",
+          "description": "燃油供给、高压燃油共轨压力及喷油指令监测",
+          "pointCount": 5
+        },
+        {
+          "systemId": "servo_oil",
+          "systemName": "伺服系统",
+          "systemNameEn": "Servo Oil System",
+          "description": "伺服油共轨压力与伺服油泵泄漏报警监测",
+          "pointCount": 3
+        }
+      ],
+      "points": [
+        {
+          "pointCode": "DC0001",
+          "pointCodeImmutable": true,
+          "internalKey": "rpm",
+          "defaultName": "主机转速",
+          "defaultNameEn": "M/E RPM",
+          "instanceNameOverridable": true,
+          "systemId": "main_engine",
+          "systemName": "主机系统",
+          "subsystemTag": "主机本体运行",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "RPM",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "曲轴/主轴",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 1,
+          "oemTagCode": "ME RPM",
+          "signalType": "RPM Selector",
+          "physicalRange": {
+            "min": -120,
+            "max": 120,
+            "unit": "RPM"
+          },
+          "sensorAccuracy": null,
+          "normalRange": {
+            "min": 102,
+            "max": 106,
+            "unit": "RPM",
+            "condition": "实船稳态巡航参考（停机为0，机动/过渡工况随车令变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": null,
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": {
+              "relativePctOfRated": 110,
+              "unit": "% rated RPM",
+              "delaySec": 0,
+              "oemTag": "ST5111-12S"
+            },
+            "unit": "RPM",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1; 第6章-技术参数与报警设定.md",
+            "configDependencyNote": "超速停机按额定转速110%设定（ST5111-12S，0s）；WECS故障对策培训资料另记115%。需按具体主机额定转速折算绝对RPM。"
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "rpm",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": true
+          },
+          "collectorKeyAliases": [
+            "DC0001",
+            "RPM",
+            "主机转速",
+            "M/E RPM",
+            "主机转速_M/E RPM",
+            "ME RPM"
+          ]
+        },
+        {
+          "pointCode": "DC0002",
+          "pointCodeImmutable": true,
+          "internalKey": "turbo_rpm",
+          "defaultName": "增压器转速",
+          "defaultNameEn": "M/E turbocharger tachometer",
+          "instanceNameOverridable": true,
+          "systemId": "turbocharger",
+          "systemName": "增压系统",
+          "subsystemTag": "增压器",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "RPM",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 0,
+          "cylinderNo": null,
+          "componentTag": "涡轮增压器",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 2,
+          "oemTagCode": "0426",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 20000,
+            "unit": "RPM"
+          },
+          "sensorAccuracy": "1 RPM",
+          "normalRange": {
+            "min": 11200,
+            "max": 11800,
+            "unit": "RPM",
+            "condition": "实船稳态巡航参考（随主机负荷显著变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "rpm",
+            "inNfForecast50": false,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0002",
+            "0013",
+            "增压器转速",
+            "M/E turbocharger tachometer",
+            "增压器转速_M/E turbocharger tachometer",
+            "0426",
+            "T/C REVOLUTION"
+          ]
+        },
+        {
+          "pointCode": "DC0003",
+          "pointCodeImmutable": true,
+          "internalKey": "shaft_aft_bearing_temp",
+          "defaultName": "尾轴后轴承温度",
+          "defaultNameEn": "Stern tube aft bearing temperature",
+          "instanceNameOverridable": true,
+          "systemId": "shafting",
+          "systemName": "轴系系统",
+          "subsystemTag": "轴系轴承",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "艉管后轴承",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 3,
+          "oemTagCode": "0203",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 38,
+            "max": 41,
+            "unit": "°C",
+            "condition": "实船巡航典型范围（受海水温度与航速影响）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "bearing_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0003",
+            "0203",
+            "尾轴后轴承温度",
+            "艉管后轴承温度"
+          ],
+          "notes": "属于船体轴系监测，不在 Wärtsilä 主机本体 0250 报警设定原表内。"
+        },
+        {
+          "pointCode": "DC0004",
+          "pointCodeImmutable": true,
+          "internalKey": "shaft_mid_bearing_temp",
+          "defaultName": "中间轴承温度",
+          "defaultNameEn": "Intermediate shaft bearing temperature",
+          "instanceNameOverridable": true,
+          "systemId": "shafting",
+          "systemName": "轴系系统",
+          "subsystemTag": "轴系轴承",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "中间轴承",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 4,
+          "oemTagCode": "0206",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 40,
+            "max": 42,
+            "unit": "°C",
+            "condition": "实船巡航典型范围（受机舱温度与航速影响）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "bearing_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0004",
+            "0206",
+            "中间轴承温度"
+          ],
+          "notes": "属于船体轴系监测，不在 Wärtsilä 主机本体 0250 报警设定原表内。"
+        },
+        {
+          "pointCode": "DC0005",
+          "pointCodeImmutable": true,
+          "internalKey": "start_air_press",
+          "defaultName": "起动空气压力",
+          "defaultNameEn": "Starting air pressure",
+          "instanceNameOverridable": true,
+          "systemId": "starting",
+          "systemName": "启动系统",
+          "subsystemTag": "起动空气",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "起动空气总管进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 5,
+          "oemTagCode": "PT4301C",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 40,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.1 bar",
+          "normalRange": {
+            "min": 19,
+            "max": 24,
+            "unit": "bar",
+            "condition": "实船常规待命/运行范围（由原采集 1.9-2.4 MPa 折算）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 12,
+            "max": 30,
+            "unit": "bar",
+            "condition": "主机起动空气入口（原表 12 至 25/30 bar，上限按空气瓶系统配置）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2005与2009版本一致。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 12,
+              "delaySec": 0,
+              "originalText": "12 bar"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "bar",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (PT4301C)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "control_air",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0005",
+            "PT4301C",
+            "起动空气压力",
+            "起动空气进总管压力"
+          ]
+        },
+        {
+          "pointCode": "DC0006",
+          "pointCodeImmutable": true,
+          "internalKey": "ctrl_air_press",
+          "defaultName": "控制空气压力",
+          "defaultNameEn": "Control air pressure",
+          "instanceNameOverridable": true,
+          "systemId": "control_air",
+          "systemName": "控制系统",
+          "subsystemTag": "控制空气",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "控制空气进总管",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 6,
+          "oemTagCode": "0302",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 10,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.025 bar",
+          "normalRange": {
+            "min": 6,
+            "max": 7,
+            "unit": "bar",
+            "condition": "实船稳态运行参考（由原采集 0.6-0.7 MPa 折算）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 6,
+            "max": 7.5,
+            "unit": "bar",
+            "condition": "主机控制空气入口（2005原表 6.0-7.5 bar，正常 6.5 bar）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; 持续运行参数与版本对照.md",
+            "versionNotes": "2017年 WinGD RT-flex50-D 安装手册(MIM)将控制空气入口列为 7-9 bar，不同子机型存在版本差异，须按实船机型核对。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 6,
+              "delaySec": 0,
+              "originalText": "6 bar (PT4401A)"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "bar",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (PT4401A)",
+            "configDependencyNote": "原表列出 PT4401A(L 6 bar) 与 PT4421A(L 5 bar) 两路控制空气低压报警，具体对应实船 DC0006/DC0007 哪一路须与 I/O 清单核对。"
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "control_air",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0006",
+            "0302",
+            "控制空气压力",
+            "控制空气进总管压力"
+          ]
+        },
+        {
+          "pointCode": "DC0007",
+          "pointCodeImmutable": true,
+          "internalKey": "ctrl_air_press_safety",
+          "defaultName": "控制空气压力(safety)",
+          "defaultNameEn": "Safety control air pressure",
+          "instanceNameOverridable": true,
+          "systemId": "control_air",
+          "systemName": "控制系统",
+          "subsystemTag": "安全控制空气",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "安全系统控制空气进总管",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 7,
+          "oemTagCode": "0303",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 10,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.025 bar",
+          "normalRange": {
+            "min": 6,
+            "max": 7,
+            "unit": "bar",
+            "condition": "实船稳态运行参考（由原采集 0.6-0.7 MPa 折算）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 6,
+            "max": 7.5,
+            "unit": "bar",
+            "condition": "控制空气安全支路（参考 2005原表控制空气入口 6.0-7.5 bar，正常 6.5 bar）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1",
+            "versionNotes": "同 DC0006，需区分 RT-flex50 (2005) 与 RT-flex50-D (2017) 差异。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 5,
+              "delaySec": 0,
+              "originalText": "5 bar (PT4421A)"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "bar",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (PT4421A)",
+            "configDependencyNote": "原表另一控制空气监测信号 PT4421A 设定为 L 5 bar；实船与 DC0006 的减压阀前后位置关系不可凭名称推定，须现场核对。"
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "control_air",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0007",
+            "0303",
+            "控制空气压力safety",
+            "控制空气进总管压力(safety)"
+          ]
+        },
+        {
+          "pointCode": "DC0008",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_cyl1",
+          "defaultName": "1缸排气温度",
+          "defaultNameEn": "ME NO.1 Exhaust gas temp.after cylinder",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 1,
+          "componentTag": "1号缸排气出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 8,
+          "oemTagCode": "0305A",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 380,
+            "max": 400,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸排气上限",
+            "maxDelta": "缸间偏差 ±50 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3701A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3701A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "exhaust_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0008",
+            "0305A",
+            "1缸排气温度",
+            "主机NO.1气缸排烟温度",
+            "exhaust_gas_cyl1",
+            "ME NO.1 Exhaust gas temp.after cylinder",
+            "1缸排温",
+            "TE3701A"
+          ]
+        },
+        {
+          "pointCode": "DC0009",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_cyl2",
+          "defaultName": "2缸排气温度",
+          "defaultNameEn": "ME NO.2 Exhaust gas temp.after cylinder",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 2,
+          "componentTag": "2号缸排气出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 9,
+          "oemTagCode": "0305B",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 380,
+            "max": 400,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸排气上限",
+            "maxDelta": "缸间偏差 ±50 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3702A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3702A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "exhaust_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0009",
+            "0305B",
+            "2缸排气温度",
+            "主机NO.2气缸排烟温度",
+            "exhaust_gas_cyl2",
+            "2缸排温",
+            "TE3702A"
+          ]
+        },
+        {
+          "pointCode": "DC0010",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_cyl3",
+          "defaultName": "3缸排气温度",
+          "defaultNameEn": "ME NO.3 Exhaust gas temp.after cylinder",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 3,
+          "componentTag": "3号缸排气出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 10,
+          "oemTagCode": "0305C",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 380,
+            "max": 400,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸排气上限",
+            "maxDelta": "缸间偏差 ±50 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3703A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3703A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "exhaust_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0010",
+            "0305C",
+            "3缸排气温度",
+            "主机NO.3气缸排烟温度",
+            "exhaust_gas_cyl3",
+            "3缸排温",
+            "TE3703A"
+          ]
+        },
+        {
+          "pointCode": "DC0011",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_cyl4",
+          "defaultName": "4缸排气温度",
+          "defaultNameEn": "ME NO.4 Exhaust gas temp.after cylinder",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 4,
+          "componentTag": "4号缸排气出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 11,
+          "oemTagCode": "0305D",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 380,
+            "max": 400,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸排气上限",
+            "maxDelta": "缸间偏差 ±50 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3704A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3704A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "exhaust_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0011",
+            "0305D",
+            "4缸排气温度",
+            "主机NO.4气缸排烟温度",
+            "exhaust_gas_cyl4",
+            "4缸排温",
+            "TE3704A"
+          ]
+        },
+        {
+          "pointCode": "DC0012",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_cyl5",
+          "defaultName": "5缸排气温度",
+          "defaultNameEn": "ME NO.5 Exhaust gas temp.after cylinder",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 5,
+          "componentTag": "5号缸排气出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 12,
+          "oemTagCode": "0305E",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 380,
+            "max": 400,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸排气上限",
+            "maxDelta": "缸间偏差 ±50 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3705A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3705A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "exhaust_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0012",
+            "0305E",
+            "5缸排气温度",
+            "主机NO.5气缸排烟温度",
+            "exhaust_gas_cyl5",
+            "5缸排温",
+            "TE3705A"
+          ]
+        },
+        {
+          "pointCode": "DC0013",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_cyl6",
+          "defaultName": "6缸排气温度",
+          "defaultNameEn": "ME NO.6 Exhaust gas temp.after cylinder",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 6,
+          "componentTag": "6号缸排气出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 13,
+          "oemTagCode": "0305F",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 380,
+            "max": 400,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸排气上限",
+            "maxDelta": "缸间偏差 ±50 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3706A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3706A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "exhaust_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0013",
+            "0305F",
+            "6缸排气温度",
+            "主机NO.6气缸排烟温度",
+            "exhaust_gas_cyl6",
+            "6缸排温",
+            "TE3706A"
+          ]
+        },
+        {
+          "pointCode": "DC0014",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_dev_cyl1",
+          "defaultName": "1缸排气温度偏差",
+          "defaultNameEn": "Cylinder No.1 exhaust gas temperature deviation",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度偏差",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "derived_deviation",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 1,
+          "componentTag": "1号缸排气偏差通道",
+          "loadDependent": false,
+          "signed16Decode": true,
+          "modbusAddress": 14,
+          "oemTagCode": "0305A-DEV",
+          "signalType": "Deviation",
+          "physicalRange": {
+            "min": -100,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": -10,
+            "max": 10,
+            "unit": "°C",
+            "condition": "实船巡航典型绝对偏差范围（config.yaml/CSV 简写为 0-10 °C，实际通道输出带正负号）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": -50,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率允许缸间排温偏差 ±50 °C",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": {
+              "plusMinus": 50,
+              "delaySec": 0,
+              "originalText": "±50 °C (TE3701-08A)"
+            },
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": {
+              "plusMinus": 70,
+              "delaySec": 60,
+              "originalText": "±70 °C (TE3701-08A)"
+            },
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_dev",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": "exhaust_dev",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0014",
+            "0305A-DEV",
+            "1缸排气温度偏差",
+            "主机NO.1气缸排烟温度偏差"
+          ],
+          "notes": "原始寄存器带符号，须按 signed16 补码解码（见 ship-profile.json signed16PointNameMarkers）。"
+        },
+        {
+          "pointCode": "DC0015",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_dev_cyl2",
+          "defaultName": "2缸排气温度偏差",
+          "defaultNameEn": "Cylinder No.2 exhaust gas temperature deviation",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度偏差",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "derived_deviation",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 2,
+          "componentTag": "2号缸排气偏差通道",
+          "loadDependent": false,
+          "signed16Decode": true,
+          "modbusAddress": 15,
+          "oemTagCode": "0305B-DEV",
+          "signalType": "Deviation",
+          "physicalRange": {
+            "min": -100,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": -10,
+            "max": 10,
+            "unit": "°C",
+            "condition": "实船巡航典型绝对偏差范围（config.yaml/CSV 简写为 0-10 °C，实际通道输出带正负号）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": -50,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率允许缸间排温偏差 ±50 °C",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": {
+              "plusMinus": 50,
+              "delaySec": 0,
+              "originalText": "±50 °C (TE3701-08A)"
+            },
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": {
+              "plusMinus": 70,
+              "delaySec": 60,
+              "originalText": "±70 °C (TE3701-08A)"
+            },
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_dev",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": "exhaust_dev",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0015",
+            "0305B-DEV",
+            "2缸排气温度偏差",
+            "主机NO.2气缸排烟温度偏差"
+          ],
+          "notes": "原始寄存器带符号，须按 signed16 补码解码（见 ship-profile.json signed16PointNameMarkers）。"
+        },
+        {
+          "pointCode": "DC0016",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_dev_cyl3",
+          "defaultName": "3缸排气温度偏差",
+          "defaultNameEn": "Cylinder No.3 exhaust gas temperature deviation",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度偏差",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "derived_deviation",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 3,
+          "componentTag": "3号缸排气偏差通道",
+          "loadDependent": false,
+          "signed16Decode": true,
+          "modbusAddress": 16,
+          "oemTagCode": "0305C-DEV",
+          "signalType": "Deviation",
+          "physicalRange": {
+            "min": -100,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": -10,
+            "max": 10,
+            "unit": "°C",
+            "condition": "实船巡航典型绝对偏差范围（config.yaml/CSV 简写为 0-10 °C，实际通道输出带正负号）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": -50,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率允许缸间排温偏差 ±50 °C",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": {
+              "plusMinus": 50,
+              "delaySec": 0,
+              "originalText": "±50 °C (TE3701-08A)"
+            },
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": {
+              "plusMinus": 70,
+              "delaySec": 60,
+              "originalText": "±70 °C (TE3701-08A)"
+            },
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_dev",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": "exhaust_dev",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0016",
+            "0305C-DEV",
+            "3缸排气温度偏差",
+            "主机NO.3气缸排烟温度偏差"
+          ],
+          "notes": "原始寄存器带符号，须按 signed16 补码解码（见 ship-profile.json signed16PointNameMarkers）。"
+        },
+        {
+          "pointCode": "DC0017",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_dev_cyl4",
+          "defaultName": "4缸排气温度偏差",
+          "defaultNameEn": "Cylinder No.4 exhaust gas temperature deviation",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度偏差",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "derived_deviation",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 4,
+          "componentTag": "4号缸排气偏差通道",
+          "loadDependent": false,
+          "signed16Decode": true,
+          "modbusAddress": 17,
+          "oemTagCode": "0305D-DEV",
+          "signalType": "Deviation",
+          "physicalRange": {
+            "min": -100,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": -10,
+            "max": 10,
+            "unit": "°C",
+            "condition": "实船巡航典型绝对偏差范围（config.yaml/CSV 简写为 0-10 °C，实际通道输出带正负号）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": -50,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率允许缸间排温偏差 ±50 °C",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": {
+              "plusMinus": 50,
+              "delaySec": 0,
+              "originalText": "±50 °C (TE3701-08A)"
+            },
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": {
+              "plusMinus": 70,
+              "delaySec": 60,
+              "originalText": "±70 °C (TE3701-08A)"
+            },
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_dev",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": "exhaust_dev",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0017",
+            "0305D-DEV",
+            "4缸排气温度偏差",
+            "主机NO.4气缸排烟温度偏差"
+          ],
+          "notes": "原始寄存器带符号，须按 signed16 补码解码（见 ship-profile.json signed16PointNameMarkers）。"
+        },
+        {
+          "pointCode": "DC0018",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_dev_cyl5",
+          "defaultName": "5缸排气温度偏差",
+          "defaultNameEn": "Cylinder No.5 exhaust gas temperature deviation",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度偏差",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "derived_deviation",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 5,
+          "componentTag": "5号缸排气偏差通道",
+          "loadDependent": false,
+          "signed16Decode": true,
+          "modbusAddress": 18,
+          "oemTagCode": "0305E-DEV",
+          "signalType": "Deviation",
+          "physicalRange": {
+            "min": -100,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": -10,
+            "max": 10,
+            "unit": "°C",
+            "condition": "实船巡航典型绝对偏差范围（config.yaml/CSV 简写为 0-10 °C，实际通道输出带正负号）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": -50,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率允许缸间排温偏差 ±50 °C",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": {
+              "plusMinus": 50,
+              "delaySec": 0,
+              "originalText": "±50 °C (TE3701-08A)"
+            },
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": {
+              "plusMinus": 70,
+              "delaySec": 60,
+              "originalText": "±70 °C (TE3701-08A)"
+            },
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_dev",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": "exhaust_dev",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0018",
+            "0305E-DEV",
+            "5缸排气温度偏差",
+            "主机NO.5气缸排烟温度偏差"
+          ],
+          "notes": "原始寄存器带符号，须按 signed16 补码解码（见 ship-profile.json signed16PointNameMarkers）。"
+        },
+        {
+          "pointCode": "DC0019",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_dev_cyl6",
+          "defaultName": "6缸排气温度偏差",
+          "defaultNameEn": "Cylinder No.6 exhaust gas temperature deviation",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "各缸排气温度偏差",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "derived_deviation",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 6,
+          "componentTag": "6号缸排气偏差通道",
+          "loadDependent": false,
+          "signed16Decode": true,
+          "modbusAddress": 19,
+          "oemTagCode": "0305F-DEV",
+          "signalType": "Deviation",
+          "physicalRange": {
+            "min": -100,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": -10,
+            "max": 10,
+            "unit": "°C",
+            "condition": "实船巡航典型绝对偏差范围（config.yaml/CSV 简写为 0-10 °C，实际通道输出带正负号）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": -50,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率允许缸间排温偏差 ±50 °C",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": null,
+            "alarmDeviation": {
+              "plusMinus": 50,
+              "delaySec": 0,
+              "originalText": "±50 °C (TE3701-08A)"
+            },
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": {
+              "plusMinus": 70,
+              "delaySec": 60,
+              "originalText": "±70 °C (TE3701-08A)"
+            },
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3701-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_dev",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": "exhaust_dev",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0019",
+            "0305F-DEV",
+            "6缸排气温度偏差",
+            "主机NO.6气缸排烟温度偏差"
+          ],
+          "notes": "原始寄存器带符号，须按 signed16 补码解码（见 ship-profile.json signed16PointNameMarkers）。"
+        },
+        {
+          "pointCode": "DC0020",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_before_turbo",
+          "defaultName": "增压器前排烟温度",
+          "defaultNameEn": "Exhaust gas temperature before turbocharger",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "增压器排气",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "增压器涡轮进口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 20,
+          "oemTagCode": "0307",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 440,
+            "max": 455,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 515,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率上限（原表仅列上限 515 °C）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 515,
+              "delaySec": 0,
+              "originalText": "515 °C (TE3721A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 530,
+              "delaySec": 60,
+              "originalText": "530 °C (TE3721A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3721A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0020",
+            "0307",
+            "增压器前排烟温度",
+            "主机增压器前排烟温度"
+          ]
+        },
+        {
+          "pointCode": "DC0021",
+          "pointCodeImmutable": true,
+          "internalKey": "exh_after_turbo",
+          "defaultName": "增压器后排烟温度",
+          "defaultNameEn": "Exhaust gas temperature after turbocharger",
+          "instanceNameOverridable": true,
+          "systemId": "exhaust",
+          "systemName": "排气系统",
+          "subsystemTag": "增压器排气",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "增压器涡轮出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 21,
+          "oemTagCode": "0308",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 600,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "1 °C",
+          "normalRange": {
+            "min": 350,
+            "max": 360,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": null,
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 480,
+              "delaySec": 0,
+              "originalText": "480 °C (TE3731A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE3731A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "exhaust_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0021",
+            "0308",
+            "增压器后排烟温度",
+            "主机增压器后排烟温度"
+          ]
+        },
+        {
+          "pointCode": "DC0022",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_cyl1",
+          "defaultName": "1缸扫气温度",
+          "defaultNameEn": "Cylinder No.1 scavenge air temperature",
+          "instanceNameOverridable": true,
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "subsystemTag": "各缸扫气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 1,
+          "componentTag": "1号缸扫气室/活塞下部测温点",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 22,
+          "oemTagCode": "0310A",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "scavenge_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0022",
+            "0310A",
+            "1缸扫气温度",
+            "主机NO.1气缸扫气温度"
+          ],
+          "notes": "因探头物理安装位置须按实船 I/O 清单核实，模板不硬写默认正常上下限及报警限值（留空选填）。原表区分：(1) 冷却器后扫气总管 TE4031A：运行 25-60 °C，ALM L 25 / H 60 °C(0s)，SLD H 70 °C(60s)；(2) 各缸活塞下部火警探测 TE4081-88A：ALM H 80 °C(0s)，SLD H 120 °C(60s)；长航碧玉 CSV 曾记巡航参考 55-60 °C。"
+        },
+        {
+          "pointCode": "DC0023",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_cyl2",
+          "defaultName": "2缸扫气温度",
+          "defaultNameEn": "Cylinder No.2 scavenge air temperature",
+          "instanceNameOverridable": true,
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "subsystemTag": "各缸扫气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 2,
+          "componentTag": "2号缸扫气室/活塞下部测温点",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 23,
+          "oemTagCode": "0310B",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "scavenge_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0023",
+            "0310B",
+            "2缸扫气温度",
+            "主机NO.2气缸扫气温度"
+          ],
+          "notes": "因探头物理安装位置须按实船 I/O 清单核实，模板不硬写默认正常上下限及报警限值（留空选填）。原表区分：(1) 冷却器后扫气总管 TE4031A：运行 25-60 °C，ALM L 25 / H 60 °C(0s)，SLD H 70 °C(60s)；(2) 各缸活塞下部火警探测 TE4081-88A：ALM H 80 °C(0s)，SLD H 120 °C(60s)；长航碧玉 CSV 曾记巡航参考 55-60 °C。"
+        },
+        {
+          "pointCode": "DC0024",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_cyl3",
+          "defaultName": "3缸扫气温度",
+          "defaultNameEn": "Cylinder No.3 scavenge air temperature",
+          "instanceNameOverridable": true,
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "subsystemTag": "各缸扫气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 3,
+          "componentTag": "3号缸扫气室/活塞下部测温点",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 24,
+          "oemTagCode": "0310C",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "scavenge_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0024",
+            "0310C",
+            "3缸扫气温度",
+            "主机NO.3气缸扫气温度"
+          ],
+          "notes": "因探头物理安装位置须按实船 I/O 清单核实，模板不硬写默认正常上下限及报警限值（留空选填）。原表区分：(1) 冷却器后扫气总管 TE4031A：运行 25-60 °C，ALM L 25 / H 60 °C(0s)，SLD H 70 °C(60s)；(2) 各缸活塞下部火警探测 TE4081-88A：ALM H 80 °C(0s)，SLD H 120 °C(60s)；长航碧玉 CSV 曾记巡航参考 55-60 °C。"
+        },
+        {
+          "pointCode": "DC0025",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_cyl4",
+          "defaultName": "4缸扫气温度",
+          "defaultNameEn": "Cylinder No.4 scavenge air temperature",
+          "instanceNameOverridable": true,
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "subsystemTag": "各缸扫气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 4,
+          "componentTag": "4号缸扫气室/活塞下部测温点",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 25,
+          "oemTagCode": "0310D",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "scavenge_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0025",
+            "0310D",
+            "4缸扫气温度",
+            "主机NO.4气缸扫气温度"
+          ],
+          "notes": "因探头物理安装位置须按实船 I/O 清单核实，模板不硬写默认正常上下限及报警限值（留空选填）。原表区分：(1) 冷却器后扫气总管 TE4031A：运行 25-60 °C，ALM L 25 / H 60 °C(0s)，SLD H 70 °C(60s)；(2) 各缸活塞下部火警探测 TE4081-88A：ALM H 80 °C(0s)，SLD H 120 °C(60s)；长航碧玉 CSV 曾记巡航参考 55-60 °C。"
+        },
+        {
+          "pointCode": "DC0026",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_cyl5",
+          "defaultName": "5缸扫气温度",
+          "defaultNameEn": "Cylinder No.5 scavenge air temperature",
+          "instanceNameOverridable": true,
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "subsystemTag": "各缸扫气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 5,
+          "componentTag": "5号缸扫气室/活塞下部测温点",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 26,
+          "oemTagCode": "0310E",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "scavenge_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0026",
+            "0310E",
+            "5缸扫气温度",
+            "主机NO.5气缸扫气温度"
+          ],
+          "notes": "因探头物理安装位置须按实船 I/O 清单核实，模板不硬写默认正常上下限及报警限值（留空选填）。原表区分：(1) 冷却器后扫气总管 TE4031A：运行 25-60 °C，ALM L 25 / H 60 °C(0s)，SLD H 70 °C(60s)；(2) 各缸活塞下部火警探测 TE4081-88A：ALM H 80 °C(0s)，SLD H 120 °C(60s)；长航碧玉 CSV 曾记巡航参考 55-60 °C。"
+        },
+        {
+          "pointCode": "DC0027",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_cyl6",
+          "defaultName": "6缸扫气温度",
+          "defaultNameEn": "Cylinder No.6 scavenge air temperature",
+          "instanceNameOverridable": true,
+          "systemId": "scavenge_air",
+          "systemName": "扫气系统",
+          "subsystemTag": "各缸扫气温度",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 6,
+          "componentTag": "6号缸扫气室/活塞下部测温点",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 27,
+          "oemTagCode": "0310F",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_temp",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "scavenge_temp",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0027",
+            "0310F",
+            "6缸扫气温度",
+            "主机NO.6气缸扫气温度"
+          ],
+          "notes": "因探头物理安装位置须按实船 I/O 清单核实，模板不硬写默认正常上下限及报警限值（留空选填）。原表区分：(1) 冷却器后扫气总管 TE4031A：运行 25-60 °C，ALM L 25 / H 60 °C(0s)，SLD H 70 °C(60s)；(2) 各缸活塞下部火警探测 TE4081-88A：ALM H 80 °C(0s)，SLD H 120 °C(60s)；长航碧玉 CSV 曾记巡航参考 55-60 °C。"
+        },
+        {
+          "pointCode": "DC0028",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_main_press",
+          "defaultName": "滑油进主轴承压力",
+          "defaultNameEn": "Main bearing lubricating oil inlet pressure",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "主轴承润滑",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "主轴承滑油总管进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 28,
+          "oemTagCode": "0401",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 6,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.015 bar",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "lo_main",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0028",
+            "0401",
+            "滑油进主轴承压力",
+            "主机主轴承滑油进机压力",
+            "lo_main_pressure"
+          ],
+          "notes": "因存在主机版本与供油配置差异，模板不硬写默认正常上下限及保护限值（留空选填）。参考资料：(1) 2005 RT-flex50 纸质原表：运行 3.5-4.9 bar，ALM L 3.5 bar(0s) / SLD L 3.3 bar(60s) / SHD LL 2.8 bar(10s)；(2) 2009 OM-RT-flex50 手册：运行 5.0-6.0 bar，ALM L 5.0 / SLD L 4.8 / SHD LL 4.3 bar；(3) 2017 RT-flex50-D 有十字头增压泵为 4.0-6.0 bar、无增压泵为 5.0-6.0 bar。"
+        },
+        {
+          "pointCode": "DC0029",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_main_temp",
+          "defaultName": "滑油进主轴承温度",
+          "defaultNameEn": "Main bearing lubricating oil inlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "主轴承润滑",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "主轴承滑油总管进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 29,
+          "oemTagCode": "0402",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 42,
+            "max": 45,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（传感器数据范围.csv 另记 41-42 °C）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 40,
+            "max": 50,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率（主轴承/活塞冷却滑油入口）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2005与2009版本一致。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 50,
+              "delaySec": 0,
+              "originalText": "50 °C (TE2011A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 55,
+              "delaySec": 60,
+              "originalText": "55 °C (TE2011A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2011A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "lo_main",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0029",
+            "0402",
+            "滑油进主轴承温度",
+            "主机主轴承滑油进机温度"
+          ]
+        },
+        {
+          "pointCode": "DC0030",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_thrust_temp",
+          "defaultName": "推力轴承滑油出口温度",
+          "defaultNameEn": "Thrust bearing lubricating oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "推力轴承润滑",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "推力块轴承滑油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 30,
+          "oemTagCode": "0403",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 42,
+            "max": 45,
+            "unit": "°C",
+            "condition": "实船巡航典型范围",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 65,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率上限（滑油出口温度，不等同轴瓦金属温度）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 65,
+              "delaySec": 0,
+              "originalText": "65 °C (TE2121A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 70,
+              "delaySec": 60,
+              "originalText": "70 °C (TE2121A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TS2121S)"
+            },
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2121A / TS2121S)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "lo_main",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0030",
+            "0403",
+            "推力轴承滑油出口温度",
+            "主机推力轴承滑油出口温度"
+          ]
+        },
+        {
+          "pointCode": "DC0031",
+          "pointCodeImmutable": true,
+          "internalKey": "piston_lo_cyl1",
+          "defaultName": "1缸活塞冷却油出口温度",
+          "defaultNameEn": "Cylinder No.1 piston cooling oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "活塞冷却油",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 1,
+          "componentTag": "1号缸活塞冷却油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 31,
+          "oemTagCode": "0404A",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 56,
+            "max": 58,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 80,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率出口上限 80 °C",
+            "maxDelta": "进出口最大温差 30 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 80,
+              "delaySec": 0,
+              "originalText": "80 °C (TE2501A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TE2501A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2501-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "piston_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "piston_lo",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0031",
+            "0404A",
+            "1缸活塞冷却油出口温度",
+            "主机NO.1缸活塞冷却油出口温度",
+            "piston_cool_oil_cyl1",
+            "TE2501A"
+          ]
+        },
+        {
+          "pointCode": "DC0032",
+          "pointCodeImmutable": true,
+          "internalKey": "piston_lo_cyl2",
+          "defaultName": "2缸活塞冷却油出口温度",
+          "defaultNameEn": "Cylinder No.2 piston cooling oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "活塞冷却油",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 2,
+          "componentTag": "2号缸活塞冷却油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 32,
+          "oemTagCode": "0404B",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 56,
+            "max": 58,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 80,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率出口上限 80 °C",
+            "maxDelta": "进出口最大温差 30 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 80,
+              "delaySec": 0,
+              "originalText": "80 °C (TE2502A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TE2502A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2501-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "piston_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "piston_lo",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0032",
+            "0404B",
+            "2缸活塞冷却油出口温度",
+            "主机NO.2缸活塞冷却油出口温度",
+            "piston_cool_oil_cyl2",
+            "TE2502A"
+          ]
+        },
+        {
+          "pointCode": "DC0033",
+          "pointCodeImmutable": true,
+          "internalKey": "piston_lo_cyl3",
+          "defaultName": "3缸活塞冷却油出口温度",
+          "defaultNameEn": "Cylinder No.3 piston cooling oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "活塞冷却油",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 3,
+          "componentTag": "3号缸活塞冷却油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 33,
+          "oemTagCode": "0404C",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 56,
+            "max": 58,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 80,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率出口上限 80 °C",
+            "maxDelta": "进出口最大温差 30 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 80,
+              "delaySec": 0,
+              "originalText": "80 °C (TE2503A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TE2503A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2501-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "piston_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "piston_lo",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0033",
+            "0404C",
+            "3缸活塞冷却油出口温度",
+            "主机NO.3缸活塞冷却油出口温度",
+            "piston_cool_oil_cyl3",
+            "TE2503A"
+          ]
+        },
+        {
+          "pointCode": "DC0034",
+          "pointCodeImmutable": true,
+          "internalKey": "piston_lo_cyl4",
+          "defaultName": "4缸活塞冷却油出口温度",
+          "defaultNameEn": "Cylinder No.4 piston cooling oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "活塞冷却油",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 4,
+          "componentTag": "4号缸活塞冷却油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 34,
+          "oemTagCode": "0404D",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 56,
+            "max": 58,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 80,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率出口上限 80 °C",
+            "maxDelta": "进出口最大温差 30 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 80,
+              "delaySec": 0,
+              "originalText": "80 °C (TE2504A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TE2504A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2501-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "piston_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "piston_lo",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0034",
+            "0404D",
+            "4缸活塞冷却油出口温度",
+            "主机NO.4缸活塞冷却油出口温度",
+            "piston_cool_oil_cyl4",
+            "TE2504A"
+          ]
+        },
+        {
+          "pointCode": "DC0035",
+          "pointCodeImmutable": true,
+          "internalKey": "piston_lo_cyl5",
+          "defaultName": "5缸活塞冷却油出口温度",
+          "defaultNameEn": "Cylinder No.5 piston cooling oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "活塞冷却油",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 5,
+          "componentTag": "5号缸活塞冷却油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 35,
+          "oemTagCode": "0404E",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 56,
+            "max": 58,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 80,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率出口上限 80 °C",
+            "maxDelta": "进出口最大温差 30 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 80,
+              "delaySec": 0,
+              "originalText": "80 °C (TE2505A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TE2505A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2501-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "piston_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "piston_lo",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0035",
+            "0404E",
+            "5缸活塞冷却油出口温度",
+            "主机NO.5缸活塞冷却油出口温度",
+            "piston_cool_oil_cyl5",
+            "TE2505A"
+          ]
+        },
+        {
+          "pointCode": "DC0036",
+          "pointCodeImmutable": true,
+          "internalKey": "piston_lo_cyl6",
+          "defaultName": "6缸活塞冷却油出口温度",
+          "defaultNameEn": "Cylinder No.6 piston cooling oil outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "活塞冷却油",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 6,
+          "componentTag": "6号缸活塞冷却油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 36,
+          "oemTagCode": "0404F",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 56,
+            "max": 58,
+            "unit": "°C",
+            "condition": "实船稳态巡航参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": null,
+            "max": 80,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率出口上限 80 °C",
+            "maxDelta": "进出口最大温差 30 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 80,
+              "delaySec": 0,
+              "originalText": "80 °C (TE2506A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": {
+              "value": 85,
+              "delaySec": 60,
+              "originalText": "85 °C (TE2506A)"
+            },
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE2501-08A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "piston_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "piston_lo",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0036",
+            "0404F",
+            "6缸活塞冷却油出口温度",
+            "主机NO.6缸活塞冷却油出口温度",
+            "piston_cool_oil_cyl6",
+            "TE2506A"
+          ]
+        },
+        {
+          "pointCode": "DC0037",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_turbo_press",
+          "defaultName": "增压器滑油压力",
+          "defaultNameEn": "Turbocharger lubricating oil pressure",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "增压器润滑",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "增压器滑油进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 37,
+          "oemTagCode": "0405",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 6,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.006 bar",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "turbo_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0037",
+            "0405",
+            "增压器滑油压力",
+            "增压器滑油进机压力ABB-TPL"
+          ],
+          "notes": "依赖实船增压器型号与供油方式，模板不硬写默认正常上下限及保护限值（留空选填）。原表(PT2611A/PS2611S)参考：(1) ABB TPL 内部供油：运行 1.0-2.5 bar（长航碧玉实船参考 1.6-1.8 bar），ALM L 1.0(5s) / SLD L 0.8(60s) / SHD LL 0.6 bar(5s)；(2) ABB TPL 外部供油：运行 1.3-2.5 bar，ALM 1.3 / SLD 1.1 / SHD 0.9 bar；(3) MHI MET：运行 0.7-1.5 bar，ALM 0.7(0s) / SLD 0.6(60s) / SHD 0.4 bar(5s)。"
+        },
+        {
+          "pointCode": "DC0038",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_turbo_temp",
+          "defaultName": "增压器滑油温度",
+          "defaultNameEn": "Turbocharger lubricating oil temperature",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "增压器润滑",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "增压器滑油出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 38,
+          "oemTagCode": "0406",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 200,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "turbo_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0038",
+            "0406",
+            "增压器滑油温度",
+            "增压器滑油出口温度ABB-TPL",
+            "turbo_lo_out_temp",
+            "turbo_lo_outlet_temp"
+          ],
+          "notes": "依赖实船增压器型号与供油方式，模板不硬写默认正常上下限及保护限值（留空选填）。原表(TE2601A)参考：(1) ABB TPL 内部供油：上限 110 °C（长航碧玉实船参考 56-59 °C），ALM H 110 °C(0s) / SLD H 120 °C(60s)；(2) ABB TPL 外部供油：ALM 120 / SLD 130 °C；(3) MHI MET：ALM 85 / SLD 95 °C。"
+        },
+        {
+          "pointCode": "DC0039",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_fwd_damper_press",
+          "defaultName": "前端阻尼器滑油压力",
+          "defaultNameEn": "Forward damper lubricating oil pressure",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "轴向减振器",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "前端轴向减振器",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 39,
+          "oemTagCode": "0407",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 6,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.015 bar",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "damper_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0039",
+            "0407",
+            "前端阻尼器滑油压力",
+            "主机轴向前端阻尼器滑油压力"
+          ],
+          "notes": "因与主轴承滑油供油版本相关，模板不硬写默认正常上下限（留空选填）。参考：2005原表供油 3.5-4.9 bar（长航碧玉实船参考 4.6-4.8 bar）；2009手册供油 5.0-6.0 bar；腔室监测最低 1.7 bar；0250-2/A1 未单独列报警设定值。"
+        },
+        {
+          "pointCode": "DC0040",
+          "pointCodeImmutable": true,
+          "internalKey": "lo_aft_damper_press",
+          "defaultName": "后端阻尼器滑油压力",
+          "defaultNameEn": "Aft damper lubricating oil pressure",
+          "instanceNameOverridable": true,
+          "systemId": "lube_oil",
+          "systemName": "润滑系统",
+          "subsystemTag": "轴向减振器",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "后端轴向减振器",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 40,
+          "oemTagCode": "0408",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 6,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.015 bar",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "damper_lo",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0040",
+            "0408",
+            "后端阻尼器滑油压力",
+            "主机轴向后端阻尼器滑油压力"
+          ],
+          "notes": "因与主轴承滑油供油版本相关，模板不硬写默认正常上下限（留空选填）。参考：2005原表供油 3.5-4.9 bar（长航碧玉实船参考 4.6-4.8 bar）；2009手册供油 5.0-6.0 bar；腔室监测最低 1.7 bar；0250-2/A1 未单独列报警设定值。"
+        },
+        {
+          "pointCode": "DC0041",
+          "pointCodeImmutable": true,
+          "internalKey": "fo_in_press",
+          "defaultName": "燃油进机压力",
+          "defaultNameEn": "Fuel oil inlet pressure",
+          "instanceNameOverridable": true,
+          "systemId": "fuel_oil",
+          "systemName": "燃油系统",
+          "subsystemTag": "燃油供给",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "燃油供油单元进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 41,
+          "oemTagCode": "0413",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 16,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.04 bar",
+          "normalRange": {
+            "min": 7,
+            "max": 10,
+            "unit": "bar",
+            "condition": "实船运行及待机范围（2026-05-09修正，压力保持阀维持，由原采集 0.7-1.0 MPa 折算）",
+            "source": "ship-data-collector/config.yaml; ship-fault-diagnosis/references/sensor-mapping.md",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 7,
+            "max": 10,
+            "unit": "bar",
+            "condition": "供给单元燃油泵入口（7 bar 为 100% 负荷最低值，10 bar 为待机状态压力；非高压燃油共轨压力）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2005与2009版本一致。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 7,
+              "delaySec": 0,
+              "originalText": "7 bar (PT3421A)"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "bar",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (PT3421A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "fuel_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0041",
+            "0413",
+            "燃油进机压力",
+            "主机燃油进机压力"
+          ]
+        },
+        {
+          "pointCode": "DC0042",
+          "pointCodeImmutable": true,
+          "internalKey": "fo_in_temp",
+          "defaultName": "燃油进机温度",
+          "defaultNameEn": "Fuel oil inlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "fuel_oil",
+          "systemName": "燃油系统",
+          "subsystemTag": "燃油供给",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "燃油供油单元进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 42,
+          "oemTagCode": "0414",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": {
+            "min": null,
+            "max": 150,
+            "unit": "°C",
+            "condition": "供给单元燃油泵入口最高 150 °C（须满足 13-17 cSt 黏度要求）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "fuel_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0042",
+            "0414",
+            "燃油进机温度",
+            "主机燃油进机温度"
+          ],
+          "notes": "实际正常温度取决于所燃轻油(MDO)/重油(HFO)黏度控制目标(13-17 cSt)，不硬写固定正常上下限（留空选填）。原表 TE3411A 低温报警栏写为 60-120 °C (0s)，属随油种选用的设定范围；长航碧玉 CSV 曾记轻油/参考值 70-74 °C，重油工况可达 110-135 °C。"
+        },
+        {
+          "pointCode": "DC0043",
+          "pointCodeImmutable": true,
+          "internalKey": "servo_leak",
+          "defaultName": "伺服油泄漏",
+          "defaultNameEn": "Servo oil leakage",
+          "instanceNameOverridable": true,
+          "systemId": "servo_oil",
+          "systemName": "伺服系统",
+          "subsystemTag": "伺服油供油单元",
+          "pointKind": "alarm",
+          "apiDataType": 2,
+          "unit": "",
+          "signalRole": "discrete_alarm",
+          "dataValueType": "boolean",
+          "precision": 0,
+          "cylinderNo": null,
+          "componentTag": "供油单元伺服油泵泄漏监测开关",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 43,
+          "oemTagCode": "0418",
+          "signalType": "Digital Input",
+          "physicalRange": null,
+          "sensorAccuracy": null,
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 1,
+              "delaySec": 0,
+              "originalText": "液位 max / On (LS2055A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1; 传感器测点清单.md; RT-flex报警对策对照表.md (LS2055A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": {
+            "normalValue": 0,
+            "activeValue": 1,
+            "normalLabel": "正常(无泄漏)",
+            "activeLabel": "泄漏报警激活",
+            "triggerTransition": "0->1"
+          },
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "servo_oil",
+            "inNfForecast50": false,
+            "inHealthScore": false,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0043",
+            "0418",
+            "伺服油泄漏",
+            "伺服油泵油泄漏监测",
+            "LS2055A",
+            "供油单元伺服油泵漏油"
+          ],
+          "legacyCompatibilityNote": "物理上为 Digital Input (On/Off) 泄漏报警点位（对应厂家位号 LS2055A）；在长航碧玉历史采集接口中曾按 dataType=1 传输 0/1 数值，且旧版 changhangbiyu_mapping.json 曾误标单位为 L/min，T1 模板已统一归类为 alarm 点位且单位置空。"
+        },
+        {
+          "pointCode": "DC0044",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_in_press",
+          "defaultName": "缸套冷却水进口压力",
+          "defaultNameEn": "Cylinder liner cooling water inlet pressure",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "缸套冷却水总管进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 44,
+          "oemTagCode": "0501",
+          "signalType": "4-20 mA",
+          "physicalRange": {
+            "min": 0,
+            "max": 6,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.015 bar",
+          "normalRange": {
+            "min": 3.5,
+            "max": 3.6,
+            "unit": "bar",
+            "condition": "实船稳态运行参考（由原采集 0.35-0.36 MPa 折算）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 2,
+            "max": 4,
+            "unit": "bar",
+            "condition": "MCR 持续服务功率（原表 2-4 bar）",
+            "maxDelta": null,
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2005与2009版本一致。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 2,
+              "delaySec": 0,
+              "originalText": "2.0 bar (PT1101A)"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": {
+              "value": 1.8,
+              "delaySec": 60,
+              "originalText": "1.8 bar"
+            },
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": {
+              "value": 1.5,
+              "delaySec": 60,
+              "originalText": "1.5 bar (PS1101S)"
+            },
+            "shutdownHigh": null,
+            "unit": "bar",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (PT1101A / PS1101S)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": "模板统一采用 bar（与厂家手册 0250-1/2 及岸端标准映射一致）；若实船采集源原始数值为 MPa（如长航碧玉本地历史库），接入时按 ×10 折算至 bar。",
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_inlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0044",
+            "0501",
+            "缸套冷却水进口压力",
+            "主机气缸缸套冷却水进机压力"
+          ]
+        },
+        {
+          "pointCode": "DC0045",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_in_temp",
+          "defaultName": "缸套冷却水进口温度",
+          "defaultNameEn": "Cylinder liner cooling water inlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "缸套冷却水总管进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 45,
+          "oemTagCode": "0502",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 70,
+            "max": 72,
+            "unit": "°C",
+            "condition": "实船稳态运行参考",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 65,
+            "max": null,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率下限 65 °C，原表未列上限",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 安装手册(MIM)最低入口温度为 70 °C。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 65,
+              "delaySec": 0,
+              "originalText": "65 °C (TE1111A)"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1111A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_inlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0045",
+            "0502",
+            "缸套冷却水进口温度",
+            "主机气缸缸套冷却水进机温度"
+          ]
+        },
+        {
+          "pointCode": "DC0046",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_out_cyl1",
+          "defaultName": "1缸冷却淡水出口温度",
+          "defaultNameEn": "Cylinder No.1 cooling fresh water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 1,
+          "componentTag": "1号缸缸套冷却淡水出口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 46,
+          "oemTagCode": "0503A",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 78,
+            "max": 80,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（受三通温控阀恒温控制）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 80,
+            "max": 90,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸出口范围 80-90 °C",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 温控目标设定为 90 °C（稳态±2 °C，瞬态±4 °C）。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 90,
+              "delaySec": 0,
+              "originalText": "90 °C (TE1121A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1121-28A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_outlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "cfw_outlet",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0046",
+            "0503A",
+            "1缸冷却淡水出口温度",
+            "主机NO.1缸缸套冷却水出口温度",
+            "TE1121A"
+          ]
+        },
+        {
+          "pointCode": "DC0047",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_out_cyl2",
+          "defaultName": "2缸冷却淡水出口温度",
+          "defaultNameEn": "Cylinder No.2 cooling fresh water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 2,
+          "componentTag": "2号缸缸套冷却淡水出口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 47,
+          "oemTagCode": "0503B",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 78,
+            "max": 80,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（受三通温控阀恒温控制）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 80,
+            "max": 90,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸出口范围 80-90 °C",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 温控目标设定为 90 °C（稳态±2 °C，瞬态±4 °C）。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 90,
+              "delaySec": 0,
+              "originalText": "90 °C (TE1122A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1121-28A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_outlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "cfw_outlet",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0047",
+            "0503B",
+            "2缸冷却淡水出口温度",
+            "主机NO.2缸缸套冷却水出口温度",
+            "TE1122A"
+          ]
+        },
+        {
+          "pointCode": "DC0048",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_out_cyl3",
+          "defaultName": "3缸冷却淡水出口温度",
+          "defaultNameEn": "Cylinder No.3 cooling fresh water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 3,
+          "componentTag": "3号缸缸套冷却淡水出口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 48,
+          "oemTagCode": "0503C",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 78,
+            "max": 80,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（受三通温控阀恒温控制）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 80,
+            "max": 90,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸出口范围 80-90 °C",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 温控目标设定为 90 °C（稳态±2 °C，瞬态±4 °C）。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 90,
+              "delaySec": 0,
+              "originalText": "90 °C (TE1123A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1121-28A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_outlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "cfw_outlet",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0048",
+            "0503C",
+            "3缸冷却淡水出口温度",
+            "主机NO.3缸缸套冷却水出口温度",
+            "TE1123A"
+          ]
+        },
+        {
+          "pointCode": "DC0049",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_out_cyl4",
+          "defaultName": "4缸冷却淡水出口温度",
+          "defaultNameEn": "Cylinder No.4 cooling fresh water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 4,
+          "componentTag": "4号缸缸套冷却淡水出口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 49,
+          "oemTagCode": "0503D",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 78,
+            "max": 80,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（受三通温控阀恒温控制）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 80,
+            "max": 90,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸出口范围 80-90 °C",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 温控目标设定为 90 °C（稳态±2 °C，瞬态±4 °C）。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 90,
+              "delaySec": 0,
+              "originalText": "90 °C (TE1124A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1121-28A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_outlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "cfw_outlet",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0049",
+            "0503D",
+            "4缸冷却淡水出口温度",
+            "主机NO.4缸缸套冷却水出口温度",
+            "TE1124A"
+          ]
+        },
+        {
+          "pointCode": "DC0050",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_out_cyl5",
+          "defaultName": "5缸冷却淡水出口温度",
+          "defaultNameEn": "Cylinder No.5 cooling fresh water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 5,
+          "componentTag": "5号缸缸套冷却淡水出口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 50,
+          "oemTagCode": "0503E",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 78,
+            "max": 80,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（受三通温控阀恒温控制）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 80,
+            "max": 90,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸出口范围 80-90 °C",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 温控目标设定为 90 °C（稳态±2 °C，瞬态±4 °C）。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 90,
+              "delaySec": 0,
+              "originalText": "90 °C (TE1125A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1121-28A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_outlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "cfw_outlet",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0050",
+            "0503E",
+            "5缸冷却淡水出口温度",
+            "主机NO.5缸缸套冷却水出口温度",
+            "TE1125A"
+          ]
+        },
+        {
+          "pointCode": "DC0051",
+          "pointCodeImmutable": true,
+          "internalKey": "cfw_out_cyl6",
+          "defaultName": "6缸冷却淡水出口温度",
+          "defaultNameEn": "Cylinder No.6 cooling fresh water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "缸套冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": 6,
+          "componentTag": "6号缸缸套冷却淡水出口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 51,
+          "oemTagCode": "0503F",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": {
+            "min": 78,
+            "max": 80,
+            "unit": "°C",
+            "condition": "实船稳态运行参考（受三通温控阀恒温控制）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": true
+          },
+          "manualOperatingRange": {
+            "min": 80,
+            "max": 90,
+            "unit": "°C",
+            "condition": "MCR 持续服务功率各缸出口范围 80-90 °C",
+            "maxDelta": "出入口最大温差 15 °C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-1/A1; OM-RT-flex50 2009-07",
+            "versionNotes": "2017 RT-flex50-D 温控目标设定为 90 °C（稳态±2 °C，瞬态±4 °C）。"
+          },
+          "oemProtectionLimits": {
+            "alarmLow": null,
+            "alarmHigh": {
+              "value": 90,
+              "delaySec": 0,
+              "originalText": "90 °C (TE1126A)"
+            },
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1121-28A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "cfw_outlet",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": "cfw_outlet",
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0051",
+            "0503F",
+            "6缸冷却淡水出口温度",
+            "主机NO.6缸缸套冷却水出口温度",
+            "TE1126A"
+          ]
+        },
+        {
+          "pointCode": "DC0052",
+          "pointCodeImmutable": true,
+          "internalKey": "ac_in_temp",
+          "defaultName": "空冷器冷却水进口温度",
+          "defaultNameEn": "Air cooler cooling water inlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "空冷器冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "空冷器冷却水进口",
+          "loadDependent": false,
+          "signed16Decode": false,
+          "modbusAddress": 52,
+          "oemTagCode": "0505",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 150,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": {
+            "alarmLow": {
+              "value": 25,
+              "delaySec": 0,
+              "originalText": "25 °C (TE1371A, 淡水/海水配置相同)"
+            },
+            "alarmHigh": null,
+            "alarmDeviation": null,
+            "slowdownLow": null,
+            "slowdownHigh": null,
+            "slowdownDeviation": null,
+            "shutdownLow": null,
+            "shutdownHigh": null,
+            "unit": "°C",
+            "source": "Wärtsilä RT-flex50 2005原表 0250-2/A1 (TE1371A)",
+            "configDependencyNote": null
+          },
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "air_cooler",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0052",
+            "0505",
+            "空冷器冷却水进口温度",
+            "主机空冷器冷却水进口温度"
+          ],
+          "notes": "受实船冷却介质配置（LT淡水 vs 海水）及海域水温影响，模板不硬写默认正常上下限（留空选填）。原表参考：LT淡水入口 25-36 °C，海水入口 25-32 °C（长航碧玉 CSV 曾记 28-30 °C）；两种配置低温报警均为 25 °C。"
+        },
+        {
+          "pointCode": "DC0053",
+          "pointCodeImmutable": true,
+          "internalKey": "ac_out_temp",
+          "defaultName": "空冷器冷却水出口温度",
+          "defaultNameEn": "Air cooler cooling water outlet temperature",
+          "instanceNameOverridable": true,
+          "systemId": "cooling",
+          "systemName": "冷却系统",
+          "subsystemTag": "空冷器冷却水",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "°C",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "空冷器冷却水出口",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 53,
+          "oemTagCode": "0506",
+          "signalType": "PT100",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "°C"
+          },
+          "sensorAccuracy": "0.1 °C",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "air_cooler",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0053",
+            "0506",
+            "空冷器冷却水出口温度",
+            "主机空冷器冷却水出口温度"
+          ],
+          "notes": "依赖实船空冷器冷却介质配置（LT淡水 vs 海水），模板不硬写默认正常上下限及保护限值（留空选填）。原表(TE1381A)参考：LT淡水配置 ALM H = 70 °C (0s)；海水配置上限及 ALM H = 57 °C (0s)；长航碧玉 CSV 曾记参考 30-32 °C。"
+        },
+        {
+          "pointCode": "DC0054",
+          "pointCodeImmutable": true,
+          "internalKey": "servo_press_1",
+          "defaultName": "伺服油压力1",
+          "defaultNameEn": "Servo oil pressure No.1",
+          "instanceNameOverridable": true,
+          "systemId": "servo_oil",
+          "systemName": "伺服系统",
+          "subsystemTag": "伺服油共轨",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "伺服油共轨压力传感器#1",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 54,
+          "oemTagCode": "IN2433-01",
+          "signalType": "Serial Analog",
+          "physicalRange": {
+            "min": 0,
+            "max": 250,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.01 bar",
+          "normalRange": {
+            "min": 120,
+            "max": 138,
+            "unit": "bar",
+            "condition": "实船巡航典型范围（PWM随负荷调节，全工况实际范围 80-190 bar）",
+            "source": "ship-data-collector/config.yaml; ship-fault-diagnosis/references/sensor-mapping.md",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": 100,
+            "max": 200,
+            "unit": "bar",
+            "condition": "WECS-9520 随负荷动态调节范围（PT2071C）",
+            "maxDelta": null,
+            "source": "传感器测点清单.md 附录",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "servo_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0054",
+            "IN2433-01",
+            "伺服油压力1",
+            "伺服油压力传感器#1",
+            "PT2071C",
+            "伺服油共轨压力1"
+          ],
+          "notes": "由 WECS-9520 按负荷曲线动态分级触发高/低/极低及双传感器(IN2433-01/IN2434-02)差值高报警，无固定静态报警阈值。"
+        },
+        {
+          "pointCode": "DC0055",
+          "pointCodeImmutable": true,
+          "internalKey": "servo_press_2",
+          "defaultName": "伺服油压力2",
+          "defaultNameEn": "Servo oil pressure No.2",
+          "instanceNameOverridable": true,
+          "systemId": "servo_oil",
+          "systemName": "伺服系统",
+          "subsystemTag": "伺服油共轨",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "伺服油共轨压力传感器#2(冗余)",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 55,
+          "oemTagCode": "IN2434-02",
+          "signalType": "Serial Analog",
+          "physicalRange": {
+            "min": 0,
+            "max": 250,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.01 bar",
+          "normalRange": {
+            "min": 120,
+            "max": 138,
+            "unit": "bar",
+            "condition": "实船巡航典型范围（PWM随负荷调节，全工况实际范围 80-190 bar）",
+            "source": "ship-data-collector/config.yaml; ship-fault-diagnosis/references/sensor-mapping.md",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": 100,
+            "max": 200,
+            "unit": "bar",
+            "condition": "WECS-9520 随负荷动态调节范围（PT2072C 冗余传感器）",
+            "maxDelta": null,
+            "source": "传感器测点清单.md 附录",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "servo_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0055",
+            "IN2434-02",
+            "伺服油压力2",
+            "伺服油压力传感器#2",
+            "IN2433-02",
+            "PT2072C",
+            "伺服油共轨压力2"
+          ],
+          "notes": "同 DC0054，由 WECS-9520 动态分级判定并与 DC0054 做双传感器偏差比对。"
+        },
+        {
+          "pointCode": "DC0056",
+          "pointCodeImmutable": true,
+          "internalKey": "fo_rail_press_1",
+          "defaultName": "燃油共轨压力1",
+          "defaultNameEn": "Fuel rail pressure No.1",
+          "instanceNameOverridable": true,
+          "systemId": "fuel_oil",
+          "systemName": "燃油系统",
+          "subsystemTag": "燃油共轨",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "燃油共轨压力传感器#1",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 56,
+          "oemTagCode": "IN2562-03",
+          "signalType": "Serial Analog",
+          "physicalRange": {
+            "min": 0,
+            "max": 1200,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "1 bar",
+          "normalRange": {
+            "min": 650,
+            "max": 670,
+            "unit": "bar",
+            "condition": "实船稳态巡航典型范围（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": 500,
+            "max": 1000,
+            "unit": "bar",
+            "condition": "WECS-9520 随负荷动态调节范围（PT3461C）",
+            "maxDelta": null,
+            "source": "传感器测点清单.md 附录",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "fuel_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0056",
+            "IN2562-03",
+            "燃油共轨压力1",
+            "燃油共轨压力传感器#1",
+            "PT3461C"
+          ],
+          "notes": "由 WECS-9520 按负荷曲线动态分级判定轨压高/低/极低及双传感器差值高报警，无固定静态报警阈值。"
+        },
+        {
+          "pointCode": "DC0057",
+          "pointCodeImmutable": true,
+          "internalKey": "fo_rail_press_2",
+          "defaultName": "燃油共轨压力2",
+          "defaultNameEn": "Fuel rail pressure No.2",
+          "instanceNameOverridable": true,
+          "systemId": "fuel_oil",
+          "systemName": "燃油系统",
+          "subsystemTag": "燃油共轨",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "燃油共轨压力传感器#2(冗余)",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 57,
+          "oemTagCode": "IN2563-04",
+          "signalType": "Serial Analog",
+          "physicalRange": {
+            "min": 0,
+            "max": 1200,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "1 bar",
+          "normalRange": {
+            "min": 650,
+            "max": 670,
+            "unit": "bar",
+            "condition": "实船稳态巡航典型范围（随主机负荷变化）",
+            "source": "ship-data-collector/config.yaml; 传感器数据范围.csv",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": {
+            "min": 500,
+            "max": 1000,
+            "unit": "bar",
+            "condition": "WECS-9520 随负荷动态调节范围（PT3462C 冗余传感器）",
+            "maxDelta": null,
+            "source": "传感器测点清单.md 附录",
+            "versionNotes": null
+          },
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "fuel_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0057",
+            "IN2563-04",
+            "燃油共轨压力2",
+            "燃油共轨压力传感器#2",
+            "PT3462C"
+          ],
+          "notes": "同 DC0056，由 WECS-9520 动态分级判定并与 DC0056 做双传感器偏差比对。"
+        },
+        {
+          "pointCode": "DC0058",
+          "pointCodeImmutable": true,
+          "internalKey": "fo_command",
+          "defaultName": "燃油指令",
+          "defaultNameEn": "Fuel index command",
+          "instanceNameOverridable": true,
+          "systemId": "fuel_oil",
+          "systemName": "燃油系统",
+          "subsystemTag": "喷油控制指令",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "%",
+          "signalRole": "control_command",
+          "dataValueType": "float",
+          "precision": 1,
+          "cylinderNo": null,
+          "componentTag": "WECS/调速器燃油指令",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 58,
+          "oemTagCode": "FUEL INDEX U",
+          "signalType": "Serial Analog",
+          "physicalRange": {
+            "min": 0,
+            "max": 100,
+            "unit": "%"
+          },
+          "sensorAccuracy": "1 %",
+          "normalRange": null,
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "fuel_oil",
+            "inNfForecast50": true,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0058",
+            "FUEL INDEX U",
+            "燃油指令",
+            "燃油油量指令"
+          ],
+          "notes": "控制型信号（油门/喷油量指令），全工况输出 0-50%（满载典型参考 47-50%），无固定正常上下限，严禁作为静态超限报警依据，仅用于工况与监控启用条件判断。"
+        },
+        {
+          "pointCode": "DC0059",
+          "pointCodeImmutable": true,
+          "internalKey": "scav_air_press",
+          "defaultName": "扫气空气进总管压力",
+          "defaultNameEn": "Scavenge air inlet manifold pressure",
+          "instanceNameOverridable": true,
+          "systemId": "turbocharger",
+          "systemName": "增压系统",
+          "subsystemTag": "扫气增压空气",
+          "pointKind": "numeric",
+          "apiDataType": 1,
+          "unit": "bar",
+          "signalRole": "measurement",
+          "dataValueType": "float",
+          "precision": 2,
+          "cylinderNo": null,
+          "componentTag": "扫气空气进总管",
+          "loadDependent": true,
+          "signed16Decode": false,
+          "modbusAddress": 59,
+          "oemTagCode": "CHARGEAIR P",
+          "signalType": "Serial Analog",
+          "physicalRange": {
+            "min": 0,
+            "max": 4,
+            "unit": "bar"
+          },
+          "sensorAccuracy": "0.01 bar",
+          "normalRange": {
+            "min": 0.7,
+            "max": 0.95,
+            "unit": "bar",
+            "condition": "实船稳态巡航参考（2026-05-09由运行数据修正；停机为0，全工况随负荷 0-0.95 bar）",
+            "source": "ship-data-collector/config.yaml; ship-fault-diagnosis/references/sensor-mapping.md",
+            "allowStaticThresholdCheck": false
+          },
+          "manualOperatingRange": null,
+          "oemProtectionLimits": null,
+          "alarmStateSpec": null,
+          "unitConversionNote": null,
+          "algorithmUsage": {
+            "anomalyDetectionGroup": "scavenge_press",
+            "inNfForecast50": false,
+            "inHealthScore": true,
+            "multiCylinderGroup": null,
+            "isRegimeDriver": false
+          },
+          "collectorKeyAliases": [
+            "DC0059",
+            "CHARGEAIR P",
+            "扫气空气进总管压力",
+            "主机扫气空气进总管压力",
+            "scavenge_air_pressure",
+            "PT4043",
+            "PT4044"
+          ],
+          "notes": "WECS-9520 监测双变送器(PT4043/PT4044)测量故障、差值高及增压空气过压报警，无固定静态上下限。"
+        }
+      ]
+    }
+  ],
+  "extensibilityRoadmap": {
+    "note": "后续由需求提出人提供其他设备类型的正式点位清单与系统标签后，按相同结构追加至 deviceTypes[] 数组即可，不在此处虚构未核实点位。",
+    "plannedDeviceTypes": [
+      {
+        "deviceTypeId": "diesel-generator-template",
+        "suggestedName": "柴油发电机组（待补充点位清单）",
+        "status": "pending_point_spec"
+      },
+      {
+        "deviceTypeId": "auxiliary-boiler-template",
+        "suggestedName": "辅锅炉（待补充点位清单）",
+        "status": "pending_point_spec"
+      },
+      {
+        "deviceTypeId": "steering-gear-template",
+        "suggestedName": "舵机（待补充点位清单）",
+        "status": "pending_point_spec"
+      },
+      {
+        "deviceTypeId": "air-compressor-template",
+        "suggestedName": "主空压机（待补充点位清单）",
+        "status": "pending_point_spec"
+      }
+    ]
+  }
+}
