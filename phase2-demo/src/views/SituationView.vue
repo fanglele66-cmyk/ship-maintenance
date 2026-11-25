@@ -1,7 +1,7 @@
 <template>
   <div class="situation-view">
     <button
-      v-if="isAssistantCollapsed && !isShipLevel "
+      v-if="isAssistantCollapsed && !isShipLevel && !isConfigConsoleOpen"
       class="compact-assistant-float"
       :class="{ 'is-active': compactAssistantOpen, 'is-dragging': isCompactFloatDragging }"
       :style="compactFloatStyle"
@@ -34,7 +34,7 @@
 
         <!-- Layer 2: device-level attention, maintenance and todo overview -->
         <div v-if="!attentionId && !maintenanceId && !issueId && currentLayer === 2" class="layer" :class="layerClass(2)">
-          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @open-data="sensorView='list';sensorSearchQuery=''" @back="goToLayer(1)">
+          <DeviceSituation ref="deviceSituationRef" :device-id="selectedDeviceId" :device-name="selectedDeviceName" :can-configure="canConfigureDevice" @select-device="id=>handleDeviceClick(deviceStore.getDeviceById(id))" @select-sensor="handleSensorClick" @open-data="sensorView='list';sensorSearchQuery=''" @back="goToLayer(1)">
             <template #data>
               <div class="device-data-toolbar">
                 <span class="sensor-update-time">数据更新于 {{ sensorUpdateTime }}</span>
@@ -50,13 +50,16 @@
               <SensorGrid v-if="sensorView === 'list'" :search-query="sensorSearchQuery" @select-sensor="handleSensorClick" />
               <SensorTrend v-else :search-query="sensorSearchQuery" @quick-report="openQuickReport" />
             </template>
+            <template #config>
+              <ShipConfigConsole v-if="canConfigureDevice" :key="selectedDeviceId" :active-device-id="selectedDeviceId" />
+            </template>
           </DeviceSituation>
         </div>
       </div>
 
       <!-- 拖拽手柄（在内容区和助手之间，独立元素不受 overflow 裁剪） -->
       <div
-        v-if="!isAssistantCollapsed && !isShipLevel && attentionId!=='air-delivery'"
+        v-if="!isAssistantCollapsed && !isShipLevel && !isConfigConsoleOpen && attentionId!=='air-delivery'"
         class="panel-resize-handle"
         :class="{ resizing: isResizingAssistant }"
         @pointerdown="startResize"
@@ -70,9 +73,9 @@
       </div>
 
       <!-- 助手面板容器（宽度由拖拽控制） -->
-      <template v-if="!isShipLevel "><Transition name="compact-assistant-slide">
+      <template v-if="!isShipLevel && !isConfigConsoleOpen"><Transition name="compact-assistant-slide">
         <div
-          v-if="!isShipLevel && attentionId!=='air-delivery' && (!isAssistantCollapsed || compactAssistantOpen)"
+          v-if="!isShipLevel && !isConfigConsoleOpen && attentionId!=='air-delivery' && (!isAssistantCollapsed || compactAssistantOpen)"
           class="assistant-wrapper"
           :class="{ 'compact-assistant-overlay': isAssistantCollapsed }"
           :style="assistantWidthStyle"
@@ -111,11 +114,14 @@ import ShipOverview from './ShipOverview.vue'
 import HomeSituationAssistant from '@/components/HomeSituationAssistant.vue'
 const SensorGrid=lazyPane(()=>import('./SensorGrid.vue'))
 const SensorTrend=lazyPane(()=>import('./SensorTrend.vue'))
+const ShipConfigConsole=lazyPane(()=>import('@/components/config/ShipConfigConsole.vue'))
 const DeviceSituation=lazyPane(()=>import('./DeviceSituation.vue'))
 const MaintenanceAdviceDetail=lazyPane(()=>import('@/components/MaintenanceAdviceDetail.vue'))
 const AttentionDossier=lazyPane(()=>import('@/components/AttentionDossier.vue'))
 const Phase2Assistant=lazyPane(()=>import('@/components/Phase2Assistant.vue'))
 import BackButton from '@/components/BackButton.vue'
+import { auth } from '@/services/auth'
+import { useShipConfigStore } from '@/stores/shipConfigStore'
 import { useSensorStore } from '@/stores/sensorStore'
 import { useSituationStore } from '@/stores/situationStore'
 import { useDeviceStore } from '@/stores/deviceStore'
@@ -130,6 +136,7 @@ const localReadings=computed(()=>{
 })
 const situationStore = useSituationStore()
 const deviceStore = useDeviceStore()
+const shipConfigStore = useShipConfigStore()
 const demoStore = usePhase2DemoStore()
 const router = useRouter()
 const route = useRoute()
@@ -145,6 +152,12 @@ const {
   sensorSearchQuery,
   sensorView
 } = storeToRefs(situationStore)
+const deviceSituationRef = ref(null)
+const canConfigureDevice = computed(() => auth.user?.role === 'admin' && shipConfigStore.devices.some(device => device.id === selectedDeviceId.value))
+const isConfigConsoleOpen = computed(() => canConfigureDevice.value && deviceSituationRef.value?.activeTab === 'config')
+watch(() => shipConfigStore.devices.find(device => device.id === selectedDeviceId.value)?.name, name => {
+  if (name) selectedDeviceName.value = name
+})
 
 const visibleSensors = computed(() => {
   const query = sensorSearchQuery.value.trim().toLowerCase()
@@ -401,8 +414,11 @@ function handleDeviceClick(device) {
   situationContext.action = 'select_device'
 }
 
-const deviceSituationRef = ref(null)
-watch(()=>route.query.device,id=>{if(id){const device=id==='aux-system'?{id:'aux-system',name:'辅机'}:deviceStore.getDeviceById(id);if(device)handleDeviceClick(device)}},{immediate:true})
+watch([() => route.query.device, () => shipConfigStore.loaded], ([id]) => {
+  if (route.name !== 'Situation' || !id || (currentLayer.value === 2 && selectedDeviceId.value === id)) return
+  const device = deviceStore.getDeviceById(id)
+  if (device) handleDeviceClick(device)
+}, {immediate:true})
 watch([attentionId,maintenanceId], async ([id, maintenance]) => {
   if(maintenance) { demoStore.clearObservationFocus();demoStore.selectAttention('maintenance');demoStore.attentionInFocus=true;demoStore.regularMaintenanceInFocus=maintenance==='planned';return }
   demoStore.regularMaintenanceInFocus=false

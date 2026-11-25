@@ -1,129 +1,245 @@
-import {appUrl} from '../services/appUrl.js'
+import { appUrl } from '../services/appUrl.js'
 import { defineStore } from 'pinia'
-import {sessionHeaders} from '../services/session.js'
+import { sessionHeaders } from '../services/session.js'
 import { ref, computed, reactive, watch, onScopeDispose } from 'vue'
 import { mockSensors, subsystemTagsByDevice } from '@/mock/sensors'
-import {localSensors,localPointIds,isLocalSensor} from '@/workflow/localSensorData.js'
-import {simulationDefaults,buildSimulationSensors,simulationSample,simulationTrend} from '@/mock/sensorSimulation'
+import {
+  buildConfiguredDeviceSensors,
+  parsePointCodeFromSensorId,
+  toTemplateUnitValue,
+  isLocalSensor
+} from '@/workflow/localSensorData.js'
+import { simulationDefaults, buildSimulationSensors, simulationSample, simulationTrend } from '@/mock/sensorSimulation'
+import { useShipConfigStore } from '@/stores/shipConfigStore'
 
 export const useSensorStore = defineStore('sensor', () => {
-  const simulationConfig=reactive({...simulationDefaults})
-  const simulationSensors=buildSimulationSensors(mockSensors)
-  const sampledAt=ref(Date.now())
-  const allSensors = ref([...simulationSensors.filter(s=>!isLocalSensor(s)).map(s=>simulationSample(s,sampledAt.value,simulationConfig)),...localSensors()])
-  const localData=ref(null),localError=ref('正在连接本地数据服务'),health=ref(null)
-  const localChronology=computed(()=>localData.value?.chronology||{periods:[],source:'本地数据库',markdown:''})
-  let fetching=false
-  async function refreshLocalData(){
-    if(fetching)return
-    fetching=true
-    try{
-      const responses=await Promise.all(['/api/data/situation','/api/data/health'].map(url=>fetch(appUrl(url),{headers:sessionHeaders(),signal:AbortSignal.timeout(15000)})))
-      if(!responses[0].ok)throw Error('本地数据不可用，请检查后端与数据副本。')
-      const data=await responses[0].json()
-      localData.value=data;sampledAt.value=data.sampledAt||Date.now()
-      allSensors.value=[...allSensors.value.filter(s=>!isLocalSensor(s)),...localSensors(data.points),{id:'ship-speed',nameCn:'航速',deviceId:'ship',value:data.speed,unit:'kn',status:data.speed===null?'unknown':'normal',sourceKind:data.source}]
-      localError.value=data.exhausted?'历史回放数据已用尽，请准备新的数据副本。':!data.fresh?'当前数据存在缺口，等待下一条采样。':''
-      if(responses[1].ok)health.value=await responses[1].json()
+  const shipConfigStore = useShipConfigStore()
+  const simulationConfig = reactive({ ...simulationDefaults })
+  const simulationSensors = buildSimulationSensors(mockSensors)
+  const sampledAt = ref(Date.now())
+  const localData = ref(null)
+  const localError = ref('正在连接本地数据服务')
+  const health = ref(null)
+
+  const configuredDeviceIds = computed(() => new Set((shipConfigStore.config?.devices || []).map((d) => d.id)))
+
+  function isSimulatedDeviceSensor(sensor) {
+    if (isLocalSensor(sensor)) return false
+    if (String(sensor.deviceId || '').startsWith('aux-engine-')) return false
+    if (configuredDeviceIds.value.has(sensor.deviceId)) return false
+    return true
+  }
+
+  function buildAllSensors(nowTs = sampledAt.value) {
+    const simulated = simulationSensors
+      .filter(isSimulatedDeviceSensor)
+      .map((s) => simulationSample(s, nowTs, simulationConfig))
+    const configured = buildConfiguredDeviceSensors(
+      shipConfigStore.config?.devices || [],
+      localData.value?.points,
+      shipConfigStore.template
+    )
+    const speedEntry = localData.value
+      ? [{
+          id: 'ship-speed',
+          nameCn: '航速',
+          deviceId: 'ship',
+          value: localData.value.speed,
+          unit: 'kn',
+          status: localData.value.speed === null ? 'unknown' : 'normal',
+          sourceKind: localData.value.source
+        }]
+      : []
+    return [...simulated, ...configured, ...speedEntry]
+  }
+
+  const allSensors = ref(buildAllSensors())
+  const localChronology = computed(() => localData.value?.chronology || { periods: [], source: '本地数据库', markdown: '' })
+
+  function syncConfiguredSensors() {
+    allSensors.value = buildAllSensors(sampledAt.value)
+  }
+
+  watch(
+    () => shipConfigStore.config,
+    () => {
+      syncConfiguredSensors()
       retainSamples()
-    }catch(error){
-      localError.value=error.message
-      allSensors.value=allSensors.value.map(s=>isLocalSensor(s)?{...s,value:null,status:'unknown'}:s)
-    }finally{fetching=false}
+    },
+    { deep: true }
+  )
+
+  let fetching = false
+  async function refreshLocalData() {
+    if (fetching) return
+    fetching = true
+    try {
+      const responses = await Promise.all(
+        ['/api/data/situation', '/api/data/health'].map((url) =>
+          fetch(appUrl(url), { headers: sessionHeaders(), signal: AbortSignal.timeout(15000) })
+        )
+      )
+      if (!responses[0].ok) throw Error('本地数据不可用，请检查后端与数据副本。')
+      const data = await responses[0].json()
+      localData.value = data
+      sampledAt.value = data.sampledAt || Date.now()
+      allSensors.value = buildAllSensors(sampledAt.value)
+      localError.value = data.exhausted
+        ? '历史回放数据已用尽，请准备新的数据副本。'
+        : !data.fresh
+          ? '当前数据存在缺口，等待下一条采样。'
+          : ''
+      if (responses[1].ok) health.value = await responses[1].json()
+      retainSamples()
+    } catch (error) {
+      localError.value = error.message
+      allSensors.value = allSensors.value.map((s) => (isLocalSensor(s) ? { ...s, value: null, status: 'unknown' } : s))
+    } finally {
+      fetching = false
+    }
   }
-  let dataTimer=null
-  if(typeof window!=='undefined'){
-    void refreshLocalData();dataTimer=setInterval(refreshLocalData,15000)
+
+  let dataTimer = null
+  if (typeof window !== 'undefined') {
+    void refreshLocalData()
+    dataTimer = setInterval(refreshLocalData, 15000)
   }
+
   // Retain only samples actually emitted in this session. Never regenerate a
   // past repair window from today's simulator baseline.
-  const sampledFrames=[]
-  function retainSamples(){
-    const frame={timestamp:sampledAt.value,values:Object.fromEntries(allSensors.value.map(sensor=>[sensor.id,sensor.value]))}
-    if(sampledFrames.at(-1)?.timestamp===frame.timestamp)sampledFrames[sampledFrames.length-1]=frame
+  const sampledFrames = []
+  function retainSamples() {
+    const frame = {
+      timestamp: sampledAt.value,
+      values: Object.fromEntries(allSensors.value.map((sensor) => [sensor.id, sensor.value]))
+    }
+    if (sampledFrames.at(-1)?.timestamp === frame.timestamp) sampledFrames[sampledFrames.length - 1] = frame
     else sampledFrames.push(frame)
-    while(sampledFrames.length&&sampledFrames[0].timestamp<frame.timestamp-72*3600000)sampledFrames.shift()
+    while (sampledFrames.length && sampledFrames[0].timestamp < frame.timestamp - 72 * 3600000) sampledFrames.shift()
   }
   retainSamples()
-  function recordedSensorChannels(ids,start,end=Date.now()){
-    return ids.map(id=>{
-      const sensor=allSensors.value.find(item=>item.id===id)
-      return {channelId:id,name:sensor?.nameCn||id,unit:sensor?.unit||'',sourceKind:sensor?.sourceKind||'prototype',
-        trendData:sampledFrames.filter(frame=>frame.timestamp>=start&&frame.timestamp<=end).map(frame=>({timestamp:frame.timestamp,value:Number.isFinite(frame.values[id])?frame.values[id]:null}))}
+
+  function recordedSensorChannels(ids, start, end = Date.now()) {
+    return ids.map((id) => {
+      const sensor = allSensors.value.find((item) => item.id === id)
+      return {
+        channelId: id,
+        name: sensor?.nameCn || id,
+        unit: sensor?.unit || '',
+        sourceKind: sensor?.sourceKind || 'prototype',
+        trendData: sampledFrames
+          .filter((frame) => frame.timestamp >= start && frame.timestamp <= end)
+          .map((frame) => ({
+            timestamp: frame.timestamp,
+            value: Number.isFinite(frame.values[id]) ? frame.values[id] : null
+          }))
+      }
     })
   }
-  let timer=null
-  function refreshSimulation(){allSensors.value=[...simulationSensors.filter(s=>!isLocalSensor(s)).map(s=>simulationSample(s,Date.now(),simulationConfig)),...allSensors.value.filter(isLocalSensor)];retainSamples()}
-  function setSimulationBaselines(updates){
-    for(const [id,settings] of Object.entries(updates)){const sensor=simulationSensors.find(s=>s.id===id);if(sensor)Object.assign(sensor,settings)}
+
+  let timer = null
+  function refreshSimulation() {
+    allSensors.value = buildAllSensors(Date.now())
+    retainSamples()
+  }
+
+  function setSimulationBaselines(updates) {
+    for (const [id, settings] of Object.entries(updates)) {
+      const sensor = simulationSensors.find((s) => s.id === id)
+      if (sensor) Object.assign(sensor, settings)
+    }
     refreshSimulation()
   }
-  function configureSimulation(settings){
-    Object.assign(simulationConfig,{enabled:settings.enabled??simulationConfig.enabled,intervalSeconds:Math.min(300,Math.max(5,Number(settings.intervalSeconds)||30)),strength:Math.min(3,Math.max(0,Number(settings.strength??simulationConfig.strength)||0))})
+
+  function configureSimulation(settings) {
+    Object.assign(simulationConfig, {
+      enabled: settings.enabled ?? simulationConfig.enabled,
+      intervalSeconds: Math.min(300, Math.max(5, Number(settings.intervalSeconds) || 30)),
+      strength: Math.min(3, Math.max(0, Number(settings.strength ?? simulationConfig.strength) || 0))
+    })
   }
-  watch(()=>[simulationConfig.enabled,simulationConfig.intervalSeconds,simulationConfig.strength],()=>{
-    if(timer)clearInterval(timer)
-    if(simulationConfig.enabled)refreshSimulation()
-    timer=simulationConfig.enabled?setInterval(refreshSimulation,simulationConfig.intervalSeconds*1000):null
-    timer?.unref?.() // SSR/unit tests should not be kept alive by the browser simulator.
-  },{immediate:true})
-  onScopeDispose(()=>{if(timer)clearInterval(timer);if(dataTimer)clearInterval(dataTimer)})
-  function getSimulationTrend(id,hours=24,start=null,end=null,maxPoints=900){
-    const localCode=Object.keys(localPointIds).find(code=>localPointIds[code]===id)
-    if(localCode){
-      const cutoff=Math.min(end??Date.now(),Date.now()),from=start??cutoff-hours*3600000
-      return (localData.value?.trends[localCode]||[]).filter(p=>p.timestamp>=from&&p.timestamp<=cutoff).map(p=>({...p,time:new Date(p.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Shanghai',hour12:false})}))
+
+  watch(
+    () => [simulationConfig.enabled, simulationConfig.intervalSeconds, simulationConfig.strength],
+    () => {
+      if (timer) clearInterval(timer)
+      if (simulationConfig.enabled) refreshSimulation()
+      timer = simulationConfig.enabled ? setInterval(refreshSimulation, simulationConfig.intervalSeconds * 1000) : null
+      timer?.unref?.()
+    },
+    { immediate: true }
+  )
+
+  onScopeDispose(() => {
+    if (timer) clearInterval(timer)
+    if (dataTimer) clearInterval(dataTimer)
+  })
+
+  function getPointTrendByCode(pointCode, hours = 24, start = null, end = null) {
+    const rawList = localData.value?.trends?.[pointCode] || []
+    if (!rawList.length) return []
+    const latestTs = localData.value?.now || rawList.at(-1)?.timestamp || Date.now()
+    const cutoff = end !== null ? Math.min(end, latestTs) : latestTs
+    const from = start !== null ? start : cutoff - hours * 3600000
+    return rawList
+      .filter((p) => p.timestamp >= from && p.timestamp <= cutoff)
+      .map((p) => ({
+        timestamp: p.timestamp,
+        value: toTemplateUnitValue(pointCode, p.value),
+        time: new Date(p.timestamp).toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Shanghai',
+          hour12: false
+        })
+      }))
+  }
+
+  function getSimulationTrend(id, hours = 24, start = null, end = null, maxPoints = 900) {
+    const localCode = parsePointCodeFromSensorId(id)
+    if (localCode) {
+      return getPointTrendByCode(localCode, hours, start, end)
     }
-    if(id==='ship-speed'||id==='main-load')return []
-    const sensor=simulationSensors.find(s=>s.id===id)
-    if(!sensor)return []
-    const cutoff=Math.min(end??sampledAt.value,sampledAt.value)
-    const from=start??cutoff-hours*3600000
-    const data=from>cutoff?[]:simulationTrend(sensor,from,cutoff,{...simulationConfig,enabled:true},maxPoints)
-    const latest=allSensors.value.find(s=>s.id===id)
-    if(data.length&&cutoff===sampledAt.value&&latest)data[data.length-1].value=latest.value
+    if (id === 'ship-speed' || id === 'main-load') return []
+    const sensor = simulationSensors.find((s) => s.id === id)
+    if (!sensor) return []
+    const cutoff = Math.min(end ?? sampledAt.value, sampledAt.value)
+    const from = start ?? cutoff - hours * 3600000
+    const data = from > cutoff ? [] : simulationTrend(sensor, from, cutoff, { ...simulationConfig, enabled: true }, maxPoints)
+    const latest = allSensors.value.find((s) => s.id === id)
+    if (data.length && cutoff === sampledAt.value && latest) data[data.length - 1].value = latest.value
     return data
   }
+
   const currentSystem = ref('全部')
   const currentDeviceId = ref(null)
   const currentSubsystem = ref('全部')
   const selectedSensorId = ref(null)
   const trendHours = ref(24)
 
-  /**
-   * 当前设备对应的子系统标签列表
-   */
   const currentSubsystemTags = computed(() => {
     const deviceId = currentDeviceId.value
-    if(deviceId==='aux-system'||deviceId?.startsWith('aux-engine-'))return ['全部','发电系统','转速监测','排温系统','冷却系统','滑油系统']
-    if(deviceId==='main-engine-1')return ['全部',...new Set([...subsystemTagsByDevice[deviceId],...allSensors.value.filter(sensor=>sensor.deviceId===deviceId).map(sensor=>sensor.subsystem).filter(Boolean)])]
-    if (!deviceId || !subsystemTagsByDevice[deviceId]) return ['全部']
-    return ['全部', ...subsystemTagsByDevice[deviceId]]
+    if (!deviceId) return ['全部']
+    const deviceSensors = allSensors.value.filter((sensor) => sensor.deviceId === deviceId)
+    if (deviceSensors.length) {
+      return ['全部', ...new Set(deviceSensors.map((sensor) => sensor.subsystem).filter(Boolean))]
+    }
+    if (subsystemTagsByDevice[deviceId]) return ['全部', ...subsystemTagsByDevice[deviceId]]
+    return ['全部']
   })
 
-  /**
-   * 传感器筛选逻辑：
-   * 1. 如果选中了特定设备 → 按设备筛选 + 按子系统二次筛选
-   * 2. 否则 → 按旧 system 字段筛选
-   */
   const filteredSensors = computed(() => {
     let list = [...allSensors.value]
 
     if (currentDeviceId.value) {
-      // 设备级：先按设备筛选
-      list = list.filter(s => currentDeviceId.value==='aux-system'?String(s.deviceId).startsWith('aux-engine-'):s.deviceId === currentDeviceId.value)
-      // 再按子系统二次筛选
+      list = list.filter((s) => s.deviceId === currentDeviceId.value)
       if (currentSubsystem.value !== '全部') {
-        list = list.filter(s => s.subsystem === currentSubsystem.value)
+        list = list.filter((s) => s.subsystem === currentSubsystem.value)
       }
-    } else {
-      // 全局级：按旧 system 字段筛选
-      if (currentSystem.value !== '全部') {
-        list = list.filter(s => s.system === currentSystem.value)
-      }
+    } else if (currentSystem.value !== '全部') {
+      list = list.filter((s) => s.system === currentSystem.value)
     }
 
-    // 超限/异常排前面
     const order = { over: 0, warning: 1, normal: 2 }
     list.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3))
     return list
@@ -131,24 +247,22 @@ export const useSensorStore = defineStore('sensor', () => {
 
   const selectedSensor = computed(() => {
     if (!selectedSensorId.value) return null
-    return allSensors.value.find(s => s.id === selectedSensorId.value) || null
+    return allSensors.value.find((s) => s.id === selectedSensorId.value) || null
   })
 
-  // 当前选中传感器的趋势数据
   const currentTrendData = computed(() => {
     const sensor = selectedSensor.value
     if (!sensor) return []
-    return getSimulationTrend(sensor.id,trendHours.value)
+    return getSimulationTrend(sensor.id, trendHours.value)
   })
 
-  // 统计数据
   const sensorStats = computed(() => {
     const list = filteredSensors.value
     return {
       total: list.length,
-      over: list.filter(s => s.status === 'over').length,
-      warning: list.filter(s => s.status === 'warning').length,
-      normal: list.filter(s => s.status === 'normal').length
+      over: list.filter((s) => s.status === 'over').length,
+      warning: list.filter((s) => s.status === 'warning').length,
+      normal: list.filter((s) => s.status === 'normal').length
     }
   })
 
@@ -156,26 +270,17 @@ export const useSensorStore = defineStore('sensor', () => {
     selectedSensorId.value = sensorId
   }
 
-  /**
-   * 进入设备级视图：锁定到特定设备，默认显示全部子系统
-   */
   function setDevice(deviceId) {
     currentDeviceId.value = deviceId
-    if(deviceId==='main-engine-1')trendHours.value=Math.min(trendHours.value,24)
+    if (configuredDeviceIds.value.has(deviceId)) trendHours.value = Math.min(trendHours.value, 24)
     currentSubsystem.value = '全部'
     selectedSensorId.value = null
   }
 
-  /**
-   * 设置子系统筛选
-   */
   function setSubsystem(subsystem) {
     currentSubsystem.value = subsystem
   }
 
-  /**
-   * 退出设备级视图，回到全局系统视图
-   */
   function clearDevice() {
     currentDeviceId.value = null
     currentSubsystem.value = '全部'
@@ -193,8 +298,19 @@ export const useSensorStore = defineStore('sensor', () => {
   }
 
   return {
-    allSensors, localData, localError, localChronology, health, refreshLocalData,
-    simulationConfig, sampledAt, configureSimulation, getSimulationTrend, setSimulationBaselines, recordedSensorChannels,
+    allSensors,
+    localData,
+    localError,
+    localChronology,
+    health,
+    refreshLocalData,
+    simulationConfig,
+    sampledAt,
+    configureSimulation,
+    getSimulationTrend,
+    getPointTrendByCode,
+    setSimulationBaselines,
+    recordedSensorChannels,
     currentSystem,
     currentDeviceId,
     currentSubsystem,

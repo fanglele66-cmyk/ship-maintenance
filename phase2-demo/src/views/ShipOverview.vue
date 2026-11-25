@@ -6,7 +6,7 @@
    <div ref="twinRef" class="twin-viewport">
     <div class="twin-scene" :style="sceneStyle">
      <img src="/ship-situation-engines.png" alt="船舶俯视态势图，设备入口位置为示意" decoding="async" fetchpriority="high" width="941" height="1672"/>
-     <button v-for="device in devices" :key="device.id" class="twin-device" :style="{left:positions[device.id].x,top:positions[device.id].y}" :aria-label="'查看'+device.name+'设备详情'" @click="emit('selectDevice',device)">
+     <button v-for="device in devices" :key="device.id" class="twin-device" :style="{left:device.pos.x,top:device.pos.y}" :aria-label="'查看'+device.name+'设备详情'" @click="emit('selectDevice',device)">
       <span class="twin-device-copy"><span class="twin-device-name"><i :class="device.signal" aria-hidden="true"/>{{device.name}}</span><span class="twin-device-hint">查看设备详情</span></span>
       <svg class="twin-device-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
      </button>
@@ -41,6 +41,7 @@ onDeactivated(()=>assistantOpen.value=false)
 import {useElementSize} from '@vueuse/core'
 import {useDeviceStore} from '@/stores/deviceStore'
 import {useSensorStore} from '@/stores/sensorStore'
+import {useShipConfigStore} from '@/stores/shipConfigStore'
 import {usePhase2DemoStore} from '@/stores/phase2DemoStore'
 import {captainDeviceSignal} from '@/mock/captainWorkbench'
 
@@ -57,6 +58,8 @@ import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const lifecycle=useEventLifecycleStore(),workbench=ref(null)
 const emit=defineEmits(['selectDevice','selectItem']),store=usePhase2DemoStore(),deviceStore=useDeviceStore(),twinRef=ref(null)
 const sensorStore=useSensorStore()
+const shipConfigStore=useShipConfigStore()
+const EXTRA_POSITIONS=[{x:'50%',y:'56%'},{x:'50%',y:'44%'},{x:'50%',y:'32%'},{x:'34%',y:'74%'},{x:'66%',y:'74%'},{x:'34%',y:'62%'},{x:'66%',y:'62%'}]
 function formatReading(id){const point=sensorStore.allSensors.find(s=>s.id===id);return Number.isFinite(point?.value)?Number(point.value).toFixed(1):'—'}
 const sampleTimeIso=computed(()=>new Date(sensorStore.sampledAt).toISOString())
 const sampleTimeLabel=computed(()=>new Date(sensorStore.sampledAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Shanghai'}))
@@ -64,11 +67,18 @@ const chronology=computed(()=>sensorStore.localChronology)
 const {width,height}=useElementSize(twinRef)
 const sceneStyle=computed(()=>{const scale=Math.max(width.value/941,height.value/1672);return {height:1672*scale+'px',width:941*scale+'px'}})
 const devices=computed(()=>{
- const main=deviceStore.devices.find(d=>d.id==='main-engine-1')
- const auxiliary=deviceStore.devices.filter(d=>d.id.startsWith('aux-engine-'))
- const signals=auxiliary.map(d=>captainDeviceSignal(store,d.id))
- const signal=signals.includes('danger')?'danger':signals.includes('warning')?'warning':'normal'
- return [...(main?[{...main,signal:sensorStore.health?.latest?.healthStatus==='abnormal'?'danger':sensorStore.health?.latest?.healthStatus==='warning'?'warning':'normal'}]:[]),{id:'aux-system',name:'辅机',system:'辅机系统',signal}]
+ let extraIdx=0
+ return shipConfigStore.enabledDevices.map(cfg=>{
+  const resolved=deviceStore.getDeviceById(cfg.id)
+  const pos=positions[cfg.id]||EXTRA_POSITIONS[extraIdx++%EXTRA_POSITIONS.length]
+  let signal='normal'
+  if(cfg.id==='main-engine-1'){
+   signal=sensorStore.health?.latest?.healthStatus==='abnormal'?'danger':sensorStore.health?.latest?.healthStatus==='warning'?'warning':'normal'
+  }else if(resolved?.status==='danger'||resolved?.status==='warning'){
+   signal=resolved.status
+  }
+  return {id:cfg.id,name:cfg.name,signal,pos}
+ })
 })
 </script>
 <style scoped>

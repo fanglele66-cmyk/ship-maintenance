@@ -108,7 +108,7 @@ export function buildSensorLayout(readings = []) {
     devices.get(key).readings.push(sensor)
   }
   return {
-    main: mainReadings.length ? { columns, matrix, operatingGroups, additionalGroups, count: mainReadings.length } : null,
+    main: mainReadings.length ? { name: mainReadings[0].device || '主机', columns, matrix, operatingGroups, additionalGroups, count: mainReadings.length } : null,
     devices: [...devices.values()].map(device => ({
       id: device.id,
       name: device.name,
@@ -138,6 +138,16 @@ export function filterSensorReadings(readings, query = '') {
 // The overview keeps operating context and the four comparable cylinder
 // temperatures. Detailed actuator feedback and secondary points stay in data.
 export function overviewSensorReadings(readings = []) {
+  const overviewPointCodes = new Set([
+    'DC0001', 'DC0002', 'DC0005', 'DC0006',
+    'DC0008', 'DC0009', 'DC0010', 'DC0011', 'DC0012', 'DC0013',
+    'DC0022', 'DC0023', 'DC0024', 'DC0025', 'DC0026', 'DC0027',
+    'DC0028', 'DC0029',
+    'DC0031', 'DC0032', 'DC0033', 'DC0034', 'DC0035', 'DC0036',
+    'DC0041', 'DC0044', 'DC0045',
+    'DC0046', 'DC0047', 'DC0048', 'DC0049', 'DC0050', 'DC0051',
+    'DC0054', 'DC0056', 'DC0059',
+  ])
   const mainIds = new Set([
     'main-fuel-rail-pressure', 's-002', 's-009', 's-010', 's-011',
     'main-control-air-pressure', 'main-air-spring-pressure', 'main-servo-rail-pressure',
@@ -145,5 +155,9 @@ export function overviewSensorReadings(readings = []) {
     ...sensorCylinderNumbers.flatMap(number => ['exhaust', 'scavenge', 'coolant', 'piston']
       .map(topic => mainCylinderSensorBindings[number][topic])),
   ])
-  return readings.filter(sensor => sensor.deviceId !== 'main-engine-1' || mainIds.has(sensor.id))
+  return readings.filter(sensor => {
+    if (sensor.deviceId === 'main-engine-1') return mainIds.has(sensor.id)
+    if (sensor.pointCode) return overviewPointCodes.has(sensor.pointCode)
+    return true
+  })
 }

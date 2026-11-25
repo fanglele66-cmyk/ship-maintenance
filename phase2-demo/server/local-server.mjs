@@ -4,6 +4,7 @@ import {readFile,stat} from 'node:fs/promises'
 import {resolve,extname,sep} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createAuthService} from './auth-api.mjs'
+import {createShipConfigService} from './ship-config-api.mjs'
 import {createDataService} from './data-api.mjs'
 import {createAiHandler} from './ai-api.mjs'
 import {configStore,resolveProvider} from './ai-config.mjs'
@@ -18,6 +19,7 @@ if(process.env.SHIP_REQUIRE_TELEMETRY==='true'){
  if(config.enabled)await resolveProvider(config)
 }
 const auth=await createAuthService(root)
+const shipConfig=await createShipConfigService(root)
 const data=await createDataService(root),ai=createAiHandler(root),workflow=await getWorkflowService(root),events=await workflowHandler(root)
 if(process.env.SHIP_SCHEDULERS_ENABLED!=='false')workflow.start()
 const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.woff2':'font/woff2'}
@@ -39,7 +41,7 @@ const server=createServer((req,res)=>{
   res.writeHead(stopping?503:200,{'Content-Type':'application/json','Cache-Control':'no-store'})
   return res.end(req.method==='HEAD'?undefined:JSON.stringify({status:stopping?'stopping':'ok'}))
  }
- Promise.resolve(auth.handler(req,res,()=>data.handler(req,res,()=>events(req,res,()=>ai(req,res,()=>void staticFile(req,res)))))).catch(()=>{if(!res.headersSent)res.writeHead(500);res.end()})
+ Promise.resolve(auth.handler(req,res,()=>shipConfig.handler(req,res,()=>data.handler(req,res,()=>events(req,res,()=>ai(req,res,()=>void staticFile(req,res))))))).catch(()=>{if(!res.headersSent)res.writeHead(500);res.end()})
 })
 const host=process.env.HOST||'127.0.0.1'
 server.listen(Number(process.env.PORT)||5173,host,()=>console.log(JSON.stringify({level:'info',event:'server_started',host,port:server.address().port,contextPath,requestMode:process.env.SHIP_REQUEST_MODE||'local',publicOrigin:process.env.SHIP_PUBLIC_ORIGIN||'',schedulers:process.env.SHIP_SCHEDULERS_ENABLED!=='false'})))
@@ -47,6 +49,6 @@ async function shutdown(){
  if(stopping)return;stopping=true
  const deadline=setTimeout(()=>process.exit(1),Math.max(1000,Number(process.env.SHIP_SHUTDOWN_TIMEOUT_MS)||30000));deadline.unref()
  await new Promise(resolve=>server.close(resolve))
- await data.close();await workflow.close();auth.close();clearTimeout(deadline)
+ await shipConfig.close();await data.close();await workflow.close();auth.close();clearTimeout(deadline)
 }
 process.once('SIGINT',shutdown);process.once('SIGTERM',shutdown)

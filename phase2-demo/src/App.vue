@@ -32,7 +32,7 @@ import AppNav from '@/components/AppNav.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import { installDevViewRecovery } from '@/utils/devViewRecovery'
 
-void loadAccount()
+if (!auth.ready) void loadAccount()
 const authTimer=setInterval(async()=>{const before=auth.user?.username;await loadAccount();if(before!==auth.user?.username)location.reload()},15000)
 onBeforeUnmount(()=>clearInterval(authTimer))
 const viewRevision=ref(0)

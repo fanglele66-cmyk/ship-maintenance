@@ -2,13 +2,14 @@ import {localWorkflowPlugin} from './server/workflow-service.mjs'
 import {defineConfig} from 'vite'
 import vue from '@vitejs/plugin-vue'
 import {localAuthPlugin} from './server/auth-api.mjs'
+import {localShipConfigPlugin} from './server/ship-config-api.mjs'
 import {localDataPlugin} from './server/data-api.mjs'
 import {localAiPlugin} from './server/ai-api.mjs'
 import {resolve,join} from 'node:path'
 import {existsSync,readdirSync,copyFileSync,mkdirSync} from 'node:fs'
 const buildId=Date.now().toString(36)
 export default defineConfig({
- plugins:[vue(),localAuthPlugin(),localWorkflowPlugin(),localAiPlugin(),localDataPlugin(),{
+ plugins:[vue(),localAuthPlugin(),localShipConfigPlugin(),localWorkflowPlugin(),localAiPlugin(),localDataPlugin(),{
  name:'ship-release',
  transformIndexHtml(html){return html.replaceAll('__SHIP_BUILD_ID__',buildId)},
  generateBundle(){this.emitFile({type:'asset',fileName:'build-version.json',source:JSON.stringify({version:buildId})})},

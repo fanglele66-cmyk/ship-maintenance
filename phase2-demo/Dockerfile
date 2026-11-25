@@ -39,6 +39,7 @@ RUN npm ci --omit=dev
 COPY --chown=node:node server ./server
 COPY --chown=node:node src ./src
 COPY --chown=node:node data ./data
+COPY --chown=node:node docs/device-type-template.json ./docs/device-type-template.json
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node .claude ./.claude
 COPY --chown=node:node wiki_rt-flex50 ./wiki_rt-flex50

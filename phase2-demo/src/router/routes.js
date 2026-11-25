@@ -25,5 +25,11 @@ export const routes = [
     name: 'Knowledge',
     component: () => import('@/views/KnowledgeView.vue'),
     meta: { title: '知识库', icon: '📖' }
+  },
+  {
+    path: '/ship-config',
+    name: 'ShipConfig',
+    component: () => import('@/components/config/ShipConfigConsole.vue'),
+    meta: { title: '本船配置', requiresAdmin: true }
   }
 ]

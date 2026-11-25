@@ -7,8 +7,9 @@
     <div v-for="(section, index) in group.sections" :key="index" class="sensor-system-section">
       <div v-if="section.title" class="sensor-section-label">{{ section.title }}</div>
       <button v-for="sensor in section.sensors" :key="sensor.id" type="button" class="sensor-reading"
+        :class="{'is-over':sensor.status==='over'}"
         :data-sensor-id="sensor.id" :aria-label="`查看${sensor.nameCn}的趋势分析`"
-        :title="`${sensor.nameCn} · ${sensor.nameEn || ''}`" @click="$emit('selectSensor', sensor)">
+        :title="`${sensor.nameCn} · ${sensor.nameEn || ''} · ${sensor.range || ''}`" @click="$emit('selectSensor', sensor)">
         <span class="sensor-reading-name">{{ sensor.nameCn }}</span>
         <span class="sensor-reading-value">{{ formatSensorValue(sensor) }}<small>{{ sensor.unit }}</small><i aria-hidden="true">›</i></span>
       </button>
@@ -38,6 +39,7 @@ h4{margin:0;font-size:13px;font-weight:600;line-height:1.5;color:#354052}
 .sensor-reading-value small{min-width:17px;font:400 10px/1.5 Arial,sans-serif;color:#8993a1}
 .sensor-reading-value i{color:#a6b0bf;font:400 14px/1 Arial,sans-serif;width:6px}
 .sensor-reading:hover{background:#edf4ff}
+.sensor-reading.is-over .sensor-reading-value{color:#d93025}
 .sensor-reading:hover .sensor-reading-value,.sensor-reading:hover .sensor-reading-value i{color:#106bff}
 .sensor-reading:focus-visible{outline:2px solid #106bff;outline-offset:1px;background:#edf4ff}
 .sensor-system.compact{padding:5px 9px 6px}.compact .sensor-system-head{min-height:25px;margin-bottom:1px;gap:6px}.compact h4{font-size:11px;line-height:1.3}.compact .sensor-system-head small{display:none}.compact .sensor-system-section+.sensor-system-section{margin-top:2px}.compact .sensor-section-label{font-size:9px;padding:0 3px;line-height:1.5}.compact .sensor-reading{min-height:22px;padding:2px 3px;gap:6px}.compact .sensor-reading-name{font-size:10px;line-height:1.4}.compact .sensor-reading-value{font-size:13px;line-height:1.3;gap:3px}.compact .sensor-reading-value small{font-size:9px;min-width:14px}.compact .sensor-reading-value i{font-size:12px}

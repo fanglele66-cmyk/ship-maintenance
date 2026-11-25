@@ -188,7 +188,8 @@ const hoveredIndex = ref(null)
 const chartSize = reactive({ width: 0, height: 0 })
 let hoverPointerType = 'dashed'
 
-const timeRanges = computed(()=>sensorStore.currentDeviceId==='main-engine-1'?[1,6,24]:[1,6,24,168])
+const isLocalReplayDevice = computed(() => scopedSensors.value.some(s => s.sourceKind === 'historical-copy-replay') || sensorStore.currentDeviceId === 'main-engine-1')
+const timeRanges = computed(()=>isLocalReplayDevice.value?[1,6,24]:[1,6,24,168])
 const customRangeError=ref('')
 
 const selectedCardStyle = computed(() => {
@@ -257,7 +258,7 @@ function getTrendDataForHours(hours) {
 const scopedSensors = computed(() => {
   let sensors = sensorStore.allSensors
   if (sensorStore.currentDeviceId) {
-    sensors = sensors.filter(sensor => sensorStore.currentDeviceId==='aux-system'?sensor.deviceId.startsWith('aux-engine-'):sensor.deviceId === sensorStore.currentDeviceId)
+    sensors = sensors.filter(sensor => sensor.deviceId === sensorStore.currentDeviceId)
   } else if (sensorStore.currentSystem !== '全部') {
     sensors = sensors.filter(sensor => sensor.system === sensorStore.currentSystem)
   }
@@ -374,10 +375,10 @@ function applyPreset(hours) {
 
 function applyCustomRange() {
   customRangeError.value=''
-  if(sensorStore.currentDeviceId==='main-engine-1'){
+  if(isLocalReplayDevice.value){
     const start=new Date(customStart.value).getTime(),end=new Date(customEnd.value).getTime()
     const now=sensorStore.localData?.now||Date.now()
-    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||start<now-24*3600000||end>now){customRangeError.value='当前主机趋势支持最近 24 小时内的有效时间范围。';return}
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||start<now-24*3600000||end>now){customRangeError.value='当前设备趋势支持最近 24 小时内的有效时间范围。';return}
   }
   if (customStart.value && customEnd.value) {
     isCustomRange.value = true

@@ -8,17 +8,19 @@
     <!-- Nav Items -->
     <div class="nav-items">
       <router-link
-        v-for="(item, idx) in navItems"
+        v-for="item in navItems"
         :key="item.path"
         :to="item.path"
+        :aria-label="item.shortLabel ? item.label : undefined"
+        :title="item.shortLabel ? item.label : undefined"
         @click="navigate(item.path)"
         class="nav-item"
         :class="{ active: isActive(item.path) }"
       >
         <!-- Icon -->
-        <Document v-if="item.path==='/reports'" class="nav-icon nav-report-icon" aria-hidden="true"/>
+        <component v-if="item.iconComponent" :is="item.iconComponent" class="nav-icon nav-vector-icon" aria-hidden="true"/>
         <span v-else class="nav-icon" :style="{ '--nav-icon-url': `url(${appStyleUrl(item.icon)})` }"></span>
-        <span class="nav-label">{{ item.label }}</span>
+        <span class="nav-label">{{ item.shortLabel || item.label }}</span>
         <!-- Unread badge -->
         <span
           v-if="item.path === '/event' && totalUnread > 0"
@@ -41,7 +43,7 @@ import {appStyleUrl} from '../services/appUrl.js'
 import {ElPopover} from 'element-plus'
 import 'element-plus/es/components/popover/style/css'
 import {auth,logout} from '../services/auth'
-import {Document} from '@element-plus/icons-vue'
+import {Document, Setting} from '@element-plus/icons-vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePhase2DemoStore } from '@/stores/phase2DemoStore'
@@ -81,13 +83,14 @@ watch(totalUnread, (v) => {
 })
 onUnmounted(() => { if (bumpTimer) clearTimeout(bumpTimer) })
 
-const navItems = [
+const navItems = computed(() => [
   { path: '/situation', label: '态势', icon: '/nav-icons/situation.svg' },
   { path: '/issues', label: '事件', icon: '/nav-icons/event.svg' },
   { path: '/event', label: '任务', icon: '/nav-icons/inspection.svg' },
-  { path: '/reports', label: '报告' },
-  { path: '/knowledge', label: '知识库', icon: '/nav-icons/knowledge.svg' }
-]
+  { path: '/reports', label: '报告', iconComponent: Document },
+  { path: '/knowledge', label: '知识库', icon: '/nav-icons/knowledge.svg' },
+  ...(auth.user?.role === 'admin' ? [{ path: '/ship-config', label: '本船配置', shortLabel: '配置', iconComponent: Setting }] : [])
+])
 </script>
 
 <style scoped>
@@ -168,7 +171,7 @@ const navItems = [
   display: block;
 }
 
-.nav-icon.nav-report-icon { background:none; mask:none; -webkit-mask:none; }
+.nav-icon.nav-vector-icon { background:none; mask:none; -webkit-mask:none; }
 
 .nav-label {
   font-size: 12px;

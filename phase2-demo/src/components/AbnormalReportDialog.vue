@@ -22,7 +22,7 @@
               >
                 <el-option v-for="device in deviceStore.devices" :key="device.id" :label="device.name" :value="device.id">
                   <span class="report-option-main">{{ device.name }}</span>
-                  <span class="report-option-meta">{{ device.system }}</span>
+                  <span class="report-option-meta">{{ device.deviceTypeName || device.system }}</span>
                 </el-option>
               </el-select>
             </div>
@@ -163,7 +163,8 @@ const systemOptions = computed(() => {
   const systems = [...new Set(sensorsForDevice.value
     .map(sensor => sensor.subsystem || sensor.system)
     .filter(Boolean))]
-  return systems.length ? systems : [selectedDevice.system]
+  if (systems.length || !selectedDevice.system) return systems
+  return [selectedDevice.system]
 })
 const sensorOptions = computed(() => {
   if (!form.systems.length) return []
