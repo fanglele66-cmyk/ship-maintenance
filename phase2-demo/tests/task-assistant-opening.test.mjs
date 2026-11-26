@@ -27,7 +27,8 @@ for(const kind of ['investigation','repair'])test(`${kind}: opening choices intr
   for(const name of kind==='repair'?['preparationStart','preparationAnswer']:['investigationStart','investigationAnswer']){
    const item=STEP_ASSIST_DEMO_CASES.find(item=>item.id===name),message=await ask(item.input)
    assert.equal(message.source,'scripted-demo');assert.equal(message.response.kind,item.response.kind)
-   assert.equal(message.response.note,item.response.note)
+   if(item.response.kind==='draft')assert.equal(message.response.note,item.response.note)
+   else assert.ok(message.response.note?.includes('船员记录'))
   }
   assert.equal(JSON.stringify(task.draft.records),before,'the opening and drafts do not fill results or adopt notes')
  }

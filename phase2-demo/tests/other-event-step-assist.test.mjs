@@ -28,7 +28,7 @@ for(const [id,folder] of Object.entries(folders))test(`${folder}: real dispatch 
   assert.equal(task.steps.length,new Set(selected.map(c=>c.stepIndex)).size)
   const ask=text=>assistTaskStep(state,id,task.id,task.draft.stepIndex||0,text,{},(body,emit)=>serve(body,{...backend,emit}))
   const opening=taskAssistantOpening(task)
-  const first=await ask(opening.choices[0].prompt)
+  const first=await ask(opening.choices[0].label)
   assert.equal(first.response.kind,'question');assert.equal(task.draft.records[0].note,'')
   for(let index=0;index<task.steps.length;index++){
    task.draft.stepIndex=index
@@ -38,7 +38,12 @@ for(const [id,folder] of Object.entries(folders))test(`${folder}: real dispatch 
    for(const item of inputs){
     assert.ok(isStepAssistScriptInput({event,task,stepIndex:index,text:item.input}))
     const before=JSON.stringify(task.draft.records),message=await ask(item.input)
-    assert.deepEqual(message.response,item.response,item.id)
+    const expected=item.response.kind==='question'&&item.response.choices?.length?{...item.response,followUpRound:1,maxFollowUpRounds:3}:item.response
+    if(expected.kind==='question'){
+     const {note,...question}=message.response
+     assert.deepEqual(question,expected,item.id)
+     if(note)assert.ok(note.trim(),'a partial proposal must contain text')
+    }else assert.deepEqual(message.response,expected,item.id)
     assert.equal(JSON.stringify(task.draft.records),before,'questions and drafts cannot write records')
     assert.equal(message.source,'scripted-demo');assert.deepEqual(message.usage,{inputTokens:0,outputTokens:0})
     assert.equal(message.progressLog.length,4)
@@ -98,4 +103,18 @@ test('C4 initial follow-up gets a stable reviewed template without overwriting t
  assert.equal(ensureTaskPlan(placeholder).status,'ready')
  const future=structuredClone(event);future.tasks.push({...future.tasks[0],id:'next'});future.currentTask='next';future.pendingPlan=null
  assert.equal(ensureTaskPlan(future).status,'pending','later rounds must not reuse the second-round template')
+})
+
+test('every short choice records exactly its visible observation for the event and step where it was offered',()=>{
+ for(const item of cases.filter(item=>item.response.choices)){
+  for(const choice of item.response.choices){
+   assert.deepEqual(Object.keys(choice).sort(),['id','label'])
+   const opening={role:'user',stepIndex:item.stepIndex,text:item.input}
+   const context={event:{id:item.eventId},task:{id:'task',kind:item.kind},step:{label:item.stepLabel},stepIndex:item.stepIndex,record:{},history:[opening],message:{text:choice.label}}
+   const reply=matchStepAssistDemo({context})
+   assert.equal(reply.note,item.input+'\n'+choice.label+'。')
+   assert.equal(matchStepAssistDemo({context:{...context,history:[{...opening,stepIndex:item.stepIndex+1}]}}),null)
+   assert.equal(matchStepAssistDemo({context:{...context,history:[opening,{...opening,text:'更正，检查情况有变化。'}]}}),null)
+  }
+ }
 })

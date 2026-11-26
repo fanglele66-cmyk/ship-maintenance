@@ -1,7 +1,7 @@
 <template>
  <div v-if="event&&allowed" class="lc-workspace">
   <main class="lc-main" :class="{'lc-repair-execution':repairExecution}">
-   <header class="lc-event-header"><div class="lc-title"><BackButton class="lc-back" label="返回列表" @click="router.push(route.query.from==='tasks'?{path:'/event',query:route.query.returnView?{view:route.query.returnView}:{}}:'/issues')"/><div><small>{{event.type}} · {{event.device}} <span class="lc-event-number">{{event.number}}</span></small><h1>{{event.title}}</h1></div></div><div class="lc-header-facts"><button v-if="captain" type="button" class="lc-shore-button" @click="decisionDialog?.open('shore')">上报岸基</button><span class="lc-status">{{eventState(event)}}</span></div></header>
+   <header class="lc-event-header"><div class="lc-title"><BackButton class="lc-back" :label="route.query.from==='statistics'?'返回统计看板':'返回列表'" @click="router.push(returnTarget)"/><div><small>{{event.type}} · {{event.device}} <span class="lc-event-number">{{event.number}}</span></small><h1>{{event.title}}</h1></div></div><div class="lc-header-facts"><button v-if="captain" type="button" class="lc-shore-button" @click="decisionDialog?.open('shore')">上报岸基</button><span class="lc-status">{{eventState(event)}}</span></div></header>
    <section class="lc-current-summary" aria-label="事件当前情况"><div><small>当前责任</small><strong>{{responsibility.owner}}</strong><p class="responsibility-line">{{responsibility.detail}}</p><small v-if="responsibility.deadline">当前任务期限 {{timeText(responsibility.deadline)}}</small></div><button v-if="captain&&canDecide" class="lc-primary" @click="decisionDialog?.open()">填写决策</button></section>
    <dl v-if="event.type==='效果观察'" class="lc-observation-origin" aria-label="观察关联信息"><div><dt>关联事件</dt><dd><RouterLink :to="'/situation/issue/'+event.parentEventId">{{observationOrigin.parent?.title||event.parentEventId}} ↗</RouterLink><small>{{observationOrigin.parent?.number}}</small></dd></div><div><dt>关联任务</dt><dd><RouterLink v-if="observationOrigin.task&&event.sourceTaskId&&!event.sourceTaskId.startsWith('initial-')" :to="'/tasks/'+event.sourceTaskId">{{taskTitle(observationOrigin.task)}} ↗</RouterLink><span v-if="event.sourceTaskId?.startsWith('initial-')">初始事件依据（无人员任务）</span><small>{{observationOrigin.task?.number}}</small></dd></div><div><dt>来源报告</dt><dd><button @click="openReport(event.sourceReportId)">{{observationOrigin.report?.title||'查看来源报告'}} ↗</button><small>观察建立于 {{timeText(event.createdAt)}}</small></dd></div></dl>
    <nav class="lc-stage-strip" aria-label="事件阶段"><button v-for="p in visiblePhases" :key="p.id" :class="{active:selected===p.id}" @click="choosePhase(p.id)"><span>{{p.kind==='reminder'&&event.tasks.length?'已派发 · ':''}}{{p.label}}</span><small v-if="p.taskId">{{p.reportId?'已提交':event.tasks.find(t=>t.id===p.taskId)?.status==='waiting'?'等待条件':event.tasks.find(t=>t.id===p.taskId)?.status==='assigned'?'执行中':'已提交'}}</small></button></nav>
@@ -21,7 +21,7 @@
      <EventCauseCandidates v-if="!event.manualReport&&!event.detectionReport" :event-id="event.id" :timeline="event.timeline"/>
     </template>
     <template v-else-if="['排查步骤','复查步骤','维修方案','维保安排','维修步骤','维保步骤'].includes(tab)"><div class="lc-task-summary lc-task-metadata"><strong>第{{task?.round}}轮{{taskName(task)}}任务{{task?.purpose==='recheck'?'（复查）':''}}</strong><small>执行人 {{task?.owner}} · 要求完成 {{timeText(task?.deadline)}} · 派发于 {{timeText(task?.assignedAt)}} · {{task?.status==='assigned'?'等待执行人员提交':reportGenerationStatus(task)==='streaming'?'现场已提交 · AI 分析中':reportGenerationStatus(task)==='error'?'现场已提交 · AI 分析待重试':'已提交报告'}}</small></div><div v-if="!captain&&task?.owner===actor(store.state)&&isCurrent&&['assigned','reporting','report-error'].includes(task?.status)" class="lc-task-entry"><p>本次执行任务已独立建档，请进入任务页面填写本轮结果。</p><button class="lc-primary" @click="router.push('/tasks/'+task.id)">进入{{taskName(task)}}任务 →</button></div><LifecycleTaskRecords v-if="showTaskSteps" :key="phase.id+':'+task.id" :event="event" :task="task" :records="task.records||[]" :show-feedback="showTaskFeedback"/></template>
-    <section v-else-if="tab==='阶段报告'"><div class="stage-report-toolbar"><nav class="report-submissions" aria-label="本轮提交版本"><button v-for="r in roundReports" :key="r.id" type="button" @click="reportOverride=r.id" :aria-pressed="report?.id===r.id">{{r.kind}} · {{r.submissionNumber?'第'+r.submissionNumber+'次提交':timeText(r.at)}}</button></nav><button v-if="report" type="button" class="download-btn" @click="downloadReportMarkdown(report)">下载</button></div><LifecycleReport v-if="report" :report="report" :show-download="false"/></section>
+    <section v-else-if="tab==='阶段报告'"><div class="stage-report-toolbar"><nav class="report-submissions" aria-label="本轮提交版本"><button v-for="r in roundReports" :key="r.id" type="button" @click="reportOverride=r.id" :aria-pressed="report?.id===r.id">{{r.kind}} · {{r.submissionNumber?'第'+r.submissionNumber+'次提交':timeText(r.at)}}</button></nav><ReportDownloadButton v-if="report"  class="download-btn" :report="report"/></div><LifecycleReport v-if="report" :report="report" :show-download="false"/></section>
     <template v-else-if="tab==='维保任务'"><h2>{{event.maintenance?.number}}</h2><dl class="lc-definition"><dt>负责人</dt><dd>{{event.maintenance?.owner}}</dd><dt>计划窗口</dt><dd>{{event.maintenance?.window?.label||event.maintenance?.window}}</dd><dt>关联正式工单</dt><dd>{{event.maintenance?.plan?.workOrder?.number||'未关联'}} · {{event.maintenance?.plan?.workOrder?.status||'待核实'}}（完工状态独立确认）</dd><dt>维保范围</dt><dd>{{event.maintenance?.scope}}</dd><dt>处理情况</dt><dd>{{maintenanceTask?.status==='submitted'?maintenanceTask.summary:'待执行人员提交维保作业报告'}}</dd></dl><LifecycleReport v-if="maintenanceReport" :report="maintenanceReport"/></template>
     <template v-else-if="tab==='闭环结果'"><h2>闭环归档</h2><p>{{event.closeReason}}</p><small>轮机长 {{people.captain}} · {{timeText(event.closedAt)}}</small><LifecycleReport v-if="closeReport" :report="closeReport"/></template>
    </section>
@@ -56,7 +56,7 @@ import LifecycleDecisionDialog from '../components/LifecycleDecisionDialog.vue'
 import LifecycleAssistant from '../components/LifecycleAssistant.vue'
 import {reportTask} from '../workflow/reportSubmissions'
 import LifecycleReport from '../components/LifecycleReport.vue'
-import {downloadReportMarkdown} from '../workflow/downloadReport.js'
+import ReportDownloadButton from '../components/ReportDownloadButton.vue'
 import LifecycleEffectObservation from '../components/LifecycleEffectObservation.vue'
 import LifecycleObservationAdvice from '../components/LifecycleObservationAdvice.vue'
 import BackButton from '../components/BackButton.vue'
@@ -66,6 +66,11 @@ import EventDecisionBrief from '../components/EventDecisionBrief.vue'
 import {decisionAnalysisItems} from '../workflow/lifecycleAnalysis'
 import {observationTaskFor} from '../workflow/observationContext'
 const store=useEventLifecycleStore(),route=useRoute(),router=useRouter(),selected=ref(''),tab=ref(''),reportOverride=ref(null),assistant=ref(null),decisionDialog=ref(null),toast=ref('')
+const returnTarget=computed(()=>{
+ if(route.query.from==='statistics')return {name:'SituationStatistics'}
+ if(route.query.from==='tasks')return {path:'/event',query:route.query.returnView?{view:route.query.returnView}:{}}
+ return '/issues'
+})
 // Keep the cached workspace bound to its last event while another route is
 // active. Swapping its root during KeepAlive deactivation corrupts DOM anchors.
 const eventId=ref(route.params.attentionId),shoreOverride=ref('')

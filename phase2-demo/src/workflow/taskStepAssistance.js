@@ -1,12 +1,37 @@
-import {buildStepAssistRequest,canUseStepAssist,normalizeStepAssistResult,STEP_ASSIST_LIMITS} from './stepAssistContract.js'
+import {buildStepAssistRequest,canUseStepAssist,normalizeStepAssistResult,crewFollowUpChoices,STEP_ASSIST_LIMITS} from './stepAssistContract.js'
 import {taskConversation} from './lifecycleWorkItems.js'
 import {lifecycleSnapshot} from './demoTimeline.js'
+import {demoWorkspace} from './workspaceCache.js'
+import {readStepPhoto} from '../services/stepPhotoFiles.js'
+import {prepareStepPhoto,stepPhotoBytes} from './stepPhotoUpload.js'
 import {operationalText} from './operationalText.js'
 
 const copy=value=>JSON.parse(JSON.stringify(value))
 const signature=step=>JSON.stringify(step)
 const now=()=>new Date().toISOString()
 const requestKey=(eventId,role,taskId)=>`${eventId}:${role}:${taskId}`
+async function includeRecentPhotos(body, messages) {
+ const seen=new Set(body.images.map(image=>image.dataUrl))
+ let bytes=body.images.reduce((sum,image)=>sum+stepPhotoBytes(image),0)
+ for(let i=messages.length-1;i>=0&&seen.size<STEP_ASSIST_LIMITS.maxImages;i--){
+  const m=messages[i]
+  if(m.kind!=='user'||m.stepIndex!==body.stepIndex)continue
+  for(const photo of m.originalPhotos||m.images||[]){
+   if(seen.size>=STEP_ASSIST_LIMITS.maxImages)break
+   let image=photo
+   if(!image.dataUrl){
+    try{
+     const blob=await readStepPhoto(photo)
+     image=await prepareStepPhoto(new File([blob],photo.name,{type:photo.mimeType}))
+    }catch{continue}
+   }
+   if(!image.dataUrl||seen.has(image.dataUrl))continue
+   const size=stepPhotoBytes(image)
+   if(bytes+size>STEP_ASSIST_LIMITS.maxTotalImageBytes)continue
+   body.history[i].images.push(image);seen.add(image.dataUrl);bytes+=size
+  }
+ }
+}
 function context(state,eventId,taskId,stepIndex,role=state.role){
  const event=state.events[eventId],task=event?.tasks.find(item=>item.id===taskId)
  if(!canUseStepAssist(event,task,role))throw Error('当前任务或身份不能使用步骤协助。')
@@ -19,22 +44,32 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
  if(pendingRequests[key])throw Error('助手正在处理上一条消息，请稍候。')
  const {event,task,record,conversation}=context(state,eventId,taskId,stepIndex,role)
  if((task.draft.stepIndex||0)!==stepIndex)throw Error('请先返回对应步骤，再开启 AI 协助。')
- const history=conversation.filter(m=>['user','model','advice','step-assist'].includes(m.kind)&&m.status!=='interrupted'&&m.status!=='streaming').slice(-STEP_ASSIST_LIMITS.maxHistory).map(m=>({
+ const previous=conversation.filter(m=>['user','model','advice','step-assist'].includes(m.kind)&&m.status!=='interrupted'&&m.status!=='streaming').slice(-STEP_ASSIST_LIMITS.maxHistory)
+ const history=previous.map(m=>({
   eventId,taskId,stepIndex:Number.isInteger(m.stepIndex)?m.stepIndex:null,role:m.kind==='user'?'user':'assistant',
-  text:m.kind==='step-assist'?[m.response?.text,m.response?.note].filter(Boolean).join('\n'):m.text||'',
+  text:(m.kind==='step-assist'?[...new Set([m.response?.text,m.response?.question,m.response?.note].filter(Boolean))].join('\n'):m.text||'').slice(0,STEP_ASSIST_LIMITS.maxTextChars),
   ...(m.source?{source:m.source}:{}),
-  ...(m.kind==='user'?{images:m.images||[],attachments:m.attachments||[]}:{})
+  ...(m.kind==='step-assist'&&m.response?.kind?{responseKind:m.response.kind}:{}),
+  ...(m.kind==='step-assist'&&m.isOpening?{isOpening:true}:{}),
+  ...(m.response?.kind==='question'&&!m.isOpening&&m.response.choices?.length?{choiceLabels:crewFollowUpChoices(m.response.choices).map(choice=>choice.label)}:{}),
+  ...(m.kind==='user'?{images:[],attachments:m.attachments||[]}:{})
  }))
  const body=buildStepAssistRequest({event,task,stepIndex,role,text,history,images:uploads?.images||[],attachments:uploads?.attachments||[]})
- // Leave room for subsequent text edits in the existing local demo storage.
- const estimated=2*(lifecycleSnapshot(state)+JSON.stringify({images:body.images,attachments:body.attachments})).length
- if(estimated>4*1024*1024)throw Error('记录中的图片较大，请压缩图片后重试；现有备注和对话未修改。')
+ const originals=uploads?.originalPhotos||[]
+ if(originals.length&&originals.length!==body.images.length)throw Error('照片原件尚未全部保存，请重新选择后发送。')
+ const photoFields=originals.length?{originalPhotos:copy(originals)}:{images:copy(body.images)}
+ if(!event.backendManaged && (lifecycleSnapshot(demoWorkspace(state)).length+JSON.stringify({...photoFields,attachments:body.attachments}).length)*2>4*1024*1024)
+  throw Error('本地演示记录空间不足，本条消息尚未发送。')
  const at=now(),replyId=crypto.randomUUID(),baseNote=record.note||'',baseResult=record.result||'',baseExecutionStatus=record.executionStatus||'',baseStep=signature(task.steps[stepIndex])
- conversation.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at,stepAssistance:true,stepIndex,images:copy(body.images||[]),attachments:copy(body.attachments||[])})
+ body.requestId=replyId
+ conversation.push({id:crypto.randomUUID(),kind:'user',text:text.trim(),at,stepAssistance:true,stepIndex,stepLabel:task.steps[stepIndex].label,...photoFields,attachments:copy(body.attachments||[])})
  conversation.push({id:replyId,kind:'step-assist',stepIndex,baseNote,baseResult,baseExecutionStatus,baseStep,at,status:'streaming',reasoning:'',response:null,progress:'正在整理本步骤的现场信息…',progressLog:[]})
  const locate=()=>state.events[eventId]?.tasks.find(t=>t.id===taskId)?.conversations?.[role]?.find(m=>m.id===replyId)
  pendingRequests[key]=true
  try{
+  if(previous.some(m=>m.kind==='user' && m.stepIndex===stepIndex && (m.originalPhotos?.length || m.images?.length))) {
+   await includeRecentPhotos(body,previous)
+  }
   const result=await request(body,(kind,data)=>{
    const m=locate();if(!m)return
    if(kind==='reasoning'){m.reasoning+=data.delta||'';return}
@@ -49,10 +84,12 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
   if(!message)return null
   const latest=state.events[eventId]?.tasks.find(t=>t.id===taskId)
   if(!canUseStepAssist(state.events[eventId],latest,role)||signature(latest.steps[stepIndex])!==baseStep)throw Error('任务范围或状态已变化，请回到当前步骤重新协助。')
-  Object.assign(message,{response,status:'complete',source:result.source||'model',reasoning:result.reasoning??message.reasoning,model:result.model,usage:result.usage,sources:result.sources||[],at:now()})
+  Object.assign(message,{response,status:'complete',source:result.source||'model',...(result.isOpening?{isOpening:true}:{}),reasoning:result.reasoning??message.reasoning,model:result.model,usage:result.usage,sources:result.sources||[],at:now()})
   message.progressLog||=[]
   message.progressLog.push({stage:'complete',label:response.kind==='answer'?'已回答您的问题':response.kind==='question'?'已整理待确认的问题':'备注草稿已生成，待您核对'})
-  for(const old of latest.conversations[role])if(old.id!==replyId&&old.kind==='step-assist'&&old.stepIndex===stepIndex&&old.response?.kind==='draft'&&!old.appliedAt)old.supersededAt=message.at
+  if(response.note){
+   for(const old of latest.conversations[role])if(old.id!==replyId&&old.kind==='step-assist'&&old.stepIndex===stepIndex&&old.response?.note&&!old.appliedAt)old.supersededAt=message.at
+  }
   return message
  }catch(error){const message=locate();if(message)Object.assign(message,{status:'interrupted',modelError:error.message});throw error}
  finally{delete pendingRequests[key]}
@@ -60,7 +97,7 @@ export async function assistTaskStep(state,eventId,taskId,stepIndex,text,uploads
 
 export function applyTaskStepNote(state,eventId,taskId,messageId,pendingRequests={}){
  const task=state.events[eventId]?.tasks.find(t=>t.id===taskId),message=task?.conversations?.[state.role]?.find(m=>m.id===messageId)
- if(!message||message.kind!=='step-assist'||message.status!=='complete'||message.response?.kind!=='draft')throw Error('找不到可采用的本步骤备注草稿。')
+ if(!message||message.kind!=='step-assist'||message.status!=='complete'||!message.response?.note)throw Error('找不到可采用的本步骤备注草稿。')
  const {record,conversation}=context(state,eventId,taskId,message.stepIndex)
  if(pendingRequests[requestKey(eventId,state.role,taskId)])throw Error('请等待本次协助完成后再采用。')
  if((task.draft.stepIndex||0)!==message.stepIndex)throw Error(`请先回到左侧第 ${message.stepIndex+1} 步，再采用该草稿。`)
@@ -68,7 +105,7 @@ export function applyTaskStepNote(state,eventId,taskId,messageId,pendingRequests
  if(message.supersededAt)throw Error('已有更新的协助内容，请核对最新草稿。')
  // Adoption only writes the note. Independent result/feedback selections must
  // remain the operator's choice and must not invalidate an unchanged note.
- if(signature(task.steps[message.stepIndex])!==message.baseStep||(record.note||'')!==message.baseNote)throw Error('步骤要求或备注已被修改，请点击“继续修改”重新整理，避免覆盖新记录。')
+ if(signature(task.steps[message.stepIndex])!==message.baseStep||(record.note||'')!==message.baseNote)throw Error('步骤要求或备注已被修改，请在卡内补充修改内容，重新生成草稿后再采用。')
  const note=operationalText(normalizeStepAssistResult(message.response).note)
  if(!note)throw Error('草稿尚无本步骤的作业记录，请继续补充现场情况。')
  record.note=note;task.draft.updatedAt=now();message.appliedAt=task.draft.updatedAt

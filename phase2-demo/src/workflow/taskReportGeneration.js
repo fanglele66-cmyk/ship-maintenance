@@ -12,7 +12,9 @@ export async function generateTaskReport(state,eventId,taskId,request,{ownerSess
  const report=event.reports.find(r=>r.id===task.reportGeneration.factReportId),submitted=reportTask(event,report)
  const context=copy({id:event.id,title:event.title,number:event.number,tracking:event.tracking,phase:event.phase,currentTask:task.id,brief:event.brief,reports:currentReportContext(event,{excludeTaskId:task.id}),submissionContext:submissionContext(event,submitted,task.reportGeneration.factReportId),tasks:[task],taskContext:{title:task.title,scope:task.scope,owner:task.owner}})
  // Only original feedback and the dispatched plan are sent, never UI drafts or chat state.
- context.tasks=[{...submissionSnapshot(submitted),status:'submitted'}]
+ const snapshot=submissionSnapshot(submitted)
+ if(Array.isArray(snapshot.records))snapshot.records=snapshot.records.map(r=>r?.photos?.length?{...r,photos:r.photos.map(({name,mimeType})=>({name,mimeType}))}:r)
+ context.tasks=[{...snapshot,status:'submitted'}]
  try{
   const result=await request({mode:'submit-report',role,actor:people[role],reportId:report.id,submissionNumber:report.submissionNumber,text:'根据本次已提交的逐项现场记录生成本轮报告。分别写清做过什么、发现什么、尚不能确认什么。现场事实和AI分析建议分开。明确区分：不适用是本项无需执行，按已反馈流转，不列入待恢复；未完成或实施条件受阻才保留补做项目。恢复后以本次记录为准，历史未完成现已完成属于状态更新，不是矛盾。',event:context,taskId},(kind,data)=>{
    const c=current();if(!c)return

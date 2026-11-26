@@ -1,4 +1,5 @@
 import {reportTask,submissionSnapshot,submissionContext} from '../src/workflow/reportSubmissions.js'
+import {createStepPhotoFiles} from './step-photo-files.mjs'
 import {existsSync} from 'node:fs'
 import {mkdir,readFile,writeFile,rm,lstat,realpath} from 'node:fs/promises'
 import {join,resolve,dirname} from 'node:path'
@@ -33,6 +34,8 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
  const deleted=()=>{if(!existsSync(join(directory,'accounts.sqlite')))return new Set();let accounts;try{accounts=new DatabaseSync(join(directory,'accounts.sqlite'),{readOnly:true});return new Set(accounts.prepare('SELECT id FROM deleted_events').all().map(r=>r.id))}finally{accounts?.close()}}
  const unavailable=(event,removed=deleted())=>removed.has(event.id)||removed.has(event.parentEventId)||removed.has(event.sourceEventId)
  const visible=user=>repository.list().filter(e=>!unavailable(e)&&canSeeEvent(e,user))
+ const photos=createStepPhotoFiles(db,id=>{const event=repository.get(id);return event&&!unavailable(event)?event:null},clock)
+ photos.collect()
  function lock(name,now){
   db.exec('BEGIN IMMEDIATE');try{const current=db.prepare('SELECT * FROM workflow_locks WHERE name=?').get(name);let alive=current&&current.until_at>now
    if(alive)try{process.kill(current.pid,0)}catch(e){if(e.code==='ESRCH')alive=false}
@@ -75,7 +78,9 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
    event={...event,sensorScope:copy(parent.sensorScope),deviceId:parent.deviceId,responsible:people.captain}
    return repository.save(event)
   }
-  return repository.save(event,{expected,user})
+  const saved=await repository.save(event,{expected,user})
+  photos.collect()
+  return saved
  }
  async function authorize(input,user){
   if(!input.event?.id)return
@@ -88,13 +93,22 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
    const report=event.reports.find(r=>r.id===input.reportId&&r.taskId===input.taskId)
    const task=report&&reportTask(event,report)
    if(!task||task.owner!==people[user.workflowRole]||report.submissionNumber!==input.submissionNumber)throw Error('只能分析本人已正式提交的对应版本报告。')
-   input.event.tasks=[{...submissionSnapshot(task),status:'submitted'}]
+   const snapshot=submissionSnapshot(task)
+   if(Array.isArray(snapshot.records))snapshot.records=snapshot.records.map(r=>r?.photos?.length?{...r,photos:r.photos.map(({name,mimeType})=>({name,mimeType}))}:r)
+   input.event.tasks=[{...snapshot,status:'submitted'}]
    input.event.submissionContext=submissionContext(event,task,report.id)
   }
   if(input.mode==='step-assist'){
    const requested=input.task?.id||input.taskId,task=event.tasks.find(t=>t.id===requested)
    if(!task||task.status!=='assigned'||event.currentTask!==task.id||task.owner!==people[user.workflowRole])throw Error('只能协助本人当前正在执行的任务。')
-   input.event={...event,tasks:[task]};input.task=task
+   // Step navigation and unsaved edits may precede the next workspace sync.
+   // Keep the server-owned plan and assignment; use only the active form's
+   // submitted values as model context, never as a write to the task.
+   const form=input.event.tasks?.find(item=>item.id===task.id)?.draft
+   const index=input.stepIndex
+   const activeTask=form?.stepIndex===index&&Number.isInteger(index)&&task.steps[index]&&form.records?.[index]
+    ?{...task,draft:{...task.draft,stepIndex:index,records:task.steps.map((_,i)=>i===index?form.records[i]:{})}}:task
+   input.event={...event,tasks:[activeTask]};input.task=activeTask
   }
  }
  const startedAt=clock(),session=`detect-${startedAt}-${randomUUID().slice(0,8)}`
@@ -163,7 +177,7 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
   pending=(async()=>{try{const now=clock();for(const event of repository.list())if(!unavailable(event)&&event.phase!=='closed')for(const phase of event.phases)if(phase.observationWaiting&&Date.parse(phase.observationDueAt)<=now)await observe(event,phase,now);await periodic(now)}finally{clearInterval(heartbeat);busy=false;unlock('background')}})()
   return pending
  }
- return {repository,manual,save,visible,authorize,tick,startedAt,async status(){return {startedAt,nextAt:startedAt+(Math.floor((clock()-startedAt)/HOUR)+1)*HOUR,runs:db.prepare('SELECT * FROM runs ORDER BY rowid DESC LIMIT 12').all().map(r=>({id:r.id,status:r.status,...JSON.parse(r.json)}))}},start(){if(!timer){void tick();timer=setInterval(()=>void tick(),15000);timer.unref?.()}},async close(){if(closing)return;closing=true;clearInterval(timer);await pending;await Promise.allSettled([...inFlight.values()]);await repository.close()}}
+ return {repository,photos,manual,save,visible,authorize,tick,startedAt,async status(){return {startedAt,nextAt:startedAt+(Math.floor((clock()-startedAt)/HOUR)+1)*HOUR,runs:db.prepare('SELECT * FROM runs ORDER BY rowid DESC LIMIT 12').all().map(r=>({id:r.id,status:r.status,...JSON.parse(r.json)}))}},start(){if(!timer){void tick();timer=setInterval(()=>void tick(),15000);timer.unref?.()}},async close(){if(closing)return;closing=true;clearInterval(timer);await pending;await Promise.allSettled([...inFlight.values()]);await repository.close()}}
 }
 
 export async function readWorkflowJson(request){
@@ -176,10 +190,19 @@ export async function readWorkflowJson(request){
 export async function workflowHandler(root){
  const service=await getWorkflowService(root)
  return async(req,res,next)=>{
-  const path=req.url.split('?')[0];if(!['/api/workflow/events','/api/workflow/save','/api/workflow/status'].includes(path))return next()
+  const path=req.url.split('?')[0];if(!['/api/workflow/events','/api/workflow/save','/api/workflow/status','/api/workflow/step-photos'].includes(path))return next()
   const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
   if(!req.user)return send(401,{error:'请先登录。'})
   try{
+   if(path==='/api/workflow/step-photos'){
+    const params=new URL(req.url,'http://localhost').searchParams
+    if(req.method==='POST')return send(201,await service.photos.upload(req,req.user,params))
+    if(req.method==='GET'){
+     const photo=service.photos.download(params.get('id')||'',req.user)
+     res.writeHead(200,{'Content-Type':photo.mimeType,'Content-Length':photo.bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
+     return res.end(photo.bytes)
+    }
+   }
    if(path==='/api/workflow/events'&&req.method==='GET')return send(200,{events:service.visible(req.user)})
    if(path==='/api/workflow/status'&&req.method==='GET')return send(200,await service.status())
    if(path==='/api/workflow/save'&&req.method==='POST'){const body=await readWorkflowJson(req);return send(200,{event:await service.save(body.event,body.revision,req.user)})}

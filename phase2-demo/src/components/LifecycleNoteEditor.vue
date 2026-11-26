@@ -1,24 +1,73 @@
 <template>
  <div class="lc-step-note note-editor">
   <div class="note-heading"><label :for="id">{{label}}</label><button v-if="!assistMode" type="button" :disabled="busy||listening||!(sourceText||modelValue).trim()" @click="polish">✦ {{busy?'正在整理…':'AI 总结'}}</button></div>
-  <div class="note-input"><textarea :id="id" :value="modelValue" @input="$emit('update:modelValue',$event.target.value)" :rows="rows" :required="required" :placeholder="placeholder"/>
-   <button v-if="!assistMode" type="button" class="voice-button" :class="{listening}" :disabled="busy" :aria-pressed="listening" @click="voice"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>{{listening?'结束录音':'语音输入'}}</button>
+  <div class="note-input">
+   <textarea :id="id" :value="modelValue" @input="$emit('update:modelValue',$event.target.value)" :rows="rows" :required="required" :placeholder="placeholder"/>
+   <div v-if="photoEnabled||!assistMode" class="note-input-actions">
+    <button v-if="photoEnabled" type="button" class="photo-button" :disabled="photoControlsDisabled" aria-label="拍照" @click="cameraInput?.click()">
+     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h5l2-3h4l2 3h5v13H3z"/><circle cx="12" cy="13" r="3.5"/></svg>拍照
+    </button>
+    <button v-if="photoEnabled" type="button" class="photo-button" :disabled="photoControlsDisabled" aria-label="上传照片" title="选择 JPEG、PNG 或 WebP，每步最多 4 张，单张不超过 12 MB" @click="photoInput?.click()">
+     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-5 5 5-5 5 5M4 15v5h16v-5"/></svg>{{readingPhotos?'保存中…':'上传照片'}}
+    </button>
+    <button v-if="!assistMode" type="button" class="voice-button" :class="{listening}" :disabled="busy" :aria-pressed="listening" @click="voice"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>{{listening?'结束录音':'语音输入'}}</button>
+   </div>
+   <input v-if="photoEnabled" ref="cameraInput" type="file" hidden accept="image/png,image/jpeg,image/webp" capture="environment" @change="attachPhotos"/>
+   <input v-if="photoEnabled" ref="photoInput" type="file" hidden accept="image/png,image/jpeg,image/webp" multiple @change="attachPhotos"/>
   </div>
+  <div v-if="photoEnabled&&photos.length" class="step-photo-strip" aria-label="本步骤已附现场照片">
+   <StepPhotoGallery :photos="photos" editable :disabled="readingPhotos" @remove="removePhoto"/>
+   <small class="step-photo-caption">已附 {{photos.length}} 张照片，将随本步骤选项和备注一并提交。</small>
+  </div>
+  <small v-if="photoError" role="alert" class="lc-error">{{photoError}}</small>
   <small v-if="listening" role="status">正在听取语音… {{interim}}</small><small v-if="error" role="alert" class="lc-error">{{error}}</small>
   <section v-if="proposal" class="note-proposal"><strong>AI 整理建议</strong><p>{{proposal}}</p><div><button type="button" @click="apply">采用整理内容</button><button type="button" @click="proposal=''">保留原文</button></div></section>
  </div>
 </template>
 <script setup>
-import {ref,useId,onBeforeUnmount} from 'vue'
+import {computed,ref,useId,nextTick,onBeforeUnmount} from 'vue'
+import StepPhotoGallery from './StepPhotoGallery.vue'
 import {aiStreamRequest} from '../services/aiClient.js'
-const props=defineProps({modelValue:{type:String,default:''},label:{type:String,default:'备注（选填）'},rows:{type:Number,default:4},required:Boolean,placeholder:String,context:String,sourceText:String,assistMode:Boolean})
-const emit=defineEmits(['update:modelValue','assist']),id=useId(),busy=ref(false),listening=ref(false),interim=ref(''),error=ref(''),proposal=ref('')
+import {MAX_STEP_PHOTOS} from '../workflow/stepPhotoFile.js'
+import {collectBrowserStepPhotos,saveStepPhoto} from '../services/stepPhotoFiles.js'
+const props=defineProps({modelValue:{type:String,default:''},photos:{type:Array,default:()=>[]},photoEnabled:{type:Boolean,default:false},photoContext:Object,flushPhotos:Function,label:{type:String,default:'备注（选填）'},rows:{type:Number,default:4},required:Boolean,placeholder:String,context:String,sourceText:String,assistMode:Boolean})
+const emit=defineEmits(['update:modelValue','update:photos','photo-pending','assist']),id=useId(),busy=ref(false),listening=ref(false),interim=ref(''),error=ref(''),proposal=ref('')
+const photoInput=ref(null), cameraInput=ref(null), readingPhotos=ref(false), photoError=ref('')
+const photoControlsDisabled=computed(()=>readingPhotos.value||props.photos.length>=MAX_STEP_PHOTOS)
 let recognition,controller,original='',originalSource='',disposed=false
 async function polish(){
  original=props.modelValue;originalSource=props.sourceText||'';error.value='';proposal.value='';busy.value=true;controller=new AbortController()
  try{const result=await aiStreamRequest({mode:'note',text:props.sourceText||original,noteContext:props.context},()=>{},{signal:controller.signal});if(!result.answer.trim())throw Error('未生成有效内容，请重试；原文已保留。');if(!disposed)proposal.value=result.answer.trim()}catch(e){if(!disposed)error.value=e.message}finally{busy.value=false}
 }
 function apply(){if(props.modelValue!==original||(props.sourceText||'')!==originalSource){error.value='原文或步骤记录已更新，请重新点击 AI 总结，避免覆盖新记录。';return}emit('update:modelValue',proposal.value);proposal.value='';error.value=''}
+async function attachPhotos(ev){
+ const files=Array.from(ev.target.files||[]);ev.target.value=''
+ if(!files.length||readingPhotos.value)return
+ photoError.value=''
+ if(props.photos.length+files.length>MAX_STEP_PHOTOS){photoError.value=`本步骤最多上传 ${MAX_STEP_PHOTOS} 张照片。`;return}
+ readingPhotos.value=true
+ emit('photo-pending',true)
+ try{
+  for(const file of files){
+   const photo=await saveStepPhoto(file,props.photoContext)
+   if(disposed)return
+   if(!props.photos.some(item=>item.id===photo.id))emit('update:photos',[...props.photos,photo])
+   await nextTick()
+  }
+  if(props.photoContext.backendManaged)await props.flushPhotos?.()
+  else void collectBrowserStepPhotos()
+ }catch(e){if(!disposed)photoError.value=e.message}
+ finally{if(!disposed){readingPhotos.value=false;emit('photo-pending',false)}}
+}
+async function removePhoto(index){
+ if(readingPhotos.value)return
+ photoError.value=''
+ emit('update:photos',props.photos.filter((_,i)=>i!==index))
+ await nextTick()
+ if(props.photoContext.backendManaged){
+  try{await props.flushPhotos?.()}catch(e){if(!disposed)photoError.value=e.message}
+ }else void collectBrowserStepPhotos()
+}
 function voice(){
  if(listening.value){recognition?.stop();return}
  error.value='';const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition
@@ -29,8 +78,15 @@ function voice(){
  recognition.onend=()=>{listening.value=false;interim.value=''}
  try{recognition.start();listening.value=true}catch{error.value='无法开始语音输入，请检查麦克风权限。'}
 }
-onBeforeUnmount(()=>{disposed=true;controller?.abort();if(recognition){recognition.onresult=null;recognition.onerror=null;recognition.onend=null;recognition.abort()}})
+onBeforeUnmount(()=>{disposed=true;if(readingPhotos.value)emit('photo-pending',false);controller?.abort();if(recognition){recognition.onresult=null;recognition.onerror=null;recognition.onend=null;recognition.abort()}})
 </script>
 <style scoped>
-.note-editor{display:flex;flex-direction:column;gap:9px}.note-heading{display:flex;align-items:center;gap:12px;font-size:13px}.note-heading button{font-size:12px;color:#987637;background:#faf7ef;border:1px solid #e8deca;border-radius:5px;padding:4px 9px;cursor:pointer}.note-heading button:disabled{opacity:.5;cursor:default}.note-input{position:relative}.note-input textarea{width:100%;box-sizing:border-box;padding:11px 12px 43px;border:1px solid #dcdfd7;border-radius:6px;color:#465e76;font:inherit;line-height:1.7;resize:vertical;background:#fff}.voice-button{position:absolute;bottom:10px;right:10px;display:flex;align-items:center;gap:6px;border:0;border-radius:5px;padding:5px 8px;font-size:12px;background:#f4f5f1;color:#778675;cursor:pointer}.voice-button svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6}.voice-button.listening{background:#f9e9e5;color:#b55f51}.note-editor small{font-size:12px;color:#8390a0}.note-editor .lc-error{color:#b86a47}.note-proposal{padding:12px 15px;border-left:2px solid #bca575;background:#faf8f2;font-size:13px}.note-proposal p{white-space:pre-wrap;margin:8px 0}.note-proposal div{display:flex;gap:10px}.note-proposal button{font-size:12px;border:1px solid #dfd7c6;border-radius:4px;padding:5px 9px;background:white;color:#876e42;cursor:pointer}
+.note-editor{display:flex;flex-direction:column;gap:8px}.note-heading{display:flex;align-items:center;gap:12px;font-size:13px}.note-heading button{font-size:12px;color:#987637;background:#faf7ef;border:1px solid #e8deca;border-radius:5px;padding:4px 9px;cursor:pointer}.note-heading button:disabled{opacity:.5;cursor:default}.note-input{position:relative}.note-input textarea{width:100%;box-sizing:border-box;padding:10px 12px 40px;border:1px solid #dcdfd7;border-radius:6px;color:#465e76;font:inherit;line-height:1.7;resize:vertical;background:#fff}
+.note-input-actions{position:absolute;bottom:8px;right:8px;display:flex;align-items:center;gap:6px;z-index:1}
+.photo-button,.voice-button{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:4px 9px;font-size:12px;line-height:1.4;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.photo-button{border:1px solid #ded8c7;background:#faf8f2;color:#6f5b3a}.photo-button:hover:enabled{background:#f4eedf;border-color:#c6ae81;color:#574528}.photo-button.has-photos{background:#f5efe0;border-color:#ccb486;color:#6b532c}.photo-button:disabled{opacity:.5;cursor:not-allowed}.photo-button svg,.voice-button svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.voice-button{border:0;background:#f4f5f1;color:#778675}.voice-button.listening{background:#f9e9e5;color:#b55f51}
+.step-photo-strip{display:flex;flex-direction:column;gap:4px;padding:6px 8px;border:1px solid #e4e7df;border-radius:6px;background:#fafbf8}
+.step-photo-caption{font-size:11px;color:#6e7d75}
+.note-editor small{font-size:12px;color:#8390a0}.note-editor .lc-error{color:#b86a47}.note-proposal{padding:12px 15px;border-left:2px solid #bca575;background:#faf8f2;font-size:13px}.note-proposal p{white-space:pre-wrap;margin:8px 0}.note-proposal div{display:flex;gap:10px}.note-proposal button{font-size:12px;border:1px solid #dfd7c6;border-radius:4px;padding:5px 9px;background:white;color:#876e42;cursor:pointer}
 </style>

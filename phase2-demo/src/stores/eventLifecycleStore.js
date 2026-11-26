@@ -1,6 +1,7 @@
 import {createDecisionEditing} from '../workflow/decisionEditing.js'
 import {reportGenerationStatus} from '../workflow/reportGenerationState.js'
 import {createBackendWorkflowSync} from '../workflow/backendWorkflowSync.js'
+import {collectBrowserStepPhotos} from '../services/stepPhotoFiles.js'
 import {workflowStatus} from '../services/workflowStatus.js'
 import {auth,accountRequest,pruneDeletedEvents} from '../services/auth'
 import {assistTaskStep,applyTaskStepNote} from '../workflow/taskStepAssistance.js'
@@ -48,6 +49,7 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  const aiStreamRequest=async(body,progress)=>{if(body.event&&state.events[body.event.id]?.backendManaged)await backend.flush();return rawAiRequest(body,progress)}
  watch(()=>state.events,()=>backend.schedule(),{deep:true})
  if(!import.meta.env?.SSR&&auth.user){
+  void collectBrowserStepPhotos()
   void backend.pull().catch(error=>workflowStatus.error=error.message)
   const backendTimer=setInterval(()=>void backend.refresh(),5000);backendTimer.unref?.()
   window.addEventListener('pagehide',()=>{void backend.flush().catch(()=>{})})

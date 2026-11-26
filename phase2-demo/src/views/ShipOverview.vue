@@ -2,7 +2,9 @@
  <div class="ship-home-layout" :class="{'assistant-open':assistantOpen}">
  <div class="captain-workbench">
   <section class="captain-twin">
-   <header><strong>长航碧玉</strong><span class="ship-scope">设备健康态势</span></header>
+   <header><strong>长航碧玉</strong><span class="ship-scope">设备健康态势</span>
+    <RouterLink class="stats-link" :to="{name:'SituationStatistics'}"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 3v13h14M7 12V8m4 4V5m4 7V9"/></svg>统计看板</RouterLink>
+   </header>
    <div ref="twinRef" class="twin-viewport">
     <div class="twin-scene" :style="sceneStyle">
      <img src="/ship-situation-engines.png" alt="船舶俯视态势图，设备入口位置为示意" decoding="async" fetchpriority="high" width="941" height="1672"/>
@@ -82,6 +84,7 @@ const devices=computed(()=>{
 })
 </script>
 <style scoped>
+.stats-link{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;padding:5px 9px;border:1px solid #647c88;border-radius:6px;background:#133549;color:#eaf2f3;text-decoration:none;font-size:12px;line-height:1.5}.stats-link svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.stats-link:hover,.stats-link:focus-visible{background:#21485b;border-color:#adbec4}
 .local-data-note{font-size:12px;color:#7c8797;padding:0 20px;margin:0 0 10px}
 .home-assistant-toggle{border:1px solid #dfd7c7;background:#faf8f2;color:#8b6b39;border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer}.home-assistant-toggle[aria-expanded=true]{background:#eee6d5}
 

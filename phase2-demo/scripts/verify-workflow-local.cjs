@@ -58,11 +58,12 @@ const mod=name=>import(pathToFileURL(root+'/'+name));
   for(const text of ['现场已核对独立表计，燃油进机压力0.89 MPa，和系统一致，未发现泄漏。','补充：记录时间为本次巡检时，主机停机，其他情况尚未核实。','以上就是目前掌握的全部情况，请整理备注。']){
    const before=await page.locator('.step-note-message').count();await page.getByLabel('询问助手').fill(text);await page.getByLabel('询问助手').press('Enter');
    await page.waitForFunction(n=>document.querySelectorAll('.step-note-message').length>n&&!document.querySelector('.step-note-progress'),before,{timeout:180000});
-   if(await page.getByText('这份备注草稿怎么处理？',{exact:true}).count())break;
+   if(await page.getByRole('radio',{name:'采用到本步骤',exact:true}).count())break;
   }
   await page.screenshot({path:path.join(out,'task-assistant-local.png')});
-  await page.locator('.assistant-question label').filter({hasText:'采用到本步骤'}).click();
-  const confirmation=page.getByRole('button',{name:'确认 →',exact:true});if(await confirmation.count())await confirmation.click();
+  const card=page.locator('.assistant-question').filter({has:page.getByRole('radio',{name:'采用到本步骤',exact:true})});
+  await card.locator('label').filter({hasText:'采用到本步骤'}).click();
+  await card.getByRole('button',{name:'确认',exact:true}).click();
   await page.waitForFunction(()=>[...document.querySelectorAll('.lc-task-feedback textarea')].some(t=>t.value.includes('0.89')));await checkpoint('task note adopted to left form');
   await page.getByRole('radio',{name:'未见异常',exact:true}).check();await page.getByRole('button',{name:'提交排查报告',exact:true}).click();
   await waitForEvent(e=>e.tasks[0].status==='submitted',eventId);await checkpoint('formal feedback enriched into same report');

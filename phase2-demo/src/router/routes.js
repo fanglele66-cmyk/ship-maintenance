@@ -3,6 +3,7 @@ export const routes = [
   {path:'/real-cases',redirect:'/situation'},
   {path:'/reports/:reportId?',name:'LifecycleReport',component:()=>import('@/views/LifecycleReportView.vue'),meta:{title:'报告'}},
   {path:'/situation/todos',name:'SituationTodos',component:()=>import('@/views/LifecycleTodoView.vue'),meta:{title:'态势 · 个人待办',crossBusiness:true}},
+  {path:'/situation/statistics',name:'SituationStatistics',component:()=>import('@/views/SituationStatistics.vue'),meta:{title:'统计看板'}},
   {path:'/issues',name:'SituationIssues',component:()=>import('@/views/LifecycleListView.vue'),meta:{title:'事件中心'}},
   {path:'/tasks/:taskId',name:'LifecycleTask',component:()=>import('@/views/LifecycleTaskView.vue'),meta:{title:'任务详情'}},
   {path:'/situation/issue/warning-history',redirect:'/issues'},

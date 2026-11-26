@@ -32,8 +32,11 @@ export function seedDecisionForm(event,draft,action,now=Date.now()){
  if(previous)draft._actionDrafts[previous]=Object.fromEntries(fields.filter(k=>draft[k]!==undefined).map(k=>[k,copy(draft[k])]))
  const defaults=decisionFormDefaults(event,action,now)
  if(draft._actionDrafts[action]){
-  for(const key of fields)delete draft[key]
-  Object.assign(draft,copy(draft._actionDrafts[action]))
+  const saved=draft._actionDrafts[action]
+  for(const key of fields){
+   if(saved[key]===undefined)delete draft[key]
+   else draft[key]=copy(saved[key])
+  }
  }else if(previous){
   for(const key of fields)delete draft[key]
   Object.assign(draft,defaults)

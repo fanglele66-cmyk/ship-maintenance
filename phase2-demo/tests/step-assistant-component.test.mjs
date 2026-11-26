@@ -41,20 +41,22 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
   await t.test('opening offers an explicit choice and direct current-step input without the left entry button',async()=>{
    assert.equal(state.mode,'step');assert.equal(state.stepIndex,0)
    assert.match(state.decisionQuestion.title,/从哪里开始/)
+   const chat=await renderToString(createSSRApp({render:()=>h(Assistant,props)}).use(pinia))
+   const openingCard=chat.match(/<section class="assistant-question[^>]*>[\s\S]*?<\/section>/)?.[0]
+   assert.match(openingCard,/>确认<\/button>/);assert.equal((openingCard.match(/<button\b/g)||[]).length,1)
+   assert.match(chat,/<textarea[^>]*aria-label="询问助手"/)
    const option=state.decisionQuestion.choices[0]
    state.confirmQuestion(option.id);await nextTick()
-   assert.equal(sent.at(-1)[3],option.prompt)
+   assert.equal(sent.at(-1)[3],option.label)
    assert.equal(task.draft.records[0].note,'');assert.equal(task.draft.records[0].result,'')
    sent.length=0;state.input='尚未发送的现场描述'
    state.confirmQuestion(option.id);await nextTick()
    assert.equal(sent.length,0);assert.equal(state.input,'尚未发送的现场描述');assert.equal(state.decisionQuestion,null)
   })
 
-  await t.test('focus and continue editing preserve manual text and never send automatically',async()=>{
+  await t.test('opening a step preserves manual text and scopes pending material to its step',async()=>{
    state.input='人工输入尚未发送';assert.equal(state.assistStep(0),true);await nextTick()
    assert.equal(state.mode,'step');assert.equal(state.input,'人工输入尚未发送');assert.equal(sent.length,0)
-   state.reviseStep({id:'draft-0',stepIndex:0});await nextTick()
-   assert.equal(state.input,'人工输入尚未发送');assert.equal(state.editingMessageId,'draft-0');assert.equal(sent.length,0)
    state.askFollowup('还需哪些信息？');assert.equal(state.input,'人工输入尚未发送\n还需哪些信息？');assert.equal(sent.length,0,'a follow-up does not discard a prepared draft')
    state.input='人工输入尚未发送'
    state.images=[photo];state.attachments=[{name:'记录.txt',text:'待复核的现场记录'}]
@@ -69,18 +71,20 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
   await t.test('images and text files have removable previews and are passed to the selected step',async()=>{
    state.images=[];state.attachments=[]
    const file={name:'照片.png',type:'image/png',size:68,dataUrl:png}
-   await state.attachPhotos({target:{files:[file],value:'fakepath'}})
+   const saveOriginal=async(stored,scope)=>{assert.equal(stored,file);assert.equal(scope.stepIndex,0);return {id:'photo-1',name:stored.name,storage:'browser'}}
+   await state.attachPhotos({target:{files:[file],value:'fakepath'}},saveOriginal)
    assert.equal(state.images.length,1);assert.equal(state.images[0].dataUrl,png)
    state.images.splice(0,1);assert.equal(state.images.length,0)
-   await state.attachPhotos({target:{files:[{...file,size:3*1024*1024+1}],value:''}})
-   assert.match(state.fileNotice,/3 MB/);assert.equal(state.images.length,0)
+   await state.attachPhotos({target:{files:[{...file,size:12*1024*1024+1}],value:''}})
+   assert.match(state.fileNotice,/12 MB/);assert.equal(state.images.length,0)
    await state.attachPhotos({target:{files:[{...file,type:'image/svg+xml'}],value:''}})
    assert.match(state.fileNotice,/PNG、JPEG 或 WebP/);assert.equal(state.images.length,0)
-   await state.attachPhotos({target:{files:[file],value:''}})
+   await state.attachPhotos({target:{files:[file],value:''}},saveOriginal)
    await state.attach({target:{files:[{name:'现场.txt',size:20,text:async()=> 'ICU 检查记录，原因待核实。'}],value:''}})
    assert.equal(state.attachments[0].name,'现场.txt')
    await state.ask('请结合现场照片整理备注')
    assert.equal(sent.length,1);assert.deepEqual(sent[0].slice(0,4),[id,task.id,0,'请结合现场照片整理备注'])
+   assert.equal(sent[0][4].originalPhotos[0].id,'photo-1');assert.equal(sent[0][4].images[0].originalPhoto,undefined)
    assert.equal(sent[0][4].images[0].dataUrl,png);assert.equal(sent[0][4].attachments[0].text,'ICU 检查记录，原因待核实。')
    assert.equal(state.input,'');assert.equal(state.images.length,0);assert.equal(state.attachments.length,0)
    assert.equal(task.draft.records[0].result,'');assert.equal(task.draft.records[0].note,'')
@@ -100,7 +104,28 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
    task.conversations.engineer.push(proposal)
    assert.equal(task.draft.records[0].note,'','receiving a proposal does not adopt it')
    const render=message=>renderToString(createSSRApp(Proposal,{message}))
-   const draftHtml=await render(proposal);assert.match(draftHtml,/本步骤备注草稿/);assert.doesNotMatch(draftHtml,/<button|radio|checkbox/);assert.equal(state.currentProposal.id,proposal.id);assert.deepEqual(state.decisionQuestion.choices.map(choice=>choice.id),['apply','revise'])
+   const draftHtml=await render(proposal);assert.match(draftHtml,/本步骤备注草稿/);assert.equal(state.currentProposal.id,proposal.id)
+   const chatHtml=await renderToString(createSSRApp({render:()=>h(Assistant,props)}).use(pinia))
+   const draftReply=chatHtml.match(/data-message-id="proposal-0"[^>]*>([\s\S]*?)<\/article>/)?.[1]
+   assert.equal((draftReply.match(/type="radio"/g)||[]).length,2)
+   assert.equal((draftReply.match(/<button\b/g)||[]).length,1)
+   assert.match(draftReply,/>确认<\/button>/)
+   assert.ok(draftReply.includes('采用到本步骤') && draftReply.includes('继续修改'))
+   const {default:Card}=await server.ssrLoadModule('/src/components/AssistantQuestionCard.vue')
+   const card=mount(Card,pinia,{draftAvailable:true,onConfirm:(choice,text)=>state.confirmStepChoice(proposal,choice,text)})
+   try{
+    sent.length=0;store.assistStep=async(...args)=>sent.push(args)
+    state.input='底部待发内容';state.images=[photo];state.attachments=[{name:'记录.txt',text:'附件'}]
+    card.state.selected='__other__';card.state.otherText='  ';card.state.submit()
+    card.state.otherText='请改为可见范围内未见异常。'
+    assert.equal(sent.length,0)
+    card.state.submit();await nextTick()
+    assert.deepEqual(sent[0].slice(2),[0,card.state.otherText,{images:[],attachments:[]}])
+    assert.equal(task.draft.records[0].note,'');assert.equal(state.input,'底部待发内容')
+    assert.deepEqual(state.images,[photo]);assert.equal(state.attachments[0].name,'记录.txt')
+    mounted.props.activeStepIndex=1;await nextTick();card.state.submit();assert.equal(sent.length,1)
+    mounted.props.activeStepIndex=0;await nextTick()
+   }finally{card.app.unmount()}
    state.applyStepNote(proposal.id)
    assert.equal(task.draft.records[0].note,proposal.response.note);assert.equal(task.draft.records[0].result,'')
    assert.equal(task.conversations.engineer.filter(m=>m.response?.kind==='receipt').length,1)
@@ -112,7 +137,7 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
   await t.test('image entry and conversation thumbnails are accessible and limited to C2 tasks',async()=>{
    task.conversations.engineer.push({id:'photo-user',kind:'user',text:'现场照片',stepAssistance:true,stepIndex:0,images:[photo],attachments:[{name:'附记.txt',text:'附记'}],at:new Date().toISOString()})
    const render=extra=>renderToString(createSSRApp({render:()=>h(Assistant,{...props,...extra})}).use(pinia))
-   const html=await render();assert.match(html,/aria-label="添加现场照片"/);assert.match(html,/capture="environment"/);assert.match(html,/查看图片：现场.png/);assert.match(html,/附件 · 附记.txt/)
+   const html=await render();assert.match(html,/aria-label="添加现场照片"/);assert.match(html,/accept="image\/png,image\/jpeg,image\/webp"/);assert.match(html,/查看图片：现场.png/);assert.match(html,/附件 · 附记.txt/)
    assert.ok(html.indexOf('aria-label="添加文件"')<html.indexOf('aria-label="添加现场照片"'));assert.ok(html.indexOf('aria-label="添加现场照片"')<html.indexOf('class="composer-voice"'));assert.ok(html.indexOf('class="composer-voice"')<html.indexOf('class="composer-send"'))
    assert.doesNotMatch(await render({taskId:''}),/aria-label="添加现场照片"/)
   })
@@ -187,7 +212,7 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
    task.status='assigned';await nextTick()
   })
 
-  await t.test('questions and drafts show only genuine thinking above the response, without processing logs',async()=>{
+  await t.test('questions and drafts group the response and note before optional thinking, without processing logs',async()=>{
    const render=message=>renderToString(createSSRApp(Proposal,{message})),progressLog=[{stage:'context',label:'不应显示的程序进度'}]
    for(const kind of ['question','draft']){
     const message={stepIndex:1,status:'streaming',reasoning:'模型核对 <现场记录>。',response:{kind,text:'',...(kind==='draft'?{note:''}:{})},progressLog}
@@ -195,7 +220,7 @@ test('C2 step collaboration scopes drafts, routes complete current-step scripts 
     assert.match(html,/role="status"[^>]*aria-live="polite"[^>]*aria-busy="true"/);assert.match(html,/step-progress-spinner/)
     assert.match(html,/思考过程/);assert.match(html,/&lt;现场记录&gt;/);assert.doesNotMatch(html,/<现场记录>|不应显示的程序进度|处理进度/)
     const complete=await render({...message,status:'complete',response:{kind,text:'请核对记录。',note:'现场读数仍待核对。'}})
-    assert.ok(complete.indexOf('思考过程')<complete.indexOf('请核对记录'))
+    assert.match(complete,/请核对记录。[\s\S]*现场读数仍待核对。[\s\S]*思考过程/)
     assert.doesNotMatch(complete,/处理进度|step-progress-spinner|aria-busy="true"/)
    }
    assert.doesNotMatch(await render({status:'complete',progress:'旧版本处理记录',response:{kind:'question',text:'请补充读数。'}}),/旧版本处理记录|思考过程/)

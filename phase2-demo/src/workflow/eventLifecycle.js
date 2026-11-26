@@ -1,3 +1,4 @@
+import {submittedStepRecords, editableStepRecords, stepPhotoIndex} from './stepPhotoEvidence.js'
 import {submissionCode,submissionNumber,submissionTitle,submissionSnapshot,refreshSubmissionLabels,reportTask,taskReports,reportContextVersion} from './reportSubmissions.js'
 import {workflowCases, workflowIssues, composeRepair} from '../mock/fourStoryWorkflow.js'
 import {eventBriefingFor} from '../mock/eventBriefings.js'
@@ -117,9 +118,11 @@ export function makeReport(event,task,reportId){
  const id=reportId||uid('report'),number=submissionNumber(event,task,reportId),title=submissionTitle(event,task,number)
  const priorRows=[...(task.procedureHistory||[]),...(task.feedbackHistory||[])].map(h=>'### 历史阶段的原填写记录\n\n'+h.draft.records.filter(r=>r.result||r.note).map(r=>`- ${r.label} · ${r.result||'未选结果'}：${r.note||'未填备注'}`).join('\n')).join('\n\n')
  const generated=task.generatedReport,analysis=generated?.patch.summary||reportAnalysisSummary(event,task),analysisMarkdown=generated?generatedAnalysis(generated.patch):reportAnalysis(event,task)
- const markdown=`# ${title}\n\n- 报告编号：${submissionCode(event,task,number)}\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'检查结果摘要':'处理结果与剩余事项'}\n\n${generated?.patch.summary||reportAnalysisSummary(event,task)}\n\n${executionFacts(task)}\n\n## AI分析与建议\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}${priorRows?'\n\n'+priorRows:''}\n\n${task.attachments?.length?'## 附件索引\n\n'+task.attachments.map(a=>'- '+a.name).join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
+ const stepPhotoLines=stepPhotoIndex(task.records||[])
+ const attachmentLines=[...(task.attachments||[]).map(a=>'- '+a.name),...stepPhotoLines]
+ const markdown=`# ${title}\n\n- 报告编号：${submissionCode(event,task,number)}\n- 事件类型：${event.type}\n- 负责人：${task.owner}\n- 提交时间：${timeText(task.submittedAt)}\n\n## ${task.kind==='investigation'?'检查结果摘要':'处理结果与剩余事项'}\n\n${generated?.patch.summary||reportAnalysisSummary(event,task)}\n\n${executionFacts(task)}\n\n## AI分析与建议\n\n${analysisMarkdown}\n\n## 任务安排与批准范围\n\n- 派发时间：${timeText(task.assignedAt)}\n- 要求完成：${timeText(task.deadline)}\n\n${task.scope}${priorRows?'\n\n'+priorRows:''}\n\n${attachmentLines.length?'## 附件索引\n\n'+attachmentLines.join('\n'):'## 附件索引\n\n本轮未关联附件。'}`
  const maintenanceText=task.maintenance?`\n\n## 提前维保安排\n\n- 维保计划：${task.maintenance.plan.id} · ${task.maintenance.plan.title}\n- 计划版本：${task.maintenance.plan.revision}\n- 关联正式工单：${task.maintenance.plan.workOrder?.number||'未关联'} · ${task.maintenance.plan.workOrder?.status||'待核实'}\n- 工单状态独立管理，本次报告不自动确认正式工单完工。\n- 靠港时间：${task.maintenance.window.label}\n- 执行方式：按选定维保计划提前执行，实际措施见逐项记录。`:''
- return {id,title,kind,number:submissionCode(event,task,number),submissionNumber:number,submissionSnapshot:submissionSnapshot(task),analysisContextVersion:reportContextVersion,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：')+maintenanceText,analysis,analysisMarkdown,summary:generated?.patch.summary||task.summary,presentationVersion:6,...(generated?{generatedBy:generated.model,usage:generated.usage,sources:generated.sources,generatedAt:generated.at}:{})}
+ return {id,title,kind,number:submissionCode(event,task,number),submissionNumber:number,submissionSnapshot:{...submissionSnapshot(task),photoSourcesRecorded:true},analysisContextVersion:reportContextVersion,taskId:task.id,eventId:event.id,eventNumber:event.number,owner:task.owner,at:task.submittedAt,markdown:markdown.replace('- 事件类型：','- 事件编号：'+event.number+'\n- 事件类型：')+maintenanceText,analysis,analysisMarkdown,summary:generated?.patch.summary||task.summary,presentationVersion:6,...(generated?{generatedBy:generated.model,usage:generated.usage,sources:generated.sources,generatedAt:generated.at}:{})}
 }
 export function refreshLifecyclePresentation(state){
  for(const event of Object.values(state.events)){
@@ -259,7 +262,7 @@ export function decide(state,id,form){
   required(task?.status==='waiting','当前任务不在等待条件状态。')
   if(form.deadline)required(Date.parse(form.deadline)>Date.now(),'调整的完成时限应晚于当前时间。')
   task.feedbackHistory||=[];task.feedbackHistory.push({at:task.submittedAt,observation:task.observation?copy(task.observation):null,reportId:e.reports.findLast(r=>r.taskId===task.id)?.id,draft:{records:copy(task.records),summary:task.summary}})
-  task.draft={records:copy(task.records),summary:task.summarySource==='records'?'':task.summary,attachments:copy(task.attachments||[])}
+  task.draft={records:copy(editableStepRecords(task.records)),summary:task.summarySource==='records'?'':task.summary,attachments:copy(task.attachments||[])}
   task.status='assigned';task.deadline=form.deadline||task.deadline;task.resumedAt=at;task.waiting={...task.waiting,resumedAt:at,resumeReason:form.reason,reviewRequested:null}
   delete task.generatedReport;delete task.reportGeneration;delete task.observation;delete task.observationEndedAt;delete task.observationStartedAt;delete task.observationMode
   e.phase=task.kind;e.phases.at(-1).resumeAt=at;e.status='任务执行中';e.unread.engineer=true;e.unread.captain=false
@@ -343,7 +346,8 @@ export function submitTask(state,id,taskId,generation){
  required(ownsTask(state.role,task)&&task.status==='assigned','本任务已提交或不属于当前人员。')
  const draft=task.draft
  required(draft.records.length===task.steps.length&&draft.records.every((r,i)=>task.steps[i].options.includes(r.result)),'请为每个步骤选择实际结果；备注可以不填。')
- task.records=copy(draft.records);task.summarySource=draft.summary?.trim()?'executor':'records';task.summary=draft.summary?.trim()||taskRecordSummary(draft.records);task.attachments=copy(draft.attachments);task.submittedAt=new Date().toISOString();task.status='submitted'
+ const submittedAt=new Date().toISOString()
+ task.records=copy(submittedStepRecords(task,draft.records,submittedAt));task.summarySource=draft.summary?.trim()?'executor':'records';task.summary=draft.summary?.trim()||taskRecordSummary(draft.records);task.attachments=copy(draft.attachments);task.submittedAt=submittedAt;task.status='submitted'
  const report=makeReport(e,task);e.reports.push(report)
  task.goalStatus=taskExecution(task).incomplete?'unresolved':'completed'
  task.conversations||={captain:[],engineer:[]}
@@ -377,7 +381,7 @@ export function resumeOwnTask(state,eventId,taskId,{reason,unchanged=true}={}){
  if(!unchanged){task.waiting.reviewRequested={at,reason,owner:actor(state)};event.unread.captain=true;return}
  required(task.waiting.resumeApproved,'原等待安排尚未授权条件具备后继续，请由轮机长确认。')
  task.feedbackHistory||=[];task.feedbackHistory.push({at:task.submittedAt,reportId:event.reports.findLast(r=>r.taskId===task.id)?.id,draft:{records:copy(task.records),summary:task.summary}})
- task.draft={records:copy(task.records),summary:task.summarySource==='records'?'':task.summary,attachments:copy(task.attachments||[])}
+ task.draft={records:copy(editableStepRecords(task.records)),summary:task.summarySource==='records'?'':task.summary,attachments:copy(task.attachments||[])}
  task.status='assigned';task.resumedAt=at;task.waiting={...task.waiting,resumedAt:at,resumeReason:reason,confirmedBy:actor(state),reviewRequested:null}
  delete task.generatedReport;delete task.reportGeneration;delete task.observation
  event.phase=task.kind;event.status='任务执行中';event.unread.captain=false

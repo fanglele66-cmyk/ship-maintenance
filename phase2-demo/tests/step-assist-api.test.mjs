@@ -128,7 +128,14 @@ test('free-form questions remain answers or clarifications after any number of t
    assert.equal(content.clarificationRounds,undefined);assert.doesNotMatch(content._context,/clarificationRounds/)
    return modelResponse(value)
   }})
-  assert.deepEqual(result.stepAssist,value);assert.equal(result.stepAssist.note,undefined)
+  assert.equal(result.stepAssist.text,value.text)
+  assert.equal(result.stepAssist.kind,value.kind)
+  if(value.kind==='question'){
+   assert.equal(result.stepAssist.question,value.text)
+   assert.equal(result.stepAssist.followUpRound,1)
+   assert.ok(result.stepAssist.allowOther&&result.stepAssist.choices.length>=2)
+  }
+  assert.equal(result.stepAssist.note,undefined)
  }
  assert.match(stepAssistInstruction,/对话轮数不是生成草稿的条件/)
  assert.match(stepAssistInstruction,/kind=answer/)

@@ -23,7 +23,8 @@ test('all 14 conversational inputs and concise responses stay synchronized with 
   assert.ok(docs[item.kind].includes(item.input),'document contains full canonical input: '+item.id)
   assert.equal(response.kind,expectedKinds[i],item.id)
   assert.ok(response.text.length<80);assert.equal(response.text.includes('\n'),false)
-  assert.deepEqual(Object.keys(response).sort(),response.kind==='question'?['kind','text']:['kind','note','text'])
+  assert.deepEqual(Object.keys(response).sort(),response.kind==='question'?['allowOther','choices','kind','question','text']:['kind','note','text'])
+  if(response.kind==='question'){assert.ok(Array.isArray(response.choices)&&response.choices.length>=2,item.id);assert.equal(response.allowOther,true,item.id)}
   assert.doesNotMatch(item.input,/说清楚|说清这次|请只整理|不要补填|不补造|演示|练习|虚构|DEMO-|AI 生成|人员甲|人员乙/,item.id)
   if(response.kind==='draft'){
    assert.doesNotMatch(response.note,/演示|练习|虚构|AI 生成|图片来源|历史图|DEMO-|人员甲|人员乙/)

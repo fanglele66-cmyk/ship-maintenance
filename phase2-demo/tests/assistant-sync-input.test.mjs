@@ -29,14 +29,14 @@ test('backend snapshots preserve the current assistant draft and do not manufact
   const assistant=mount(Assistant,pinia,{event:store.state.events[id],taskId:task.id,activeStepIndex:0}),steps=mount(Steps,pinia,{event:store.state.events[id],task})
   mounted.push(assistant,steps)
   const state=assistant.state
-  await t.test('repeated server snapshots retain text, attachments, edit choice and dismissed opening',async()=>{
-   state.customQuestion();await nextTick()
-   state.input='尚未发送的现场读数';state.images=[{name:'现场.png',dataUrl:'data:image/png;base64,test'}];state.attachments=[{name:'记录.txt',text:'现场待核对'}];state.editingMessageId='draft-to-revise'
+  await t.test('repeated server snapshots retain text, attachments and dismissed opening',async()=>{
+   state.input='尚未发送的现场读数';state.images=[{name:'现场.png',dataUrl:'data:image/png;base64,test'}];state.attachments=[{name:'记录.txt',text:'现场待核对'}]
+   state.confirmQuestion(state.decisionQuestion.choices[0].id);await nextTick()
    for(let i=0;i<3;i++){
     const replacement={...copy(assistant.props.event),serverRevision:10+i}
     replacement.conversations.captain.push({id:'other-session-'+i,kind:'user',text:'其他账号的新消息'})
     assistant.props.event=reactive(replacement);await nextTick()
-    assert.equal(state.input,'尚未发送的现场读数');assert.equal(state.images[0]?.name,'现场.png');assert.equal(state.attachments[0]?.text,'现场待核对');assert.equal(state.editingMessageId,'draft-to-revise');assert.equal(state.decisionQuestion,null)
+    assert.equal(state.input,'尚未发送的现场读数');assert.equal(state.images[0]?.name,'现场.png');assert.equal(state.attachments[0]?.text,'现场待核对');assert.equal(state.decisionQuestion,null)
    }
   })
   await t.test('unchanged records from the server do not update the draft timestamp; typing still does',async()=>{

@@ -51,7 +51,8 @@ test('early maintenance validates plan/window, snapshots selected steps, hands o
  const plan=maintenancePlans(event)[1],window=availableMaintenanceWindows()[0],form={action:'maintenance',reason:'已核实异动，按批准计划提前维保',owner:people.engineer,deadline:window.end,maintenancePlanId:plan.id,window:window.id}
  assert.throws(()=>decide(state,id,{...form,maintenancePlanId:'wrong'}),/维保计划/)
  assert.throws(()=>decide(state,id,{...form,window:'expired'}),/靠港/)
- assert.throws(()=>decide(state,id,{...form,deadline:'2026-11-20T00:00:00Z'}),/窗口内/)
+ const afterWindow=new Date(Date.parse(window.end)+60000).toISOString()
+ assert.throws(()=>decide(state,id,{...form,deadline:afterWindow}),/窗口内/)
  event.decisionDraft={maintenancePlanId:plan.id};const draft=ensureTaskPlan(event);assert.deepEqual(draft.steps,plan.steps)
  decide(state,id,form);const work=currentTask(event)
  assert.equal(work.kind,'maintenance');assert.equal(work.maintenance.plan.id,plan.id);assert.equal(work.maintenance.window.id,window.id);assert.deepEqual(work.steps,plan.steps);assert.ok(work.steps.length<=4)

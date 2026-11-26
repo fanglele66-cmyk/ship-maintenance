@@ -50,18 +50,24 @@ const notes={
  handover:"18:00 已向轮机长交接批准范围、总成及密封件领用、旧件暂存和未送检状态。尚需补齐同刻对照记录、另行获准工况试验及认可车间检验结论，由李建国跟进，时限待轮机长确认。拟关注二缸指令反馈、各缸排温、燃油轨压力、转速负荷及原报警复现；新一轮效果观察尚未开始，长期修复效果未经证明。本轮作业附件未补齐；本步只确认记录交接。",
 }
 
-const question=text=>({kind:'question',text})
-const draft=(note,text='整理好了，核对后可以采用。')=>({kind:'draft',text,note})
+const question=(text,options={})=>({kind:'question',text,...(options.question?{question:options.question}:{}),...(options.choices?.length?{choices:options.choices,allowOther:options.allowOther!==false}:{})})
+const draft=(note,text='整理好了，核对后可以采用。',extra={})=>({kind:'draft',text,note,...extra})
 const stepLabels={investigation:['核查 C2 ICU 液压机构与反馈','核查燃油供给与瞬态工况'],repair:['作业准备与安全隔离','实施维修与过程记录','复装与分阶段试验','交接与效果观察']}
+const options=(...labels)=>labels.map((label,index)=>({id:'opt-'+(index+1),label}))
+const stepChoices={
+ investigationStart:options('液压活塞回位正常','液压活塞回位不畅','尚未检查液压活塞动作'),
+ preparationStart:options('工单已签认','工单尚未签认','签认状态待核实'),
+ repairStart:options('已更换 ICU 总成','仅处理外部连接','ICU 总成尚未处理'),
+}
 const rules=[
- {kind:'investigation',step:0,prompt:'investigationStart',reply:question('液压活塞动作检查做了吗，结果怎么样？')},
+ {kind:'investigation',step:0,prompt:'investigationStart',reply:question('已记下插头、线束和指令反馈的检查情况。',{question:'液压活塞的动作情况怎么样？',choices:stepChoices.investigationStart})},
  {kind:'investigation',step:0,prompt:'investigationAnswer',requires:['investigationStart'],results:['发现异常','无法确认'],reply:draft(notes.investigation)},
  {kind:'investigation',step:0,prompt:'investigationRevise',requires:['investigationStart','investigationAnswer'],results:['发现异常','无法确认'],reply:draft(notes.investigationRevised,'已保留回位不畅，原因仍待确认。')},
  {kind:'investigation',step:1,prompt:'supply',results:['未见异常'],reply:draft(notes.supply)},
  {kind:'investigation',step:1,prompt:'supplyClarify',requires:['supply'],results:['未见异常'],reply:draft(notes.supply,'数值和材料缺口已保留。')},
- {kind:'repair',step:0,prompt:'preparationStart',reply:question('谁执行隔离、谁复核，工单签认了吗？')},
+ {kind:'repair',step:0,prompt:'preparationStart',reply:question('已记下本次准备和隔离的情况。',{question:'本次作业工单签认了吗？',choices:stepChoices.preparationStart})},
  {kind:'repair',step:0,prompt:'preparationAnswer',requires:['preparationStart'],results:['已完成'],reply:draft(notes.preparation)},
- {kind:'repair',step:1,prompt:'repairStart',reply:question('总成这次具体怎么处理的，拆换了还是做了连接修复？')},
+ {kind:'repair',step:1,prompt:'repairStart',reply:question('已记下插接件标识和接口封堵的情况。',{question:'二缸 ICU 总成实际做了哪种处理？',choices:stepChoices.repairStart})},
  {kind:'repair',step:1,prompt:'repairAnswer',requires:['repairStart'],results:['已完成'],reply:draft(notes.repair)},
  {kind:'repair',step:1,prompt:'repairRevise',requires:['repairStart','repairAnswer'],results:['已完成'],reply:draft(notes.repair,'已只记拆换措施，复装试验和原因仍待核实。')},
  {kind:'repair',step:2,prompt:'trial',results:['未完成'],reply:draft(notes.trial)},
@@ -70,6 +76,14 @@ const rules=[
  {kind:'repair',step:3,prompt:'handoverClarify',requires:['handover'],results:['已完成'],reply:draft(notes.handover,'时限仍记为待轮机长确认。')},
 ].map(rule=>({...rule,label:stepLabels[rule.kind][rule.step]}))
 
+// Only the question depends on the selected branch. The note is built from
+// the actual opening observation and visible answers, never a specimen report.
+const investigationScope=question('已记下液压活塞回位不畅。',{
+ question:'本次液压机构检查到什么范围？',choices:options('只检查了外部','也检查了内部','检查范围待核实'),
+})
+const investigationRecord=question('已记下本次检查范围。',{
+ question:'目前有内部检验记录吗？',choices:options('尚未取得内部检验记录','已有内部检验记录','检验记录待核实'),
+})
 const missingQuestions={
  investigationStart:'插头、线束检查和报警时的指令反馈核对，结果分别怎么样？',
  investigationAnswer:'液压活塞动作检查做了吗，什么时段、结果怎样？',
@@ -80,11 +94,15 @@ const missingQuestions={
  trial:'复装和试验实际做到了哪一步，还有哪些没完成？',
  handover:'已经交接了哪些情况，还有哪些事项要跟进？',
 }
-const allRules=[...rules.map(rule=>({...rule,eventId:'real-alarm-0430'})),...OTHER_STEP_ASSIST_CASES.map(item=>({eventId:item.eventId,kind:item.kind,step:item.stepIndex,label:item.stepLabel,prompt:item.id,requires:item.requires,results:item.results,reply:item.response}))]
+const allRules=[
+ ...rules.map(rule=>({...rule,eventId:'real-alarm-0430'})),
+ ...OTHER_STEP_ASSIST_CASES.map(item=>({eventId:item.eventId,kind:item.kind,step:item.stepIndex,label:item.stepLabel,prompt:item.id,requires:item.requires,results:item.results,reply:item.response})),
+]
 const inputRules=new Map()
-for(const rule of allRules.filter(item=>item.eventId==='real-alarm-0430')){
- inputRules.set(normalizeText(prompts[rule.prompt]),rule)
- inputRules.set(normalizeText(publishedPrompts[rule.prompt]),rule)
+for(const rule of rules){
+ const entry=allRules.find(item=>item.eventId==='real-alarm-0430'&&item.prompt===rule.prompt)
+ inputRules.set(normalizeText(prompts[rule.prompt]),entry)
+ inputRules.set(normalizeText(publishedPrompts[rule.prompt]),entry)
 }
 for(const item of OTHER_STEP_ASSIST_CASES)inputRules.set(normalizeText(item.input),allRules.find(rule=>rule.prompt===item.id))
 // Only these known presentation-only wrappers may surround a complete line.
@@ -115,14 +133,54 @@ export function isStepAssistScriptInput({event,task,stepIndex,text}={}){
 export const STEP_ASSIST_DEMO_CASES=Object.freeze(rules.map(rule=>Object.freeze({id:rule.prompt,kind:rule.kind,stepIndex:rule.step,stepLabel:rule.label,input:prompts[rule.prompt],aliases:Object.freeze([publishedPrompts[rule.prompt]]),response:Object.freeze({...rule.reply}),requires:Object.freeze([...(rule.requires||[])])})))
 const acknowledgments=new Set(['谢谢','谢谢你','多谢','好的','好','收到','明白','明白了','了解','了解了','知道了','辛苦了','嗯','好，继续','请继续','继续','好的，谢谢','好的，收到','谢谢，先这样','谢谢，辛苦了','谢谢你，辛苦了'].map(normalizeText))
 
+function conflictingResult(result){
+  return question('当前选择“'+result+'”与这段记录不一致，哪项需要调整？',{
+   question:'当前选择“'+result+'”与这段记录不一致，你希望怎么核对？',
+   choices:[
+    {id:'conflict-adjust-result',label:'按刚才的现场描述记录'},
+    {id:'conflict-reconfirm',label:'重新核对现场情况'},
+   ],
+  })
+}
+
+function selectedReply(context,messages){
+ const turns=messages.filter(item=>!taskAssistantOpeningReply(context.task,item.text)&&!acknowledgments.has(normalizeText(item.text)))
+ const opening=turns[0]
+ if(!opening)return null
+ const start=scopedRule({...context,text:opening.text})
+ if(!start?.reply.choices||start.results&&context.record?.result&&!start.results.includes(context.record.result))return null
+ let offered=start.reply
+ const initialNotes={
+  investigationStart:'二缸可接近的插头和反馈线束未见松脱或明显破损。对照报警片段，指令与反馈曾不对应。',
+  repairStart:'16:20—17:05，按获批工单标识二缸 ICU 插头、管路和方向，拆开接口已封堵。船上未做液压活塞内部精修，未用砂纸，未处理燃油供给通路。',
+ }
+ const facts=[initialNotes[start.prompt]||opening.text.trim()]
+ for(const [i,text] of [...turns.slice(1).map(item=>item.text),context.message.text].entries()){
+  const choice=offered?.choices?.find(option=>option.label===text.trim())
+  if(!choice)return null
+  if(start.prompt==='investigationStart'&&choice.label==='液压活塞回位不畅'&&context.record?.result==='未见异常')return conflictingResult(context.record.result)
+  facts.push(choice.label+'。')
+  if(start.prompt==='investigationStart'&&i===0&&choice.label==='液压活塞回位不畅')offered=investigationScope
+  else if(offered===investigationScope&&choice.label!=='检查范围待核实')offered=investigationRecord
+  else offered=null
+ }
+ const saved=context.record?.note?.trim()||''
+ const note=[saved,...facts.filter(fact=>!saved.includes(fact))].filter(Boolean).join('\n').slice(0,4000)
+ return offered?{...offered,note}:draft(note)
+}
+
 export function matchStepAssistDemo({context,images=[]}={}){
  if(!context)return null
  const opening=isStepAssistEvent(context.event)&&taskAssistantOpeningReply(context.task,context.message?.text)
  if(opening)return opening
- let rule=scopedRule({...context,text:context.message?.text})
- if(!rule)return null
- const currentPrompt=rule.prompt
  const users=(Array.isArray(context.history)?context.history:[]).filter(message=>message?.role==='user'&&message.stepIndex===context.stepIndex&&(!message.scope||message.scope==='current-step')&&(!message.eventId||message.eventId===context.event.id)&&(!message.taskId||message.taskId===context.task.id))
+ let rule=scopedRule({...context,text:context.message?.text})
+ if(!rule){
+  const last=(context.history||[]).findLast(item=>item.role==='assistant'&&item.stepIndex===context.stepIndex)
+  if(last?.source==='model'||(last?.responseKind&&last.responseKind!=='question'))return null
+  return selectedReply(context,users)
+ }
+ const currentPrompt=rule.prompt
  const prior=new Set()
  for(const message of users){
   if(taskAssistantOpeningReply(context.task,message.text))continue
@@ -141,12 +199,12 @@ export function matchStepAssistDemo({context,images=[]}={}){
  // A known line never falls through to a model just because its result or
  // prerequisites are missing. Ask without modifying the selected result.
  if(context.record?.result&&rule.results&&!rule.results.includes(context.record.result)){
-  return question('当前选择“'+context.record.result+'”与这段记录不一致，哪项需要调整？')
+  return conflictingResult(context.record.result)
  }
  const missing=(rule.requires||[]).find(id=>!prior.has(id))
  if(missing)return question(missingQuestions[missing]||OTHER_STEP_ASSIST_CASES.find(item=>item.id===missing)?.missingQuestion||'请先补充本步实际检查范围和结果。')
  // Known optional lines and retries are harmless; another main step is ignored.
  // Pictures never establish scripted facts or imply a current work photo exists.
  void images
- return {...rule.reply}
+ return JSON.parse(JSON.stringify(rule.reply))
 }

@@ -61,7 +61,7 @@ const totalUnread = computed(() => lifecycle.workItems.pending.filter(item=>item
 function isActive(path) {
   if(route.path.startsWith('/tasks/'))return path==='/event'
   const detail=route.path.startsWith('/situation/issue/')
-  if(detail){if(route.query.from==='tasks')return path==='/event';if(route.query.from==='workbench')return path==='/situation';return path==='/issues'}
+  if(detail){if(route.query.from==='tasks')return path==='/event';if(['workbench','statistics'].includes(route.query.from))return path==='/situation';return path==='/issues'}
   if(route.path.startsWith('/reports'))return path==='/reports'
   const issueDetail = false
   if (path === '/issues') return route.path === '/issues' || issueDetail

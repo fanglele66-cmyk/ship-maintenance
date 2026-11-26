@@ -19,6 +19,7 @@ services:
       SHIP_PUBLIC_ORIGIN: ${SHIP_PUBLIC_ORIGIN:-http://localhost:8080}
       SHIP_TRUSTED_PROXY_IPS: ${SHIP_PROXY_IP:-172.30.86.2}
       SHIP_SCHEDULERS_ENABLED: ${SHIP_SCHEDULERS_ENABLED:-true}
+      SHIP_GLM_API_KEY: ${SHIP_GLM_API_KEY:-}
       SHIP_SHUTDOWN_TIMEOUT_MS: 30000
     volumes:
       - ship-runtime:/app/runtime

@@ -1,13 +1,13 @@
 # GitHub 代码同步说明
 
-本次同步源：公司 GitLab `env/dev`，提交 `742947cbbdd9555ef284a4e141f82d5cf4dca627`。
+本次同步源：公司 GitLab `env/dev`，提交 `a24e49770f88cf4aa3e9e6749243b5fabfd76ab5`。
 
 应用源代码、测试、构建产物 `phase2-demo/dist`、部署脚本和 Windows 启动脚本均与该提交一致。GitHub 分支沿用自己的提交历史，不包含公司部署分支中的数据库或实际模型配置。
 
 ## 本地运行前需要补充
 
 1. 将单独提供的 `ship-continuous-24h.db` 放到 `phase2-demo/deployment-data/telemetry/`；目录中保留了对应的 manifest、receipt 和说明。可在应用目录运行 `npm run deployment:check-data` 验证。
-2. 参照 `phase2-demo/.local-ai/README.md` 配置模型；现有本地 `config.json` 可继续使用。
+2. 参照 `phase2-demo/.local-ai/README.md` 配置模型。首选 GLM 的示例为 `phase2-demo/server/ai-project.example.json`，备用模型沿用本机或持久卷的配置。
 3. 安装依赖后按原说明构建和启动。运行状态保存在 `.local-data`，已有账号和业务记录保留。
 
 公司容器部署说明中的“数据库及模型配置随仓库交付”针对 GitLab 版本；GitHub 构建容器前需要自行补齐上述两个文件。

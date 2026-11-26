@@ -4,12 +4,26 @@ import {createServer} from 'vite'
 import {createSSRApp,h} from 'vue'
 import {renderToString} from '@vue/server-renderer'
 import {createPinia,setActivePinia,disposePinia} from 'pinia'
-import {taskStepLabel} from '../src/workflow/taskStepPresentation.js'
+import {taskStepLabel,taskStepResultChoices} from '../src/workflow/taskStepPresentation.js'
 import {maintenancePlans} from '../src/workflow/maintenancePlans.js'
 import {createLifecycleState,people} from '../src/workflow/eventLifecycle.js'
 
 const labels=['作业准备与安全隔离','实施维修与过程记录','复装与分阶段试验','交接与效果观察']
 const steps=()=>labels.map(label=>({label,guide:`本项要求：${label}。`,checks:['按批准范围核对现场情况。'],recordHint:'登记本轮实际发现和未执行范围。',options:['已完成','未完成','不适用']}))
+
+test('repair feedback names the operation while preserving stored and custom result values',()=>{
+ const standard=steps()
+ const choices=standard.map(step=>taskStepResultChoices(step,'repair'))
+ for(const [i,items] of choices.entries()){
+  assert.deepEqual(items.map(item=>item.value),standard[i].options)
+  assert.ok(items.every(item=>item.label!==item.value))
+ }
+ assert.equal(new Set(choices.map(items=>items[0].label)).size,standard.length)
+ const custom=taskStepResultChoices({...standard[0],label:'核对滤器压差'},'repair')
+ assert.ok(custom.every(item=>item.label.includes('核对滤器压差')))
+ const legacy={label:'检查供气',options:['读数一致','读数不一致']}
+ assert.deepEqual(taskStepResultChoices(legacy,'repair'),legacy.options.map(value=>({value,label:value})))
+})
 
 test('work phase labels are concise presentation values and preserve original persisted instructions',()=>{
  const original=steps(),snapshot=structuredClone(original)

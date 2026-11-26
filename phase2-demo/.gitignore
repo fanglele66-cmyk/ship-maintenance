@@ -7,6 +7,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+server/ai-project.json
 
 .local-ai/*
 !.local-ai/config.example.json

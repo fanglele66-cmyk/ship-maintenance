@@ -49,7 +49,7 @@ test('knowledge thinking is retained after streaming and reload but excluded fro
  await sendKnowledgeQuestion(session,'下一个问题','主机',async(body)=>{assert.doesNotMatch(JSON.stringify(body.history),/原始模型推理/);return {answer:'后续正文'}})
 })
 
-test('right-hand model and task replies render thinking before content and references only after completion',async()=>{
+test('model and task replies preserve their reading order and show references only after completion',async()=>{
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {default:Reply}=await server.ssrLoadModule('/src/components/ModelReply.vue')
@@ -60,7 +60,10 @@ test('right-hand model and task replies render thinking before content and refer
    const message={...content,status:'streaming',reasoning:'核对 <现场> 读数。',sources,progressLog:[{label:'不应展示的程序进度'}]}
    const streaming=await render(component,message)
    assert.match(streaming,/思考过程/);assert.match(streaming,/&lt;现场&gt;/);assert.doesNotMatch(streaming,/<现场>|参考资料|不应展示的程序进度|分析摘要与处理进度|处理进度/)
-   assert.ok(streaming.indexOf('思考过程')<streaming.indexOf('正文已开始'))
+   const body=streaming.indexOf('正文已开始'),thinking=streaming.indexOf('思考过程')
+   assert.ok(body>=0 && thinking>=0)
+   if(component===Step)assert.ok(body<thinking)
+   else assert.ok(thinking<body)
    const complete=await render(component,{...message,status:'complete'})
    assert.ok(complete.indexOf('参考资料')>complete.indexOf('正文已开始'));assert.doesNotMatch(complete,/<details[^>]* open/)
    assert.match(await render(component,{...message,status:'interrupted'}),/已中断/)

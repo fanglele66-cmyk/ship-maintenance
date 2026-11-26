@@ -12,7 +12,7 @@ export function taskAssistantOpening(task){
 }
 
 export function taskAssistantOpeningReply(task,text){
- const choice=taskAssistantOpening(task)?.choices.find(item=>item.prompt===text?.trim())
+ const choice=taskAssistantOpening(task)?.choices.find(item=>[item.label,item.prompt].includes(text?.trim()))
  if(!choice)return null
  const work=['repair','maintenance'].includes(task.kind),label=task.kind==='maintenance'?'维保':'维修'
  if(choice.id==='guidance')return {kind:'question',text:work

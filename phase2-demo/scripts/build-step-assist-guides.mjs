@@ -3,40 +3,48 @@ import {mkdir,writeFile} from 'node:fs/promises'
 import {OTHER_STEP_ASSIST_CASES as cases} from '../src/workflow/stepAssistScenarios.js'
 import {taskAssistantOpening,taskAssistantOpeningReply} from '../src/workflow/taskAssistantOpening.js'
 
+import {taskStepResultChoices} from '../src/workflow/taskStepPresentation.js'
+
+const resultLabel=({kind,stepLabel,results})=>taskStepResultChoices({label:stepLabel,options:results},kind)[0].label
+
 const scenarios=[
  {id:'real-warning-0523',folder:'控制空气步骤协作演示',title:'控制空气双测点低压核实',number:'CBY-EVT-20260523-001',next:'repair',
   entry:'轮机长打开控制空气事件的初始信息，核对四项排查建议，选择“派发排查”，执行人为李建国（大管轮），要求完成时间选择当前时间之后。切换为大管轮，从任务页进入第 1 轮排查。',
   handoff:'轮机长审阅排查报告后，选择“派发维修”，核对一号减压阀已定位的密封垫问题，明确 WO-AIR-001 范围。二号供气路径保留，不扩大为全部阀组或空气供给部件更换。切换为大管轮进入维修任务。',
   boundary:'两个进口压力通道不是减压阀前后测点；压力回升不等于已修复。独立表、阀前后实测和供气分段核查分别记录。',
+  photo:{kind:'repair',step:0,title:'控制空气一号减压阀隔离示意照片',path:'images/air-reducer-isolated-demo.jpg'},
   refs:[['控制空气供给原理图','../../public/task-reference-images/air-system-overview.png'],['进口压力位置图','../../public/task-reference-images/air-inlet-location.png'],['历史减压阀拆检照片','../../public/wiki_rt-flex50/images/changhangbiyu_20260523_pressure_reducer_disassembly.jpeg']]},
  {id:'real-tracking-exhaust-baseline',folder:'一缸步骤协作演示',title:'一缸排温长期基线抬升跟踪',number:'CBY-EVT-20260812-001',next:'maintenance',
   entry:'轮机长打开一缸事件初始信息，选择“派发排查”，执行人为李建国（大管轮），要求完成时间选择当前时间之后。切换为大管轮，从任务页进入两步排查。',
   handoff:'轮机长审阅排查报告，确认“异动成立、部件原因未定”，选择“提前维保”。在维保计划中选择 CBY-MP-BALANCE-01“一缸测温与燃烧平衡专项维保”（4 步），不要选择默认的 3 步测温保养计划。选择仍有效的靠港停机窗口，要求完成时间必须在该窗口内；当前预置上海 2027-01-31 09:00—16:00、宁波 2027-02-02 08:00—15:00。确认计划、负责人和窗口后派发，再以大管轮进入维保任务。以下作业描述对应所选窗口内的执行路径，不表示在窗口之前已经作业。',
   boundary:'核实基线抬升不等于确认喷油器或排气阀损坏。同源显示一致不能替代独立仪表校验；计划备件不等于已经领用或批准更换。',
+  photo:{kind:'investigation',step:0,title:'一缸排温探头位置示意照片',path:'images/c1-probe-location-demo.png'},
   refs:[['排温测量位置图','../../public/task-reference-images/exhaust-temperature-points.png']]},
  {id:'real-health-c4-baseline',folder:'四缸步骤协作演示',title:'四缸排温相对基线下移跟踪',number:'CBY-EVT-20260812-002',next:'repair',
   entry:'此事件初始状态已包含第 1 轮排查报告，首轮月度资料保留，不重新填写或覆盖。轮机长审阅首轮报告后选择“继续排查”，核对两步建议“核对四缸测温连接与独立校验／核对四缸历史调整与燃烧资料”，派发给李建国（大管轮），完成时间选择当前时间之后。大管轮从任务页进入第 2 轮排查。此轮固定建议仅用于首轮报告后的首次继续排查；人工修改后的计划与后续新轮次不会被覆盖。',
   handoff:'轮机长审阅第 2 轮排查报告后选择“派发维修”，核定 WO-C4-001 仅恢复已定位的测温端子连接并独立校验，不扩展为喷油器、排气阀或未确认的探头更换。切换为大管轮进入第 1 轮维修任务。',
   boundary:'端子连接异常和短时读数波动不能自动解释整段月度基线下移；恢复连接、完成独立校验、验证长期趋势是不同记录。',
+  photo:{kind:'investigation',step:0,title:'四缸测温端子连接示意照片',path:'images/c4-temperature-terminals-demo.png'},
   refs:[['排温测量位置图','../../public/task-reference-images/exhaust-temperature-points.png']]},
 ]
 const label=kind=>({investigation:'排查',repair:'维修',maintenance:'维保'}[kind])
 const quote=text=>'> '+text.replaceAll('\n','\n> ')
-const common=`每个任务只有一个助手。开场只出现一次，切换左侧步骤继续使用本任务对话，不重复开场。左侧不需要 AI 协助按钮；直接在右侧发送即可。附件、图片和语音入口在输入框底部，发送前核对内容。
+const samplePhoto=({photo})=>`[${photo.title}](${photo.path})`
+const common=`每个任务共用一段对话，切换左侧步骤后，助手围绕当前步骤答疑。船员可随时直接选结果、写备注并提交，也可以先在右侧咨询。
 
-原话完全匹配时使用固定回复，先展示分段处理进度，再给一句追问或备注草稿。追问等待合计约 1.6 秒，草稿约 1.8 秒；这是处理状态，不是外部模型的推理。脚本外新事实或改写仍调用当前配置的真实模型，并携带本任务上下文；不要把其他步骤内容当成本步已执行证据。
+需要确认现场情况时，在该条助手回复内选一个符合现场的答案并确认。没有符合的选项时，选「其他」，填写自己的情况后发送。也可以继续直接问助手。后续答疑仍在正常对话中显示，船员可以核对并采用随答复整理的草稿。
 
-信息不足先追问，不会每次都给草稿。草稿出现后，输入框上方选择“采用到本步骤”，再点“确认”；只写本步备注，不自动选择结果、换步或提交。选择“继续修改”后点“确认”会点亮输入框，再发送补充；在有可选修订的步骤，可使用下文给出的修订原话。
+回复先答疑，再显示本步备注草稿和补充确认。选「采用到本步骤」并点「确认」即可写入备注。需要改稿时，选「其他（补充或修改）」；只有草稿时选「继续修改」。在选项内填写内容并确认。
 
-每个主步骤可独立开始，不必完成上一主步骤的可选修订；补充回答仍需本步前文。先选结果再采用、先采用再选结果都可；若结果与描述冲突，助手先简短核对。采用后按橙黄色“下一步”提示手动切换左侧步骤。必填结果齐全时导航变绿，只代表填写齐全。
+在左侧本步备注区点「拍照」或「上传照片」。也可在右侧当前步骤的对话中选图并发送。提交时，两处原图随所属步骤的结果、备注一起归档；同一步从两处提交同一原图，只保留一份，并标明两个来源。
 
-提交后任务助手最前的两句自我介绍保持不变，报告进度与提交回执在后续消息显示，不向引导语追加状态。报告页仍按现有生成流程工作，固定对话不包含最终报告生成；生成失败时保留已提交事实记录，可重试。`
+报告有照片时，下载 ZIP，内含 Markdown 报告与照片文件；没有照片时，直接下载 Markdown（.md）。`
 
 for(const scenario of scenarios){
  const directory=new URL(`../docs/${scenario.folder}/`,import.meta.url)
  await mkdir(directory,{recursive:true})
  const selected=cases.filter(c=>c.eventId===scenario.id)
- const table=selected.filter(c=>c.id.endsWith(':start')).map(c=>`| ${label(c.kind)} | ${c.stepIndex+1}. ${c.stepLabel} | ${c.results[0]} |`).join('\n')
+ const table=selected.filter(c=>c.id.endsWith(':start')).map(c=>`| ${label(c.kind)} | ${c.stepIndex+1}. ${c.stepLabel} | ${resultLabel(c)} |`).join('\n')
  const refs=scenario.refs.map(([title,path])=>`- [${title}](${path})`).join('\n')
  await writeFile(new URL('README.md',directory),`# ${scenario.title} · 步骤协作
 
@@ -63,9 +71,11 @@ ${table}
 
 ## 参考图与材料
 
-${refs}
+${label(scenario.photo.kind)}第 ${scenario.photo.step+1} 步可用这张模拟照片演示提交：${samplePhoto(scenario)}。
 
-以上图为原理、位置或历史参考，与本轮实际附件分开。无需重复上传参考图；确有本轮照片或读数截图时使用右侧图片入口，未上传就保留待补，不能填写“附件齐全”。本次不新建界面截图，也不恢复已删除截图。
+作业位置与历史资料可参阅：
+
+${refs}
 
 ${scenario.boundary}
 
@@ -89,30 +99,37 @@ ${scenario.boundary}
 
 任务助手先自我介绍：“我是任务助手，可以帮你把现场情况整理成${label(kind)}备注。”并提示可以说情况、发照片或读数截图。
 
-输入框上方问“${opening.title}”。选择“${choice.label}”后点“确认”，相当于发送：
+任务助手会问“${opening.title}”。选择“${choice.label}”后点“确认”，聊天中显示：
 
-${quote(choice.prompt)}
+${quote(choice.label)}
 
 助手回应：
 
-${quote(taskAssistantOpeningReply({kind},choice.prompt).text)}
+${quote(taskAssistantOpeningReply({kind},choice.label).text)}
 
 然后按下文发送现场描述。也可直接发送，不必先作开场选择。后续换步仍是同一个助手，不重复此开场。
 `
   const steps=selected.filter(c=>c.kind===kind)
   for(const start of steps.filter(c=>c.id.endsWith(':start'))){
-   text+=`\n## 第 ${start.stepIndex+1} 步 · ${start.stepLabel}\n\n在左侧切到对应步骤；${kind==='investigation'?'检查结果':'作业反馈'}选择 **${start.results[0]}**。可在采用草稿前后选择，按此路径已经描述的事实核对。\n`
+   text+=`\n## 第 ${start.stepIndex+1} 步 · ${start.stepLabel}\n\n在左侧切到对应步骤；${kind==='investigation'?'检查结果':'作业反馈'}选择 **${resultLabel(start)}**。可在采用草稿前后选择，按此路径已经描述的事实核对。\n`
+   if(kind===scenario.photo.kind&&start.stepIndex===scenario.photo.step){
+    text+=`\n**演示随步照片**　在左侧「上传照片」选择${samplePhoto(scenario)}。要演示对话发图，可在本步右侧把同一文件随下方现场描述发送。提交后在本步执行记录里核对这张原图及「步骤备注」「助手对话」两个来源。\n`
+   }
    for(const [i,c] of steps.filter(c=>c.stepIndex===start.stepIndex).entries()){
     const revision=c.id.endsWith(':revise')
-    text+=`\n### ${revision?'可选：继续修改':`发送 ${i+1}`}\n\n${revision?'在草稿选择卡点“继续修改”，确认后再发送以下内容；不需要修订可跳过。\n\n':''}${quote(c.input)}\n\n助手${c.response.kind==='question'?'追问':'回应'}：\n\n${quote(c.response.text)}\n`
+    const action=revision?'可选：继续修改':`发送 ${i+1}`
+    text+=`\n### ${action}\n\n${revision?'选「继续修改」，在选项下填写以下内容并确认。\n\n':''}${quote(c.input)}\n\n助手${c.response.kind==='question'?'追问':'回应'}：\n\n${quote(c.response.text)}\n`
+    if(c.response.choices?.length){
+     text+=`\n${quote(c.response.question)}\n\n可直接选择${c.response.choices.map(option=>"「"+option.label+"」").join("、")}。每次确认只发送所选短句。要复现下面的完整记录，请选「其他」并输入下一段现场原话。\n`
+    }
     if(c.response.note){
      const canRevise=!revision&&steps.some(item=>item.stepIndex===c.stepIndex&&item.id.endsWith(':revise'))
-     text+=`\n本步骤备注整理稿：\n\n${quote(c.response.note)}\n\n${canRevise?'需要下方可选修订时，先不采用，选择 **继续修改 → 确认** 后发送修订原话。不需要修订时，可直接选择 **采用到本步骤 → 确认** 并进入下一步。':'核对后，在输入框上方选择 **采用到本步骤 → 确认**。左侧备注更新为上述内容，人员选择的结果不变。'}\n`
+     text+=`\n本步骤备注整理稿：\n\n${quote(c.response.note)}\n\n${canRevise?'如需调整，选「继续修改」，在卡内填写下方原话并确认。核对新稿后，选「采用到本步骤」并点「确认」。':'核对后，选「采用到本步骤」并点「确认」，即可在左侧看到备注。'}\n`
     }
    }
    text+=start.stepIndex===Math.max(...steps.map(c=>c.stepIndex))?'\n最后一步采用后，核对各步结果与备注，再提交本轮报告。\n':'\n采用回执会提示下一步的主要内容，点击左侧 **下一步** 继续。\n'
   }
-  text+=`\n## 提交与交接\n\n1. 核对全部必填结果和采用后的备注；没有上传的附件仍记待补，不补造数值。\n2. 点击左侧 **提交${label(kind)}报告**；右侧助手保持展开，开场自我介绍不变化。报告生成进度与提交回执另行显示，记录已提交与验证已完成分开。\n3. 通过“本轮执行记录／${label(kind)}报告”页签核对；执行记录按步骤切换，下载按钮下载 Markdown。\n4. ${kind==='investigation'?scenario.handoff:'本路径有未完成验证，交轮机长选择“等待条件，保留原任务”或继续派发剩余任务；缺少独立校验、完整试验或可比工况资料时，不将提交报告等同于维修有效或事件闭环。'}\n\n## 使用说明\n\n${common}\n\n图片仅使用真实上传的本轮材料；已有参考图与来源见 [README](README.md)。脚本外输入转入当前配置的真实模型，最终报告生成也沿用现有流程；本地固定回复不声称执行图片识别或真实模型推理。\n`
+  text+=`\n## 提交与交接\n\n1. 核对每步所选结果、备注和随步照片。\n2. 点击左侧 **提交${label(kind)}报告**，在右侧查看提交回执。\n3. 打开「本轮执行记录」核对每一步，再打开「${label(kind)}报告」点「下载」。有照片时得到 ZIP（含报告和原图），没有照片时得到 .md 文件。\n4. ${kind==='investigation'?scenario.handoff:'本路径仍有待验证事项，由轮机长选择「等待条件，保留原任务」或派发剩余任务。'}\n\n## 使用说明\n\n${common}\n\n本案例的示例照片和参考资料见 [README](README.md)。\n`
   await writeFile(new URL(`${label(kind)}演示脚本.md`,directory),text,'utf8')
  }
 }
@@ -123,8 +140,10 @@ await writeFile(new URL('../docs/四事件步骤协作演示索引.md',import.me
 | --- | --- | --- |
 ${rows.map(([title,folder,path])=>`| ${title} | [说明与脚本](${folder}/README.md) | ${path} |`).join('\n')}
 
-四项事件均支持任务级一次开场、口语输入、必要追问、备注整理、人员核对采用与提交报告。固定输入必须对应当前任务步骤；每个步骤可独立开始，脚本外输入进入真实模型。采用只写备注，不自动选择结果或提交。提交后最前的任务助手引导语保持两句不变。
+在当前步骤的助手回复中可选择符合现场的答案，或选「其他」自行填写。核对草稿后，选「采用到本步骤」并点「确认」。船员也可直接完成左侧表单。
 
-一缸使用 CBY-MP-BALANCE-01 四步专项维保计划；四缸从已存在的第一轮报告继续。未完成项和材料缺口保留，由轮机长安排后续。以上目录为产品流程复现材料，预设内容不替代实际现场证据。没有新增界面截图。
+演示可使用各目录提供的模拟照片。左侧添加的照片和右侧已发送的原图随步归档，同一步内的相同照片合并保存。有照片的报告下载为 ZIP，无照片时下载 .md。
+
+一缸使用 CBY-MP-BALANCE-01 四步专项维保计划，四缸从已有的首轮报告继续排查。
 `,'utf8')
 console.log(`Updated ${scenarios.length} folders, 6 task scripts, ${cases.length} exact inputs and the event index.`)

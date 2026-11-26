@@ -9,12 +9,12 @@
 </template>
 <script setup>
 import {computed} from 'vue'
-import {reportGenerationStatus} from '../workflow/reportGenerationState.js'
+import {canRetryTaskReport,reportGenerationStatus} from '../workflow/reportGenerationState.js'
 import MarkdownContent from './MarkdownContent.vue'
 import {generatedPreview} from '../workflow/generatedReport'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore'
 const props=defineProps({event:Object,task:Object}),emit=defineEmits(['submitting','submitted']),store=useEventLifecycleStore()
-const canRetry=computed(()=>{const report=props.event.reports.find(r=>r.id===props.task.reportGeneration?.factReportId);return reportGenerationStatus(props.task)==='error'&&report&&!report.revisions?.length&&!report.original})
+const canRetry=computed(()=>canRetryTaskReport(props.event,props.task))
 const preview=computed(()=>generatedPreview(props.task.reportGeneration?.patch))
 async function retry(){emit('submitting');try{await store.submit(props.event.id,props.task.id);emit('submitted')}catch{ /* Error and partial content remain in the persisted generation state. */ }}
 </script>

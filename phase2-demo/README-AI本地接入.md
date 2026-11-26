@@ -8,9 +8,11 @@
 
 模型仅通过后端文件配置，前端没有设置按钮、配置页面或配置读写接口。
 
-编辑本机 `.local-ai/config.json`（已创建）；可参考 `server/ai-config.example.json`。默认选择 CC Switch 的“DeepSeek”（当前模型 `deepseek-v4-flash`）；`model` 和 `baseUrl` 留空时跟随该供应商配置。原 GLM（众数个人用）默认供应商 ID 已在 `server/ai-config.mjs` 中注释保留，本机原配置备份为 `.local-ai/config.glm-disabled.json`；恢复时可复制备份覆盖 `config.json`。后端只读 `%USERPROFILE%/.cc-switch/cc-switch.db`，不切换或修改 CC Switch。可用 `CC_SWITCH_DB` 环境变量指定数据库路径。
+工作目录下的 `server/ai-project.json` 指定首选模型 `glm-5.3-flash`、内网地址、协议和单次输出上限。后端依次使用环境变量 `SHIP_GLM_API_KEY`、该文件中的 `apiKey`、CC Switch“众数（个人用）”中同一网关的凭据。公司 GitLab 交付包含可直接使用的后端配置，GitHub 版本提供无密钥模板。CC Switch 数据库默认位于 `%USERPROFILE%/.cc-switch/cc-switch.db`，也可用 `CC_SWITCH_DB` 指定。
 
-可配置 `enabled`、`source`、`providerId`、`model`、`baseUrl`、`protocol`、`maxTokens`、`timeoutMs` 和 `knowledgeEnabled`，每次请求读取最新文件，无需重启。`source` 为 `manual` 时，在本机文件中加入 `apiKey`，并填写模型、地址和协议（`anthropic` 或 `openai`）。密钥不返回给页面，不进入前端包；`.local-ai` 已排除 Git，并禁止通过 Vite 文件服务访问。
+本机的 `.local-ai/config.json` 和容器内的 `/app/runtime/ai/config.json` 保存备用模型以及服务总开关、知识检索开关和请求限额。项目文件、凭据或模型服务不可用时，新的请求可使用备用配置。已经输出文字或思考内容的本次回复以中断结束，下一次请求重新选用模型。
+
+备用配置支持 `enabled`、`source`、`providerId`、`model`、`baseUrl`、`protocol`、`maxTokens`、`timeoutMs` 和 `knowledgeEnabled`，每次请求重新读取。`source` 为 `manual` 时，填写 `apiKey`、模型、地址和协议（`anthropic` 或 `openai`）。后端读取凭据，Vite 禁止直接访问 `server` 和 `.local-ai` 目录。
 
 在此目录运行 `npm run ai:test` 检查真实连接，输出供应商、模型、回答和 Token 用量，不输出密钥。
 

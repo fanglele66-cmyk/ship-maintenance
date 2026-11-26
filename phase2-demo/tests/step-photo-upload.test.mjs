@@ -28,7 +28,7 @@ test('the upload copy is reduced further when its first encoding is still too la
 })
 
 test('oversize, unsupported and unreadable inputs fail explicitly instead of losing a photo',async()=>{
- await assert.rejects(prepareStepPhoto({type:'image/png',size:3*1024*1024+1}),/3 MB/)
+ await assert.rejects(prepareStepPhoto({type:'image/png',size:12*1024*1024+1}),/12 MB/)
  await assert.rejects(prepareStepPhoto({type:'image/svg+xml',size:1000}),/PNG、JPEG 或 WebP/)
  await assert.rejects(prepareStepPhoto({name:'损坏.png',type:'image/png',size:1000000},{read:async()=>originalUrl,decode:async()=>({width:0,height:0})}),/照片尺寸/)
  await assert.rejects(prepareStepPhoto({name:'错误编码.png',type:'image/png',size:1000000},{read:async()=>originalUrl,decode:async()=>({width:100,height:100}),canvas:()=>({getContext:()=>({fillRect(){},drawImage(){}}),toDataURL:()=>originalUrl})}),/上传副本生成失败/)

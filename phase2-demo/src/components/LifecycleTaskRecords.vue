@@ -6,12 +6,18 @@
   <section v-if="step" :id="panelId" class="task-record-panel" role="tabpanel" :aria-labelledby="tabId(index)">
    <LifecycleStepInstructions :event="event" :task="task" :number="index+1" :step="step" :compact="!investigation"/>
    <RecordGuidance v-if="investigation&&!step.substeps?.length" :text="step.recordHint"/>
-   <dl v-if="showFeedback" class="record-feedback"><div><dt>{{investigation?'检查结果':'作业反馈'}}</dt><dd>{{record?.result||'尚未填写'}}</dd></div><div v-if="record?.executionStatus"><dt>实际执行情况</dt><dd>{{record.executionStatus}}</dd></div><div><dt>备注</dt><dd>{{record?.note||'未填写备注'}}</dd></div></dl>
+   <dl v-if="showFeedback" class="record-feedback">
+    <div><dt>{{investigation?'检查结果':'作业反馈'}}</dt><dd>{{record?.result||'尚未填写'}}</dd></div>
+    <div v-if="record?.executionStatus"><dt>实际执行情况</dt><dd>{{record.executionStatus}}</dd></div>
+    <div><dt>备注</dt><dd>{{record?.note||'未填写备注'}}</dd></div>
+    <div v-if="record?.photos?.length"><dt>现场照片（{{record.photos.length}} 张）</dt><dd class="record-photos"><StepPhotoGallery :photos="record.photos" label-prefix="查看现场照片："/></dd></div>
+   </dl>
   </section>
  </section>
 </template>
 <script setup>
 import {computed,ref,watch,nextTick,useId} from 'vue'
+import StepPhotoGallery from './StepPhotoGallery.vue'
 import LifecycleStepInstructions from './LifecycleStepInstructions.vue'
 import RecordGuidance from './RecordGuidance.vue'
 import {isTaskStepComplete} from '../workflow/taskStepCompletion.js'
@@ -30,4 +36,5 @@ async function moveTab(event){
 </script>
 <style scoped>
 .task-records-wizard{min-width:0}.lc-stepper{display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid #e7edf4;padding:10px 0}.lc-stepper button{display:flex;flex:1 0 130px;align-items:center;gap:8px;font-size:12px;text-align:left;min-height:42px}.lc-stepper button span{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:11px}.task-record-panel{padding-top:12px}.record-feedback{display:flex;flex-direction:column;gap:12px;margin:16px 0 0;padding:14px;background:#f6f8fa;font-size:13px;line-height:1.7}.record-feedback dt{color:#718091;margin-bottom:4px}.record-feedback dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#40596d}
+.record-photos{padding-top:4px}
 </style>

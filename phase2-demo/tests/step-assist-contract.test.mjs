@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,decide,currentTask,people} from '../src/workflow/eventLifecycle.js'
-import {buildStepAssistRequest,prepareStepAssistInput,normalizeStepAssistResult,canUseStepAssist,STEP_ASSIST_LIMITS} from '../src/workflow/stepAssistContract.js'
+import {buildStepAssistRequest,prepareStepAssistInput,normalizeStepAssistResult,crewFollowUpChoices,canUseStepAssist,STEP_ASSIST_LIMITS} from '../src/workflow/stepAssistContract.js'
 
 export const png={name:'现场.png',mimeType:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lT8AAAAASUVORK5CYII='}
 export function fixture(){
@@ -75,5 +75,17 @@ test('structured replies support answers, questions or note drafts, never automa
  assert.deepEqual(normalizeStepAssistResult({kind:'answer',text:'当前任务列出的备件是适配本机的 ICU 总成和密封件。'}),{kind:'answer',text:'当前任务列出的备件是适配本机的 ICU 总成和密封件。'})
  assert.deepEqual(normalizeStepAssistResult({kind:'question',text:'具体检查了哪个接口？'}),{kind:'question',text:'具体检查了哪个接口？'})
  assert.deepEqual(normalizeStepAssistResult({kind:'draft',text:'请核对草稿。',note:'接口未见松动，动作尚未检查。'}),{kind:'draft',text:'请核对草稿。',note:'接口未见松动，动作尚未检查。'})
- for(const value of [{kind:'draft',text:'完成',note:'测试',result:'未见异常'},{kind:'question',text:'测试',submit:true},{kind:'answer',text:'测试',note:'咨询不能附草稿'},{kind:'draft',text:'测试',note:''},{kind:'complete',text:'测试'}])assert.throws(()=>normalizeStepAssistResult(value))
+ assert.equal(normalizeStepAssistResult({kind:'answer',text:'这是核对方法。',note:'现场尚未停机。'}).note,'现场尚未停机。')
+ for(const value of [{kind:'draft',text:'完成',note:'测试',result:'未见异常'},{kind:'question',text:'测试',submit:true},{kind:'answer',text:'测试',note:{result:'未见异常'}},{kind:'draft',text:'测试',note:''},{kind:'complete',text:'测试'}])assert.throws(()=>normalizeStepAssistResult(value))
+})
+
+test('follow-up buttons submit a single visible fact and discard hidden legacy script details',()=>{
+ const old=[{id:'first',label:'液压活塞回位不畅',value:'15:10 停机，三次发涩。',description:'原件已由陈志远封存。'},
+  {id:'time',label:'15:10—15:18 许可停机检查'},
+  {id:'count',label:'三次动作都发涩'},
+  {id:'name',label:'陈志远已复核'},
+  {id:'action',label:'采用到本步骤'}]
+ const choices=crewFollowUpChoices(old)
+ assert.deepEqual(choices,[{id:'first',label:'液压活塞回位不畅'},{id:'unconfirmed',label:'暂时无法确认'}])
+ assert.deepEqual(normalizeStepAssistResult({kind:'question',text:'已收到。',question:'回位情况怎么样？',choices:old}).choices,choices)
 })

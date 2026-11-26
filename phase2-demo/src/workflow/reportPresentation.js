@@ -1,6 +1,9 @@
 // Format submitted content without rewriting its original evidence or revisions.
 export function reportMarkdown(report){
  let text=report.markdown||''
+ const photos=stepPhotoIndex(report.submissionSnapshot?.records||[])
+ if(photos.length && text.includes('## 附件索引\n\n本轮未关联附件。'))
+  text=text.replace('## 附件索引\n\n本轮未关联附件。','## 附件索引\n\n'+photos.join('\n'))
  text=text.replace(/^(#{1,6} [^\n]*)（不作为现场事实）$/gm,'$1')
   .replace(/^(#{1,6} )(?:AI后续建议|建议处置|后续建议)$/gm,'$1AI建议')
   .replace(/^(#{1,6} )(?:尚不能确认与未执行事项|尚不能确认与未执行项目|待核实事项)$/gm,'$1未执行与待核实事项')
@@ -12,3 +15,4 @@ export function reportMarkdown(report){
  return text
 }
 import {operationalText} from './operationalText.js'
+import {stepPhotoIndex} from './stepPhotoEvidence.js'

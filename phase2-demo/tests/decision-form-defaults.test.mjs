@@ -37,6 +37,22 @@ test('opening dispatch fields keeps existing user text and derives only a propos
  assert.equal(event.tasks.length,0)
 })
 
+test('a saved dispatch draft can be reused without copying obsolete classifications into new decisions',()=>{
+ const state=createLifecycleState(),event=state.events['real-alarm-0430']
+ const legacy={urgency:'urgent',component:'二缸 ICU',fault:'confirmed'}
+ const oldDecision={action:'investigate',classification:{...legacy}}
+ event.decisions.push(structuredClone(oldDecision))
+ const draft={action:'investigate',owner:people.engineer,_actionDrafts:{investigate:{
+  ...legacy,evidence:'复核现场反馈',deadline:new Date(Date.now()+3600000).toISOString()
+ }}}
+ seedDecisionForm(event,draft,draft.action)
+ for(const key of Object.keys(legacy))assert.equal(Object.hasOwn(draft,key),false)
+ assert.equal(draft.evidence,'复核现场反馈')
+ decide(state,event.id,{...draft,...legacy})
+ assert.equal(Object.hasOwn(event.decisions.at(-1),'classification'),false)
+ assert.deepEqual(event.decisions.at(-2),oldDecision)
+})
+
 test('confirmed observation preserves the editable purpose and manual report sensor names',()=>{
  const state=createLifecycleState(),event=state.events['real-warning-0523'],deadline=new Date(Date.now()+3600000).toISOString()
  decide(state,event.id,{action:'investigate',owner:people.engineer,deadline})

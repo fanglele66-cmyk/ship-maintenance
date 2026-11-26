@@ -1,0 +1,7 @@
+{
+  "name": "GLM",
+  "model": "glm-5.3-flash",
+  "baseUrl": "https://gateway.example.invalid",
+  "protocol": "anthropic",
+  "maxTokens": 8192
+}

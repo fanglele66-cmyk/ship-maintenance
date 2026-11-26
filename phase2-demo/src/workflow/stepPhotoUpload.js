@@ -1,4 +1,4 @@
-import {STEP_ASSIST_LIMITS} from './stepAssistContract.js'
+import {checkStepPhotoFile} from './stepPhotoFile.js'
 
 export const STEP_PHOTO_COPY_TARGET_BYTES=800*1024
 export const isStepPhotoCopy=photo=>Boolean(photo?.name?.endsWith('（上传压缩副本）'))
@@ -8,8 +8,7 @@ function decodeImage(dataUrl){return new Promise((resolve,reject)=>{const pictur
 
 // Build an upload-only copy. Never change or write back to the selected File.
 export async function prepareStepPhoto(file,{read=readDataUrl,decode=decodeImage,canvas=()=>document.createElement('canvas')}={}){
- if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('请选择 PNG、JPEG 或 WebP 照片。')
- if(file.size>STEP_ASSIST_LIMITS.maxImageBytes)throw Error('单张照片不能超过 3 MB。')
+ checkStepPhotoFile(file.type,file.size)
  const original={name:file.name,mimeType:file.type,dataUrl:await read(file)}
  if(file.size<=STEP_PHOTO_COPY_TARGET_BYTES)return original
  const picture=await decode(original.dataUrl),sourceWidth=picture.naturalWidth||picture.width,sourceHeight=picture.naturalHeight||picture.height

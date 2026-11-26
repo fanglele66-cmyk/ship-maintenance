@@ -47,3 +47,23 @@ export function taskStepLabel(step,kind,index=0){
  }
  return step?.short||label||`步骤${index+1}`
 }
+
+// Values are part of the task snapshot and report contract. Only the radio
+// labels change, so reopening or resuming a saved draft keeps its selection.
+const workFeedback=new Map([
+ ['作业准备与安全隔离', ['准备与隔离核对已完成','准备或隔离核对尚未完成','本次无需执行此项准备']],
+ ['实施维修与过程记录', ['本步维修作业已完成','仍有维修项目待完成','本次无需执行此项维修']],
+ ['实施维保与过程记录', ['本步维保作业已完成','仍有维保项目待完成','本次无需执行此项维保']],
+ ['复装与分阶段试验', ['本步复装及试验已完成','复装或试验仍有未完成项','本次无需执行此项复装试验']],
+ ['交接与效果观察', ['已交接作业记录与观察事项','交接或观察安排仍待补充','本次无需交接观察事项']],
+])
+const workResultIndex=new Map([['已完成',0],['未完成',1],['不适用',2]])
+
+export function taskStepResultChoices(step,kind){
+ const options=Array.isArray(step?.options)?step.options:[]
+ const title=step?.label?.trim()
+ if(!['repair','maintenance'].includes(kind)||!title)return options.map(value=>({value,label:value}))
+ const label=kind==='maintenance'&&title==='实施维修与过程记录'?'实施维保与过程记录':title
+ const labels=workFeedback.get(label)||[`已完成「${title}」`,`「${title}」尚未完成`,`本次无需「${title}」`]
+ return options.map(value=>({value,label:labels[workResultIndex.get(value)]??value}))
+}

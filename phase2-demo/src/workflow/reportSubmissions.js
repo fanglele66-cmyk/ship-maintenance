@@ -1,3 +1,4 @@
+import {submittedStepRecords} from './stepPhotoEvidence.js'
 // Reports are immutable submission snapshots, not live views of a mutable task.
 const copy=value=>JSON.parse(JSON.stringify(value))
 export const reportContextVersion=2
@@ -25,6 +26,16 @@ export function reportTask(event,report){
  if(old)return {...task,...copy(old.draft),submittedAt:old.at,generatedReport:undefined}
  return taskReports(event,task.id).at(-1)?.id===report.id?task:null
 }
+// Previously archived chat uploads were stored in the task thread. Rebuild the
+// attachment list from messages that already existed at the time of this report.
+export function restoreHistoricalPhotoSources(task,report){
+ const snapshot=report.submissionSnapshot,cutoff=Date.parse(report.at)
+ if(!task || !snapshot?.records || snapshot.photoSourcesRecorded || !Number.isFinite(cutoff))return
+ const hasPhoto=Object.values(task.conversations||{}).some(messages=>messages.some(m=>m.kind==='user' && Number.isInteger(m.stepIndex) && Date.parse(m.at)<=cutoff && (m.images?.length||m.originalPhotos?.length)))
+ if(!hasPhoto)return
+ snapshot.records=submittedStepRecords(task,snapshot.records,report.at)
+ snapshot.photoSourcesRecorded=true
+}
 export function refreshSubmissionLabels(event){
  for(const task of event.tasks){
   const reports=taskReports(event,task.id)
@@ -33,6 +44,7 @@ export function refreshSubmissionLabels(event){
    report.submissionNumber=number;report.title=title;report.number=submissionCode(event,task,number)
    if(report.markdown)report.markdown=report.markdown.replace(/^# [^\n]+/,()=>`# ${title}`)
    if(!report.submissionSnapshot&&source)report.submissionSnapshot=submissionSnapshot(source)
+   restoreHistoricalPhotoSources(task,report)
    for(const phase of event.phases)if(phase.reportId===report.id&&['decision','review'].includes(phase.kind)){
     phase.label=`${task.kind==='investigation'?'排查后决策':'结果处置'} · 第${number}次`
    }

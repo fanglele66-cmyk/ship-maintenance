@@ -212,6 +212,6 @@ test('storage budget rejection keeps existing conversation and execution records
  const f=fixture();f.task.conversations={engineer:[{id:'existing',kind:'user',text:'保留已有对话'}]}
  f.state.events['real-warning-0523'].conversations.engineer.push({id:'large-existing',kind:'user',text:'x'.repeat(4*1024*1024)})
  const before=records(f),conversation=JSON.stringify(f.task.conversations)
- await assert.rejects(ask(f,()=>assert.fail('the model must not be called')),/图片较大/)
+ await assert.rejects(ask(f,()=>assert.fail('the model must not be called')),/本地演示记录空间不足/)
  assert.equal(records(f),before);assert.equal(JSON.stringify(f.task.conversations),conversation);assert.deepEqual(f.pending,{})
 })

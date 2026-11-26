@@ -1,5 +1,10 @@
 // Execution and optional AI enrichment have independent lifecycles.
 export const reportGenerationStatus=task=>task?.reportGeneration?.status||(task?.status==='reporting'?'streaming':task?.status==='report-error'?'error':'')
+export function canRetryTaskReport(event, task) {
+ if (reportGenerationStatus(task) !== 'error') return false
+ const report = event.reports?.find(item => item.id === task.reportGeneration?.factReportId)
+ return Boolean(report && !report.revisions?.length && !report.original)
+}
 export function normalizeSubmittedTask(event,task){
  if(['reporting','report-error'].includes(task.status)&&task.submittedAt&&event.reports?.some(r=>r.taskId===task.id)){
   task.reportGeneration||={}

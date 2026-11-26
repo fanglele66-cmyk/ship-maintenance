@@ -3,6 +3,7 @@ import {mkdir,writeFile,rename} from 'node:fs/promises'
 import {join,resolve} from 'node:path'
 import {people} from '../src/workflow/lifecyclePermissions.js'
 import {eventTitle} from '../src/workflow/eventTitle.js'
+import {restoreHistoricalPhotoSources} from '../src/workflow/reportSubmissions.js'
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
 const copy=value=>JSON.parse(JSON.stringify(value))
 export const canSeeEvent=(event,user)=>user?.workflowRole==='captain'||event.participants?.includes(people[user?.workflowRole])
@@ -41,7 +42,13 @@ export async function createEventRepository(directory){
  db.exec(`PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,json TEXT NOT NULL,updated INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,event_id TEXT);
  CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,status TEXT NOT NULL,json TEXT NOT NULL);`)
- const get=id=>{const row=db.prepare('SELECT revision,json FROM events WHERE id=?').get(id);return row?{...JSON.parse(row.json),serverRevision:row.revision}:null}
+ const get=id=>{
+  const row=db.prepare('SELECT revision,json FROM events WHERE id=?').get(id)
+  if(!row)return null
+  const event={...JSON.parse(row.json),serverRevision:row.revision}
+  for(const report of event.reports||[])if(report.taskId)restoreHistoricalPhotoSources(event.tasks?.find(task=>task.id===report.taskId),report)
+  return event
+ }
  const list=()=>db.prepare('SELECT id FROM events ORDER BY updated DESC').all().map(row=>get(row.id))
  const pending=new Map()
  function folder(id){if(!/^[\w-]{1,240}$/.test(id))throw Error('事件编号无效。');return join(directory,'events',id)}

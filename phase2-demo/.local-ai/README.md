@@ -5,3 +5,5 @@ GitHub 版本不包含实际模型密钥。复制 `config.example.json` 为本�
 实际 `config.json` 被 Git 忽略；公司 GitLab 版本单独提供已授权的初始配置。不要直接将公司交付分支历史合并或推送到 GitHub。
 
 容器构建前也需要准备 `config.json`，Dockerfile 使用它初始化持久卷中的 AI 配置。现有持久卷不会被镜像里的初始配置覆盖。
+
+要启用首选 GLM，将 `server/ai-project.example.json` 复制为 `server/ai-project.json`，填写实际网关地址，并为后端设置 `SHIP_GLM_API_KEY`。也可以将密钥配置在私有文件的 `apiKey` 字段，在运行时只读挂载到 `/app/server/ai-project.json`。服务开关和备用模型继续使用持久卷配置。
