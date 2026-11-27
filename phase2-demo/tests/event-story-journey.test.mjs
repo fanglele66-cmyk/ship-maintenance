@@ -8,7 +8,8 @@ test('additional stories accept independent check choices and retain the group-l
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {scenarioSensors}=await server.ssrLoadModule('/src/mock/phase2Content.js')
-  setActivePinia(createPinia());const store=usePhase2DemoStore();store.createTodo('fault')
+  setActivePinia(createPinia());const store=usePhase2DemoStore()
+  assert.ok(store.createTodo('real-alarm-0430'))
   assert.equal(store.visibleTodos.length,1)
   assert.equal(store.createTodo('air-delivery'),true)
   // The current lubrication warning has its own verification-first journey tests.
@@ -28,14 +29,17 @@ test('additional stories accept independent check choices and retain the group-l
    const form=store.executionInquiry(id)
    const values={equipment:store.cases[id].device,task0:'已完成',task1:'已完成',measures:'记录本次实际处理',executedAt:'2026-10-12T10:00',acceptance:'原异常仍存在',completion:'completed',verification:'unresolved',comparable:'missing'}
    assert.equal(store.confirmExecutionRecord(id,form.id,values),true)
-   assert.equal(store.isTaskHandled(id),true)
+   assert.equal(store.isTaskHandled(id),false)
+   assert.equal(store.eventStatus[id],'assigned')
+   assert.equal(store.currentStage.id,'investigate-r2')
    assert.equal(store.executionRecords[id].length,1)
-   assert.equal(store.taskResults[id+':repair:0'],'已完成')
-   assert.equal(store.visibleTodos.filter(t=>t.id===id).length,0)
-   assert.equal(store.confirmExecutionRecord(id,form.id,values),false)
+   assert.equal(store.executionRecords[id][0].values.measures,values.measures)
+   assert.equal(store.observationRecords[id].length,0)
+   assert.ok(store.confirmExecutionRecord(id,form.id,values))
+   assert.equal(store.executionRecords[id].length,1)
    assert.equal(store.executionRecords[id][0].values.verification,'unresolved')
    assert.equal(store.assignments[id].owner,store.cases[id].owner)
   }
-  store.resetDemo();store.createTodo('fault');assert.equal(store.visibleTodos.length,1);assert.equal(store.progress['steering-heat'],0);assert.equal(store.executionRecords['steering-heat'],undefined)
+  store.resetDemo();assert.ok(store.createTodo('real-alarm-0430'));assert.equal(store.visibleTodos.length,1);assert.equal(store.progress['steering-heat'],0);assert.equal(store.executionRecords['steering-heat'],undefined)
  }finally{await server.close()}
 })

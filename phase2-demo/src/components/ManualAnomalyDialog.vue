@@ -19,12 +19,14 @@
 <script setup>
 import {computed,reactive,ref,watch} from 'vue'
 import {useEventLifecycleStore} from '../stores/eventLifecycleStore.js'
-import {reportDevices,reportSensors,reportSensorsForSystems} from '../workflow/manualAnomaly.js'
+import {useShipConfigStore} from '../stores/shipConfigStore'
+import {reportSensors,reportSensorsForSystems} from '../workflow/manualAnomaly.js'
 const emit=defineEmits(['submitted']),store=useEventLifecycleStore(),dialog=ref(null),pending=ref(false),error=ref(''),progress=ref(''),system=ref('')
 const localInput=value=>new Date(value).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16).replace(' ','T')
 const form=reactive({deviceId:'',sensorIds:[],start:localInput(Date.now()-1800000),end:localInput(Date.now()),description:''})
 let requestId=crypto.randomUUID()
-const sensors=computed(()=>reportSensors(form.deviceId)),systems=computed(()=>[...new Set(sensors.value.map(s=>s.subsystem))]),availableSensors=computed(()=>system.value?reportSensorsForSystems(form.deviceId,[system.value]):[])
+const shipConfiguration=useShipConfigStore(),reportDevices=computed(()=>shipConfiguration.reportCatalog.devices)
+const sensors=computed(()=>reportSensors(form.deviceId,shipConfiguration.reportCatalog)),systems=computed(()=>[...new Set(sensors.value.map(s=>s.subsystem))]),availableSensors=computed(()=>system.value?reportSensorsForSystems(form.deviceId,[system.value],shipConfiguration.reportCatalog):[])
 watch(()=>form.deviceId,()=>{system.value='';form.sensorIds=[]})
 watch(system,()=>{form.sensorIds=[];requestId=crypto.randomUUID();error.value=''})
 watch(form,()=>{requestId=crypto.randomUUID();error.value=''})

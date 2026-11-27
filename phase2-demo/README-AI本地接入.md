@@ -18,6 +18,17 @@
 
 模型接口仅允许本机同源页面请求，带固定客户端标记以阻止跨站请求。当前角色切换仍是原型的前端视角控制，不是多用户身份认证；公开部署这套后端前需接入真正的登录、角色授权和共享报告存储。
 
+## 船端技能与页面产物
+
+| 入口 | 技能及产物 |
+| --- | --- |
+| AI 周期检测与人工上报 | [周期检测](.claude/skills/ship-anomaly-detection/SKILL.md)读取本船时序窗口并整理预警依据。[人工异常研判](.claude/skills/ship-manual-anomaly-analysis/SKILL.md)按船员提交的时间与现象生成报警研判。 |
+| OEM 硬件报警 | [OEM 报警研判](.claude/skills/ship-oem-alarm-analysis/SKILL.md)核对设备、点位开关和报警状态变化。默认生成证据，显式发布经核对的研判后，事件进入待决策列表。 |
+| 设备健康与效果观察 | [设备健康分析](.claude/skills/ship-engine-health/SKILL.md)生成最近六小时的设备健康报告，[长期异动跟踪](.claude/skills/ship-health-score/SKILL.md)按需分析长期评分与基线偏离，[效果观察](.claude/skills/ship-effect-observation/SKILL.md)整理事件进入观察后的数据。 |
+| 任务、报告与对话 | [事件流转](.claude/skills/ship-event-workflow/SKILL.md)生成待派任务草稿，[报告生成](.claude/skills/ship-report-generation/SKILL.md)生成正式报告和修订草案。[事件](.claude/skills/ship-event-assistant/SKILL.md)、[任务](.claude/skills/ship-task-assistant/SKILL.md)、[态势](.claude/skills/ship-situation-assistant/SKILL.md)和[知识库](.claude/skills/ship-knowledge-assistant/SKILL.md)各有对应的对话技能。 |
+
+[检测小模型 MCP 备用技能](.claude/skills-MCP/ship-mcp-anomaly-analysis/SKILL.md)提供接入所需的输入、推理工具调用顺序、结果校验及离线回放方法。现有周期检测继续使用本地入口。
+
 ## 问答与资料引用
 
 右侧助手使用真实模型回答普通问题，保留已有规则建议和历史对话。页面不显示模型名称。回答采用流式输出；接口异常时明确显示失败原因，普通问答尚未输出正文时可返回现有规则建议，已输出的部分保留并标明中断；报告修订失败时不修改报告。
@@ -32,7 +43,7 @@
 
 修订稿的结论和分析随模型输出逐段显示，完整生成且通过结构校验后才显示“确认补充并更新报告”，点击后写入。中断、超时、截断及缺失章节的草稿不能写入；刷新页面后将未完成生成标记为中断。原有报告编号、事件编号、提交时间、负责人、任务范围和逐项记录不变；结论和分析更新，增加提交后补充记录。保留每次修订前版本、补充原文、模型与资料索引，并提醒轮机长重新审阅。关闭的事件不能补充；报告已变化时拒绝应用旧修订稿。
 
-报告仍使用现有浏览器本地存储，刷新后保留；同源其他标签页通过 storage 事件同步。清理浏览器数据会删除这些报告，当前尚无服务器持久化和跨设备同步。
+后端管理的事件按报告 ID 在 `SHIP_DATA_DIR/events/<eventId>/reports/` 保存独立 JSON，包含报告正文、提交快照和步骤照片引用。浏览器演示事件的独立 JSON File 保存在本站 IndexedDB，演示工作区继续通过同源浏览器标签页同步。详见[独立报告与页面字段](.claude/skills/ship-report-generation/references/files.md)。
 
 ## 派发前任务与决策分支
 
@@ -44,7 +55,7 @@
 
 效果观察阶段提供闭环、复查和同步岸基。复查页先显示四步预设任务，同时由 AI 依据实际维修报告、剩余事项及观察记录整理新版；生成成功后整体替换，失败时保留预设并提供重试，轮机长可核对后使用预设。复查后发现异常则进入维修；未见异常则返回效果观察，供轮机长决定闭环或再次复查。复查仍归入排查类报告，标题注明复查。既有维保报告与历史安排保留。
 
-对话修改、报告补充或阶段切换期间，过期的模型响应不能覆盖新草稿或历史任务。任务与报告继续使用本机浏览器存储。
+对话修改、报告补充或阶段切换期间，过期的模型响应不能覆盖新草稿或历史任务。
 
 ## 自动采样
 

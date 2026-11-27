@@ -1,6 +1,10 @@
 import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
-const names=new Set(['ship-manual-anomaly-analysis','ship-anomaly-detection','ship-event-assistant','ship-task-assistant','ship-effect-observation'])
+const names=new Set([
+ 'ship-manual-anomaly-analysis','ship-anomaly-detection','ship-effect-observation',
+ 'ship-event-assistant','ship-task-assistant','ship-situation-assistant','ship-knowledge-assistant',
+ 'ship-event-workflow','ship-report-generation',
+])
 export async function skillInstruction(root,name){
  if(!names.has(name))throw Error('未知 Skill')
  return readFile(join(root,'.claude/skills',name,'SKILL.md'),'utf8')

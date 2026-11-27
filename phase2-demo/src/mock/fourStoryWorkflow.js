@@ -70,7 +70,7 @@ export function storyDossier(store,id){
   const assessment=store.checkAssessments?.[id],decision=store.completedTasks?.[id]
   const execution=store.executionRecords?.[id]?.at(-1)
   const observation=store.observationRecords?.[id]?.length?store.getObservationResult?.(id):null
-  const executionState=store.eventStatus?.[id]==='closed'?'本轮已人工确认结束，执行与观察记录已归档。':observation?.title||executionSummary(execution)
+  const executionState=store.eventStatus?.[id]==='closed'?'本轮已人工确认结束，执行与观察记录已归档。':[executionSummary(execution),observation?.title].filter(Boolean).join(' ')
   let update=assessmentMarkdown(assessment)
   if(execution)update+=`\n\n### 实际措施与验证\n\n${[...new Set([execution.values.measures,execution.values.acceptance].filter(Boolean))].join('\n\n')}\n\n${executionState}`
   if(store.ignoredSuggestions?.[id]&&!store.todoCreated?.[id])update+=`\n\n### 本次决定\n\n${store.ignoredSuggestions[id].reason}。原来源记录与周期计划继续保留。`
@@ -94,7 +94,7 @@ export function storyDossier(store,id){
   // The overview summarizes state; analysis interprets evidence; the timeline owns raw receipts.
   const summaries=item?.isTrackingContainer?recommendations.map(child=>storyDossier(store,child.id).overviewSummary).filter(Boolean):[]
   const disposition=store.trackingDispositions?.[id]
-  if(disposition)update=`### 当前处置结论\n\n${trackingDispositionSummary(disposition)}\n\n${disposition.reason||disposition.recommendation?.reason||''}`+(disposition.plan?`\n\n### 专项观察安排\n\n负责人：${disposition.plan.owner}\n\n关注指标：${disposition.plan.metrics}\n\n复核期限：${disposition.plan.deadline.replace('T',' ')}\n\n下次判断条件：${disposition.plan.criteria}`:'')+(disposition.observationResult?`\n\n### 最新观察反馈\n\n${disposition.observationResult.findings}`:'')
+  if(disposition)update=[`### 当前处置结论\n\n${trackingDispositionSummary(disposition)}\n\n${disposition.reason||disposition.recommendation?.reason||''}`+(disposition.plan?`\n\n### 专项观察安排\n\n负责人：${disposition.plan.owner}\n\n关注指标：${disposition.plan.metrics}\n\n复核期限：${disposition.plan.deadline.replace('T',' ')}\n\n下次判断条件：${disposition.plan.criteria}`:'')+(disposition.observationResult?`\n\n### 最新观察反馈\n\n${disposition.observationResult.findings}`:''),update].filter(Boolean).join('\n\n')
   const prior=trackingProcessReference(id)
   const priorFindings=prior?`### 首轮核实回交 · ${prior.at}\n\n${prior.feedback.map(entry=>`- **${entry.label}：${entry.result}**。${entry.note}`).join('\n\n')}`:''
   if(prior&&disposition?.status==='review'&&!disposition.observationResult)update+='\n\n'+priorFindings
@@ -196,6 +196,11 @@ export function workflowReply(store,id,text) {
 }
 
 export function deviceStoryAssessment(store,deviceId){
+  const track=healthTracks.find(item=>!item.realCaseId&&item.requestId&&workflowCases[item.requestId]?.deviceId===deviceId&&(store.checkAssessments?.[item.requestId]||store.healthUpdates?.[item.id]))
+  if(track){
+    const assessment=store.checkAssessments?.[track.requestId],report=healthStoryMarkdown(store,track.requestId)
+    return {conclusion:assessment?.message||track.conclusion,basis:report,next:track.next}
+  }
   const current=allCases.filter(item=>item.realCaseId&&item.deviceId===deviceId&&parentIssueId(item.id)===item.id)
   if(current.length){
     const context={cases:store.cases||workflowCases,unlockedRecommendations:store.unlockedRecommendations,

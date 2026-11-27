@@ -59,8 +59,12 @@ test('event task previews and records render one readable step with role-safe fe
   const {useEventLifecycleStore}=await server.ssrLoadModule('/src/stores/eventLifecycleStore.js')
   const {useSensorStore}=await server.ssrLoadModule('/src/stores/sensorStore.js')
   globalThis.window={addEventListener(){}}
-  let externalCalls=0
-  globalThis.fetch=async()=>{externalCalls++;throw Error('external model requests are disabled in this UI test')}
+  const unexpectedRequests=[]
+  globalThis.fetch=async url=>{
+   const path=new URL(url,'http://localhost').pathname
+   if(!['/api/data/situation','/api/data/health'].includes(path))unexpectedRequests.push(path)
+   return new Response(null,{status:503})
+  }
   useSensorStore().configureSimulation({enabled:false})
   const store=useEventLifecycleStore()
   store.prepareTaskPlan=async eventId=>store.state.events[eventId].pendingPlan
@@ -157,6 +161,6 @@ test('event task previews and records render one readable step with role-safe fe
    }
    assert.equal(JSON.stringify([first,second,data.task]),frozen)
   })
-  assert.equal(externalCalls,0)
+  assert.deepEqual(unexpectedRequests,[],'viewing the steps must never request model generation')
  }finally{disposePinia(pinia);await server.close();globalThis.fetch=oldFetch;if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow}
 })

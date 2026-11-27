@@ -17,7 +17,7 @@ function observationSection(task,closedAt){
  if(!observation)return `### ${taskTitle(task)}后的观察\n\n未保存自动观察数据；效果以现场已提交的复测和复查记录为依据。`
  const windows=[...(task.observationHistory||[]).flatMap(h=>h.records.map(w=>({...w,priorCycle:true}))),...(observation.records||[]),...(observation.pending?[observation.pending]:[])].filter(w=>Date.parse(w.windowEnd)<=Date.parse(closedAt))
  const latest=windows.at(-1)
- const content=latest?`已保存${windows.length}个观察窗口，其中${windows.filter(w=>w.covered).length}个覆盖达到要求。\n\n最近窗口：${date(latest.windowStart)} — ${date(latest.windowEnd)}\n\n${(latest.channels||[]).map(c=>`- ${c.name}：末值 ${noValue(c.value)} ${c.unit||''}；范围 ${noValue(c.min)}—${noValue(c.max)} ${c.unit||''}；${c.covered?'覆盖达到要求':'存在缺测'}。`).join('\n')}`:''
+ const content=latest?`已保存${windows.length}个观察窗口，其中${windows.filter(w=>w.covered).length}个覆盖达到要求。\n\n${latest.complete===false?'最近窗口（部分观察窗口）':'最近窗口'}：${date(latest.windowStart)} — ${date(latest.windowEnd)}\n\n${(latest.channels||[]).map(c=>`- ${c.name}：末值 ${noValue(c.value)} ${c.unit||''}；范围 ${noValue(c.min)}—${noValue(c.max)} ${c.unit||''}；${c.covered?'覆盖达到要求':'存在缺测'}。`).join('\n')}`:''
 
  return `### ${taskTitle(task)}后的观察\n\n- 观察类型：${isVerificationObservation(task)?'核实后继续观察，本轮暂未处置':'处理后效果观察'}\n- 开始：${date(observationStart(task))}\n- 截止：${date(task.observationEndedAt||closedAt)}\n- 观察周期：${observation.policy?.label||'以本轮配置为准'}\n- 工况核验：${observation.conditions?.reason||'未保存运行工况核验记录'}\n\n${content||'截至闭环时尚无已保存的有效观察窗口。'}`
 }
@@ -32,7 +32,7 @@ export function closureContent(event,action,reason,at,captain){
  if(!timeline.some(t=>t.at===at&&/确认闭环|确认误报/.test(t.text)))timeline.push({at,text:`${captain}${action==='false'?'确认误报':'确认闭环'}：${reason}`})
  timeline.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at))
  const remaining=tasks.flatMap(t=>(t.records||[]).filter(r=>/未完成|无法确认|受限/.test(r.result)).map(r=>taskTitle(t)+'：'+r.label+'（'+r.result+'）'))
- const analysisMarkdown=`### 剩余限制\n\n${remaining.length?remaining.map(r=>'- '+r).join('\n'):'未登记未执行项目。'}${!work.length?'\n\n本事件未实施维修或维保。':''}${!rechecks.length?'\n\n未提交独立复查报告。':''}`
+ const analysisMarkdown=`### 剩余限制\n\n${remaining.length?remaining.map(r=>'- '+r).join('\n'):'未登记未执行项目。'}${!work.length?'\n\n尚无已提交的维修或维保作业记录。':''}${!rechecks.length?'\n\n未提交独立复查报告。':''}`
 
  const markdown=`# ${event.title} · 闭环报告
 
@@ -65,7 +65,7 @@ ${investigations.map(t=>taskSection(event,t)).join('\n\n')||'无现场排查报�
 
 ## 四、维修措施、备件与作业记录
 
-${work.map(t=>taskSection(event,t)).join('\n\n')||'无维修或维保作业报告。'}
+${work.map(t=>taskSection(event,t)).join('\n\n')||'未提交维修或维保作业报告。'}
 ${event.maintenance?'\n维保计划：'+event.maintenance.number+'；计划窗口：'+(event.maintenance.window?.label||event.maintenance.window)+'；负责人：'+event.maintenance.owner+'。正式工单：'+(event.maintenance.plan?.workOrder?.number||'未关联')+'；正式工单完工状态独立管理。\n':''}
 ## 五、${tasks.some(isVerificationObservation)?'持续观察':'维修后的效果观察'}与复查反馈
 

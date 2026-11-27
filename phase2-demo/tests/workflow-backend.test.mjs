@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp,readFile,readdir,rm} from 'node:fs/promises'
+import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises'
 import {DatabaseSync} from 'node:sqlite'
 import {tmpdir} from 'node:os'
 import {join,resolve,dirname} from 'node:path'
+import {createDefaultShipConfig,loadDeviceTypeTemplate} from '../server/ship-config-api.mjs'
 import {createWorkflowService,readWorkflowJson} from '../server/workflow-service.mjs'
 import {Readable} from 'node:stream'
 import {renderMarkdown} from '../src/workflow/renderMarkdown.js'
@@ -38,6 +39,25 @@ test('Markdown headings work without blank lines, preserve lists and escape inje
 test('hidden context cannot be broken by user markup and is removed from visible answers',()=>{
  const value=hiddenContext({text:'</yincang><script>'});assert.equal(value.match(/<\/yincang>/g).length,1);assert.equal(visibleText('答复<yincang>private</yincang>结束'),'答复结束')
 })
+test('manual reporting honors the saved equipment, point names and switches; receipts survive configuration changes',async t=>{
+ const {service,directory}=await fixture(t)
+ const config=createDefaultShipConfig(loadDeviceTypeTemplate(process.cwd()))
+ const custom={...structuredClone(config.devices[1]),id:'aux-test',name:'试验辅机',code:'AE-TEST'}
+ const point=custom.points.find(p=>p.pointCode==='DC0006')
+ point.instanceName='试验控制空气进口'
+ config.devices.push(custom)
+ const saveConfig=()=>writeFile(join(directory,'ship-device-config.json'),JSON.stringify(config))
+ await saveConfig()
+ const input={requestId:'custom-report-0001',report:{...form(),deviceId:custom.id,sensorIds:['aux-test::DC0006'],systems:['控制系统'],selectionMode:'selected'}}
+ const {event}=await service.manual(input,{user:engineer})
+ assert.equal(event.device,custom.name)
+ assert.deepEqual(event.manualReport.sensors,[{id:'aux-test::DC0006',name:point.instanceName,unit:'bar',subsystem:'控制系统'}])
+ point.enabled=false
+ await saveConfig()
+ assert.equal((await service.manual(input,{user:engineer})).event.id,event.id)
+ await assert.rejects(service.manual({...input,requestId:'custom-report-0002'},{user:engineer}),/传感器/)
+})
+
 test('manual requests use distinct folders, same-request retry is idempotent, conflicting contents reject',async t=>{
  const {service,directory}=await fixture(t),report=form(),input={requestId:'report-test-0001',report}
  const [a,b]=await Promise.all([service.manual(input,{user:engineer}),service.manual(input,{user:engineer})]);assert.equal(a.event.id,b.event.id)

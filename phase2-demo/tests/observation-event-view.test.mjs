@@ -29,7 +29,7 @@ test('独立观察页、来源事件及闭环报告均可完整渲染',async()=>
   assert.equal(router.resolve('/situation/issue/aux-health').name,'Situation')
   async function render(id){await router.push('/situation/issue/'+id);const app=createSSRApp({render:()=>h(View)});app.use(pinia);app.use(router);return renderToString(app)}
   const parentHtml=await render(parent.id);assert.match(parentHtml,/效果观察已独立建档/);assert.match(parentHtml,new RegExp(child.title))
-  const childHtml=await render(child.id);assert.match(childHtml,/关联事件/);assert.match(childHtml,/关联任务/);assert.match(childHtml,/来源报告/);assert.match(childHtml,new RegExp('/tasks/'+task.id));assert.match(childHtml,/lc-effect-chart/);assert.match(childHtml,/观察条件/);assert.match(childHtml,/效果观察/);assert.match(childHtml,/事件助手/);assert.match(childHtml,/>决策<\/button>/);assert.doesNotMatch(childHtml,/<select/)
+  const childHtml=await render(child.id);assert.match(childHtml,/关联事件/);assert.match(childHtml,/关联任务/);assert.match(childHtml,/来源报告/);assert.match(childHtml,new RegExp('/tasks/'+task.id));assert.match(childHtml,/lc-effect-chart/);assert.match(childHtml,/观察条件/);assert.match(childHtml,/效果观察/);assert.match(childHtml,/事件助手/);assert.match(childHtml,/>填写决策<\/button>/);assert.doesNotMatch(childHtml,/<select/)
   decide(store.state,child.id,{action:'close',reason:'核对本轮观察记录后确认结束。'})
   const closedHtml=await render(child.id);assert.match(closedHtml,/闭环归档/);assert.match(closedHtml,/关联事件/)
  }finally{disposePinia(pinia);await server.close();if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow}

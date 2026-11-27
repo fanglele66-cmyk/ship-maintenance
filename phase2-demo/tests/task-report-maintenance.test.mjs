@@ -80,4 +80,5 @@ test('submission API invokes provider, streams report previews and validates com
   try{return await aiStreamRequest(body,on)}finally{globalThis.fetch=original}
  })
  assert.equal(calls,1);assert.match(sent.system,/当前提交的报告/);assert.deepEqual(JSON.parse(sent.messages.at(-1).content).availableDecisions.map(o=>o.value),['maintenance','observe','close','shore']);assert.equal(report.usage.inputTokens,12);assert.equal(report.usage.outputTokens,24);assert.equal(report.summary,patch.summary)
+ assert.match(sent.system,/name: ship-report-generation/)
 })

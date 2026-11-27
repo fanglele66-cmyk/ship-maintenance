@@ -9,12 +9,14 @@ test('four scenario journeys preserve evidence and route every valid outcome',as
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
   const {useSensorStore}=await server.ssrLoadModule('/src/stores/sensorStore.js')
   const {workbenchIssues,activeWorkbenchIssues}=await server.ssrLoadModule('/src/mock/captainWorkbench.js')
+  const {storyTimeline}=await server.ssrLoadModule('/src/mock/storyRecords.js')
   function fresh(id){setActivePinia(createPinia());const store=usePhase2DemoStore();if(id){store.unlockedRecommendations[id]=true;store.createTodo(id);store.selectTodo(id);store.advanceTodo(id)}return store}
   function feedback(store,id,values){return store.currentStage.tasks.map((task,i)=>({label:task.label,result:values[i],note:'现场记录 '+i,attachments:['记录'+i+'.png']}))}
   function execute(store,id,overrides={}){const form=store.executionInquiry(id);return store.confirmExecutionRecord(id,form.id,{...Object.fromEntries(store.currentStage.tasks.map((_,i)=>['task'+i,'已完成'])),equipment:store.cases[id].device,measures:'按现场发现完成本轮处置',executedAt:'2026-10-14T10:00',acceptance:'已记录现场复测',completion:'completed',verification:'resolved',comparable:'available',...overrides})}
   await t.test('only the four current requests are active; historical decisions are retained',()=>{
    const store=fresh();assert.deepEqual(activeWorkbenchIssues(store).map(i=>i.type),['报警事件','预警事件','异动跟踪','异动跟踪']);assert.equal(store.visibleTodos.length,0)
-   assert.equal(workbenchIssues(store).filter(i=>i.history&&i.state==='已闭环').length,1)
+   assert.equal(workbenchIssues(store).some(i=>i.id==='maintenance-history'),false)
+   assert.ok(storyTimeline(store,'bearing-health').some(row=>row.id==='maintenance-history'))
   })
   for(const values of [['发现异常','未见异常'],['未见异常','发现异常'],['发现异常','发现异常']])await t.test('cooling repair scope follows '+values.join('/'),()=>{
    const store=fresh('fault');const result=store.advanceTodo('fault',feedback(store,'fault',values));assert.equal(result.advanced,true)
@@ -103,28 +105,41 @@ test('four scenario journeys preserve evidence and route every valid outcome',as
   await t.test('finished work with unresolved symptoms reopens the same task and preserves scope and feedback',()=>{
    const store=fresh('fault');store.advanceTodo('fault',feedback(store,'fault',['发现异常','发现异常']))
    assert.equal(execute(store,'fault',{verification:'unresolved',comparable:'missing'}),true)
-   assert.equal(store.currentStage.id,'investigate');assert.equal(store.isTaskHandled('fault'),false);assert.equal(store.executionRecords.fault.length,1);assert.equal(store.workflowRounds.fault,2)
+   assert.equal(store.currentStage.id,'investigate-r2');assert.equal(store.isTaskHandled('fault'),false);assert.equal(store.executionRecords.fault.length,1);assert.equal(store.workflowRounds.fault,2)
    store.advanceTodo('fault',feedback(store,'fault',['未见异常','发现异常']))
-   assert.equal(store.currentStage.tasks.length,2);assert.equal(store.executionInquiry('fault').values.verification,undefined)
+   assert.equal(store.currentStage.id,'repair-r2');assert.equal(store.currentStage.packageKeys.length,1)
+   assert.equal(store.executionInquiry('fault').values.verification,undefined)
    assert.equal(store.executionRecords.fault[0].scope.length,4);assert.equal(store.visibleTodos.length,1)
   })
   await t.test('unfinished work and pending acceptance retain progress without pretending recovery',()=>{
    const store=fresh('fault');store.advanceTodo('fault',feedback(store,'fault',['发现异常','未见异常']))
-   assert.equal(execute(store,'fault',{completion:'partial',task1:'待补充',verification:'pending'}),true);assert.equal(store.currentStage.kind,'work')
-   assert.equal(execute(store,'fault',{verification:'pending'}),true);assert.equal(store.currentStage.kind,'work');assert.equal(store.executionObservationReady('fault'),false)
+   const stepForm=store.stageFeedbackForm('fault')
+   store.updateStageFeedback('fault',{result_0:'已完成',result_1:'未完成',note_1:'作业条件未满足'},stepForm.id)
+   assert.ok(store.submitStageFeedback('fault',stepForm.id).ok)
+   assert.equal(execute(store,'fault',{verification:'resolved'}),false)
+   assert.equal(execute(store,'fault',{verification:'pending'}),false)
+   assert.equal(store.currentStage.kind,'work');assert.equal(store.executionObservationReady('fault'),false)
+   assert.equal(store.workStepRecords['fault:'+store.currentStage.id].records[1].note,'作业条件未满足')
+   assert.equal(store.executionRecords.fault,undefined)
   })
-  await t.test('missing comparable records do not fabricate improvement; stable records need explicit closure',()=>{
+  await t.test('a manual reading is preserved separately and cannot certify the observation window',st=>{
+   st.mock.method(Date,'now',()=>Date.parse('2026-10-14T10:00:00+08:00'))
    const store=fresh('fault');store.advanceTodo('fault',feedback(store,'fault',['未见异常','发现异常']))
    execute(store,'fault',{comparable:'missing'});store.selectObservation('fault')
    assert.equal(store.observationRecords.fault.length,0);assert.equal(store.eventStatus.fault,'observing')
    assert.equal(store.supplementObservation('fault',{value0:79.1,value1:86.5,conditions:'同负荷，10月14日11:00',note:'现场已复测'}),true)
-   store.reviewObservation('fault');assert.equal(store.getObservationResult('fault').type,'archive');assert.notEqual(store.eventStatus.fault,'closed')
-   store.completeObservation('fault');assert.equal(store.eventStatus.fault,'closed');assert.equal(activeWorkbenchIssues(store).some(i=>i.id==='fault'),false)
+   assert.deepEqual(store.observationRecords.fault[0].values,[79.1,86.5])
+   assert.equal(store.executionRecords.fault[0].values.comparable,'missing','later observations cannot rewrite the original execution receipt')
+   assert.notEqual(store.getObservationResult('fault').type,'archive')
+   assert.equal(store.completeObservation('fault').ok,false)
+   assert.equal(store.eventStatus.fault,'observing')
   })
   await t.test('observation recurrence reopens the original event and retains earlier observations',()=>{
    const store=fresh('fault');store.advanceTodo('fault',feedback(store,'fault',['发现异常','未见异常']));execute(store,'fault');store.selectObservation('fault')
    store.recordObservationEvidence('fault','abnormal','相近负荷下再次温升');store.reopenTodo('fault')
-   assert.equal(store.progress.fault,1);assert.equal(store.observationHistory.fault.length,1);assert.equal(store.visibleTodos.filter(t=>t.id==='fault').length,1)
+   assert.equal(store.currentStage.id,'investigate-r2')
+   assert.ok(store.observationHistory.fault[0].records.some(row=>row.status==='abnormal'&&/再次温升/.test(row.note)))
+   assert.equal(store.observationHistory.fault.length,1);assert.equal(store.visibleTodos.filter(t=>t.id==='fault').length,1)
   })
   await t.test('false alarm preserves the source and reset restores independent fixture copies',()=>{
    const store=fresh();assert.equal(store.confirmFalseAlarm('fault','现场核对采集链错误，原报警记录留存'),true)

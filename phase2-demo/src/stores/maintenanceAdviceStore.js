@@ -15,12 +15,12 @@ export const useMaintenanceAdviceStore=defineStore('maintenance-advice',()=>{
  function decide(type,reason=''){
   if(core.isTaskHandled('maintenance'))return false
   if(type==='check'){
-   if(core.todoCreated.maintenance)return false
-   core.createTodo('maintenance');core.progress.maintenance=Math.max(core.progress.maintenance,core.cases.maintenance.stages.findIndex(stage=>stage.id==='check'));core.activeStage.maintenance=core.progress.maintenance;decision.value='check'
+   if(!core.createTodo('maintenance'))return false
+   core.progress.maintenance=Math.max(core.progress.maintenance,core.cases.maintenance.stages.findIndex(stage=>stage.id==='check'));core.activeStage.maintenance=core.progress.maintenance;decision.value='check'
    record('确认开展检查','已关联本问题的检查事件；确认检查不代表确认磨损或同意换件。')
   }else if(type==='execute'){
    if(!sufficient.value || decision.value==='execute')return false
-   if(!core.todoCreated.maintenance)core.createTodo('maintenance')
+   if(!core.todoCreated.maintenance&&!core.createTodo('maintenance'))return false
    const workIndex=core.cases.maintenance.stages.findIndex(stage=>stage.kind==='work');core.progress.maintenance=Math.max(core.progress.maintenance,workIndex);core.activeStage.maintenance=core.progress.maintenance
    decision.value='execute';record('采纳并安排执行','在原问题事件中接续实际维护；没有自动完成工单、修改周期或确认现场已经执行。')
   }else if(type==='defer'){

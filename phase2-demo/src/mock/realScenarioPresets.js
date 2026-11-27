@@ -115,7 +115,7 @@ export function realExecutionContent(item,key,stage){
 }
 export function executionPreset(item,stage,key){
  if(!item?.realCaseId||stage?.kind!=='work'||!executionPresetOptions.some(option=>option.id===key))return null
- const partial=key==='partial',p=profileFor(item),now=new Date(),local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16)
+ const partial=key==='partial',p=profileFor(item),local=new Date(Date.now()).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16).replace(' ','T')
  if(stage.round>1){
   const measures=`第${stage.round}轮按本次批准范围完成复查后的处置，已将返工、新增作业及未完成项与前轮记录逐项对应；旧新件、实际领用与复装记录另行留存。`
   const acceptance=key==='unresolved'?'本轮复测仍出现原异常，已保存复发工况与本轮措施，继续原因排查。':key==='pending'||partial?'本轮尚缺完整现场验收，保留剩余作业和需补的复测条件。':`本轮获批范围的复装及功能复核已完成，已保留 ${p.observe} 的复测资料；持续效果另行观察。`

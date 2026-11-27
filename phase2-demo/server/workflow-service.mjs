@@ -8,7 +8,7 @@ import {DatabaseSync} from 'node:sqlite'
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
 import {createEventRepository,canSeeEvent} from './event-repository.mjs'
-import {readEventEvidence} from './event-evidence.mjs'
+import {loadReportCatalog,readEventEvidence} from './event-evidence.mjs'
 import {analyzeManualAnomaly} from './manual-anomaly.mjs'
 import {createManualAnomaly,validateAnomalyReport} from '../src/workflow/manualAnomaly.js'
 import {people} from '../src/workflow/lifecyclePermissions.js'
@@ -46,22 +46,31 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
  const inFlight=new Map()
  async function manual(input,{user,emit=()=>{},signal}={}){
   const requestId=input.requestId;if(!/^[a-zA-Z0-9-]{8,80}$/.test(requestId||''))throw Error('上报编号无效。')
-  const report=validateAnomalyReport(input.report,user.workflowRole,clock()),fingerprint=hash(report),key='manual-'+requestId
-  const old=db.prepare('SELECT * FROM requests WHERE id=?').get(key)
+  const key='manual-'+requestId,old=db.prepare('SELECT * FROM requests WHERE id=?').get(key)
+  const saved=old?.event_id?repository.get(old.event_id):null
+  if(old?.event_id&&(!saved||unavailable(saved)))throw Error('该事件已删除。')
+  // A retry after renaming or disabling a point must resolve against the
+  // original server-validated submission rather than today's catalog.
+  const prior=saved?.manualReport
+  const pointCatalog=prior?{
+   devices:[{id:prior.deviceId,name:prior.device}],
+   sensors:prior.sensors.map(({id,name,unit,subsystem})=>({deviceId:prior.deviceId,id,nameCn:name,unit,subsystem}))
+  }:await loadReportCatalog(root,directory)
+  const report=validateAnomalyReport(input.report,user.workflowRole,clock(),pointCatalog),fingerprint=hash(report)
   if(old&&old.fingerprint!==fingerprint)throw Error('该上报编号已用于不同内容，请重新上报。')
-  if(old?.event_id){const event=repository.get(old.event_id);if(!event||unavailable(event))throw Error('该事件已删除。');return {event,anomaly:event.manualReport.analysis,answer:event.brief.conclusion}}
+  if(saved)return {event:saved,anomaly:prior.analysis,answer:saved.brief.conclusion}
   if(inFlight.has(key))return inFlight.get(key)
   if(!lock(key,clock()))throw Error('该上报正在分析，请稍后重试。')
   db.prepare('INSERT OR IGNORE INTO requests VALUES(?,?,NULL)').run(key,fingerprint)
   const promise=(async()=>{try{
    report.submittedAt=new Date(clock()).toISOString()
    emit('progress',{label:'正在读取上报时段的设备数据'})
-   report.evidence=evidenceReader(root,report,directory)
+   report.evidence=evidenceReader(root,report,directory,pointCatalog)
    const folder=repository.folder(key);await mkdir(folder,{recursive:true});await writeFile(join(folder,'request.json'),JSON.stringify(report,null,2),'utf8')
    let detection={devices:[],rows:0}
    if(report.deviceId==='main-engine-1'){emit('progress',{label:'AI正在异常检测分析'});detection=await detect(root,directory,Date.parse(report.start),Date.parse(report.end),join(folder,'detection'))}
-   const result=await analyze({...input,role:user.workflowRole,report,detection},{root,configuration,knowledge,fetcher,emit,signal})
-   const state={events:{},notices:[]},event=createManualAnomaly(state,report,result,requestId,{at:new Date(clock()).toISOString()})
+   const result=await analyze({...input,role:user.workflowRole,report,detection},{root,configuration,knowledge,fetcher,emit,signal,pointCatalog})
+   const state={events:{},notices:[]},event=createManualAnomaly(state,report,result,requestId,{at:new Date(clock()).toISOString(),pointCatalog})
    event.sensorScope={deviceId:report.deviceId,systems:report.systems,sensorIds:report.sensorIds};event.manualReport.evidence=report.evidence
    event.skill='ship-manual-anomaly-analysis';event.backendManaged=true
    const saved=await repository.save(event);db.prepare('UPDATE requests SET event_id=? WHERE id=?').run(saved.id,key)
@@ -131,7 +140,7 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
     if(!ids.length)continue
     const report=validateAnomalyReport({deviceId:'main-engine-1',sensorIds:ids,start:new Date(now-6*HOUR).toISOString(),end:new Date(now).toISOString(),description:`周期检测信号：${signal.event_type}；${signal.sensors.join('、')}。需核对工况及现场状态。`},'captain',now)
     report.evidence=evidenceReader(root,report,directory)
-    const analyzed=await analyze({report,role:'captain',detection:{devices:[{events:[signal]}]},skillName:'ship-anomaly-detection'},{root,configuration,knowledge,fetcher,emit:()=>{}})
+    const analyzed=await analyze({report,role:'captain',detection:{devices:[{events:[signal]}]}},{root,configuration,knowledge,fetcher,periodic:true,emit:()=>{}})
     const state={events:{},notices:[]},event=createManualAnomaly(state,report,analyzed,`${fingerprint}-${now}`,{at:new Date(now).toISOString()})
     event.id=`detected-${fingerprint}-${now}`;event.number=event.number.replace('-MR-','-AI-');event.brief.id=event.id
     // Hourly anomaly detection produces warnings. Long-history baseline tracking
@@ -152,7 +161,7 @@ export async function createWorkflowService(root,{directory=process.env.SHIP_DAT
   if(prior&&(prior.status==='complete'||JSON.parse(prior.json).retryAt>now))return
   runRecord(id,'running',{startedAt:now})
   try{
-   const evidence=evidenceReader(root,{...event.sensorScope,start:phase.at,end:phase.observationDueAt,allRelated:true},directory)
+   const evidence=evidenceReader(root,{...event.sensorScope,start:phase.at,end:phase.observationDueAt,allRelated:true},directory,await loadReportCatalog(root,directory))
    const instruction=await skillInstruction(root,'ship-effect-observation'),context={event:{id:event.id,title:event.title,reports:event.reports.filter(r=>r.kind!=='观察报告').slice(-2)},plan:phase.observationPlan||event.observationPlan,start:phase.at,end:phase.observationDueAt,sensors:evidence.map(({trendData,...s})=>s)}
    let value,model
    if(observationModel){value=await observationModel(context);model='test'}else{const config=await configuration.read();if(!config.enabled)throw Error('模型已停用，观察报告等待重试。');const provider=await resolveProvider(config);const result=await invokeModel(provider,{...config,maxTokens:8192},instruction,hiddenContext(context),fetcher,{});value=JSON.parse(result.text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''));model=result.model}

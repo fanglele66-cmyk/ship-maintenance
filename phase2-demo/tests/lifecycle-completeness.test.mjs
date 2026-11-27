@@ -23,7 +23,7 @@ test('shore is available before reporting and can sync a reviewed latest report 
 
 test('repair without package metadata has concrete preparation, execution and verification steps',()=>{
  const state=repairState(),event=state.events[id],plan=ensureTaskPlan(event),content=JSON.stringify(plan.steps)
- assert.equal(plan.steps.length,4);for(const phrase of ['备件','图号','隔离','残余压力','认可的车间','砂纸','复装','试验'])assert.ok(content.includes(phrase),phrase)
+ assert.equal(plan.steps.length,4);for(const requirement of [/备件/,/图号/,/隔离/,/核实余压|残余压力/,/认可的?车间/,/砂纸/,/复装/,/试验/])assert.match(content,requirement)
  assert.ok(plan.steps.every(s=>s.guide&&(s.checks.length>=2||s.substeps?.every(c=>c.checks.length>=2))&&s.recordHint));dispatch(state,'repair');assert.deepEqual(currentTask(event).steps,plan.steps)
 })
 
@@ -54,7 +54,7 @@ test('closure includes full rounds, revisions, actual materials, partial observa
  const draft=ensureTaskPlan(event);acceptTaskPlan(event,{key:draft.key,version:draft.version},{plan:{scope:draft.scope,rationale:draft.rationale,steps:draft.steps}});dispatch(state,'recheck');submit(state,'本次可比工况未见原报警，高负荷仍待验证。','未见异常')
  state.role='captain';decide(state,id,{action:'close',reason:'确认本次范围闭环，继续关注高负荷表现。'})
  const report=event.reports.at(-1),text=report.markdown
- for(const value of ['事件基础信息','原始异常','80.4','SLOW DOWN','排查过程','垫圈松动','尚未证实','UNIT-LOCAL-01','二缸排温','415','部分观察窗口','复查','高负荷仍待验证','完整处置时间线','过程报告与附件索引'])assert.ok(text.includes(value),value)
+ for(const value of ['事件基础信息','原始异常','80.4','SLOW DOWN','排查过程','垫圈松动','尚未证实','UNIT-LOCAL-01','二缸排温','415','部分观察窗口','复查','高负荷仍待验证','处置时间线','过程报告与附件索引'])assert.ok(text.includes(value),value)
  const archived=text;refreshLifecyclePresentation(state);assert.equal(report.markdown,archived)
  const falseState=createLifecycleState();decide(falseState,id,{action:'false',reason:'原触发窗口已核对，按记录确认为误报。'});assert.match(falseState.events[id].reports.at(-1).markdown,/未提交维修或维保作业报告/)
 })
@@ -76,6 +76,8 @@ test('repair feedback is capped at four without losing methods or marking partia
  assert.equal(groups.length,4);assert.deepEqual(groups.flatMap(g=>g.substeps).map(s=>s.label),labels)
  const value={scope:'仅处理已经确认的部位。',rationale:'依据现场报告安排详细作业。',steps:raw}
  const normalized=normalizeTaskPlan(value,'repair');assert.equal(normalized.steps.length,4);assert.deepEqual(normalizeTaskPlan(normalized,'repair'),normalized)
+ assert.ok(normalized.steps.every(group=>group.substeps.length<=2))
+ assert.deepEqual(normalized.steps.flatMap(group=>group.substeps),raw)
  const task={kind:'repair',status:'assigned',steps:raw,draft:{stepIndex:1,summary:'原作业摘要',attachments:[],records:raw.map((s,i)=>({label:s.label,result:i===0?'已完成':'',note:i===0?'原检查记录':i===4?'已换备件，待复验':''}))}}
  const original=structuredClone(task.draft);compactAssignedRepair(task)
  assert.equal(task.steps.length,4);assert.deepEqual(task.feedbackHistory[0].draft,original);assert.equal(task.draft.records[0].result,'');assert.match(task.draft.records[0].note,/原检查记录/);assert.match(task.draft.records[1].note,/已换备件/)

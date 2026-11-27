@@ -64,7 +64,7 @@ test('report controls avoid duplicate metadata and supplementation keeps the sel
    assert.ok(toolbar);assert.match(toolbar,/<nav[^>]*aria-label="本轮提交版本"/)
    assert.match(toolbar,/aria-pressed="true"[^>]*>维修报告 · 第1次提交/)
    assert.match(toolbar,/aria-pressed="false"[^>]*>维修报告 · 第2次提交/)
-   assert.match(toolbar,/<\/nav>\s*<button[^>]*class="download-btn"[^>]*>下载<\/button>/)
+   assert.match(toolbar.replace(/<!--[\s\S]*?-->/g,''),/<\/nav>\s*<button[^>]*class="download-btn"[^>]*>下载<\/button>/)
    assert.equal((html.match(/>下载<\/button>/g)||[]).length,1)
    assert.match(html,/本轮首次提交的独有内容/);assert.doesNotMatch(html,/本轮第二次提交内容|下载 Markdown/)
    const content=html.match(/<section class="lc-report"[^>]*>([\s\S]*?)<\/section>/)?.[1]

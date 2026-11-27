@@ -59,7 +59,7 @@ test('waiting-period manual closure preserves verification sampling without reco
  decide(f.state,f.id,{action:'close',reason:'核对原变化已回落，保留观察记录并确认本轮闭环。'})
  const report=f.event.reports.at(-1)
  assert.match(report.markdown,/核实后继续观察，本轮暂未处置/);assert.match(report.markdown,/未提交维修或维保作业报告/)
- assert.ok(f.task.observationEndedAt);assert.equal(f.event.phase,'closed')
+ assert.ok(report.confirmedDraft.evidence.includes(f.event.reports.find(r=>r.linkedSource).title));assert.doesNotMatch(report.confirmedDraft.process,/尚无人员执行安排/);assert.ok(f.task.observationEndedAt);assert.equal(f.event.phase,'closed')
 })
 test('verification review offers a repair draft matching the chosen action and rejects stale recheck output',()=>{
  const f=observe(verified()),draft=ensureTaskPlan(f.event),old={key:draft.key,version:draft.version}

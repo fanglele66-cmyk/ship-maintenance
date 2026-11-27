@@ -98,7 +98,7 @@ test('simulated feedback does not turn platform history into newly measured fiel
 
 test('both baseline cases keep relative temperature semantics and their evidence limits',()=>{
  const c1=eventBriefingFor('real-tracking-exhaust-baseline'),c4=eventBriefingFor('real-health-c4-baseline')
- assert.match(c1.discovery.text,/多个月份/)
+ assert.match(c1.discovery.text,/月度相对排温[\s\S]*其余五缸均值[\s\S]*4月[\s\S]*8月/)
  assert.doesNotMatch(c1.discovery.text,/多个航次/)
  assert.match(c1.boundary,/8 月 4 日同窗缸套冷却水出口温度、进出口温差及活塞冷却油出口温度/)
  assert.match(c1.tasks[1].detail,/一缸排气温度探头/)

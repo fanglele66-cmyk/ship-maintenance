@@ -10,6 +10,7 @@ import {lifecycleSnapshot,loadLifecycleState} from '../src/workflow/demoTimeline
 import {lifecycleModelContext} from '../src/workflow/lifecycleModelContext.js'
 import {initialInformationTimes} from '../src/workflow/initialInformationTimes.js'
 import {createAiHandler} from '../server/ai-api.mjs'
+import {analyzeManualAnomaly} from '../server/manual-anomaly.mjs'
 const form=()=>({deviceId:'main-engine-1',sensorIds:['s-001','s-002'],start:new Date(Date.now()-3600000).toISOString(),end:new Date(Date.now()-60000).toISOString(),description:'主机燃油压力现场读数波动，需核对压力趋势。'})
 const analysis={title:'主机燃油压力波动核实',summary:'燃油压力波动待核实；核对原始趋势与现场表计。',interpretation:'当前依据为提交人的描述，尚无对应时段采样。',unverified:'缺少时间段内原始趋势及现场表计读数。',recommendation:'安排核对燃油压力趋势与现场表计，记录对应时刻。',steps:[{label:'核对燃油压力记录',guide:'对齐趋势与现场表计的时间。',checks:['记录压力波动范围与时刻。'],recordHint:'回交时刻、压力读数及表计位置。'}]}
 function setup(){const state=createLifecycleState(),report=validateAnomalyReport(form(),'secondEngineer');return {state,report,event:createManualAnomaly(state,report,{anomaly:analysis,model:'test'},'test-report-1234')}}
@@ -44,6 +45,23 @@ test('validated AI event is idempotent, captain-owned and submitter stays visibl
  assert.deepEqual(lifecycleModelContext(event,'secondEngineer').manualReport.sensors,report.sensors)
 })
 test('malformed analysis never creates an event',()=>{const state=createLifecycleState(),count=Object.keys(state.events).length;assert.throws(()=>createManualAnomaly(state,validateAnomalyReport(form(),'engineer'),{anomaly:{title:'bad'}},'invalid-report-123'));assert.equal(Object.keys(state.events).length,count)})
+test('the host selects manual or periodic analysis even if the request names a different skill',async()=>{
+ const request={report:{...form(),evidence:[]},role:'engineer',skillName:'ship-report-generation'}
+ const configuration={read:async()=>({source:'manual',baseUrl:'https://example.test',apiKey:'fixture',model:'fixture',protocol:'openai',enabled:true,knowledgeEnabled:false,timeoutMs:5000})}
+ for(const periodic of [false,true]){
+  let messages
+  const fetcher=async(_url,options)=>{
+   messages=JSON.parse(options.body).messages
+   const frame={choices:[{delta:{content:JSON.stringify(analysis)},finish_reason:'stop'}]}
+   return new Response('data: '+JSON.stringify(frame)+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}})
+  }
+  const result=await analyzeManualAnomaly(request,{root:process.cwd(),configuration,fetcher,periodic})
+  assert.equal(result.anomaly.title,analysis.title)
+  const name=periodic?'ship-anomaly-detection':'ship-manual-anomaly-analysis'
+  assert.ok(messages[0].content.includes('name: '+name))
+  assert.ok(!messages[0].content.includes('name: ship-report-generation'))
+ }
+})
 test('backend invokes AI with submitted evidence, fixes submitter identity and rejects failed results',async()=>{
  for(const invalid of [false,true]){
   let output='',request

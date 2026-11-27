@@ -7,6 +7,7 @@ test('real incidents replace situation examples and support every preset branch'
  const server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false,ws:false},appType:'custom'})
  try{
   const {usePhase2DemoStore}=await server.ssrLoadModule('/src/stores/phase2DemoStore.js')
+  const {useSensorStore}=await server.ssrLoadModule('/src/stores/sensorStore.js')
   const {realCaseRecords,realSeries}=await server.ssrLoadModule('/src/mock/realCaseAdapter.js')
   const {eventBriefingFor}=await server.ssrLoadModule('/src/mock/eventBriefings.js')
   const {activeWorkbenchIssues}=await server.ssrLoadModule('/src/mock/captainWorkbench.js')
@@ -24,14 +25,14 @@ test('real incidents replace situation examples and support every preset branch'
    store.advanceTodo(id,feedback(store,id,id===maintenance?['有提前处理依据','条件具备']:['发现异常','未见异常']))
    assert.equal(store.currentStage.kind,'work')
   }
-  const execute=(store,id,key)=>{
+  const execute=(store,id,key,executedAt)=>{
    const form=store.executionInquiry(id),preset=executionPreset(store.cases[id],store.currentStage,key)
-   const values={...form.values,...preset,scenarioPreset:key}
+   const values={...form.values,...preset,scenarioPreset:key,...(executedAt?{executedAt}:{})}
    store.updateExecutionRecord(id,form.id,values)
    // InquiryMessage serializes declared fields only; preset metadata stays in the store draft.
    const submitted=Object.fromEntries(form.fields.map(field=>[field.key,values[field.key]]))
    store.updateExecutionRecord(id,form.id,submitted)
-   assert.equal(store.confirmExecutionRecord(id,form.id,submitted),true,form.submitError)
+   return store.confirmExecutionRecord(id,form.id,submitted)
   }
   await t.test('only four active initial matters; source measurements and cutoff remain intact',()=>{
    const store=fresh();assert.deepEqual(new Set(activeWorkbenchIssues(store).map(r=>r.id)),new Set(ids.map(id=>id===maintenance?'real-health-c4-baseline':id)))
@@ -73,29 +74,68 @@ test('real incidents replace situation examples and support every preset branch'
    for(const values of [['发现异常','未见异常'],['未见异常','发现异常'],['发现异常','发现异常'],['无法确认','未见异常']]){
     const store=fresh();start(store,alarm);const result=store.advanceTodo(alarm,feedback(store,alarm,values))
     assert.equal(result.advanced,values.includes('发现异常'))
-    if(result.advanced){assert.deepEqual(store.currentStage.tasks.map(task=>task.label),store.cases[alarm].stages.find(stage=>stage.id==='investigate').tasks.filter((_,i)=>values[i]==='发现异常').flatMap(task=>store.cases[alarm].packages[task.package].tasks.map(step=>step.label)));assert.doesNotMatch(store.currentStage.title,/温控阀|冷却滤器/)}
+    if(result.advanced){
+     const scope=store.currentStage.tasks.map(task=>task.label)
+     assert.equal(scope.length,2+values.filter(value=>value==='发现异常').length)
+     assert.match(scope[0],/隔离/);assert.match(scope.at(-1),/恢复.*复测/)
+     assert.equal(scope.some(label=>label.includes('ICU')),values[0]==='发现异常')
+     assert.equal(scope.some(label=>label.includes('燃油供给')),values[1]==='发现异常')
+     assert.doesNotMatch(store.currentStage.title,/温控阀|冷却滤器/)
+    }
     else {assert.equal(store.currentStage.id,'investigate');assert.equal(store.decideCheck(alarm,'supplement','预设新线索待核实'),true);assert.equal(store.decideCheck(alarm,'retry'),true)}
    }
   })
   for(const id of [alarm,warning,maintenance])for(const {id:key} of executionPresetOptions)await t.test(id+' execution '+key,()=>{
-   const store=fresh();toWork(store,id);execute(store,id,key)
-   assert.equal(store.executionRecords[id][0].isSimulation,true)
-   if(['partial','pending'].includes(key)){assert.equal(store.currentStage.kind,'work');assert.equal(store.isTaskHandled(id),false)}
-   else if(key==='unresolved'){assert.equal(store.currentStage.id,id===maintenance?'check':'investigate');assert.equal(store.workflowRounds[id],2)}
-   else{assert.equal(store.eventStatus[id],'observing');assert.equal(store.executionObservationReady(id),key==='complete');assert.equal(store.observationRecords[id].length,0)}
+   const store=fresh();toWork(store,id)
+   const original=store.currentStage.id,submitted=execute(store,id,key)
+   if(['partial','pending'].includes(key)){
+    assert.equal(submitted,false)
+    assert.equal(store.currentStage.id,original)
+    assert.equal(store.executionRecords[id]?.length||0,0)
+    assert.ok(store.executionInquiry(id).values.measures)
+    assert.equal(store.isTaskHandled(id),false)
+   }else{
+    assert.equal(submitted,true)
+    const [receipt]=store.executionRecords[id]
+    assert.ok(receipt.isSimulation)
+    if(key==='unresolved'){
+     assert.equal(store.currentStage.baseStageId,id===maintenance?'check':'investigate')
+     assert.equal(store.currentStage.round,2);assert.equal(store.workflowRounds[id],2)
+    }else{
+     assert.equal(store.eventStatus[id],'observing')
+     assert.equal(store.executionObservationReady(id),true)
+     assert.ok(store.automaticObservations[id])
+     assert.equal(store.observationRecords[id].length,0)
+     assert.equal(store.getObservationResult(id).type,'continue')
+    }
+   }
   })
-  for(const id of [alarm,warning,maintenance])await t.test(id+' observation continues, extends, reopens and closes only on confirmation',()=>{
-   const store=fresh();toWork(store,id);execute(store,id,'missing')
-   assert.equal(store.applyObservationPreset(id,'continue'),true);assert.equal(store.getObservationResult(id).type,'continue');store.completeObservation(id);assert.equal(store.eventStatus[id],'observing')
-   store.applyObservationPreset(id,'incomplete');assert.equal(store.getObservationResult(id).type,'extend')
-   const target=store.observationTargets[id];store.extendObservation(id);assert.equal(store.observationTargets[id],target+1)
-   store.applyObservationPreset(id,'abnormal');assert.equal(store.getObservationResult(id).type,'reinspect')
+  for(const id of [alarm,warning,maintenance])await t.test(id+' observation handles missing samples, reopens and closes only on confirmation',ctx=>{
+   const localAt='2026-10-27T08:00',startMs=Date.parse(localAt+':00+08:00')
+   ctx.mock.method(Date,'now',()=>startMs)
+   const store=fresh();toWork(store,id)
+   assert.equal(execute(store,id,'missing',localAt),true)
+   const initialTarget=store.observationTargets[id]
+   const sensors=useSensorStore()
+   sensors.recordedSensorChannels=ids=>ids.map(channelId=>({channelId,trendData:[]}))
+   store.syncAutomaticObservation(id,startMs+2*3600000)
+   assert.equal(store.getObservationResult(id).type,'extend')
+   assert.equal(store.observationTargets[id],initialTarget)
+   assert.ok(store.observationRecords[id].at(-1).values.every(value=>value===null))
+   assert.equal(store.completeObservation(id).ok,false)
+   assert.equal(store.submitObservationReview(id,'abnormal',{note:'记录再次发生的现场异常，要求复查。'}),true)
+   assert.equal(store.getObservationResult(id).type,'reinspect')
    store.reopenTodo(id);assert.equal(store.observationHistory[id].length,1);assert.equal(store.observationRecords[id].length,0)
-   assert.equal(store.currentStage.id,id===maintenance?'check':'investigate')
-   store.advanceTodo(id,feedback(store,id,id===maintenance?['有提前处理依据','条件具备']:['发现异常','未见异常']));execute(store,id,'complete')
-   store.applyObservationPreset(id,'stable');assert.equal(store.getObservationResult(id).type,'archive');assert.equal(store.eventStatus[id],'observing')
-   assert.ok(store.observationRecords[id].every(r=>r.isSimulation&&r.preset&&r.source==='处理后观察记录'))
-   store.completeObservation(id);assert.equal(store.eventStatus[id],'closed');assert.equal(store.applyObservationPreset(id,'abnormal'),false)
+   assert.equal(store.currentStage.baseStageId,id===maintenance?'check':'investigate')
+   store.advanceTodo(id,feedback(store,id,id===maintenance?['有提前处理依据','条件具备']:['发现异常','未见异常']))
+   assert.equal(execute(store,id,'complete',localAt),true)
+   assert.equal(store.completeObservation(id).ok,false)
+   const reason='轮机长确认本轮范围结束，未覆盖的运行工况继续跟踪。'
+   assert.equal(store.completeObservation(id,{reason}).ok,true)
+   const closure=store.observationRecords[id].at(-1)
+   assert.ok(closure.earlyClosure);assert.equal(closure.note,reason);assert.equal(closure.values,null)
+   assert.equal(store.eventStatus[id],'closed')
+   assert.equal(store.submitObservationReview(id,'abnormal',{note:'过期操作'}),false)
   })
   await t.test('manual arbitrary values cannot masquerade as stable recovery',()=>{
    const store=fresh();toWork(store,warning);execute(store,warning,'missing')
@@ -105,15 +145,28 @@ test('real incidents replace situation examples and support every preset branch'
   for(const [id,values,action] of [[warning,['现场与系统一致','工况变化可以解释'],'end-warning'],[tracking,['现场与系统一致','条件受限，已记录限制'],'finish-tracking'],[maintenance,['有提前处理依据','条件暂不具备'],'end-maintenance'],[maintenance,['暂无提前处理必要','条件具备'],'end-maintenance']])await t.test(id+' can finish verification without inventing repairs: '+values.join('/'),()=>{
    const store=fresh();start(store,id);assert.equal(store.advanceTodo(id,feedback(store,id,values)).advanced,false)
    assert.equal(store.decideCheck(id,action,''),false);assert.equal(store.decideCheck(id,action,'【演示】保留原资料和未完成事项'),true)
-   assert.equal(store.eventStatus[id],'closed');assert.equal(store.executionRecords[id],undefined)
-   if(id===tracking)assert.equal(store.healthUpdates[id+'-track'].taskComplete,true)
+   assert.equal(store.executionRecords[id],undefined)
+   if(id===tracking){
+    assert.equal(store.eventStatus[id],'awaiting-decision')
+    assert.equal(store.healthUpdates[id+'-track'].taskComplete,true)
+    assert.equal(store.decideTracking(id,'explained',{reason:'原跟踪资料与本轮反馈已核对，保留观察范围。'}).ok,true)
+   }
+   assert.equal(store.eventStatus[id],'closed')
   })
   await t.test('false-alarm and ignore presets preserve sources and allow fresh decisions after reset',()=>{
    const store=fresh(),source=JSON.stringify(realCaseRecords)
    assert.equal(store.confirmFalseAlarm(alarm,decisionPreset(store.cases[alarm],'false-alarm')),true)
    assert.equal(store.eventStatus[alarm],'closed');assert.equal(store.todoCreated[alarm],false)
    store.resetRealScenario(alarm);assert.equal(store.eventStatus[alarm],'pending');assert.equal(store.createTodo(alarm),true)
-   for(const id of [warning,tracking,maintenance]){assert.equal(store.ignoreSuggestion(id,decisionPreset(store.cases[id],'ignore')),true);assert.equal(activeWorkbenchIssues(store).some(row=>row.id===id),false);store.resetRealScenario(id);assert.equal(store.createTodo(id),true)}
+   for(const id of [warning,tracking,maintenance]){
+    const reason=decisionPreset(store.cases[id],'ignore')
+    assert.equal(store.ignoreSuggestion(id,reason),true)
+    assert.equal(store.ignoredSuggestions[id].reason,reason)
+    assert.equal(store.todoCreated[id],false)
+    const entry=activeWorkbenchIssues(store).find(row=>row.decisionId===id)
+    assert.equal(entry.state,'已记录决定');assert.equal(entry.decisionReason,reason)
+    store.resetRealScenario(id);assert.equal(store.ignoredSuggestions[id],undefined);assert.equal(store.createTodo(id),true)
+   }
    assert.equal(JSON.stringify(realCaseRecords),source)
   })
   await t.test('reset clears only current case including work-order association',async()=>{

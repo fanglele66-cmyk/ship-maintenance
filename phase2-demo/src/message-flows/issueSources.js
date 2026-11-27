@@ -15,7 +15,7 @@ function briefingReply(id,text,context){
  const branches=/分支|之后|然后|结果|正常|异常|无法|忽略|不采纳|误报|结束|闭环/.test(text)
  const evidence=/数据|读数|指标|证据|依据|压力|转速|温度|方向|基线|月度|历史|偏差/.test(text)
  if(decision)sections.push(['需要您确认',brief.captainDecision],['建议指派的原因',brief.dispatchReason])
- if(sources)sections.push(['事件如何形成',brief.discovery.text],['关联资料',brief.sources.map(s=>`- ${s.title} · ${s.date}：${s.summary}`).join('\n')])
+ if(sources)sections.push(['事件如何形成',[brief.discovery.label,brief.discovery.text].filter(Boolean).join('\n\n')],['关联资料',brief.sources.map(s=>`- ${s.title} · ${s.date}：${s.summary}`).join('\n')])
  if(evidence)sections.push(['数据依据',brief.facts.map(f=>`- **${f.label}：${f.value}${f.unit?' '+f.unit:''}** · ${f.at}\n  ${f.meaning}`).join('\n')])
  if(branches)sections.push(['按核实结果分流',brief.branches.map(b=>`- **${b.condition}**：${b.next}`).join('\n')])
  if(!sources&&(!sections.length||/核实|检查|任务|安排|下一步|怎么/.test(text)))sections.push(['本次核实要取得什么',brief.tasks.map(t=>`- **${t.title}**：${t.detail}`).join('\n')])

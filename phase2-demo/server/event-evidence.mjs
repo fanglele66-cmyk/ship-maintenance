@@ -1,16 +1,23 @@
 import {openLocalData,sqlTime,toTime} from './local-data.mjs'
-import {reportSensors} from '../src/workflow/manualAnomaly.js'
-export function readEventEvidence(root,{deviceId,sensorIds=[],systems=[],start,end,allRelated=false},directory){
+import {loadDeviceTypeTemplate,readShipConfig} from './ship-config-api.mjs'
+import {toTemplateUnitValue} from '../src/workflow/localSensorData.js'
+import {createReportCatalog,reportSensors} from '../src/workflow/manualAnomaly.js'
+export async function loadReportCatalog(root,directory){
+ const template=loadDeviceTypeTemplate(root)
+ const config=await readShipConfig(directory,template)
+ return createReportCatalog(config.devices,template)
+}
+export function readEventEvidence(root,{deviceId,sensorIds=[],systems=[],start,end,allRelated=false},directory,pointCatalog){
  const begin=Date.parse(start),finish=Math.min(Date.parse(end),Date.now())
  if(!Number.isFinite(begin)||!Number.isFinite(finish)||begin>=finish)throw Error('取数窗口结束时间须晚于开始时间。')
- const catalog=reportSensors(deviceId),selected=catalog.filter(s=>sensorIds.includes(s.id)),groups=new Set([...systems,...selected.map(s=>s.subsystem)])
+ const catalog=reportSensors(deviceId,pointCatalog),selected=catalog.filter(s=>sensorIds.includes(s.id)),groups=new Set([...systems,...selected.map(s=>s.subsystem)])
  const points=allRelated?catalog.filter(s=>groups.has(s.subsystem)||sensorIds.includes(s.id)||['DC0001','DC0058'].includes(s.pointCode)):selected
  const stats=points.map(sensor=>({sensor,index:sensor.pointCode?Number(sensor.pointCode.slice(2))-1:-1,count:0,sum:0,min:Infinity,max:-Infinity,last:begin,maxGap:0,buckets:new Map()})),bucketMs=Math.max(12000,(finish-begin)/120)
  if(deviceId==='main-engine-1'){
   const data=openLocalData(root,directory)
   try{for(const row of data.db.prepare('SELECT timestamp,data FROM sensor_readings WHERE timestamp>=? AND timestamp<=? ORDER BY timestamp').iterate(sqlTime(begin),sqlTime(finish))){
    const timestamp=toTime(row.timestamp),values=JSON.parse(row.data)
-   for(const s of stats){const value=values[s.index];if(!Number.isFinite(value))continue
+   for(const s of stats){const value=toTemplateUnitValue(s.sensor.pointCode,values[s.index]);if(!Number.isFinite(value))continue
     s.count++;s.sum+=value;s.min=Math.min(s.min,value);s.max=Math.max(s.max,value);s.maxGap=Math.max(s.maxGap,timestamp-s.last);s.last=timestamp;s.value=value;s.firstAt??=timestamp;s.firstValue??=value
     s.buckets.set(Math.floor((timestamp-begin)/bucketMs),{timestamp,value})
    }

@@ -1,0 +1,9 @@
+{
+  "alarm_type": "oem_alarm",
+  "ship_id": "900000000000000101",
+  "equipment_id": "left_main_engine",
+  "ser_no": "demo-oem-001",
+  "pointDataId": "90000000000000531",
+  "trigger_time": "2026-04-30T16:30:00+08:00",
+  "alarm_state_transition": {"previous_state": 0, "current_state": 1}
+}

@@ -1,6 +1,6 @@
 <template>
- <section class="manual-evidence" aria-label="上报测点资料">
-  <h3>{{report.kind==='health-tracking'?'跟踪关联测点':report.kind==='periodic'?'检测关联测点':'上报测点'}}</h3><p>{{report.systems.join('、')}} · {{timeText(report.start)}} — {{timeText(report.end)}}</p>
+ <section class="manual-evidence" :aria-label="heading+'资料'">
+  <h3>{{heading}}</h3><p>{{report.systems.join('、')}} · {{timeText(report.start)}} — {{timeText(report.end)}}</p>
   <div class="evidence-scroll"><table><thead><tr><th>传感器</th><th>样本数</th><th>窗口内记录范围</th></tr></thead><tbody><tr v-for="sensor in report.sensors" :key="sensor.id"><td>{{sensor.name}}</td><td>{{evidence(sensor.id)?.sampleCount??values(sensor.id).length}}</td><td>{{range(sensor)}}</td></tr></tbody></table></div>
   <div v-if="detailed" class="evidence-trends">
    <h3>测点趋势</h3>
@@ -18,6 +18,8 @@ import {timeText} from '../workflow/eventLifecycle.js'
 import {timelineText} from '../workflow/demoTimeline.js'
 import ObservationTrend from './ObservationTrend.vue'
 const props=defineProps({report:{type:Object,required:true},detailed:Boolean})
+const headings={'health-tracking':'跟踪关联测点',periodic:'检测关联测点',oem:'OEM 报警测点'}
+const heading=computed(()=>headings[props.report.kind]||'上报测点')
 const samples=computed(()=>Object.fromEntries(props.report.sensors.map(sensor=>[sensor.id,(props.report.evidence?.find(c=>c.channelId===sensor.id)?.trendData||[]).filter(p=>Number.isFinite(p.timestamp)&&p.timestamp>=Date.parse(props.report.start)&&p.timestamp<=Date.parse(props.report.end)).sort((a,b)=>a.timestamp-b.timestamp)])))
 const evidence=id=>props.report.evidence?.find(c=>c.channelId===id)
 const values=id=>samples.value[id].map(p=>p.value).filter(Number.isFinite)

@@ -11,7 +11,11 @@ export function issueState(store,id){
  if(assigned)return {state:'已派发',taskId:assigned.id,decisionId:assigned.id}
  if(pending)return {state:'待决策',taskId:null,decisionId:pending.id}
  if(!isTrackingContainer(id)&&store.todoCreated?.[id]&&!store.completedTasks?.[id]&&store.eventStatus?.[id]!=='closed')return {state:'已派发',taskId:id,decisionId:id}
- if(item?.trackingOnly&&(isTrackingContainer(id)||store.completedTasks?.[id]?.action==='finish-tracking'))return {state:store.completedTasks?.[id]?'待轮机长确认':children.some(child=>child.state==='已记录决定')?'已记录决定':'跟踪中',taskId:null,decisionId:id}
+ if(item?.trackingOnly&&(isTrackingContainer(id)||store.completedTasks?.[id]?.action==='finish-tracking')){
+  if(store.completedTasks?.[id])return {state:'待轮机长确认',taskId:null,decisionId:id}
+  const recorded=children.find(child=>child.state==='已记录决定')
+  return recorded?{state:'已记录决定',taskId:null,decisionId:recorded.id}:{state:'跟踪中',taskId:null,decisionId:id}
+ }
  return {state:store.eventStatus?.[id]==='closed'?'已闭环':store.ignoredSuggestions?.[id]?'已记录决定':'待决策',taskId:store.todoCreated?.[id]?id:null,decisionId:id}
 }
 // Public event status is deliberately independent of the executable task phase.
@@ -30,6 +34,7 @@ export function captainDeviceSignal(store,deviceId){
 }
 export function captainAnalysis(store,deviceIds){
  const rows=workbenchIssues(store).filter(item=>!item.history&&(!deviceIds||deviceIds.includes(item.deviceId)))
+ if(!rows.length)return '### 健康态势分析\n\n所选设备暂无待跟进的事件。'
  const pending=rows.filter(item=>item.state==='待决策'),assigned=rows.filter(item=>item.state==='已派发')
  const brief=rows.map(item=>'- **'+item.title+'**：'+item.state+(item.stage?' · '+item.stage:'')).join('\n')
  return `### 健康态势分析\n\n当前有 ${pending.length} 项待决策、${assigned.length} 项已派发。二缸报警、控制空气预警与异动跟踪按各自证据推进；维保建议由事件概览中的处置决策形成。\n\n${brief}\n\n### 建议\n\n优先核对报警和低压预警的现场依据；一缸与四缸基线变化需结合工况、历史调整和测温校验解释，专项检查分别评估必要性与条件。已有任务沿原事项跟进。\n\n一缸与四缸采用同刻六缸月度资料分别跟踪；后续建议及执行记录归入该跟踪，不重复计为独立事件。`

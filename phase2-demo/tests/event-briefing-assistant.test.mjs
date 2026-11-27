@@ -27,7 +27,8 @@ test('event briefings explain decisions using selected evidence and retain live 
   }
   const tracking='real-tracking-exhaust-baseline'
   assert.match(issueReply(tracking,'核实正常、异常和无法确认分别怎么办？',store).markdown,/历史记录|测温|基线/)
-  assert.match(issueReply(tracking,'如何发现？',store).markdown,/AI|两段/)
+  const discovery=issueReply(tracking,'如何发现？',store).markdown
+  assert.match(discovery,/AI长期基线分析/);assert.match(discovery,/一缸月度相对排温/)
   assert.equal(eventProcessRecords(store,'real-alarm-0430').records[0].actor,'船端报警系统')
   assert.equal(eventProcessRecords(store,'real-warning-0523').records[0].actor,'智能机舱监测')
   assert.equal(store.createTodo(tracking),true)

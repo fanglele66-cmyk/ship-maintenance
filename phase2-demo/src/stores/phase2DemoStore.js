@@ -48,8 +48,9 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     return storyJournal.at(-1)
   }
   function captureHealthSnapshot(at='2026-10-15 08:00'){
-    const report=deviceStoryAssessment({healthUpdates,checkAssessments,executionRecords,observationRecords,todoCreated,assignments,completedTasks,isTaskHandled},'aux-engine-1')
-    dailyHealthReports.push({id:'health-review-'+(dailyHealthReports.length+1),deviceId:'aux-engine-1',date:at.slice(0,10),at,report:JSON.parse(JSON.stringify(report))})
+    const deviceId=cases['aux-health'].deviceId
+    const report=deviceStoryAssessment({healthUpdates,checkAssessments,executionRecords,observationRecords,todoCreated,assignments,completedTasks,isTaskHandled},deviceId)
+    dailyHealthReports.push({id:'health-review-'+(dailyHealthReports.length+1),deviceId,date:at.slice(0,10),at,report:JSON.parse(JSON.stringify(report))})
   }
   const selectedAttentionId = ref('maintenance')
   const selectedTodoId = ref(null)
@@ -463,8 +464,9 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     const errors=validateInquiry(message,values)
     if(Object.keys(errors).length){message.submitError='请补齐执行记录的必填信息。';return false}
     // Future story nodes have an explicit record date; ordinary tasks retain the wall-clock boundary.
-    const recordLimit=Math.max(Date.now(),Date.parse(stage.recordCutoff||'')||0)
-    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(values.executedAt)||Date.parse(values.executedAt)>recordLimit){message.submitError='执行时间须有效，且不晚于当前记录时间。';return false}
+    const recordLimit=Math.max(Date.now(),observationTime(stage.recordCutoff)||0)
+    const executedAt=observationTime(values.executedAt)
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(values.executedAt)||!Number.isFinite(executedAt)||executedAt>recordLimit){message.submitError='执行时间须有效，且不晚于当前记录时间。';return false}
     // Steps are instructions. Only the acceptance form confirms actual work;
     // historical measurements cannot become post-repair samples here.
     const steps=sharedWorkflow.workStepRecords[id+':'+stage.id]?.records
@@ -479,13 +481,14 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(isWorkflow(id))recordStory(id,'execution','实际执行与验收记录',values.measures,values.acceptance,values.executedAt.replace('T',' '))
     message.status='submitted';message.submittedAt=at;message.receiptText=values.completion==='completed'?'实际执行与验收已确认；不修改原工单。':'已保留进展，当前阶段不推进。'
     addLog(id,'user','确认实际执行记录：'+values.measures+'；执行时间：'+values.executedAt)
+    eventUpdatedAt[id]=at
+    if(values.verification==='unresolved'){
+      message.receiptText='本轮执行与验收已保存，原异常仍存在，进入下一轮原因排查。'
+      addLog(id,'assistant',message.receiptText)
+      return returnForInvestigation(id)
+    }
     if(isWorkflow(id)){
-      eventUpdatedAt[id]=at
       if(values.completion!=='completed'){message.receiptText='已保留实际进展，未完成项目继续处理。';addLog(id,'assistant',message.receiptText);requestExecutionRecord(id);return true}
-      if(values.verification==='unresolved'){
-        message.receiptText='本轮执行与验收已保存，原异常仍存在，进入下一轮原因排查。'
-        addLog(id,'assistant',message.receiptText);returnForInvestigation(id);return true
-      }
       if(values.verification!=='resolved'){
         message.receiptText='作业记录已保存，验收尚未完成；当前不进入效果观察。'
         addLog(id,'assistant',message.receiptText);requestExecutionRecord(id);return true
@@ -501,7 +504,12 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     }else requestExecutionRecord(id)
     return true
   }
-  function executionObservationReady(id) { const record=executionRecords[id]?.at(-1);return isWorkflow(id)?Boolean(record&&record.values.completion==='completed'&&record.values.verification==='resolved'):!record||record.values.completion==='completed'&&record.values.comparable==='available' }
+  function executionObservationReady(id) {
+    const record=executionRecords[id]?.at(-1)
+    if(isWorkflow(id))return Boolean(record&&record.values.completion==='completed'&&record.values.verification==='resolved')
+    const supplemented=observationRecords[id]?.some(row=>row.source==='人员补充'&&row.values)
+    return !record||record.values.completion==='completed'&&(record.values.comparable==='available'||supplemented)
+  }
   function advanceWorkflow(id,feedback){
     const stage=cases[id].stages[activeStage[id]]
     if(stage.kind==='work')return {saved:false,advanced:false,message:'请在标准执行记录中确认实际措施与验收。'}
@@ -692,8 +700,6 @@ export const usePhase2DemoStore = defineStore('phase2-demo', () => {
     if(real&&(values.day===''||values.day==null||!Number.isInteger(day)||day<0||day<(observationRecords[id].at(-1)?.day||0)))return false
     const parsed=observationConfig[id].names.map((_,i)=>Number(values['value'+i]))
     if(parsed.some((value,i)=>values['value'+i]===''||values['value'+i]==null||!Number.isFinite(value)))return false
-    const latest=executionRecords[id].at(-1)
-    latest.values.comparable='available'
     observationRecords[id].push({day,label:real?'第'+day+'日补充':'人员补充首测',values:parsed,status:real?'pending-review':'normal',source:'人员补充',isSimulation:real,note:(real?'【待判读】':'')+values.conditions+'；'+values.note})
     return true
   }

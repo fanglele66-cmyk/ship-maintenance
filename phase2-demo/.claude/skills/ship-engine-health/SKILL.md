@@ -11,7 +11,7 @@ description: 可配置船舶设备健康分析与船端态势对话消息。消�
 
 本目录完整复制自 `ship-changhangbiyu/.claude/skills/ship-engine-health`，保留原分析器、Schema、回归和旧船端卡片分支。以下本地入口优先于后文旧船端消息展示约定。
 
-- 后端每次启动立即执行，之后以本次启动时间为基准每隔一小时执行 `scripts/run_local_health.py --data-dir <运行目录> --telemetry-dir <时序数据目录> --cutoff <北京时间>`。时序数据默认位于 `deployment-data/telemetry`，可用 `SHIP_TELEMETRY_DIR` 指定；运行目录仍为 `.local-data` 或 `SHIP_DATA_DIR`。
+- 后端启用调度且时序清单就绪时，在启动时及此后每小时执行 `scripts/run_local_health.py --data-dir <运行目录> --telemetry-dir <时序数据目录> --cutoff <北京时间>`。时序数据默认位于 `deployment-data/telemetry`，可用 `SHIP_TELEMETRY_DIR` 指定；运行目录仍为 `.local-data` 或 `SHIP_DATA_DIR`。
 - 适配器只读本项目数据库副本，截取截止时刻之前 6 小时，生成 12 个半小时 `pointDataList` 文件，再调用原 `run_engine_health.run`。不会改动源数据库或读取未来样本。
 - 分析完整六小时连续窗口。源时间与拼接点只保留在内部追溯元数据中，不裁剪为最后一个源片段；面向人员的报告按当前工况表述。
 - 原始输入与结果存放 `<运行目录>/workspace/`，与只读时序数据库、演示事件、原船端工作空间隔离。旧输入每轮替换，Skill 原目录保留最新 6 份；完整产物另存运行目录的 `health-history/<启动标识-轮次>/`，同样只保留最新 6 份，包含输入、Skill 结果和最终报告。
@@ -20,6 +20,17 @@ description: 可配置船舶设备健康分析与船端态势对话消息。消�
 - 同时以真实样本间最大间隔评估覆盖；不得把 12 个文件等同完整 6 小时。原始 result 的文件数量口径保留，前端使用适配器 coverage。
 - 后端发布 `health-latest.json` 与 `health-latest.md`，页面读取已完成产物，禁止把数据刷新时间冒充分析完成时间。
 - 原厂家参考数值及型号归属保持来源可追溯，适用性未复核；本次不将参考值转为自动报警事件。
+
+### 从分析结果到主机健康页
+
+| 产物或字段 | 用途 |
+|---|---|
+| `skill-result.json` 的 `result.devices`、`result.analysis_window`、`coverage`、`units` | 保存设备原始研判与时窗、采样覆盖和单位。归档可供复核 |
+| 模型返回 `conclusion/next/detail` | 分别对应健康摘要、关注建议、详细 Markdown。参考[有效工况不足时的文本示例](template/local-response.example.json)。模型只写这三项 |
+| `health-latest.json` 与本轮 `health-history/<轮次>/report.json` | 调度器合入 `jobId/window/coverage/dataCutoff/completedAt/healthStatus/modelStatus`。归档保留该轮，latest 提供最新一轮 |
+| `GET /api/data/health` 的 `latest/job/stale` | 主机页取 `latest.conclusion/next/detail`、完成时间和窗口；`coverage.status` 提示缺测，`stale` 或任务失败提示最近结果。模型停用或失败时显示确定性分析正文 |
+
+本地适配器读取主机时序。其他设备的页面使用其自身测点、事件与航行阶段计算摘要，不将主机报告套用到辅机。后文保留原 1.0 工作空间的独立调用说明；其中两个消息卡只用于显式调用对应的旧动作。
 
 ## 态势会话欢迎分支
 

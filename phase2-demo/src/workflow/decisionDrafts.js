@@ -11,8 +11,11 @@ export function validateObservationPlan(plan,now=Date.now()){
  return clone({...plan,dueAt:new Date(instant).toISOString(),confirmedAt:new Date(now).toISOString()})
 }
 export function closureDraft(event){
- const reports=event.reports.filter(r=>!r.linkedSource&&r.kind!=='闭环报告')
- return {conclusion:event.closeReason||reports.at(-1)?.summary||event.brief?.conclusion||'',evidence:reports.length?reports.map(r=>`${r.title}（${r.at}）：${r.summary}`).join('\n'):event.brief?.discovery?.label+'；'+(event.brief?.boundary||'尚无执行报告，需核对结束依据'),process:event.decisions.filter(d=>d.action!=='shore').map(d=>`${d.at}：${d.reason}`).join('\n')||'尚无人员执行安排。',boundary:event.observationPlan?.limits||'仅针对本事件及已核实范围；未验证部分不认定恢复正常。'}
+ const reports=event.reports.filter(r=>r.kind!=='闭环报告')
+ const sourceReport=reports.find(r=>r.id===event.sourceReportId&&r.linkedSource)
+ const process=event.decisions.filter(d=>d.action!=='shore').map(d=>`${d.at}：${d.reason}`)
+ if(sourceReport)process.unshift(`原事件已提交《${sourceReport.title}》，本轮依据该报告进入效果观察。`)
+ return {conclusion:event.closeReason||reports.findLast(r=>!r.linkedSource)?.summary||event.brief?.conclusion||'',evidence:reports.length?reports.map(r=>`${r.title}（${r.at}）：${r.summary}`).join('\n'):event.brief?.discovery?.label+'；'+(event.brief?.boundary||'尚无执行报告，需核对结束依据'),process:process.join('\n')||'尚无人员执行安排。',boundary:event.observationPlan?.limits||'仅针对本事件及已核实范围；未验证部分不认定恢复正常。'}
 }
 export function validateClosureDraft(draft){if(!draft||!['conclusion','evidence','process','boundary'].every(k=>draft[k]?.trim()))throw Error('请核对闭环结论、依据、处置过程和未验证边界。');return clone(draft)}
 export function shoreSituationDraft(event){return {situation:event.brief?.conclusion||event.title,actions:event.decisions.filter(d=>d.action!=='shore').map(d=>d.reason).join('\n')||'尚未安排人员执行。',uncertainty:event.reports.at(-1)?.summary||event.brief?.boundary||'待现场核实。',support:event.phase==='closed'?'保留本次处置与闭环资料，供岸端知悉。':'按船端当前安排继续处理；本次记录供岸端知悉。'}}

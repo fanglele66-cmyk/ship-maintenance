@@ -54,7 +54,10 @@ test('business records stay coherent across the health chain, task and analysis 
    assert.doesNotMatch(stageReport(store,'fault',store.cases.fault.stages[0]),/0.046 MPa/)
    assert.equal(store.currentStage.tasks.some(task=>task.label.includes('温控阀')),false)
   })
-  await t.test('health feedback limits and maintenance execution remain on the same root without invented replacement',()=>{
+  await t.test('health feedback limits and maintenance execution remain on the same root without invented replacement',st=>{
+   const start=Date.parse('2026-10-24T10:00:00+08:00')
+   let now=start
+   st.mock.method(Date,'now',()=>now)
    const store=fresh();dispatch(store,'aux-health')
    store.advanceTodo('aux-health',feedback(store,['现场与系统一致','条件受限，已记录限制'],['同源读数对应','燃油背景尚缺']))
    assert.match(store.checkAssessments['aux-health'].message,/受限项|解释缺口/)
@@ -62,12 +65,14 @@ test('business records stay coherent across the health chain, task and analysis 
    dispatch(store,'aux-maintenance');store.advanceTodo('aux-maintenance',feedback(store,['有提前处理依据','条件具备'],['仅提前相关检查，尚未决定换件','10月24日窗口、电力与作业条件已确认']))
    const form=store.executionInquiry('aux-maintenance')
    assert.equal(store.confirmExecutionRecord('aux-maintenance',form.id,{task0:'已完成',task1:'已完成',equipment:'2号辅机3号缸',measures:'实际检查未见需更换问题，未换件；复装复核',executedAt:'2026-10-24T10:00',executor:'赵明（三管轮）',acceptance:'本轮检查范围验收通过，原季度剩余项目保留',completion:'completed',verification:'resolved',comparable:'available'}),true)
-   store.selectObservation('aux-maintenance');store.reviewObservation('aux-maintenance')
+   store.selectObservation('aux-maintenance')
+   now=start+4*3600000
+   assert.ok(store.syncAutomaticObservation('aux-maintenance',now))
    const timeline=storyTimeline(store,'aux2-health')
    assert.match(timeline.find(entry=>entry.kind==='execution').text,/未换件/)
    assert.match(storyDossier(store,'aux-health').overviewMarkdown,/未换件/)
    assert.equal(timeline.filter(entry=>entry.kind==='observation').length,2)
-   assert.ok(timeline.findLast(entry=>entry.kind==='observation').at.startsWith('2026-10-25'))
+   assert.ok(timeline.findLast(entry=>entry.kind==='observation').at.startsWith('2026-10-24 14:00'))
   })
  }finally{await server.close()}
 })

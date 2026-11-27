@@ -19,7 +19,7 @@ test('event directory retains every lifecycle while execution remains a separate
    assert.equal(store.decideCheck(id,'finish-tracking','本轮核实结束，继续原健康趋势观测'),true)
   }
 
-  await t.test('initial pending events and historical closed records coexist without maintenance children',()=>{
+  await t.test('pending events and a recorded closure coexist without maintenance children',()=>{
    const store=fresh(),rows=eventDirectoryRows(store)
    assert.deepEqual(eventStatusOptions.map(item=>item.value),['','待决策','处置中','已闭环'])
    assert.equal(rows.filter(row=>row.executionProgress==='待决策').length,3)
@@ -27,16 +27,19 @@ test('event directory retains every lifecycle while execution remains a separate
    assert.equal(c4.eventState,'处置中');assert.equal(c4.processingState,'待轮机长确认')
    assert.equal(c4.executionProgress,'无人工任务');assert.match(c4.continuation,/首轮核实已回交/)
    assert.equal(store.trackingDispositions[c4.id].status,'review')
-   assert.ok(rows.some(row=>row.history&&row.eventState==='已闭环'))
+   assert.ok(!rows.some(row=>row.id==='warning-history'))
    assert.deepEqual([...new Set(rows.map(row=>row.type))].sort(),['报警事件','异动跟踪','预警事件'].sort())
    assert.equal(rows.some(row=>['maintenance','aux-maintenance','real-maintenance-c4-baseline','maintenance-history'].includes(row.id)),false)
    for(const row of rows.filter(row=>!row.history)){
     assert.equal(row.taskId,null);assert.equal(row.stage,'');assert.equal(row.taskOwner,'')
     assert.equal(workbenchIssues(store).find(item=>item.id===row.id).stage,undefined,'uncreated tasks do not give events a task stage')
    }
-   const history=rows.find(row=>row.history)
-   assert.equal(history.executionProgress,'无人工任务')
-   assert.equal(history.completedTaskCount,0)
+   assert.equal(store.confirmFalseAlarm('real-alarm-0430','现场确认误报，留存原始信号'),true)
+   const refreshed=eventDirectoryRows(store),closed=refreshed.find(row=>row.id==='real-alarm-0430')
+   assert.equal(closed.eventState,'已闭环')
+   assert.equal(closed.executionProgress,'无人工任务')
+   assert.equal(closed.completedTaskCount,0)
+   assert.ok(refreshed.some(row=>row.eventState==='待决策'))
    assert.equal(store.taskPortfolio.length,0)
   })
 

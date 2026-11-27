@@ -4,6 +4,7 @@ import {existsSync} from 'node:fs'
 import {DatabaseSync} from 'node:sqlite'
 import {join} from 'node:path'
 import {createManualAnomaly,reportSensors} from '../src/workflow/manualAnomaly.js'
+import {MPA_SOURCE_CODES,toTemplateUnitValue} from '../src/workflow/localSensorData.js'
 import {people} from '../src/workflow/lifecyclePermissions.js'
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const numeric=value=>typeof value==='number'&&Number.isFinite(value)
@@ -16,7 +17,8 @@ export function buildTrackingEvents(bundle,{now=Date.now()}={}){
   if(!sensor||!Number.isFinite(start)||!Number.isFinite(end)||start>=end||end>now+60000)throw Error('异动跟踪测点或窗口不正确')
   if(seen.has(candidate.pointCode)||!Array.isArray(candidate.series)||candidate.series.length<3||candidate.series.length>480)throw Error('异动跟踪测点重复或曲线不完整')
   seen.add(candidate.pointCode)
-  if(candidate.unit!==sensor.unit||!['cruise','maneuver_high','midlow','low_speed'].includes(candidate.zone))throw Error('异动跟踪单位或运行工况不匹配')
+  const historicalPressure=MPA_SOURCE_CODES.has(candidate.pointCode)&&candidate.unit==='MPa'&&sensor.unit==='bar'
+  if((candidate.unit!==sensor.unit&&!historicalPressure)||!['cruise','maneuver_high','midlow','low_speed'].includes(candidate.zone))throw Error('异动跟踪单位或运行工况不匹配')
   const latest=candidate.latest
   if(!latest||!['raw_value','baseline_median','z','ewma','cusum_7d_area','cusum_30d_area','health_score'].every(k=>numeric(latest[k]))||latest.health_score<0||latest.health_score>100)throw Error('异动跟踪指标不完整')
   let previous=-Infinity
@@ -31,14 +33,17 @@ export function buildTrackingEvents(bundle,{now=Date.now()}={}){
    steps:[{label:'核实测点与现场读数',guide:`对照${sensor.nameCn}现场独立示值与系统记录，记录时刻、单位及传感器接线和校验情况。`,checks:['现场与系统示值是否一致','探头安装和校验记录是否正常'],recordHint:'回交现场读数、系统读数、时刻及测点状态。'},
     {label:'核实同工况偏离与调整记录',guide:'结合转速区间、燃油指令及相邻测点，核对偏离是否持续；查看期间维护、换件和设定调整记录。',checks:['同工况下偏离是否仍存在','期间维护或调整能否解释变化'],recordHint:'记录趋势是否成立及其证据；原因不明与趋势不成立分别说明。'}]}
   const fingerprint=hash([candidate.pointCode,candidate.zone,bundle.baselineSha256]).slice(0,20),requestId=hash([fingerprint,candidate.end]).slice(0,32)
-  const trendData=candidate.series.map(p=>({timestamp:p.timestamp,value:numeric(p.raw_value)?p.raw_value:null}))
+  const trendData=candidate.series.map(p=>({
+   timestamp:p.timestamp,
+   value:historicalPressure?toTemplateUnitValue(candidate.pointCode,p.raw_value):numeric(p.raw_value)?p.raw_value:null
+  }))
   const report={deviceId:'main-engine-1',sensorIds:[sensor.id],systems:[sensor.subsystem],start:candidate.start,end:candidate.end,description:summary,submitter:{role:'captain',name:people.captain},evidence:[{channelId:sensor.id,name:sensor.nameCn,unit:sensor.unit,sourceKind:'health-score-window',trendData}]}
   const event=createManualAnomaly({events:{},notices:[]},report,{anomaly:analysis,sources:[]},requestId,{at})
   event.id='detected-tracking-'+requestId;event.number=event.number.replace('-MR-','-TR-');event.type='异动跟踪';event.tracking=true
   event.brief.id=event.id;event.brief.discovery={kind:'health-tracking',label:'长期健康基线分析',at,text:summary}
   event.sensorScope={deviceId:report.deviceId,systems:report.systems,sensorIds:report.sensorIds}
   event.detectionReport={...event.manualReport,kind:'health-tracking',analysis,evidence:report.evidence,
-   healthTracking:{pointCode:candidate.pointCode,unit:sensor.unit,zone:candidate.zone,validWindows:candidate.validWindows,spanDays:candidate.spanDays,latest,baselineSha256:bundle.baselineSha256,policy:bundle.policy}}
+   healthTracking:{pointCode:candidate.pointCode,unit:candidate.unit,zone:candidate.zone,validWindows:candidate.validWindows,spanDays:candidate.spanDays,latest,baselineSha256:bundle.baselineSha256,policy:bundle.policy}}
   delete event.manualReport;delete event.submitter
   event.trackingReport={fingerprint,baselineSha256:bundle.baselineSha256,resultSha256:bundle.resultSha256,policy:bundle.policy,candidate,health:bundle.health,generatedAt:at}
   event.skill='ship-health-score';event.generatedBy='fixed-baseline-analysis'

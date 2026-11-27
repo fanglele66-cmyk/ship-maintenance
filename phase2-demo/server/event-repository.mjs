@@ -4,6 +4,7 @@ import {join,resolve} from 'node:path'
 import {people} from '../src/workflow/lifecyclePermissions.js'
 import {eventTitle} from '../src/workflow/eventTitle.js'
 import {restoreHistoricalPhotoSources} from '../src/workflow/reportSubmissions.js'
+import {exportReportFiles} from './report-artifacts.mjs'
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
 const copy=value=>JSON.parse(JSON.stringify(value))
 export const canSeeEvent=(event,user)=>user?.workflowRole==='captain'||event.participants?.includes(people[user?.workflowRole])
@@ -52,10 +53,17 @@ export async function createEventRepository(directory){
  const list=()=>db.prepare('SELECT id FROM events ORDER BY updated DESC').all().map(row=>get(row.id))
  const pending=new Map()
  function folder(id){if(!/^[\w-]{1,240}$/.test(id))throw Error('事件编号无效。');return join(directory,'events',id)}
+ async function syncReportFiles(event){
+  // This is a rebuildable projection of the committed event. A file system
+  // error must not report a failed submission after its revision was saved.
+  try{await exportReportFiles(folder(event.id),event)}
+  catch(error){console.warn('独立报告文件未同步，将在再次保存或启动时重试。',event.id,error.code||error.name)}
+ }
  async function exportEvent(event){
   const dir=folder(event.id);await mkdir(dir,{recursive:true})
   const files={'event.json':event,'evidence.json':{scope:event.sensorScope||{},sensors:event.manualReport?.evidence||event.detectionReport?.evidence||[]},'analysis.json':event.manualReport?.analysis||event.detectionReport||event.brief,'tasks.json':event.tasks,'reports.json':event.reports,'conversations.json':{event:event.conversations,tasks:event.tasks.map(t=>({id:t.id,conversations:t.conversations}))}}
   for(const [name,value] of Object.entries(files)){const path=join(dir,name);await writeFile(path+'.tmp',JSON.stringify(value,null,2),'utf8');await rename(path+'.tmp',path)}
+  await syncReportFiles(event)
  }
  function save(event,{expected,user}={}){
   const operation=(pending.get(event.id)||Promise.resolve()).catch(()=>{}).then(async()=>{
@@ -69,6 +77,9 @@ export async function createEventRepository(directory){
  }
  // One-time title-only upgrade for existing events. Keep evidence, notes and
  // conversations intact, and export the same revision to the event folder.
- for(const event of list())if(eventTitle(event.title,event.type)!==event.title)await save({...event,title:eventTitle(event.title,event.type)},{expected:event.serverRevision})
+ for(const event of list()){
+  if(eventTitle(event.title,event.type)!==event.title)await save({...event,title:eventTitle(event.title,event.type)},{expected:event.serverRevision})
+  else await syncReportFiles(event)
+ }
  return {db,get,list,save,folder,async close(){await Promise.allSettled([...pending.values()]);db.close()}}
 }

@@ -17,6 +17,8 @@ export const useSensorStore = defineStore('sensor', () => {
   const simulationConfig = reactive({ ...simulationDefaults })
   const simulationSensors = buildSimulationSensors(mockSensors)
   const sampledAt = ref(Date.now())
+  const simulationSampledAt = ref(sampledAt.value)
+  let readingFailed = false
   const localData = ref(null)
   const localError = ref('正在连接本地数据服务')
   const health = ref(null)
@@ -30,13 +32,13 @@ export const useSensorStore = defineStore('sensor', () => {
     return true
   }
 
-  function buildAllSensors(nowTs = sampledAt.value) {
+  function buildAllSensors(nowTs = simulationSampledAt.value) {
     const simulated = simulationSensors
       .filter(isSimulatedDeviceSensor)
       .map((s) => simulationSample(s, nowTs, simulationConfig))
     const configured = buildConfiguredDeviceSensors(
       shipConfigStore.config?.devices || [],
-      localData.value?.points,
+      readingFailed ? [] : localData.value?.points,
       shipConfigStore.template
     )
     const speedEntry = localData.value
@@ -44,9 +46,9 @@ export const useSensorStore = defineStore('sensor', () => {
           id: 'ship-speed',
           nameCn: '航速',
           deviceId: 'ship',
-          value: localData.value.speed,
+          value: readingFailed ? null : localData.value.speed,
           unit: 'kn',
-          status: localData.value.speed === null ? 'unknown' : 'normal',
+          status: readingFailed || localData.value.speed === null ? 'unknown' : 'normal',
           sourceKind: localData.value.source
         }]
       : []
@@ -57,14 +59,13 @@ export const useSensorStore = defineStore('sensor', () => {
   const localChronology = computed(() => localData.value?.chronology || { periods: [], source: '本地数据库', markdown: '' })
 
   function syncConfiguredSensors() {
-    allSensors.value = buildAllSensors(sampledAt.value)
+    allSensors.value = buildAllSensors()
   }
 
   watch(
     () => shipConfigStore.config,
     () => {
       syncConfiguredSensors()
-      retainSamples()
     },
     { deep: true }
   )
@@ -81,17 +82,21 @@ export const useSensorStore = defineStore('sensor', () => {
       )
       if (!responses[0].ok) throw Error('本地数据不可用，请检查后端与数据副本。')
       const data = await responses[0].json()
+      readingFailed = false
       localData.value = data
-      sampledAt.value = data.sampledAt || Date.now()
-      allSensors.value = buildAllSensors(sampledAt.value)
+      if (Number.isFinite(data.sampledAt)) sampledAt.value = data.sampledAt
+      allSensors.value = buildAllSensors()
       localError.value = data.exhausted
         ? '历史回放数据已用尽，请准备新的数据副本。'
         : !data.fresh
           ? '当前数据存在缺口，等待下一条采样。'
           : ''
       if (responses[1].ok) health.value = await responses[1].json()
-      retainSamples()
+      if (Number.isFinite(data.sampledAt) && data.fresh) {
+        retainSamples(localFrames, data.sampledAt, allSensors.value.filter(isLocalSensor))
+      }
     } catch (error) {
+      readingFailed = true
       localError.value = error.message
       allSensors.value = allSensors.value.map((s) => (isLocalSensor(s) ? { ...s, value: null, status: 'unknown' } : s))
     } finally {
@@ -107,17 +112,16 @@ export const useSensorStore = defineStore('sensor', () => {
 
   // Retain only samples actually emitted in this session. Never regenerate a
   // past repair window from today's simulator baseline.
-  const sampledFrames = []
-  function retainSamples() {
+  const localFrames = [], simulationFrames = []
+  function retainSamples(sampledFrames, timestamp, sensors) {
     const frame = {
-      timestamp: sampledAt.value,
-      values: Object.fromEntries(allSensors.value.map((sensor) => [sensor.id, sensor.value]))
+      timestamp,
+      values: Object.fromEntries(sensors.map((sensor) => [sensor.id, sensor.value]))
     }
     if (sampledFrames.at(-1)?.timestamp === frame.timestamp) sampledFrames[sampledFrames.length - 1] = frame
     else sampledFrames.push(frame)
     while (sampledFrames.length && sampledFrames[0].timestamp < frame.timestamp - 72 * 3600000) sampledFrames.shift()
   }
-  retainSamples()
 
   function recordedSensorChannels(ids, start, end = Date.now()) {
     return ids.map((id) => {
@@ -127,7 +131,7 @@ export const useSensorStore = defineStore('sensor', () => {
         name: sensor?.nameCn || id,
         unit: sensor?.unit || '',
         sourceKind: sensor?.sourceKind || 'prototype',
-        trendData: sampledFrames
+        trendData: (isLocalSensor(sensor) ? localFrames : simulationFrames)
           .filter((frame) => frame.timestamp >= start && frame.timestamp <= end)
           .map((frame) => ({
             timestamp: frame.timestamp,
@@ -139,8 +143,10 @@ export const useSensorStore = defineStore('sensor', () => {
 
   let timer = null
   function refreshSimulation() {
-    allSensors.value = buildAllSensors(Date.now())
-    retainSamples()
+    const at = Date.now()
+    simulationSampledAt.value = at
+    allSensors.value = buildAllSensors(at)
+    retainSamples(simulationFrames, at, allSensors.value.filter(isSimulatedDeviceSensor))
   }
 
   function setSimulationBaselines(updates) {
@@ -203,11 +209,11 @@ export const useSensorStore = defineStore('sensor', () => {
     if (id === 'ship-speed' || id === 'main-load') return []
     const sensor = simulationSensors.find((s) => s.id === id)
     if (!sensor) return []
-    const cutoff = Math.min(end ?? sampledAt.value, sampledAt.value)
+    const cutoff = Math.min(end ?? simulationSampledAt.value, simulationSampledAt.value)
     const from = start ?? cutoff - hours * 3600000
     const data = from > cutoff ? [] : simulationTrend(sensor, from, cutoff, { ...simulationConfig, enabled: true }, maxPoints)
     const latest = allSensors.value.find((s) => s.id === id)
-    if (data.length && cutoff === sampledAt.value && latest) data[data.length - 1].value = latest.value
+    if (data.length && cutoff === simulationSampledAt.value && latest) data[data.length - 1].value = latest.value
     return data
   }
 

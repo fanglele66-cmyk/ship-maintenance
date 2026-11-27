@@ -35,7 +35,8 @@ test('captain decides origins before dispatch; assignment is unique, traceable a
  const canonical={...store,eventStatus:{'real-alarm-0430':'closed'}}
  assert.equal(workbenchIssues(canonical).find(i=>i.id==='real-alarm-0430').state,'已闭环')
  assert.equal(activeWorkbenchIssues(canonical).some(i=>i.id==='real-alarm-0430'),false,'closed item is retained only in device lookup')
- assert.equal(activeWorkbenchIssues(store).some(i=>i.id==='real-health-c4-baseline'),false,'recorded ignore decision is not a pending item')
+ const tracked=activeWorkbenchIssues(store).find(i=>i.id==='real-health-c4-baseline')
+ assert.equal(tracked.state,'已记录决定','declining this recommendation keeps the original tracking event open without a pending decision')
  for(const item of activeWorkbenchIssues(store).filter(i=>i.state==='待决策'))store.createTodo(item.decisionId||item.id)
  assert.equal(activeWorkbenchIssues(store).filter(i=>i.state==='待决策').length,0,'all-dispatched empty state has no pending rows')
  assert.ok(activeWorkbenchIssues(store).filter(i=>i.state==='已派发').length>0)

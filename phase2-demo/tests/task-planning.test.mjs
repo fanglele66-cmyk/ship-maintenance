@@ -66,5 +66,6 @@ test('plan API receives first-round findings, rejects wrong role or branch, retu
   let code,result;await handler(req,{set statusCode(v){code=v},setHeader(){},end(text){result=JSON.parse(text)}},()=>assert.fail());assert.equal(code,expected);if(expected===200)assert.equal(result.plan.scope,generated.scope);else assert.equal(result.plan,undefined)
  }
  assert.equal(calls,1);const context=JSON.parse(modelInput.messages[0].content);assert.ok(context.event.tasks[0].records.every(r=>r.result==='未见异常'));assert.ok(context.event.reports[0].markdown);assert.match(modelInput.system,/不要原样重复/)
+ assert.match(modelInput.system,/name: ship-event-workflow/)
  assert.equal(taskPlanKey(event),event.pendingPlan.key)
 })

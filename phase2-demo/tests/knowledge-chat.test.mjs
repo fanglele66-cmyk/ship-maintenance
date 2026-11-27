@@ -41,6 +41,7 @@ test('knowledge backend retrieves real sources and does not need an event; blank
  let query='',payload,content='根据 [K1] 核对冷却水参数。';const frames=[]
  const options={configuration:{read:async()=>config},knowledge:{search:async q=>{query=q;return [{id:'K1',title:'操作规程',file:'concepts/操作规程.md',text:'检查冷却水温度。'}]}},emit:(kind,data)=>frames.push([kind,data]),fetcher:async(_url,request)=>{payload=JSON.parse(request.body);return new Response('data: '+JSON.stringify({choices:[{delta:{content},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}})}}
  const result=await answerKnowledge({text:'日常怎么预防？',scope:'主机',history:[{role:'user',text:'冷却系统'}]},options)
+ assert.match(payload.messages[0].content,/name: ship-knowledge-assistant/)
  assert.match(query,/冷却系统/);assert.match(result.answer,/冷却水/);assert.equal(result.sources[0].id,'K1');assert.ok(frames.some(([event])=>event==='text'));assert.match(JSON.stringify(payload),/不虚构参数/)
  content='';await assert.rejects(answerKnowledge({text:'问题'},options),/未返回|没有返回|文本|内容/)
 })

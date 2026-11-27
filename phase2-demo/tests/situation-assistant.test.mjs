@@ -22,5 +22,6 @@ test('situation chat uses voyage readings without event decisions or repair retr
  assert.equal(context.availableDecisions,undefined)
  assert.deepEqual(context.knowledge,[])
  assert.match(sent.system,/态势助手/)
+ assert.match(sent.system,/name: ship-situation-assistant/)
  assert.doesNotMatch(sent.system,/所有事件在排查报告回交后|讨论流程时以 availableDecisions/)
 })

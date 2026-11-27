@@ -24,7 +24,11 @@ export function shoreReportBasis(event,state={events:{[event.id]:event}},fields=
 
 export function shoreReportEntries(state){
  if(state.role!=='captain')return []
- return Object.values(state.events).flatMap(event=>(event.shore||[]).map(record=>({...shoreReportPresentation(record),id:record.id,kind:'上报岸基报告',eventId:event.id,eventNumber:event.number,at:record.at,owner:record.owner||'轮机长',status:'已上报岸基',title:record.syncedReport?.title||event.title+' · 上报岸基报告'}))).sort((a,b)=>String(b.at).localeCompare(String(a.at)))
+ return Object.values(state.events).flatMap(event=>(event.shore||[]).map(record=>shoreReportEntry(event,record))).sort((a,b)=>String(b.at).localeCompare(String(a.at)))
+}
+
+export function shoreReportEntry(event,record){
+ return {...shoreReportPresentation(record),id:record.id,kind:'上报岸基报告',eventId:event.id,eventNumber:event.number,at:record.at,owner:record.owner||'轮机长',status:'已上报岸基',title:record.syncedReport?.title||event.title+' · 上报岸基报告'}
 }
 
 // Upgrade only the presentation of older frozen packets, never read current event facts.

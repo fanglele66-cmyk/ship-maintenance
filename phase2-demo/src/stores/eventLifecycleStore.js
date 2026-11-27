@@ -2,6 +2,8 @@ import {createDecisionEditing} from '../workflow/decisionEditing.js'
 import {reportGenerationStatus} from '../workflow/reportGenerationState.js'
 import {createBackendWorkflowSync} from '../workflow/backendWorkflowSync.js'
 import {collectBrowserStepPhotos} from '../services/stepPhotoFiles.js'
+import {syncDemoReportFiles} from '../services/demoReportFiles.js'
+import {formalEventReports} from '../workflow/reportArtifacts.js'
 import {workflowStatus} from '../services/workflowStatus.js'
 import {auth,accountRequest,pruneDeletedEvents} from '../services/auth'
 import {assistTaskStep,applyTaskStepNote} from '../workflow/taskStepAssistance.js'
@@ -15,6 +17,7 @@ import {currentReportContext,reportTask,submissionContext,submissionSnapshot} fr
 import {defineStore} from 'pinia'
 import {reactive,computed,watch} from 'vue'
 import {createLifecycleState,visibleEvents,pendingDecision,activeTask,decide,askAssistant,people,refreshLifecyclePresentation,ensureTaskPlan} from '../workflow/eventLifecycle.js'
+import {useShipConfigStore} from './shipConfigStore'
 import {useSensorStore} from './sensorStore'
 import {syncLifecycleObservations} from '../workflow/lifecycleObservation.js'
 import {aiStreamRequest as rawAiRequest} from '../services/aiClient'
@@ -31,7 +34,6 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  let reportSession=crypto.randomUUID();try{reportSession=sessionStorage.getItem('engine-room-report-session')||reportSession;sessionStorage.setItem('engine-room-report-session',reportSession)}catch{}
  let storage;try{storage=localStorage}catch{}
  let initial=demoWorkspace(loadLifecycleState(storage,createLifecycleState))
- try{storage?.setItem(storageKey,lifecycleSnapshot(initial))}catch{}
  initial.role=auth.user?.workflowRole||'engineer'
  pruneDeletedEvents(initial)
  refreshLifecyclePresentation(initial)
@@ -58,7 +60,13 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
  watch(()=>sensors.sampledAt,syncObservations,{immediate:true})
  const snapshot=()=>lifecycleSnapshot(demoWorkspace(state))
  let lastStored=snapshot()
+ try{if(storage&&storage.getItem(storageKey)!==lastStored)storage.setItem(storageKey,lastStored)}catch{}
  watch(()=>[state.events,state.notices],()=>{const value=snapshot();if(value!==lastStored)try{lastStored=value;localStorage.setItem(storageKey,value)}catch{}},{deep:true})
+ if(!import.meta.env?.SSR&&storage){
+  watch(()=>Object.values(state.events).filter(event=>!event.backendManaged).flatMap(formalEventReports),()=>{
+   void syncDemoReportFiles(storage).catch(error=>console.warn('演示报告文件归档失败。',error.message))
+  },{deep:true,immediate:true,flush:'post'})
+ }
  watch(()=>auth.deletedIds,()=>pruneDeletedEvents(state))
  // Real events synchronize via their server revisions, never another tab's cache.
  window.addEventListener('storage',event=>{
@@ -73,14 +81,16 @@ export const useEventLifecycleStore=defineStore('event-lifecycle',()=>{
    lastStored=lifecycleSnapshot(demoWorkspace(incoming));state.timeBase=incoming.timeBase;state.events=incoming.events;state.notices=incoming.notices||[]
   }catch{}
  })
+ const shipConfiguration=useShipConfigStore()
  const anomalyRequests=new Map()
  function reportAnomaly(form,requestId,onProgress){
   if(anomalyRequests.has(requestId))return anomalyRequests.get(requestId)
   if(state.events['manual-'+requestId])return Promise.resolve(state.events['manual-'+requestId])
-  const report=validateAnomalyReport(form,state.role)
+  const pointCatalog=shipConfiguration.reportCatalog
+  const report=validateAnomalyReport(form,state.role,Date.now(),pointCatalog)
   report.submittedAt=new Date().toISOString()
   report.evidence=reportEvidence(report,sensors.recordedSensorChannels(report.sensorIds,Date.parse(report.start),Date.parse(report.end)))
-  const run=(async()=>{try{const result=await aiStreamRequest({mode:'manual-anomaly',requestId,text:report.description,role:report.submitter.role,report},onProgress||(()=>{}));if(result.event){backend.accept(result.event);return state.events[result.event.id]}return createManualAnomaly(state,report,result,requestId)}finally{anomalyRequests.delete(requestId)}})()
+  const run=(async()=>{try{const result=await aiStreamRequest({mode:'manual-anomaly',requestId,text:report.description,role:report.submitter.role,report},onProgress||(()=>{}));if(result.event){backend.accept(result.event);return state.events[result.event.id]}return createManualAnomaly(state,report,result,requestId,{pointCatalog})}finally{anomalyRequests.delete(requestId)}})()
   anomalyRequests.set(requestId,run);return run
  }
  const shoreReports=computed(()=>shoreReportEntries(state))

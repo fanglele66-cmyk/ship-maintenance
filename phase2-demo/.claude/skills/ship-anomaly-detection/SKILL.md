@@ -14,3 +14,11 @@ description: 启动时及每小时检测最近六小时主机数据，整理检�
 正常使用实时研判语气，不向使用者解释复刻、回放等工程实现。未取得的业务证据如实保留待确认。不得虚构读数或确定维修参数。
 
 事件 title 仅描述设备、测点和异常现象，不带“待核实”“待核查”等状态后缀；证据缺口和未确认的原因保留在分析及待核实事项中。
+
+## 研判与交付
+
+研判输入为 `report`、服务端拉取的 `evidence`、`detection.devices[].events[]` 和检索到的 `knowledge`。用信号的起止时间、通道、测点和同窗测量解释现象；核对转速、负荷及数据覆盖后再列可能原因。只依据本次取得的知识来源拟定检查。缺少工况或采样时，将具体缺口写入 `unverified`。算法分数不作故障概率。
+
+模型只返回一个 JSON 对象，包含 `title`、`summary`、`interpretation`、`unverified`、`recommendation` 与 `steps[]`。每步给出 `label`、`guide`、`checks[]`、`recordHint`。前端用这组字段显示初始分析、待核实项和待派排查方案。身份、状态、时间、证据、去重及报告归档由应用写入。例见 [周期研判候选](template/ship2-analysis.example.json)。
+
+每轮目录内 `sensor-raw-data.json` 是采样输入，`detection.json` 是算法输出，`receipt.json` 记录完成时间、行数和本轮关联的事件 ID。比较不同轮次时以设备、通道、事件类型和测点集合识别同一信号；同一未闭环事件只更新最新信号及检查时间。只有当前点表能映射到实例的测点才可进入新事件。详情页读取 `detectionReport.analysis`、`evidence` 与 `brief.discovery`；已有操作记录保存在对应事件中。

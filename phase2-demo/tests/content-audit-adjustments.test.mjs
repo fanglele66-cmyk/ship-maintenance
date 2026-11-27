@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {readFile,access} from 'node:fs/promises'
+import {readFile,readdir,access} from 'node:fs/promises'
 import {createHash} from 'node:crypto'
 import {knowledgeDocs,DOC_TYPE_STATS} from '../src/mock/knowledge.js'
 import {maintenancePortCalls,availableMaintenanceWindows} from '../src/workflow/maintenancePlans.js'
@@ -11,9 +11,15 @@ import {reportMarkdown} from '../src/workflow/reportPresentation.js'
 import {finishObservation} from '../src/workflow/observationReports.js'
 
 test('all imported knowledge pages retain their source bytes, unique bodies and valid local links',async()=>{
- assert.equal(knowledgeDocs.length,61)
- assert.equal(DOC_TYPE_STATS['全部类型'],61)
- assert.equal(new Set(knowledgeDocs.map(d=>d.chapterHTML)).size,61)
+ const directories=['chapters','concepts','sources']
+ const sourcePaths=(await Promise.all(directories.map(async folder=>{
+  const entries=await readdir(new URL('../wiki_rt-flex50/'+folder+'/',import.meta.url))
+  return entries.filter(name=>name.endsWith('.md')).map(name=>'wiki_rt-flex50/'+folder+'/'+name)
+ }))).flat().sort()
+ assert.ok(sourcePaths.length>0)
+ assert.deepEqual(knowledgeDocs.map(d=>d.sourcePath).sort(),sourcePaths)
+ assert.equal(DOC_TYPE_STATS['全部类型'],sourcePaths.length)
+ assert.equal(new Set(knowledgeDocs.map(d=>d.chapterHTML)).size,sourcePaths.length)
  const ids=new Set(knowledgeDocs.map(d=>d.id)),images=new Set()
  for(const doc of knowledgeDocs){
   const original=await readFile(new URL('../'+doc.sourcePath,import.meta.url)),published=await readFile(new URL('../public/'+doc.sourcePath,import.meta.url))
@@ -23,7 +29,8 @@ test('all imported knowledge pages retain their source bytes, unique bodies and 
   for(const [,id] of doc.chapterHTML.matchAll(/href="\/#\/knowledge\?doc=([^"]+)"/g))assert.ok(ids.has(id),doc.title+' → '+id)
   for(const [,url] of doc.chapterHTML.matchAll(/<img src="([^"]+)"/g)){images.add(url);await access(new URL('../public'+decodeURI(url),import.meta.url))}
  }
- assert.equal(images.size,190)
+ const manifest=JSON.parse(await readFile(new URL('../docs/审查附件-20261104/wiki导入清单.json',import.meta.url),'utf8'))
+ assert.equal(images.size,manifest.images)
 })
 
 test('formal maintenance windows are available in January and February 2027',()=>{

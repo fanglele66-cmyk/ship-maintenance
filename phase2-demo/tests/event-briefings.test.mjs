@@ -25,7 +25,7 @@ test('initial cases retain their cutoff and never use later repair or human clos
  assert.equal(warning.evidenceCutoff,'2026-05-23 21:28:40')
  assert.equal(tracking.evidenceCutoff,'2026-08-12 11:39:59')
  assert.equal(alarm.discovery.kind,'ship-alarm')
- assert.equal(warning.discovery.kind,'ai-data-analysis')
+ assert.equal(warning.discovery.kind,'ai-warning')
  assert.equal(tracking.discovery.kind,'ai-data-analysis')
  assert.doesNotMatch(JSON.stringify(alarm),/严重卡阻|更换ICU并|喷油器喷嘴破裂|12:26|11:38|5月1日/)
  assert.doesNotMatch(JSON.stringify(warning),/密封垫老化|临时修复测试正常|HRD-FA|2026-06-09/)

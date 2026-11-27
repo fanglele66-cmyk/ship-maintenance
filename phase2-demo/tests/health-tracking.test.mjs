@@ -50,3 +50,22 @@ test('unknown sensors, future windows, mismatched units and invalid curves canno
  for(const alter of [b=>b.candidates[0].pointCode='unknown',b=>b.candidates[0].unit='MPa',b=>b.candidates[0].end='2099-01-01',b=>b.candidates[0].series[1].timestamp=1,b=>b.candidates[0].latest.health_score=null,b=>b.candidates.push(copy(b.candidates[0]))]){const b=input();alter(b);assert.throws(()=>buildTrackingEvents(b))}
  assert.deepEqual(buildTrackingEvents({...input(),candidates:[]}),[])
 })
+
+test('historical pressure candidates retain the scoring unit and publish comparable display evidence',()=>{
+ const value=input(),candidate=value.candidates[0]
+ candidate.pointCode='DC0006'
+ for(const [unit,reading] of [['MPa',0.62],['bar',6.2]]){
+  candidate.unit=unit
+  for(const row of candidate.series)row.raw_value=reading
+  const [event]=buildTrackingEvents(value)
+  assert.equal(event.trackingReport.candidate.latest.raw_value,reading)
+  assert.equal(event.detectionReport.healthTracking.unit,unit)
+  const [evidence]=event.detectionReport.evidence
+  assert.equal(evidence.unit,'bar')
+  assert.deepEqual(evidence.trendData.map(p=>p.value),[6.2,6.2,6.2])
+ }
+ for(const unit of ['kPa','',undefined]){
+  candidate.unit=unit
+  assert.throws(()=>buildTrackingEvents(value),/单位/)
+ }
+})

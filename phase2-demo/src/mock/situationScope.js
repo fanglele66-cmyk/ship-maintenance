@@ -4,7 +4,7 @@ export const situationDeviceOptions = [
   {value:'aux-system',label:'辅机'},
 ]
 export const situationDeviceIds = ['main-engine-1','aux-system','aux-engine-1']
-export const matchesSituationDevice = (item,deviceId) => !deviceId || (deviceId==='aux-system'?String(item.deviceId||item.id).startsWith('aux-engine-'): (item.deviceId||item.id)===deviceId)
+export const matchesSituationDevice = (item,deviceId) => !deviceId || (item.deviceId||item.id)===deviceId || (deviceId==='aux-system' && String(item.deviceId||item.id).startsWith('aux-engine-'))
 export const inSituationScope = item => situationDeviceIds.includes(item.deviceId || item.id)
 // Schematic entry points, not surveyed physical installation coordinates.
 export const situationPositions = {

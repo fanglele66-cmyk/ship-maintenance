@@ -3,6 +3,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLifecycleState,decide,submitTask,currentTask,ensureTaskPlan,decisionOptions,people,pendingDecision} from '../src/workflow/eventLifecycle.js'
 import {generateTaskReport} from '../src/workflow/taskReportGeneration.js'
+import {preferredTaskAction,taskRecommendation} from '../src/workflow/contentRecommendations.js'
+import {lifecycleModelContext} from '../src/workflow/lifecycleModelContext.js'
+import {createAiHandler} from '../server/ai-api.mjs'
+import {Readable} from 'node:stream'
 import {acceptTaskPlan} from '../src/workflow/taskPlanning.js'
 import {taskExecution} from '../src/workflow/taskExecution.js'
 import {lifecycleWorkItems,lifecycleNotifications} from '../src/workflow/lifecycleWorkItems.js'
@@ -14,9 +18,114 @@ const id='real-alarm-0430',deadline=()=>new Date(Date.now()+86400000).toISOStrin
 function dispatch(state,action){state.role='captain';const event=state.events[id];event.decisionDraft={action};const plan=ensureTaskPlan(event);decide(state,id,{action,reason:plan.scope,owner:people.engineer,deadline:deadline()});return currentTask(event)}
 function finish(state,summary='本轮执行完成，原报警未复现。'){state.role='engineer';const task=currentTask(state.events[id]);task.draft.summary=summary;return submitTask(state,id,task.id)}
 function repair(partial=false){const state=createLifecycleState();let task=dispatch(state,'investigate');task.draft.records.forEach(r=>r.result='发现异常');finish(state);task=dispatch(state,'repair');task.draft.records.forEach(r=>r.result='已完成');if(partial){task.draft.records.at(-1).result='未完成';task.draft.records.at(-1).note='尚不具备稳态试航条件，留待恢复航行后复测。'}finish(state);state.role='captain';return {state,event:state.events[id],task}}
+
+test('submitted step choices drive the repair and observation recommendations even without notes',()=>{
+ const state=createLifecycleState(),event=state.events[id]
+ const investigation=dispatch(state,'investigate')
+ investigation.draft.records.forEach((row,i)=>{row.result=i===0?'发现异常':'未见异常'})
+ const checkReport=finish(state,'')
+ assert.equal(investigation.summarySource,'records')
+ assert.equal(preferredTaskAction(event,investigation),'repair')
+ assert.match(taskRecommendation(event,investigation).next,/维修/)
+ assert.match(checkReport.analysisMarkdown.split('### AI建议').at(-1),/维修/)
+ assert.match(event.conversations.captain.at(-1).analysis,/维修/)
+ assert.equal(event.tasks.length,1)
+
+ const work=dispatch(state,'repair')
+ work.draft.records.forEach(row=>{row.result='已完成'})
+ const workReport=finish(state,'')
+ assert.equal(work.summarySource,'records')
+ assert.ok(work.records.every(row=>!row.note))
+ assert.equal(preferredTaskAction(event,work),'observe')
+ assert.match(taskRecommendation(event,work).next,/效果观察/)
+ assert.match(workReport.analysisMarkdown.split('### AI建议').at(-1),/效果观察/)
+ assert.match(event.conversations.captain.at(-1).analysis,/效果观察/)
+ assert.equal(event.phase,'review')
+ assert.equal(event.tasks.length,2)
+ state.role='captain'
+ decide(state,id,{action:'close',reason:'轮机长已审阅回交记录，另行组织周期复核。'})
+ assert.equal(event.phase,'closed')
+})
+
+test('incomplete, inapplicable or inconclusive records cannot earn the fully performed task preference',()=>{
+ const check=createLifecycleState(),investigation=dispatch(check,'investigate')
+ investigation.draft.records.forEach((row,i)=>{row.result=i===0?'发现异常':'无法确认'})
+ investigation.draft.records.at(-1).executionStatus='未完成'
+ assert.equal(preferredTaskAction(check.events[id],investigation),null)
+ finish(check,'')
+ assert.equal(preferredTaskAction(check.events[id],investigation),null)
+
+ for(const situation of ['未完成','不适用','条件受阻']){
+  const state=createLifecycleState(),event=state.events[id],first=dispatch(state,'investigate')
+  first.draft.records.forEach(row=>{row.result='发现异常'})
+  finish(state,'')
+  const work=dispatch(state,'repair')
+  work.draft.records.forEach(row=>{row.result=situation==='不适用'?'不适用':'已完成'})
+  if(situation==='未完成')work.draft.records.at(-1).result='未完成'
+  if(situation==='条件受阻')work.draft.records.at(-1).note='因等待备件，复装尚未实施。'
+  finish(state,'')
+  assert.equal(preferredTaskAction(event,work),null,situation)
+  assert.doesNotMatch(taskRecommendation(event,work).next,/(?:转入|安排|进入)效果观察/,situation)
+ }
+})
+
+test('an executed but inconclusive check does not cancel an abnormal finding in a different completed step',()=>{
+ const state=createLifecycleState(),event=state.events[id],task=dispatch(state,'investigate')
+ task.draft.records.forEach((row,i)=>{
+  row.result=i===0?'发现异常':'无法确认'
+  if(i)row.executionStatus='已完成'
+ })
+ finish(state,'')
+ assert.equal(taskExecution(task).incomplete,false)
+ assert.equal(preferredTaskAction(event,task),'repair')
+})
+
+test('the report model and captain event chat receive the preferred legal action for the current submission',async()=>{
+ const state=createLifecycleState(),event=state.events[id]
+ const patch={summary:'已记录本轮选择。',analysis:{evidence:'依据逐项结果。',interpretation:'以回交范围为准。',unverified:'效果待验证。',next:'请轮机长审核。'}}
+ let payload
+ const handler=createAiHandler(process.cwd(),{
+  configuration:{read:async()=>({source:'manual',baseUrl:'https://example.test',apiKey:'test',model:'test',protocol:'anthropic',enabled:true,knowledgeEnabled:false,maxTokens:2000,timeoutMs:5000})},
+  fetcher:async(_url,options)=>{
+   payload=JSON.parse(JSON.parse(options.body).messages.at(-1).content)
+   return Response.json({model:'test',content:[{type:'text',text:JSON.stringify(patch)}],usage:{input_tokens:50,output_tokens:10}})
+  }
+ })
+ async function request(input){
+  payload=null
+  const req=Readable.from([JSON.stringify(input)])
+  Object.assign(req,{url:'/api/ai/chat',method:'POST',socket:{remoteAddress:'127.0.0.1'},headers:{host:'localhost:5173','x-engine-room-client':'local-ui'}})
+  let output
+  const res={setHeader(){},end(text){output=JSON.parse(text)}}
+  await handler(req,res,()=>assert.fail('request fell outside AI handler'))
+  assert.equal(res.statusCode,200,output?.error)
+  return output
+ }
+ function ask(task){
+  const context=lifecycleModelContext(event,'captain',{taskId:task?.id})
+  if(task)context.taskContext={title:task.title,scope:task.scope,owner:task.owner}
+  return request({mode:'chat',role:'captain',text:'本轮建议如何处理？',event:context})
+ }
+ for(const [action,expected] of [['investigate','repair'],['repair','observe']]){
+  const task=dispatch(state,action)
+  task.draft.records.forEach((r,i)=>{r.result=action==='repair'?'已完成':i===0?'发现异常':'未见异常'})
+  state.role='engineer'
+  await generateTaskReport(state,id,task.id,request)
+  assert.equal(payload.preferredDecision,expected,'submit-report')
+  assert.ok(payload.availableDecisions.some(option=>option.value===expected))
+  await ask()
+  assert.equal(payload.preferredDecision,expected,'event chat')
+  assert.ok(payload.availableDecisions.some(option=>option.value===expected))
+  await ask(task)
+  assert.ok(!Object.hasOwn(payload,'preferredDecision'),'task-only chat')
+  event.decisionDraft={action:'close'}
+  await ask()
+  assert.ok(!Object.hasOwn(payload,'preferredDecision'),'captain has chosen another available action')
+ }
+})
 test('4.1 unknown cause report streams from actual feedback and separates facts from AI interpretation',async()=>{
  const state=createLifecycleState(),task=dispatch(state,'investigate');task.draft.records.forEach(r=>{r.result='未见异常';r.note='已核对本项记录，当前未复现。'});task.draft.summary='检查已完成，原因尚不能确认。';state.role='engineer'
- let calls=0;const report=await generateTaskReport(state,id,task.id,async(body,on)=>{calls++;assert.match(body.text,/现场事实和AI分析建议分开/);assert.equal(body.event.tasks[0].summary,task.summary);on('report',{patch:{summary:'检查已完成',analysis:{}}});assert.equal(state.events[id].reports.length,0);return {model:'test',patch:{summary:'检查已完成，原因尚不能确认。',analysis:{evidence:'两项核查已完成，未复现异常。',interpretation:'不能据此定位故障原因。',unverified:'故障原因与复发条件待核实。',next:'交轮机长决定继续观察或补充检查。'}},usage:{inputTokens:90,outputTokens:80}}})
+ let calls=0;const report=await generateTaskReport(state,id,task.id,async(body,on)=>{calls++;assert.match(body.text,/现场事实和AI分析建议分开/);assert.equal(body.event.tasks[0].summary,task.summary);const [factReport]=state.events[id].reports;assert.deepEqual(factReport.submissionSnapshot.records,task.records);on('report',{patch:{summary:'检查已完成',analysis:{}}});assert.deepEqual(state.events[id].reports.map(r=>r.id),[factReport.id]);return {model:'test',patch:{summary:'检查已完成，原因尚不能确认。',analysis:{evidence:'两项核查已完成，未复现异常。',interpretation:'不能据此定位故障原因。',unverified:'故障原因与复发条件待核实。',next:'交轮机长决定继续观察或补充检查。'}},usage:{inputTokens:90,outputTokens:80}}})
  assert.equal(calls,1);assert.equal(taskExecution(task).incomplete,false);assert.match(report.markdown,/现场事实（执行人原始记录）/);assert.match(report.markdown,/AI分析与建议/);assert.match(report.markdown,/原因尚不能确认/);assert.equal(state.events[id].phase,'decision');assert.ok(pendingDecision(state.events[id]))
 })
 test('4.7 skipped repair is in report, captain options and the next dispatch; model cannot erase it',()=>{

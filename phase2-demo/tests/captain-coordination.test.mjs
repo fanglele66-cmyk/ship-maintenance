@@ -136,7 +136,7 @@ test('captain summaries distinguish fleet decisions from assigned task execution
       const {default:Component}=await server.ssrLoadModule('/src/components/CaptainIssueDetail.vue')
       const render=async tab=>{const app=createSSRApp(Component,{scenario:alarm});app.use(pinia);app.provide(routerKey,{push(){}});app.provide(routeLocationKey,{query:{tab},path:'/situation/issue/'+alarm});return renderToString(app)}
       assert.doesNotMatch(await render('事件概览'),/>查看研判分析<|>查看证据资料</)
-      const html=await render('处置记录')
+      const html=await render('效果观察')
       assert.doesNotMatch(html,/接续效果观察与闭环确认|查看原始依据与执行材料|现场验收已提交，尚缺可比记录/)
       assert.match(html,/保留真实措施正文/)
       assert.match(html,/保留真实验收正文/)

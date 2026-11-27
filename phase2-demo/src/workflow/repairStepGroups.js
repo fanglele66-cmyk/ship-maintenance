@@ -3,17 +3,24 @@ export const repairFeedbackVersion=1
 const clone=value=>JSON.parse(JSON.stringify(value))
 
 // Combine contiguous operations, retaining every method and record requirement.
-export function groupRepairSteps(steps){
+export function groupRepairSteps(steps,maxChildren=Infinity){
  if(steps.length<=maxRepairFeedbackSteps)return clone(steps)
  const execution=steps.findIndex((s,i)=>i>0&&/标识|拆|实施|修复|清洁|处理|更换|检修|送修/.test(s.label)&&!/核对|范围|隔离|准备/.test(s.label))
  const restoration=steps.findIndex((s,i)=>i>execution&&/复装|恢复|试验|复测|试运行|验证/.test(s.label)&&!/交接|整理/.test(s.label))
  const handoff=steps.findIndex((s,i)=>i>restoration&&/交接|汇总|报告|整理|观察/.test(s.label))
- const semantic=execution>0&&restoration>execution&&handoff>restoration
- const bounds=semantic?[0,execution,restoration,handoff,steps.length]:[0,1,2,3,steps.length]
+ let semantic=execution>0&&restoration>execution&&handoff>restoration
+ let bounds=semantic?[0,execution,restoration,handoff,steps.length]:[0,1,2,3,steps.length]
+ const rebalance=steps.length<=maxRepairFeedbackSteps*maxChildren&&bounds.some((end,i)=>i>0&&end-bounds[i-1]>maxChildren)
+ if(rebalance){
+  // A flat model response can fit four cards even when the detected phase boundaries cannot.
+  bounds=Array.from({length:maxRepairFeedbackSteps+1},(_,i)=>Math.ceil(i*steps.length/maxRepairFeedbackSteps))
+  semantic=false
+ }
  const labels=['作业准备与安全隔离','实施维修与过程记录','复装与分阶段试验','交接与效果观察']
  return bounds.slice(0,-1).map((start,i)=>{
   const substeps=clone(steps.slice(start,bounds[i+1]))
-  return {label:semantic?labels[i]:i<3?substeps[0].label:'后续作业与复核',guide:substeps.length>1?'按以下顺序完成本项作业，再统一填写本项结果；未完成或不适用的子项请在备注中注明。':substeps[0].guide,checks:[],recordHint:substeps.map(s=>`${s.label}：${s.recordHint||'记录实际措施与结果。'}`).join('\n'),options:['已完成','未完成','不适用'],substeps,sourceIndices:Array.from({length:bounds[i+1]-start},(_,n)=>start+n)}
+  const label=semantic?labels[i]:i<3||rebalance?substeps[0].label:'后续作业与复核'
+  return {label,guide:substeps.length>1?'按以下顺序完成本项作业，再统一填写本项结果；未完成或不适用的子项请在备注中注明。':substeps[0].guide,checks:[],recordHint:substeps.map(s=>`${s.label}：${s.recordHint||'记录实际措施与结果。'}`).join('\n'),options:['已完成','未完成','不适用'],substeps,sourceIndices:Array.from({length:bounds[i+1]-start},(_,n)=>start+n)}
  })
 }
 

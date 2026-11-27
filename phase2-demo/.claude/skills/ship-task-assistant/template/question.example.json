@@ -1,0 +1,12 @@
+{
+  "kind": "question",
+  "text": "已记下接头外观的检查情况。",
+  "note": "已核对接头外观。",
+  "question": "现场示值和采集值是否一致？",
+  "choices": [
+    {"id": "matched", "label": "两者一致"},
+    {"id": "different", "label": "两者不一致"},
+    {"id": "unchecked", "label": "尚未比对"}
+  ],
+  "allowOther": true
+}

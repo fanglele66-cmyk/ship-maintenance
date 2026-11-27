@@ -54,16 +54,16 @@ export function trackingAssessment(event,task){
  const subject=(event.sourceEventId||event.id)==='real-health-c4-baseline'?'四缸相对排温基线下移':'一缸相对排温基线抬升'
  if(trackingNotSupported(event,task))return {
   scope:`本轮核实结论不支持“${subject}”。原月度相对偏差记录保留，按执行人提交的比较条件与核实理由重新评估原提醒。`,
-  interpretation:'本轮同工况核实未支持原趋势判断；该结论适用于已提交的比较时段，原月度记录仍保留。',
+  interpretation:`本轮同工况核实不支持“${subject}”。该结论适用于已提交的比较时段，原月度记录仍保留。`,
   next:taskRecommendation(event,task).next
  }
  if(confirmedTracking(event,task))return {
   scope:`本轮现场与系统对应，背景信息已记录，支持${subject}成立；尚未确认部件故障。`,
-  interpretation:'本轮测温与系统记录对应，背景核实支持相对变化成立；尚无喷油器或排气阀损坏的检验结论。',
+  interpretation:`本轮测温与系统记录对应，背景核实支持${subject}；尚无喷油器或排气阀损坏的检验结论。`,
   next:taskRecommendation(event,task).next
  }
  return {
-  scope:`本轮已回交${subject}核实资料，原因尚未确认。`,
+  scope:`本轮已回交${subject}核实资料，仍需核对可比工况和测温依据。`,
   interpretation:`现有回交资料尚未将${subject}与测温偏移或运行调整对应，原因仍未定位，不能据此确定故障部件。`,
   next:taskRecommendation(event,task).next
  }
@@ -133,5 +133,6 @@ export function adviceDetails(event,message,role){
  const records=submitted?(task.records||[]).filter(r=>isAbnormal(r)||isUnknown(r)).slice(0,2).map(r=>`- ${r.label}：${r.result}${r.note?'；'+shortSentence(r.note):''}`).join('\n'):''
  const sources=(event.brief.sources||[]).slice(0,2).map(s=>s.title+' · '+s.date).join('；')
  const gap=submitted?taskRecommendation(event,task).reason+'。':task?'本轮现场结果尚未提交。':'尚缺现场表计或独立校验记录。'
- return nonempty([c?.comparison,records||facts,'待核实：'+gap,sources?'来源：'+sources:''])
+ const crewSummary=submitted && task.summarySource==='executor' && task.summary ? '执行人提交：'+task.summary : ''
+ return nonempty([c?.comparison,records||facts,crewSummary,'待核实：'+gap,sources?'来源：'+sources:''])
 }

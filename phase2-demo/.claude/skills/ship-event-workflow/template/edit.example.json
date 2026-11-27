@@ -1,0 +1,11 @@
+{
+  "operations": [
+    {
+      "type": "update",
+      "step": 1,
+      "changes": {
+        "recordHint": "填写两处读数、单位和核对时间，注明当时是否用气。"
+      }
+    }
+  ]
+}

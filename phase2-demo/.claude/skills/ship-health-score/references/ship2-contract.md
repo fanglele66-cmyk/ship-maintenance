@@ -18,6 +18,8 @@
 
 每个候选包含 `pointCode/name/unit/start/end/zone/direction/validWindows/spanDays/latest/series`。序列时间为UTC毫秒，展示为北京时间。`latest`与序列末点必须对应窗口结束时间；缺测不可补零。历史跨转速分区时，基线曲线随对应分区显示，不将分区变化当作同工况漂移。
 
+导入时以模板点位表核对 `pointCode` 及 `unit`。有效候选的 `latest` 包含 `timestamp/raw_value/baseline_median/z/ewma/cusum_7d_area/cusum_30d_area/health_score`；页面可从 `trackingReport.candidate` 取得该窗末值及序列，从 `detectionReport.evidence[].trendData` 取得原始趋势。无候选时保留 `candidates: []` 与跳过原因，可查看评分结果而不用产生事件或报告。
+
 ## 事件页面
 
 `server/health-tracking.mjs`将候选转成现有事件模型：
